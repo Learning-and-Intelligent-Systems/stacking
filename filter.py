@@ -35,12 +35,6 @@ def make_objects(com_b):
                'object_b':object_b}
     return objects
 
-def render_state(cs, objects, vis=False):
-    # get contact state
-    ps = get_ps_from_contacts(cs, objects)
-    stable = render_objects(objects, ps, vis_frames=True, vis=vis, time_steps=200)
-    return stable
-
 def plot_particles(particles, weights):
     plt.ion()
     fig = plt.figure()
@@ -61,34 +55,44 @@ def plot_particles(particles, weights):
 true_com_b = Position(0., 0., 0.)
 true_objects = make_objects(true_com_b)
 
+T = 100     # number of steps to simulate per contact state
+I = 10      # number of contact states to try
+
 # make particles to estimate the COM of object b
-T = 10
-N = 100 # number of particles
-D = 3   # dimensions of a single particle
+N = 100     # number of particles
+D = 3       # dimensions of a single particle
 com_ranges = [(-true_objects['object_b'].dimensions.width/2, true_objects['object_b'].dimensions.width/2),
                 (-true_objects['object_b'].dimensions.length/2, true_objects['object_b'].dimensions.length/2),
                 (-true_objects['object_b'].dimensions.height/2, true_objects['object_b'].dimensions.height/2)]
 com_particles, weights = create_uniform_particles(N, D, com_ranges)
 
-for t in range(T):
+for i in range(I):
     # select action
     cs = cs_selection(true_objects)
+    init_pose = get_ps_from_contacts(cs, true_objects)
 
-    # take action and get observation
-    stable = render_state(cs, true_objects, vis=True)
-    print('true stability: ', stable)
+    # take action and get observations
+    obs_poses = render_objects(true_objects, init_pose, steps=T, vis=True)
 
-    # update particles
-    new_weights = []
-    for particle, old_weight in zip(com_particles, weights):
-        objects = make_objects(particle)
-        particle_stable = render_state(cs, objects)
-        new_weight = (particle_stable == stable)*old_weight
-        new_weights.append(new_weight)
-    weights_sum = sum(new_weights)
-    weights = np.divide(new_weights, weights_sum)
-    print(len(list(filter(lambda w: w > 0, weights))), 'particles remaining')
+    for t in range(1,T):
+        # get observation
+        obs_pose = obs_poses[t]
 
-    plot_particles(com_particles, weights)
+        # update particles
+        new_weights = []
+        for particle, old_weight in zip(com_particles, weights):
+            objects = make_objects(particle)
 
-    # in the future should resample/redistribute particles
+            # forward simulate particle
+            particle_pose = render_objects(objects, obs_poses[t-1], steps=1)
+            obj_pose = particle_pose[0]['object_b']
+            dist = np.linalg.norm(np.subtract(obj_pose, obs_pose['object_b']))
+            new_weight = dist*old_weight if dist < 0.01 else 0.0
+            new_weights.append(new_weight)
+        weights_sum = sum(new_weights)
+        weights = np.divide(new_weights, weights_sum)
+        print(len(list(filter(lambda w: w > 0, weights))), 'particles remaining')
+
+        plot_particles(com_particles, weights)
+
+        # in the future should resample/redistribute particles

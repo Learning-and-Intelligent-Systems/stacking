@@ -76,7 +76,7 @@ def object_to_urdf(object_name, object):
     object_urdf = odio_urdf.Robot(link_urdf)
     return object_urdf
 
-def render_objects(objects, obj_ps, time_steps=500, vis=False, vis_frames=False):
+def render_objects(objects, obj_ps, steps=500, vis=False, vis_frames=False):
     pybullet_server = PyBulletServer(vis)
     object_models = []
     for obj in obj_ps:
@@ -91,32 +91,22 @@ def render_objects(objects, obj_ps, time_steps=500, vis=False, vis_frames=False)
             # works if you give it the position of the center of geometry, not
             # the center of mass/inertial frame
             obj_model = pybullet_server.load_urdf(obj+'.urdf', obj_ps[obj])
-            object_models.append(obj_model)
+            object_models.append((obj, obj_model))
             if vis_frames:
                 pos, quat = pybullet_server.get_pose(obj_model)
-                pybullet_server.vis_frame(pos, quat, lifeTime=time_steps)
+                pybullet_server.vis_frame(pos, quat, lifeTime=steps)
 
-    vel = 0.0
-    for t in range(time_steps):
+    poses = []
+    for t in range(steps):
+        poses_t = {}
         pybullet_server.step()
-        vel_t = get_cumulative_vel(object_models, pybullet_server)
-        vel += vel_t
+        for obj, obj_model in object_models:
+            poses_t[obj] = Position(*pybullet_server.get_pose(obj_model)[0])
         time.sleep(.001)
-    if vel > 10.0:
-        stable = False
-    else:
-        stable = True
+        poses.append(poses_t)
 
     pybullet_server.disconnect()
-    return stable
-
-def get_cumulative_vel(object_models, server):
-    vel = 0.0
-    for object_id in object_models:
-        v, w = server.get_vel(object_id)
-        vel += sum(np.add([abs(vi) for vi in v], [abs(wi) for wi in w]))
-
-    return vel
+    return poses
 
 # get positions (center of geometry, not COM) from contact state
 def get_ps_from_contacts(contacts, objects):
