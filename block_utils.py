@@ -102,7 +102,7 @@ def render_objects(objects, obj_ps, steps=500, vis=False, vis_frames=False):
         pybullet_server.step()
         for obj, obj_model in object_models:
             poses_t[obj] = Position(*pybullet_server.get_pose(obj_model)[0])
-        time.sleep(.001)
+        time.sleep(.05)
         poses.append(poses_t)
 
     pybullet_server.disconnect()

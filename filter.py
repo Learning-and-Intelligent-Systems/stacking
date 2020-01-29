@@ -1,6 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.stats as sc
 from mpl_toolkits.mplot3d import Axes3D
+
+covmatrix = np.array([[.003,0,0],[0,.003,0], [0,0,.003]])
+
 
 from filter_utils import create_uniform_particles
 from block_utils import Dimensions, Position, Object, render_objects, get_ps_from_contacts, \
@@ -35,32 +39,37 @@ def make_objects(com_b):
                'object_b':object_b}
     return objects
 
+def gauss_ps(objects):
+    for i in objects:         
+        objects[i] = sc.multivariate_normal.rvs(mean=np.array(objects[i]), cov=covmatrix)
+
 def plot_particles(particles, weights):
-    plt.ion()
+    #plt.ion()
     fig = plt.figure()
     ax = Axes3D(fig)
+    tempmax = max(weights)
     for particle, weight in zip(particles, weights):
-        if weight > 0:
-            ax.scatter(*particle, c='g')
-        else:
-            ax.scatter(*particle, c='r')
-    ax.set_xlabel('x')
+        print(weight)
+        ax.scatter(*particle, s=100, c=str(1-weight))
+
+    ax.set_xlabel('x') 
     ax.set_ylabel('y')
     ax.set_zlabel('z')
     plt.show()
-    input('enter to close')
     plt.close()
 
 # make ground truth state
 true_com_b = Position(0., 0., 0.)
 true_objects = make_objects(true_com_b)
 
-T = 100     # number of steps to simulate per contact state
+T = 5     # number of steps to simulate per contact state
 I = 10      # number of contact states to try
 
 # make particles to estimate the COM of object b
-N = 100     # number of particles
+N = 4     # number of particles
 D = 3       # dimensions of a single particle
+
+R = .05
 com_ranges = [(-true_objects['object_b'].dimensions.width/2, true_objects['object_b'].dimensions.width/2),
                 (-true_objects['object_b'].dimensions.length/2, true_objects['object_b'].dimensions.length/2),
                 (-true_objects['object_b'].dimensions.height/2, true_objects['object_b'].dimensions.height/2)]
@@ -70,10 +79,10 @@ for i in range(I):
     # select action
     cs = cs_selection(true_objects)
     init_pose = get_ps_from_contacts(cs, true_objects)
-
     # take action and get observations
     obs_poses = render_objects(true_objects, init_pose, steps=T, vis=True)
-
+    for j in obs_poses:
+        gauss_ps(j)
     for t in range(1,T):
         # get observation
         obs_pose = obs_poses[t]
@@ -86,10 +95,11 @@ for i in range(I):
             # forward simulate particle
             particle_pose = render_objects(objects, obs_poses[t-1], steps=1)
             obj_pose = particle_pose[0]['object_b']
-            dist = np.linalg.norm(np.subtract(obj_pose, obs_pose['object_b']))
-            new_weight = dist*old_weight if dist < 0.01 else 0.0
-            new_weights.append(new_weight)
+            #new_weight = dist*old_weight if dist < 0.01 else 0.0
+
+            new_weights.append(sc.multivariate_normal.pdf(obs_pose['object_b'], mean=obj_pose,cov=covmatrix) * old_weight)
         weights_sum = sum(new_weights)
+        weights += 1.e-300
         weights = np.divide(new_weights, weights_sum)
         print(len(list(filter(lambda w: w > 0, weights))), 'particles remaining')
 
