@@ -2,13 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as sc
 from mpl_toolkits.mplot3d import Axes3D
-
-covmatrix = np.array([[.003,0,0],[0,.003,0], [0,0,.003]])
-
-
 from filter_utils import create_uniform_particles
 from block_utils import Dimensions, Position, Object, render_objects, get_ps_from_contacts, \
                         Color, Contact
+
+covmatrix = 0.003*np.eye(3)
 
 # for now an action is a random contact state
 def cs_selection(objects):
@@ -40,36 +38,49 @@ def make_objects(com_b):
     return objects
 
 def gauss_ps(objects):
-    for i in objects:         
+    for i in objects:
         objects[i] = sc.multivariate_normal.rvs(mean=np.array(objects[i]), cov=covmatrix)
 
+plt.ion()
+fig = plt.figure()
+ax = Axes3D(fig)
+
 def plot_particles(particles, weights):
-    #plt.ion()
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    tempmax = max(weights)
     for particle, weight in zip(particles, weights):
         print(weight)
         ax.scatter(*particle, s=100, c=str(1-weight))
 
-    ax.set_xlabel('x') 
+    X = particles[:,0]
+    Y = particles[:,1]
+    Z = particles[:,2]
+
+    max_range = np.array([X.max()-X.min(), Y.max()-Y.min(), Z.max()-Z.min()]).max() / 2.0
+
+    mid_x = (X.max()+X.min()) * 0.5
+    mid_y = (Y.max()+Y.min()) * 0.5
+    mid_z = (Z.max()+Z.min()) * 0.5
+    ax.set_xlim(mid_x - max_range, mid_x + max_range)
+    ax.set_ylim(mid_y - max_range, mid_y + max_range)
+    ax.set_zlim(mid_z - max_range, mid_z + max_range)
+
+    ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
-    plt.show()
-    plt.close()
+    plt.draw()
+    plt.pause(0.1)
+
 
 # make ground truth state
-true_com_b = Position(0., 0., 0.)
+true_com_b = Position(.0, .0, .0)
 true_objects = make_objects(true_com_b)
 
-T = 5     # number of steps to simulate per contact state
+T = 20     # number of steps to simulate per contact state
 I = 10      # number of contact states to try
 
 # make particles to estimate the COM of object b
-N = 4     # number of particles
-D = 3       # dimensions of a single particle
+N = 50     # number of particles
+D = 3     # dimensions of a single particle
 
-R = .05
 com_ranges = [(-true_objects['object_b'].dimensions.width/2, true_objects['object_b'].dimensions.width/2),
                 (-true_objects['object_b'].dimensions.length/2, true_objects['object_b'].dimensions.length/2),
                 (-true_objects['object_b'].dimensions.height/2, true_objects['object_b'].dimensions.height/2)]
@@ -79,30 +90,37 @@ for i in range(I):
     # select action
     cs = cs_selection(true_objects)
     init_pose = get_ps_from_contacts(cs, true_objects)
-    # take action and get observations
+
+    # take action and get noisy observations
     obs_poses = render_objects(true_objects, init_pose, steps=T, vis=True)
     for j in obs_poses:
         gauss_ps(j)
+
+    # forward simulate all particles
+    particle_poses = {}
+    for (pi, particle) in enumerate(com_particles):
+        objects = make_objects(particle)
+        particle_poses[pi] = render_objects(objects, init_pose, steps=T)
+
+    # update weights for each time step
     for t in range(1,T):
         # get observation
         obs_pose = obs_poses[t]
 
         # update particles
         new_weights = []
-        for particle, old_weight in zip(com_particles, weights):
-            objects = make_objects(particle)
+        for pi, (particle, old_weight) in enumerate(zip(com_particles, weights)):
+            particle_pose = particle_poses[pi][t]
+            new_weights.append(sc.multivariate_normal.pdf(obs_pose['object_b'],
+                                                        mean=particle_pose['object_b'],
+                                                        cov=covmatrix) * old_weight)
 
-            # forward simulate particle
-            particle_pose = render_objects(objects, obs_poses[t-1], steps=1)
-            obj_pose = particle_pose[0]['object_b']
-            #new_weight = dist*old_weight if dist < 0.01 else 0.0
-
-            new_weights.append(sc.multivariate_normal.pdf(obs_pose['object_b'], mean=obj_pose,cov=covmatrix) * old_weight)
+        # normalize particle weights
         weights_sum = sum(new_weights)
-        weights += 1.e-300
         weights = np.divide(new_weights, weights_sum)
-        print(len(list(filter(lambda w: w > 0, weights))), 'particles remaining')
+        print('max particle weight: ', max(weights))
 
+        # visualize particles
         plot_particles(com_particles, weights)
 
         # in the future should resample/redistribute particles
