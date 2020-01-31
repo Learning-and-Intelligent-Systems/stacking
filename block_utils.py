@@ -82,6 +82,7 @@ def render_objects(objects, obj_ps, steps=500, vis=False, vis_frames=False):
     for obj in obj_ps:
         if obj == 'ground':
             plane_id = pybullet_server.load_urdf("plane_files/plane.urdf", obj_ps[obj])
+            object_models.append((obj, plane_id))
         else:
             object_urdf = object_to_urdf(obj, objects[obj])
             with open(obj+'.urdf', 'w') as handle:
