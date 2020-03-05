@@ -1,0 +1,6 @@
+pybullet
+numpy
+matplotlib
+catkin-pkg
+git+git://github.com/hauptmech/odio_urdf.git#egg=odio_urdf
+scipy
