@@ -120,15 +120,29 @@ def get_ps_from_contacts(contacts):
 
     return obj_cog_ps
 
-def object_names_in_order(contacts):
+# throw away contact geometry. Return dict of pairwise relations between
+# objects. By convention, we assume object A is on top of object B
+def get_contact_dict(contacts, bottom_up=True):
     contact_dict = {}
     for contact in contacts:
-        contact_dict[contact.objectB_name] = contact.objectA_name
+        if bottom_up:
+            contact_dict[contact.objectB_name] = contact.objectA_name
+        else:
+            contact_dict[contact.objectA_name] = contact.objectB_name
 
+    return contact_dict
+
+# follow a list of contacts up from the ground to construct a list of object
+# names that describe a tower
+def object_names_in_order(contacts):
+    contact_dict = get_contact_dict(contacts)
     object_names = ['ground']
     current_object = 'ground'
+
     for _ in range(len(contacts)):
         current_object = contact_dict[current_object]
         object_names.append(current_object)
 
     return object_names
+
+
