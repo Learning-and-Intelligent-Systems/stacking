@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as sc
 from mpl_toolkits.mplot3d import Axes3D
 from filter_utils import create_uniform_particles
-from block_utils import Dimensions, Position, Object, render_objects, get_ps_from_contacts, \
-                        Color, Contact
+from block_utils import *
 
 covmatrix = 0.003*np.eye(3)
 
@@ -81,9 +80,7 @@ I = 10      # number of contact states to try
 N = 50     # number of particles
 D = 3     # dimensions of a single particle
 
-com_ranges = [(-true_objects['object_b'].dimensions.width/2, true_objects['object_b'].dimensions.width/2),
-                (-true_objects['object_b'].dimensions.length/2, true_objects['object_b'].dimensions.length/2),
-                (-true_objects['object_b'].dimensions.height/2, true_objects['object_b'].dimensions.height/2)]
+com_ranges = get_com_ranges(true_objects['object_b'])
 com_particles, weights = create_uniform_particles(N, D, com_ranges)
 
 for i in range(I):
@@ -97,6 +94,10 @@ for i in range(I):
         gauss_ps(j)
 
     # forward simulate all particles
+    # NOTE(izzy): this will be much faster if you simulate all the particles at
+    # the same time. just instantiate a bunch of blocks in one simulator
+    # instance, and offset the x,y position of each particle so they can't
+    # interact
     particle_poses = {}
     for (pi, particle) in enumerate(com_particles):
         objects = make_objects(particle)

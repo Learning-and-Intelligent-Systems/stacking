@@ -18,7 +18,7 @@ def create_uniform_particles(N, D, ranges):
     weights = np.ones(N)*(1/N)
     for d in range(D):
         particles[:, d] = uniform(*ranges[d], size=N)
-    return particles, weights
+    return ParticleDistribution(particles, weights)
 
 def create_gaussian_particles(N, D, means, stds):
     '''
@@ -32,6 +32,7 @@ def create_gaussian_particles(N, D, means, stds):
         particles[:, d] = means[d] + (randn(N) * stds[d])
     return particles
 
-def sample_particle_distribution(dist, num_samples=1):
-    return np.random.choice(dist.particles, size=num_samples,
-        replace=True, p=dist.weights)
+def sample_particle_distribution(distribution, num_samples=1):
+    idxs = np.random.choice(a=num_samples, size=num_samples, replace=True,
+        p=distribution.weights)
+    return distribution.particles[idxs]

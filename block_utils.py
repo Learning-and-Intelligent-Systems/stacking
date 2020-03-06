@@ -120,6 +120,12 @@ def get_ps_from_contacts(contacts):
 
     return obj_cog_ps
 
+
+# list of length 3 of (min, max) ranges for each dimension
+def get_com_ranges(block):
+    hdims = np.array(block.dimensions) * 0.5
+    return np.array([-hdims, hdims]).T
+
 # throw away contact geometry. Return dict of pairwise relations between
 # objects. By convention, we assume object A is on top of object B
 def get_contact_dict(contacts, bottom_up=True):
