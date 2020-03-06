@@ -89,7 +89,7 @@ com_particles, weights = create_uniform_particles(N, D, com_ranges)
 for i in range(I):
     # select action
     cs = cs_selection(true_objects)
-    init_pose = get_ps_from_contacts(cs, true_objects)
+    init_pose = get_ps_from_contacts(cs)
 
     # take action and get noisy observations
     obs_poses = render_objects(true_objects, init_pose, steps=T, vis=True)

@@ -30,8 +30,7 @@ Object = namedtuple('Object', 'dimensions mass com color')
 :param mass: float, mass of the object
 :param com: Position, position of the COM in the link frame (which is located at the center of the object)
 :param color: Color, RGB value of block
-''';
-
+'''
 Contact = namedtuple('Contact', 'objectA_name objectB_name p_a_b')
 '''
 :param objectA_name: string, name of object A involved in contact
@@ -110,19 +109,26 @@ def render_objects(objects, obj_ps, steps=500, vis=False, vis_frames=False):
     return poses
 
 # get positions (center of geometry, not COM) from contact state
-def get_ps_from_contacts(contacts, objects):
-    all_objs = []
-    for contact in contacts:
-        if contact.objectA_name not in all_objs:
-            all_objs.append(contact.objectA_name)
-        if contact.objectB_name not in all_objs:
-            all_objs.append(contact.objectB_name)
-
+def get_ps_from_contacts(contacts):
     obj_cog_ps = {'ground': Position(0.,0.,0.)}
     copy_contacts = copy(contacts)
     while len(copy_contacts) > 0:
         for contact in copy_contacts:
             if contact.objectB_name in obj_cog_ps:
                 obj_cog_ps[contact.objectA_name] = Position(*np.add(obj_cog_ps[contact.objectB_name], contact.p_a_b))
-            copy_contacts.remove(contact)
+                copy_contacts.remove(contact)
+
     return obj_cog_ps
+
+def object_names_in_order(contacts):
+    contact_dict = {}
+    for contact in contacts:
+        contact_dict[contact.objectB_name] = contact.objectA_name
+
+    object_names = ['ground']
+    current_object = 'ground'
+    for _ in range(len(contacts)):
+        current_object = contact_dict[current_object]
+        object_names.append(current_object)
+
+    return object_names
