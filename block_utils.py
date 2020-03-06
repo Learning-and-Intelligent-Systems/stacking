@@ -75,8 +75,8 @@ def object_to_urdf(object_name, object):
     object_urdf = odio_urdf.Robot(link_urdf)
     return object_urdf
 
-def render_objects(objects, obj_ps, steps=500, vis=False, vis_frames=False):
-    pybullet_server = PyBulletServer(vis)
+def render_objects(objects, obj_ps, steps=500, vis=False, vis_frames=False, cameraDistance=0.4):
+    pybullet_server = PyBulletServer(vis, cameraDistance)
     object_models = []
     for obj in obj_ps:
         if obj == 'ground':
