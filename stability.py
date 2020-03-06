@@ -4,7 +4,9 @@ Copyright 2020 Massachusetts Insititute of Technology
 Izzy Brand
 """
 from block_utils import *
+from filter_utils import *
 import numpy as np
+from copy import copy
 
 # TODO(izzy): at some point we will want to be able to be able to place a block
 # in any orientation. For now we assume the only choice is (x,y) translation
@@ -82,3 +84,21 @@ def pair_is_stable(bottom_obj, top_obj, contact):
     # and that the COM of the top object must lie within the object
     top_rel_com = np.array(top_obj.com) + contact.p_a_b
     return (np.abs(top_rel_com)*2 - bottom_obj.dimensions <= 0)[:2].all()
+
+
+def calc_expected_height(objects, contacts, com_filters, num_samples=100):
+    com_samples = {obj: sample_particle_distribution(com_filters, num_samples) \
+        for obj in objects}
+    stable_count = 0
+
+    for i in range(num_samples):
+        sample_objects = {}
+        for name, obj in objects.items():
+            com = Position(*com_samples[i])
+            sample_objects[name] = Object(obj.dimensions, obj.mass, com, obj.color)
+
+        stable_count += tower_is_stable(sample_objects, contacts) \
+            * tower_is_constructible(sample_objects, contacts)
+
+    height = np.sum(obj.dimensions.z for obj in objects.values())
+    return height * stable_count / num_samples

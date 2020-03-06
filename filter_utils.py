@@ -1,5 +1,12 @@
+from collections import namedtuple
 import numpy as np
 from numpy.random import uniform, randn
+
+ParticleDistribution = namedtuple('ParticleDistribution', 'particles weights')
+'''
+:param particles: np.array, N particles each with dimension D (NxD array)
+:param weights: np.array, the likelyhood of each particle (N array)
+'''
 
 def create_uniform_particles(N, D, ranges):
     '''
@@ -24,3 +31,7 @@ def create_gaussian_particles(N, D, means, stds):
     for d in range(D):
         particles[:, d] = means[d] + (randn(N) * stds[d])
     return particles
+
+def sample_particle_distribution(dist, num_samples=1):
+    return np.random.choice(dist.particles, size=num_samples,
+        replace=True, p=dist.weights)
