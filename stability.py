@@ -127,5 +127,6 @@ def find_tallest_tower(objects, com_filters, num_samples=100):
         height = calc_expected_height(objects, contacts, com_filters)
         if height > max_height:
             max_tower = tower
+            max_height = height
 
     return max_tower
