@@ -7,29 +7,20 @@ import odio_urdf
 from pybullet_utils import PyBulletServer
 
 Position = namedtuple('Position', 'x y z')
+Orientation = namedtuple('Orientation', 'x y z w')
+Pose = namedtuple('Pose', 'pos orn')
+
+Dimensions = namedtuple('Dimensions', 'x y z')
 '''
-:param x: float, x position
-:param y: float, y position
-:param z: float, z position
-'''
-Dimensions = namedtuple('Dimensions', 'width length height')
-'''
-:param width: float, width of object (in the x direction)
-:param length: float, length of object (in the y direction)
-:param height: float, height of object (in the z direction)
+:param x: float, length of object in x direction of object frame
+:param y: float, length of object in y direction of object frame
+:param z: float, length of object in z direction of object frame
 '''
 Color = namedtuple('Color', 'r g b')
 '''
 :param r: float in [0.,1.], red value
 :param g: float in [0.,1.], green value
 :param b: float in [0.,1.], blue value
-'''
-Object = namedtuple('Object', 'dimensions mass com color')
-'''
-:param dimensions: Dimensions, dimensions of object
-:param mass: float, mass of the object
-:param com: Position, position of the COM in the link frame (which is located at the center of the object)
-:param color: Color, RGB value of block
 '''
 Contact = namedtuple('Contact', 'objectA_name objectB_name p_a_b')
 '''
@@ -38,6 +29,16 @@ Contact = namedtuple('Contact', 'objectA_name objectB_name p_a_b')
 :param p_a_b: Position, the position of object A's CENTER (OF GEOMETRY, NOT COM)
                 object B's center
 '''
+
+class Object:
+
+    def __init__(self, dimensions, mass, com, color):
+        self.dimensions = dimensions    # Dimensions
+        self.mass = mass                # float
+        self.com = com                  # Position, position of COM relative to
+                                        # center of object
+        self.color = color              # Color
+        self.pose = None                # Pose (set later)
 
 def object_to_urdf(object_name, object):
     rgb = np.random.uniform(0, 1, 3)
@@ -55,17 +56,17 @@ def object_to_urdf(object_name, object):
                   odio_urdf.Collision(
                       odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
                       odio_urdf.Geometry(
-                          odio_urdf.Box(size=(object.dimensions.width,
-                                                object.dimensions.length,
-                                                object.dimensions.height))
+                          odio_urdf.Box(size=(object.dimensions.x,
+                                                object.dimensions.y,
+                                                object.dimensions.z))
                       )
                   ),
                   odio_urdf.Visual(
                       odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
                       odio_urdf.Geometry(
-                          odio_urdf.Box(size=(object.dimensions.width,
-                                                object.dimensions.length,
-                                                object.dimensions.height))
+                          odio_urdf.Box(size=(object.dimensions.x,
+                                                object.dimensions.y,
+                                                object.dimensions.z))
                       ),
                       odio_urdf.Material('color',
                                     odio_urdf.Color(rgba=(*object.color, 1.0))
@@ -120,7 +121,6 @@ def get_ps_from_contacts(contacts):
 
     return obj_cog_ps
 
-
 # list of length 3 of (min, max) ranges for each dimension
 def get_com_ranges(block):
     hdims = np.array(block.dimensions) * 0.5
@@ -150,5 +150,3 @@ def object_names_in_order(contacts):
         object_names.append(current_object)
 
     return object_names
-
-

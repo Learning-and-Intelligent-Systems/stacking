@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import scipy.stats as sc
 from mpl_toolkits.mplot3d import Axes3D
 from filter_utils import create_uniform_particles
-from block_utils import *
+from block_utils import render_objects, Object, Position, Dimensions, \
+                        Pose, Orientation, Color, get_com_ranges, Contact, \
+                        get_ps_from_contacts
 
 covmatrix = 0.003*np.eye(3)
 
@@ -12,11 +14,11 @@ def cs_selection(objects):
     object_a = objects['object_a']
     object_b = objects['object_b']
 
-    p_a_ground = Position(0.,0.,object_a.dimensions.height/2)
+    p_a_ground = Position(0.,0.,object_a.dimensions.z/2)
     contact_a_ground = Contact('object_a', 'ground', p_a_ground)
-    p_x_b_a_mag = (object_a.dimensions.width + object_b.dimensions.width)/2
-    p_y_b_a_mag = (object_a.dimensions.length + object_b.dimensions.length)/2
-    p_z_b_a = (object_a.dimensions.height + object_b.dimensions.height)/2
+    p_x_b_a_mag = (object_a.dimensions.x + object_b.dimensions.x)/2
+    p_y_b_a_mag = (object_a.dimensions.y + object_b.dimensions.y)/2
+    p_z_b_a = (object_a.dimensions.z + object_b.dimensions.z)/2
     p_b_a = Position(np.random.uniform(-p_x_b_a_mag, p_x_b_a_mag),\
                      np.random.uniform(-p_y_b_a_mag, p_y_b_a_mag),\
                      p_z_b_a)
@@ -27,11 +29,12 @@ def cs_selection(objects):
 # make objects
 def make_objects(com_b):
     # get object properties
+    mass = 1.0
     com_a = Position(0., 0., 0.)
     dims = Dimensions(.05, .07, .02)
-    object_a = Object(dims, 1.0, com_a, Color(1.,1.,0.))
+    object_a = Object(dims, mass, com_a, Color(1.,1.,0.))
     dims = Dimensions(.02, .04, .01)
-    object_b = Object(dims, 1.0, com_b, Color(0.,1.,0.))
+    object_b = Object(dims, mass, com_b, Color(0.,1.,0.))
     objects = {'object_a':object_a,
                'object_b':object_b}
     return objects
