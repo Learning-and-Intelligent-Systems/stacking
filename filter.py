@@ -3,16 +3,16 @@ import matplotlib.pyplot as plt
 import scipy.stats as sc
 from mpl_toolkits.mplot3d import Axes3D
 from filter_utils import create_uniform_particles
-from block_utils import render_objects, Object, Position, Dimensions, \
+from block_utils import render_worlds, Object, Position, Dimensions, World, \
                         Pose, Orientation, Color, get_com_ranges, Contact, \
                         get_ps_from_contacts
 
 covmatrix = 0.003*np.eye(3)
 
 # for now an action is a random contact state
-def cs_selection(objects):
-    object_a = objects['object_a']
-    object_b = objects['object_b']
+def cs_selection(world):
+    object_a = world.objects[0]
+    object_b = world.objects[1]
 
     p_a_ground = Position(0.,0.,object_a.dimensions.z/2)
     contact_a_ground = Contact('object_a', 'ground', p_a_ground)
@@ -27,17 +27,16 @@ def cs_selection(objects):
     return cs
 
 # make objects
-def make_objects(com_b):
+def make_world(com_b):
     # get object properties
     mass = 1.0
     com_a = Position(0., 0., 0.)
     dims = Dimensions(.05, .07, .02)
-    object_a = Object(dims, mass, com_a, Color(1.,1.,0.))
+    object_a = Object('object_a', dims, mass, com_a, Color(1.,1.,0.))
     dims = Dimensions(.02, .04, .01)
-    object_b = Object(dims, mass, com_b, Color(0.,1.,0.))
-    objects = {'object_a':object_a,
-               'object_b':object_b}
-    return objects
+    object_b = Object('object_b', dims, mass, com_b, Color(0.,1.,0.))
+    world = World([object_a, object_b])
+    return world
 
 def gauss_ps(objects):
     for i in objects:
@@ -74,7 +73,7 @@ def plot_particles(particles, weights):
 
 # make ground truth state
 true_com_b = Position(.0, .0, .0)
-true_objects = make_objects(true_com_b)
+true_world = make_world(true_com_b)
 
 T = 20     # number of steps to simulate per contact state
 I = 10      # number of contact states to try
@@ -83,16 +82,16 @@ I = 10      # number of contact states to try
 N = 50     # number of particles
 D = 3     # dimensions of a single particle
 
-com_ranges = get_com_ranges(true_objects['object_b'])
+com_ranges = get_com_ranges(true_world.objects[1])
 com_particles, weights = create_uniform_particles(N, D, com_ranges)
 
 for i in range(I):
     # select action
-    cs = cs_selection(true_objects)
+    cs = cs_selection(true_world)
     init_pose = get_ps_from_contacts(cs)
 
     # take action and get noisy observations
-    obs_poses = render_objects(true_objects, init_pose, steps=T, vis=True)
+    obs_poses = render_worlds([true_world], init_pose, steps=T, vis=True)
     for j in obs_poses:
         gauss_ps(j)
 
@@ -103,8 +102,8 @@ for i in range(I):
     # interact
     particle_poses = {}
     for (pi, particle) in enumerate(com_particles):
-        objects = make_objects(particle)
-        particle_poses[pi] = render_objects(objects, init_pose, steps=T)
+        particle_world = make_world(particle)
+        particle_poses[pi] = render_worlds([particle_world], init_pose, steps=T)
 
     # update weights for each time step
     for t in range(1,T):

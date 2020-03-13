@@ -32,7 +32,8 @@ Contact = namedtuple('Contact', 'objectA_name objectB_name p_a_b')
 
 class Object:
 
-    def __init__(self, dimensions, mass, com, color):
+    def __init__(self, name, dimensions, mass, com, color):
+        self.name = name
         self.dimensions = dimensions    # Dimensions
         self.mass = mass                # float
         self.com = com                  # Position, position of COM relative to
@@ -40,9 +41,15 @@ class Object:
         self.color = color              # Color
         self.pose = None                # Pose (set later)
 
-def object_to_urdf(object_name, object):
+class World:
+
+    def __init__(self, objects):
+        self.objects = objects
+        self.cs = None              # Contact (set later)
+
+def object_to_urdf(object):
     rgb = np.random.uniform(0, 1, 3)
-    link_urdf = odio_urdf.Link(object_name,
+    link_urdf = odio_urdf.Link(object.name,
                   odio_urdf.Inertial(
                       odio_urdf.Origin(xyz=tuple(object.com), rpy=(0, 0, 0)),
                       odio_urdf.Mass(value=object.mass),
@@ -76,26 +83,26 @@ def object_to_urdf(object_name, object):
     object_urdf = odio_urdf.Robot(link_urdf)
     return object_urdf
 
-def render_objects(objects, obj_ps, steps=500, vis=False, vis_frames=False, cameraDistance=0.4):
+def render_worlds(worlds, obj_ps, steps=500, vis=False, vis_frames=False, cameraDistance=0.4):
     pybullet_server = PyBulletServer(vis, cameraDistance)
     object_models = []
-    for obj in obj_ps:
-        if obj == 'ground':
-            plane_id = pybullet_server.load_urdf("plane_files/plane.urdf", obj_ps[obj])
-            object_models.append((obj, plane_id))
-        else:
-            object_urdf = object_to_urdf(obj, objects[obj])
-            with open(obj+'.urdf', 'w') as handle:
-                handle.write(str(object_urdf))
-            # I think there is a bug in this pyBullet function. The documentation
-            # says the position should be of the inertial frame, but it only
-            # works if you give it the position of the center of geometry, not
-            # the center of mass/inertial frame
-            obj_model = pybullet_server.load_urdf(obj+'.urdf', obj_ps[obj])
-            object_models.append((obj, obj_model))
-            if vis_frames:
-                pos, quat = pybullet_server.get_pose(obj_model)
-                pybullet_server.vis_frame(pos, quat, lifeTime=steps)
+    world = worlds[0]
+
+    plane_id = pybullet_server.load_urdf("plane_files/plane.urdf", obj_ps['ground'])
+    object_models.append(('ground', plane_id))
+    for obj in world.objects:
+        object_urdf = object_to_urdf(obj)
+        with open(obj.name+'.urdf', 'w') as handle:
+            handle.write(str(object_urdf))
+        # I think there is a bug in this pyBullet function. The documentation
+        # says the position should be of the inertial frame, but it only
+        # works if you give it the position of the center of geometry, not
+        # the center of mass/inertial frame
+        obj_model = pybullet_server.load_urdf(obj.name+'.urdf', obj_ps[obj.name])
+        object_models.append((obj.name, obj_model))
+        if vis_frames:
+            pos, quat = pybullet_server.get_pose(obj_model)
+            pybullet_server.vis_frame(pos, quat, lifeTime=steps)
 
     poses = []
     for t in range(steps):
@@ -122,9 +129,9 @@ def get_ps_from_contacts(contacts):
     return obj_cog_ps
 
 # list of length 3 of (min, max) ranges for each dimension
-def get_com_ranges(block):
-    hdims = np.array(block.dimensions) * 0.5
-    return np.array([-hdims, hdims]).T
+def get_com_ranges(object):
+    half_dims = np.array(object.dimensions) * 0.5
+    return np.array([-half_dims, half_dims]).T
 
 # throw away contact geometry. Return dict of pairwise relations between
 # objects. By convention, we assume object A is on top of object B
