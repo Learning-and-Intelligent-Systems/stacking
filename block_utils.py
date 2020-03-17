@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import os
 from collections import namedtuple
 from copy import copy
 
@@ -67,6 +68,10 @@ class World:
                 if obj_name == object.name:
                     object.set_pose(pose)
 
+    def get_positions(self):
+        return {w_obj.name: w_obj.get_pose(offset=self.offset).pos
+            for w_obj in self.objects}
+
     def get_pose(self, obj):
         for w_obj in self.objects:
             if w_obj == obj:
@@ -87,6 +92,11 @@ class Environment:
         self.plane_id = self.pybullet_server.load_urdf("plane_files/plane.urdf", \
                             Position(0.,0.,0.))
 
+        # make dir to hold temp urdf files
+        self.tmp_dir = 'tmp_urdfs'
+        if not os.path.isdir(self.tmp_dir):
+            os.mkdir(self.tmp_dir)
+
         # load objects from each world and set object link ids
         sqrt_nworlds = int(np.ceil(np.sqrt(len(self.worlds))))
         spacing = 0.5
@@ -99,13 +109,13 @@ class Environment:
                     for obj in self.worlds[world_i].objects:
                         object_urdf = object_to_urdf(obj)
 
-                        with open('tmp_urdfs/'+str(obj)+'.urdf', 'w') as handle:
+                        with open(self.tmp_dir+'/'+str(obj)+'.urdf', 'w') as handle:
                             handle.write(str(object_urdf))
                         # I think there is a bug in this pyBullet function. The documentation
                         # says the position should be of the inertial frame, but it only
                         # works if you give it the position of the center of geometry, not
                         # the center of mass/inertial frame
-                        obj_id = self.pybullet_server.load_urdf('tmp_urdfs/'+str(obj)+'.urdf', obj.pose)
+                        obj_id = self.pybullet_server.load_urdf(self.tmp_dir+'/'+str(obj)+'.urdf', obj.pose)
                         obj.set_id(obj_id)
                         if vis_frames:
                             pos, quat = self.pybullet_server.get_pose(obj_id)
@@ -131,6 +141,10 @@ class Environment:
 
     def disconnect(self):
         self.pybullet_server.disconnect()
+
+    def cleanup(self):
+        # remove temp urdf files (they will accumulate quickly)
+        shutil.rmtree(self.tmp_dir)
 
 def object_to_urdf(object):
     rgb = np.random.uniform(0, 1, 3)

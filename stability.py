@@ -34,7 +34,7 @@ def tower_is_stable(objects, contacts):
         # summarize the mass above the current block with an object and a
         # contact. The dimensions and color are None, because this describes
         # multiple objects
-        top_total_obj = Object(None, top_total_mass, top_total_com, None)
+        top_total_obj = Object('top_total', None, top_total_mass, top_total_com, None)
         top_total_contact = Contact(obj_name, 'top_total', top_total_pos - pos)
 
         # check stability
@@ -97,30 +97,31 @@ def calc_expected_height(objects, contacts, com_filters, num_samples=100):
         for name, obj in objects.items():
             com = Position(*com_samples[name][i])
             sample_objects[name] = \
-                Object(obj.dimensions, obj.mass, com, obj.color)
+                Object(name, obj.dimensions, obj.mass, com, obj.color)
 
         stable_count += tower_is_stable(sample_objects, contacts) \
             * tower_is_constructible(sample_objects, contacts)
 
-    height = np.sum([obj.dimensions.height for obj in objects.values()])
+    height = np.sum([obj.dimensions.z for obj in objects.values()])
     return height * stable_count / num_samples
 
 def find_tallest_tower(objects, com_filters, num_samples=100):
     towers = permutations(objects)
     max_height = 0
     max_tower = []
+    max_contacts = []
     for tower_idx, tower in enumerate(towers):
         contacts = []
         ground_contact_position = \
-            Position(0, 0, objects[tower[0]].dimensions.height/2)
+            Position(0, 0, objects[tower[0]].dimensions.z/2)
         contacts.append(Contact(tower[0], 'ground', ground_contact_position))
         for i in range(len(tower)-1):
             name_a = tower[i+1]
             name_b = tower[i]
             x_offset = 0
             y_offset = 0
-            z_offset = objects[name_a].dimensions.height/2 \
-                     + objects[name_b].dimensions.height/2
+            z_offset = objects[name_a].dimensions.z/2 \
+                     + objects[name_b].dimensions.z/2
             contact_position = Position(x_offset, y_offset, z_offset)
             contacts.append(Contact(name_a, name_b, contact_position))
 
@@ -128,5 +129,6 @@ def find_tallest_tower(objects, com_filters, num_samples=100):
         if height > max_height:
             max_tower = tower
             max_height = height
+            max_contacts = contacts
 
-    return max_tower
+    return max_tower, max_contacts

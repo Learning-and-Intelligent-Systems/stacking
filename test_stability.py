@@ -10,21 +10,34 @@ from block_utils import *
 from filter_utils import *
 from stability import *
 import numpy as np
+import shutil
+
+def check_stability_with_pybullet(objects, contacts, vis=False, steps=20):
+    world = World(objects.values())
+    init_positions = get_ps_from_contacts(contacts)
+    world.set_poses(init_positions)
+
+    env = Environment([world], vis_sim=vis)
+    for t in range(steps):
+        env.step(vis_frames=vis)
+    env.disconnect()
+
+    final_positions = world.get_positions()
+    return unmoved(init_positions, final_positions)
 
 # see if the two dicts of positions are roughly equivalent
 def unmoved(init_positions, final_positions, eps=1e-3):
     total_dist = 0
     for obj in init_positions:
-        total_dist += np.linalg.norm(np.array(init_positions[obj])
-            - np.array(final_positions[obj]))
+        if obj != 'ground':
+            total_dist += np.linalg.norm(np.array(init_positions[obj])
+                - np.array(final_positions[obj]))
     return total_dist < eps
 
 # compare the results of pybullet with our static analysis
 def stable_agrees_with_sim(objects, contacts, vis=False, steps=20):
-    positions = get_ps_from_contacts(contacts)
-    final_positions = render_objects(objects, positions,
-        steps=steps, vis=vis, cameraDistance=5)[-1]
-    simulation_is_stable = unmoved(positions, final_positions)
+    simulation_is_stable =\
+        check_stability_with_pybullet(objects, contacts, vis=vis, steps=steps)
 
     print("STABLE" if simulation_is_stable else "UNSTABLE")
     return simulation_is_stable == tower_is_stable(objects, contacts)
@@ -47,9 +60,9 @@ def constructible_agrees_with_stable(objects, contacts):
     return constructible == piecewise_stable
 
 def test_tower_is_stable(vis=False, T=20):
-    obj_a = Object(Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
-    obj_b = Object(Dimensions(3,1,1), 3, Position(0,0,0), Color(1,0,1))
-    obj_c = Object(Dimensions(1,1,2), 2, Position(0,0,0), Color(1,1,0))
+    obj_a = Object('obj_a', Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
+    obj_b = Object('obj_b', Dimensions(3,1,1), 3, Position(0,0,0), Color(1,0,1))
+    obj_c = Object('obj_c', Dimensions(1,1,2), 2, Position(0,0,0), Color(1,1,0))
 
     pos_a_ground = Position(0.,0.,obj_a.dimensions[2]/2)
     con_a_ground = Contact('obj_a', 'ground', pos_a_ground)
@@ -60,7 +73,7 @@ def test_tower_is_stable(vis=False, T=20):
     assert stable_agrees_with_sim(objects, contacts, vis=vis, steps=T)
 
     # This tower is stable
-    stable_pos_b_a = Position(0.4, 0,
+    stable_pos_b_a = Position(0, 0,
         obj_b.dimensions[2]/2+obj_a.dimensions[2]/2)
     stable_con_b_a = Contact('obj_b', 'obj_a', stable_pos_b_a)
     contacts = [con_a_ground, stable_con_b_a]
@@ -91,10 +104,13 @@ def test_tower_is_stable(vis=False, T=20):
     objects = {'obj_a': obj_a, 'obj_b': obj_b, 'obj_c': obj_c}
     assert stable_agrees_with_sim(objects, contacts, vis=vis, steps=T)
 
+    contacts = [con_a_ground, stable_con_b_a, stable_con_c_b]
+    assert stable_agrees_with_sim(objects, contacts, vis=vis, steps=T)
+
 def test_tower_is_constructible():
-    obj_a = Object(Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
-    obj_b = Object(Dimensions(3,1,1), 3, Position(0,0,0), Color(1,0,1))
-    obj_c = Object(Dimensions(1,1,2), 2, Position(0,0,0), Color(1,1,0))
+    obj_a = Object('obj_a', Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
+    obj_b = Object('obj_b', Dimensions(3,1,1), 3, Position(0,0,0), Color(1,0,1))
+    obj_c = Object('obj_c', Dimensions(1,1,2), 2, Position(0,0,0), Color(1,1,0))
 
     pos_a_ground = Position(0.,0.,obj_a.dimensions[2]/2)
     con_a_ground = Contact('obj_a', 'ground', pos_a_ground)
@@ -135,9 +151,9 @@ def test_tower_is_constructible():
     assert constructible_agrees_with_stable(objects, contacts)
 
 def test_calc_expected_height(num_samples=100):
-    obj_a = Object(Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
-    obj_b = Object(Dimensions(3,1,1), 3, Position(0,0,0), Color(1,0,1))
-    obj_c = Object(Dimensions(0.5,0.5,2), 2, Position(0,0,0), Color(1,1,0))
+    obj_a = Object('obj_a', Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
+    obj_b = Object('obj_b', Dimensions(3,1,1), 3, Position(0,0,0), Color(1,0,1))
+    obj_c = Object('obj_c', Dimensions(0.5,0.5,2), 2, Position(0,0,0), Color(1,1,0))
     objects = {'obj_a': obj_a, 'obj_b': obj_b, 'obj_c': obj_c}
 
     com_filters = {name:
@@ -159,7 +175,7 @@ def test_calc_expected_height(num_samples=100):
 
     # a tower where each block rests fully on the one below is always stable
     contacts = [con_b_ground, con_a_b, con_c_a]
-    total_height  = np.sum([obj.dimensions.height for obj in objects.values()])
+    total_height  = np.sum([obj.dimensions.z for obj in objects.values()])
     assert calc_expected_height(objects, contacts, com_filters) == total_height
 
     # a tall tower with a skinny block on the bottom is worse than a short
@@ -171,10 +187,10 @@ def test_calc_expected_height(num_samples=100):
     assert tall_and_wobbly < short_and_stable
 
 def test_find_tallest_tower():
-    obj_a = Object(Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
-    obj_b = Object(Dimensions(2,2,2), 3, Position(0,0,0), Color(1,0,1))
-    obj_c = Object(Dimensions(3,3,3), 2, Position(0,0,0), Color(1,1,0))
-    obj_d = Object(Dimensions(4,4,4), 2, Position(0,0,0), Color(0,0,1))
+    obj_a = Object('obj_a', Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
+    obj_b = Object('obj_b', Dimensions(2,2,2), 3, Position(0,0,0), Color(1,0,1))
+    obj_c = Object('obj_c', Dimensions(3,3,3), 2, Position(0,0,0), Color(1,1,0))
+    obj_d = Object('obj_d', Dimensions(4,4,4), 2, Position(0,0,0), Color(0,0,1))
     objects = {'obj_a': obj_a, 'obj_b': obj_b, 'obj_c': obj_c, 'obj_d': obj_d}
 
     com_filters = {name:
@@ -182,13 +198,16 @@ def test_find_tallest_tower():
         for name, obj in objects.items()}
 
     oracle_tower = ['obj_' + l for l in 'dcba']
-    tallest_tower = find_tallest_tower(objects, com_filters)
+    tallest_tower, tallest_contacts = find_tallest_tower(objects, com_filters)
     assert (np.array(tallest_tower) == np.array(oracle_tower)).all()
 
 
 if __name__ == '__main__':
-    test_tower_is_stable()
+    test_tower_is_stable(vis=False, T=20)
     test_tower_is_constructible()
     test_calc_expected_height()
     test_find_tallest_tower()
     print('ALL TESTS PASSED')
+
+    # remove temp urdf files (they will accumulate quickly)
+    shutil.rmtree('tmp_urdfs')

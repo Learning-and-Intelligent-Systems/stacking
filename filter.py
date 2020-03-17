@@ -77,11 +77,6 @@ def plot_particles(particles, weights, t=None):
     plt.draw()
     plt.pause(0.1)
 
-# make dir to hold temp urdf files
-tmp_dir = 'tmp_urdfs'
-if not os.path.isdir(tmp_dir):
-    os.mkdir(tmp_dir)
-
 # make ground truth world
 true_com_b = Position(.0, .0, .0)
 true_world = make_world(true_com_b)
