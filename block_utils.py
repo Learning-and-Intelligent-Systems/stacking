@@ -40,12 +40,97 @@ class Object:
                                         # center of object
         self.color = color              # Color
         self.pose = None                # Pose (set later)
+        self.id = None                  # int (set later)
+
+    def set_pose(self, pose):
+        self.pose = pose
+
+    def get_pose(self, offset=np.zeros(3)):
+        pos = np.subtract(self.pose.pos, [offset[0], offset[1], 0.0])
+        return Pose(pos, self.pose.orn)
+
+    def set_id(self, id):
+        self.id = id
+
+    def get_id(self):
+        return self.id
 
 class World:
 
     def __init__(self, objects):
         self.objects = objects
-        self.cs = None              # Contact (set later)
+        self.offset = None          # offset in the env (set later)
+
+    def set_poses(self, poses):
+        for object in self.objects:
+            for (obj_name, pose) in poses.items():
+                if obj_name == object.name:
+                    object.set_pose(pose)
+
+    def get_pose(self, obj):
+        for w_obj in self.objects:
+            if w_obj == obj:
+                return w_obj.get_pose(offset=self.offset)
+
+    def set_offset(self, offset):
+        self.offset = offset
+        for object in self.objects:
+            object.set_pose(np.add(object.pose, [self.offset[0], self.offset[1], 0.0]))
+
+class Environment:
+
+    def __init__(self, worlds, vis_sim=True, vis_frames=False):
+        self.worlds = worlds
+        self.pybullet_server = PyBulletServer(vis_sim)
+
+        # load ground plane
+        self.plane_id = self.pybullet_server.load_urdf("plane_files/plane.urdf", \
+                            Position(0.,0.,0.))
+
+        # load objects from each world and set object link ids
+        sqrt_nworlds = int(np.ceil(np.sqrt(len(self.worlds))))
+        spacing = 0.5
+        world_i = 0
+        for x_pos in np.linspace(-spacing*(sqrt_nworlds-1)/2, spacing*(sqrt_nworlds-1)/2, sqrt_nworlds):
+            for y_pos in np.linspace(-spacing*(sqrt_nworlds-1)/2, spacing*(sqrt_nworlds-1)/2, sqrt_nworlds):
+                if world_i < len(self.worlds):
+                    world_center = (x_pos, y_pos)
+                    worlds[world_i].set_offset(world_center)
+                    for obj in self.worlds[world_i].objects:
+                        object_urdf = object_to_urdf(obj)
+
+                        with open('tmp_urdfs/'+str(obj)+'.urdf', 'w') as handle:
+                            handle.write(str(object_urdf))
+                        # I think there is a bug in this pyBullet function. The documentation
+                        # says the position should be of the inertial frame, but it only
+                        # works if you give it the position of the center of geometry, not
+                        # the center of mass/inertial frame
+                        obj_id = self.pybullet_server.load_urdf('tmp_urdfs/'+str(obj)+'.urdf', obj.pose)
+                        obj.set_id(obj_id)
+                        if vis_frames:
+                            pos, quat = self.pybullet_server.get_pose(obj_id)
+                            self.pybullet_server.vis_frame(pos, quat)
+                    world_i += 1
+
+    def step(self, vis_frames=False):
+        # forward step the sim
+        self.pybullet_server.step()
+
+        # update all world object poses
+        for world in self.worlds:
+            for obj in world.objects:
+                pose = Pose(*self.pybullet_server.get_pose(obj.id))
+                obj.set_pose(pose)
+                if vis_frames:
+                    obj_id = obj.get_id()
+                    pos, quat = self.pybullet_server.get_pose(obj_id)
+                    self.pybullet_server.vis_frame(pos, quat)
+
+        # sleep (for visualization purposes)
+        time.sleep(0.05)
+
+    def disconnect(self):
+        self.pybullet_server.disconnect()
 
 def object_to_urdf(object):
     rgb = np.random.uniform(0, 1, 3)
@@ -82,39 +167,6 @@ def object_to_urdf(object):
 
     object_urdf = odio_urdf.Robot(link_urdf)
     return object_urdf
-
-def render_worlds(worlds, obj_ps, steps=500, vis=False, vis_frames=False, cameraDistance=0.4):
-    pybullet_server = PyBulletServer(vis, cameraDistance)
-    object_models = []
-    world = worlds[0]
-
-    plane_id = pybullet_server.load_urdf("plane_files/plane.urdf", obj_ps['ground'])
-    object_models.append(('ground', plane_id))
-    for obj in world.objects:
-        object_urdf = object_to_urdf(obj)
-        with open(obj.name+'.urdf', 'w') as handle:
-            handle.write(str(object_urdf))
-        # I think there is a bug in this pyBullet function. The documentation
-        # says the position should be of the inertial frame, but it only
-        # works if you give it the position of the center of geometry, not
-        # the center of mass/inertial frame
-        obj_model = pybullet_server.load_urdf(obj.name+'.urdf', obj_ps[obj.name])
-        object_models.append((obj.name, obj_model))
-        if vis_frames:
-            pos, quat = pybullet_server.get_pose(obj_model)
-            pybullet_server.vis_frame(pos, quat, lifeTime=steps)
-
-    poses = []
-    for t in range(steps):
-        poses_t = {}
-        pybullet_server.step()
-        for obj, obj_model in object_models:
-            poses_t[obj] = Position(*pybullet_server.get_pose(obj_model)[0])
-        time.sleep(.05)
-        poses.append(poses_t)
-
-    pybullet_server.disconnect()
-    return poses
 
 # get positions (center of geometry, not COM) from contact state
 def get_ps_from_contacts(contacts):

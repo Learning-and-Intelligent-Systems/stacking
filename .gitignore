@@ -1,3 +1,2 @@
-object_a.urdf
-object_b.urdf
+tmp_urdfs/
 __pycache__/

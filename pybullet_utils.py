@@ -4,7 +4,7 @@ import transformations as trans
 
 class PyBulletServer():
 
-    def __init__(self, vis, cameraDistance=0.4):
+    def __init__(self, vis, cameraDistance=0.3):
         if vis:
             self.client = p.connect(p.GUI)
         else:
@@ -14,7 +14,7 @@ class PyBulletServer():
         p.resetDebugVisualizerCamera(
             cameraDistance=cameraDistance,
             cameraYaw=45,
-            cameraPitch=-45,
+            cameraPitch=-15,
             cameraTargetPosition=(0., 0., 0.))
         p.setGravity(0, 0, -10)
 
