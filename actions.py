@@ -1,5 +1,13 @@
 from block_utils import Environment, World, Object, Position, \
                         Dimensions, Color
+import pybullet as p
+
+def push():
+    pass
+
+def pick_and_place():
+    pass
+
 
 if __name__ == '__main__':
     platform = Object(name='platform',
@@ -20,6 +28,12 @@ if __name__ == '__main__':
     env = Environment([world], vis_sim=True)
 
     for _ in range(100):
+        p.applyExternalForce(objectUniqueId=block.id,
+                             linkIndex=-1,
+                             forceObj=(5, 0, 0),
+                             posObj=(0, 0.01, 0.075),
+                             flags=p.WORLD_FRAME)
+
         env.step()
         
 
