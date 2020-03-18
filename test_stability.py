@@ -14,7 +14,7 @@ import shutil
 
 def check_stability_with_pybullet(objects, contacts, vis=False, steps=20):
     world = World(objects.values())
-    init_positions = get_ps_from_contacts(contacts)
+    init_positions = get_poses_from_contacts(contacts)
     world.set_poses(init_positions)
 
     env = Environment([world], vis_sim=vis, use_hand=False)

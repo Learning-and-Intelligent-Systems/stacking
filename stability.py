@@ -17,7 +17,7 @@ from itertools import permutations
 
 def tower_is_stable(objects, contacts):
     object_names = object_names_in_order(contacts)
-    positions = get_ps_from_contacts(contacts)
+    positions = get_poses_from_contacts(contacts)
 
     # iterate down the tower, checking stability along the way. Is the entire
     # tower above the current block stable on the current block?

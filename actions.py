@@ -1,5 +1,5 @@
 from block_utils import Environment, World, Object, Position, Pose, \
-                        Orientation, Dimensions, Color, get_com_ranges
+                        Quaternion, Dimensions, Color, get_com_ranges
 from filter_utils import create_uniform_particles
 import pybullet as p
 import copy
@@ -55,7 +55,7 @@ def make_world(com):
                       com=Position(x=0., y=0., z=0.),
                       color=Color(r=0.25, g=0.25, b=0.25))
     platform.set_pose(Pose(pos=Position(x=0., y=0., z=0.025),
-                           orn=Orientation(x=0, y=0, z=0, w=1)))
+                           orn=Quaternion(x=0, y=0, z=0, w=1)))
 
     block = Object(name='block',
                    dimensions=Dimensions(x=0.05, y=0.05, z=0.05),
@@ -63,7 +63,7 @@ def make_world(com):
                    com=com,
                    color=Color(r=1., g=0., b=0.))
     block.set_pose(Pose(pos=Position(x=0., y=0., z=0.075),
-                        orn=Orientation(x=0, y=0, z=0, w=1)))
+                        orn=Quaternion(x=0, y=0, z=0, w=1)))
   
     return World([platform, block])
 
