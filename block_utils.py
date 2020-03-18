@@ -60,6 +60,7 @@ class World:
     def __init__(self, objects):
         self.objects = objects
         self.offset = None          # offset in the env (set later)
+        self.hand_id = None
 
     def set_poses(self, poses):
         for object in self.objects:
@@ -76,6 +77,12 @@ class World:
         self.offset = offset
         for object in self.objects:
             object.set_pose(np.add(object.pose, [self.offset[0], self.offset[1], 0.0]))
+    
+    def set_hand_id(self, h_id):
+        self.hand_id = h_id
+
+    def get_hand_id(self):
+        return self.hand_id
 
 class Environment:
 
@@ -96,6 +103,17 @@ class Environment:
                 if world_i < len(self.worlds):
                     world_center = (x_pos, y_pos)
                     worlds[world_i].set_offset(world_center)
+
+                    # Load the gripper object.
+                    with open('tmp_urdfs/hand_'+ str(world_i) + '.urdf', 'w') as handle:
+                        handle.write(str(hand_urdf()))
+                    #hand_pose = Pose(Position(x=x_pos, y=y_pos, z=0.1), 
+                    #                 Orientation(x=0., y=0., z=0., w=1.))
+                    hand_pose = Position(x=x_pos, y=y_pos, z=0.25)
+                    hand_id = self.pybullet_server.load_urdf('tmp_urdfs/hand_'+str(world_i)+'.urdf', 
+                                                             hand_pose)
+                    self.worlds[world_i].set_hand_id(hand_id)
+
                     for obj in self.worlds[world_i].objects:
                         object_urdf = object_to_urdf(obj)
 
@@ -105,6 +123,7 @@ class Environment:
                         # says the position should be of the inertial frame, but it only
                         # works if you give it the position of the center of geometry, not
                         # the center of mass/inertial frame
+                        print('Pose:', obj.pose)
                         obj_id = self.pybullet_server.load_urdf('tmp_urdfs/'+str(obj)+'.urdf', obj.pose)
                         obj.set_id(obj_id)
                         if vis_frames:
@@ -112,10 +131,14 @@ class Environment:
                             self.pybullet_server.vis_frame(pos, quat)
                     world_i += 1
 
-    def step(self, vis_frames=False):
+    def step(self, actions=[], vis_frames=False):
+        # Apply every action.
+        for a in actions:
+            a.step()
+
         # forward step the sim
         self.pybullet_server.step()
-
+        
         # update all world object poses
         for world in self.worlds:
             for obj in world.objects:
@@ -131,6 +154,38 @@ class Environment:
 
     def disconnect(self):
         self.pybullet_server.disconnect()
+
+def hand_urdf():
+    rgb = (0, 1, 0)
+    link_urdf = odio_urdf.Link('hand',
+                    odio_urdf.Inertial(
+                      odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
+                      odio_urdf.Mass(value=0.1),
+                      odio_urdf.Inertia(ixx=0.001,
+                                        ixy=0,
+                                        ixz=0,
+                                        iyy=0.001,
+                                        iyz=0,
+                                        izz=0.001)
+                  ),
+                  odio_urdf.Collision(
+                      odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
+                      odio_urdf.Geometry(
+                          odio_urdf.Sphere(radius=0.02)
+                      )
+                  ),
+                  odio_urdf.Visual(
+                      odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
+                      odio_urdf.Geometry(
+                          odio_urdf.Sphere(radius=0.02),
+                      ),
+                      odio_urdf.Material('color',
+                                    odio_urdf.Color(rgba=(*rgb, 1.0))
+                                    )
+                  ))
+
+    object_urdf = odio_urdf.Robot(link_urdf)
+    return object_urdf
 
 def object_to_urdf(object):
     rgb = np.random.uniform(0, 1, 3)
