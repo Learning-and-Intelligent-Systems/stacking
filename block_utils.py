@@ -93,7 +93,7 @@ class World:
 
 class Environment:
 
-    def __init__(self, worlds, vis_sim=True, vis_frames=False):
+    def __init__(self, worlds, vis_sim=True, vis_frames=False, use_hand=True):
         self.worlds = worlds
         self.pybullet_server = PyBulletServer(vis_sim)
 
@@ -121,10 +121,11 @@ class Environment:
                         handle.write(str(hand_urdf()))
                     #hand_pose = Pose(Position(x=x_pos, y=y_pos, z=0.1), 
                     #                 Orientation(x=0., y=0., z=0., w=1.))
-                    hand_pose = Position(x=x_pos, y=y_pos, z=0.25)
-                    hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf', 
+                    if use_hand:
+                        hand_pose = Position(x=x_pos-0.5, y=y_pos-0.5, z=0.25)
+                        hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf', 
                                                              hand_pose)
-                    self.worlds[world_i].set_hand_id(hand_id)
+                        self.worlds[world_i].set_hand_id(hand_id)
 
                     for obj in self.worlds[world_i].objects:
                         object_urdf = object_to_urdf(obj)
@@ -241,12 +242,13 @@ def object_to_urdf(object):
 
 # get positions (center of geometry, not COM) from contact state
 def get_ps_from_contacts(contacts):
-    obj_cog_ps = {'ground': Position(0.,0.,0.)}
+    obj_cog_ps = {'ground': Pose(pos=Position(0.,0.,0.), orn=Orientation(0.,0.,0.,1.))}
     copy_contacts = copy(contacts)
     while len(copy_contacts) > 0:
         for contact in copy_contacts:
             if contact.objectB_name in obj_cog_ps:
-                obj_cog_ps[contact.objectA_name] = Position(*np.add(obj_cog_ps[contact.objectB_name], contact.p_a_b))
+                obj_cog_ps[contact.objectA_name] = Pose(pos=Position(*np.add(obj_cog_ps[contact.objectB_name].pos, contact.p_a_b)),
+                                                        orn=obj_cog_ps[contact.objectB_name].orn)
                 copy_contacts.remove(contact)
 
     return obj_cog_ps

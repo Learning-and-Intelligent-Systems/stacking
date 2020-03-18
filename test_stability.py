@@ -17,7 +17,7 @@ def check_stability_with_pybullet(objects, contacts, vis=False, steps=20):
     init_positions = get_ps_from_contacts(contacts)
     world.set_poses(init_positions)
 
-    env = Environment([world], vis_sim=vis)
+    env = Environment([world], vis_sim=vis, use_hand=False)
     for t in range(steps):
         env.step(vis_frames=vis)
     env.disconnect()
@@ -30,7 +30,7 @@ def unmoved(init_positions, final_positions, eps=1e-3):
     total_dist = 0
     for obj in init_positions:
         if obj != 'ground':
-            total_dist += np.linalg.norm(np.array(init_positions[obj])
+            total_dist += np.linalg.norm(np.array(init_positions[obj].pos)
                 - np.array(final_positions[obj]))
     return total_dist < eps
 

@@ -23,13 +23,13 @@ def tower_is_stable(objects, contacts):
     # tower above the current block stable on the current block?
     top_total_com = np.array(objects[object_names[-1]].com)
     top_total_mass = objects[object_names[-1]].mass
-    top_total_pos = np.array(positions[object_names[-1]])
+    top_total_pos = np.array(positions[object_names[-1]].pos)
 
     # we don't check the top block because there's nothing on top of it, and
     # we don't check the bottom block because it's the ground!
     for obj_name in reversed(object_names[1:-1]):
         obj = objects[obj_name]
-        pos = np.array(positions[obj_name])
+        pos = np.array(positions[obj_name].pos)
 
         # summarize the mass above the current block with an object and a
         # contact. The dimensions and color are None, because this describes
