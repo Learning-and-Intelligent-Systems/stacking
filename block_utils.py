@@ -106,7 +106,7 @@ class Environment:
 
         # load objects from each world and set object link ids
         sqrt_nworlds = int(np.ceil(np.sqrt(len(self.worlds))))
-        spacing = 0.5
+        spacing = 1.0
         world_i = 0
         for x_pos in np.linspace(-spacing*(sqrt_nworlds-1)/2, spacing*(sqrt_nworlds-1)/2, sqrt_nworlds):
             for y_pos in np.linspace(-spacing*(sqrt_nworlds-1)/2, spacing*(sqrt_nworlds-1)/2, sqrt_nworlds):

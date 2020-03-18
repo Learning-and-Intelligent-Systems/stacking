@@ -1,11 +1,21 @@
 from block_utils import Environment, World, Object, Position, \
-                        Dimensions, Color
+                        Dimensions, Color, get_com_ranges
+from filter_utils import create_uniform_particles
 import pybullet as p
 import copy
 
 
 class PushAction:
     def __init__(self, world, direction, start_pos, timesteps, delta=0.005):
+        """ PushAction moves the hand in the given world by a fixed distance 
+            every timestep. 
+        :param world: The world which this action should apply to. Used to get the hand
+                      and calculate offsets.
+        :param direction: A unit vector direction to push.
+        :param start_pos: The initial position of the hand relative to this world's origin.
+        :param timesteps: The number of timesteps to execute the action for.
+        :param delta: How far to move each timestep.
+        """
         self.start_pos = Position(x=world.offset[0]+start_pos.x,
                                   y=world.offset[1]+start_pos.y,
                                   z=start_pos.z)
@@ -20,9 +30,13 @@ class PushAction:
         self.direction = direction
         self.timesteps = timesteps
         self.delta = delta
-        self.tx =0
+        self.tx = 0
+        
+        # TODO: Store the world state when executing each action.
+        self.trajectory = []
 
     def step(self):
+        """ Move the hand forward by delta. """
         if self.tx < self.timesteps:
             updated_pos = Position(x=self.start_pos.x + self.tx*self.delta*self.direction[0],
                                    y=self.start_pos.y + self.tx*self.delta*self.direction[1],
@@ -32,7 +46,7 @@ class PushAction:
             self.tx += 1
 
 
-if __name__ == '__main__':
+def make_world(com):
     platform = Object(name='platform',
                       dimensions=Dimensions(x=0.3, y=0.2, z=0.05),
                       mass=100,
@@ -43,20 +57,33 @@ if __name__ == '__main__':
     block = Object(name='block',
                    dimensions=Dimensions(x=0.05, y=0.05, z=0.05),
                    mass=1,
-                   com=Position(x=0., y=0., z=0.),
+                   com=com,
                    color=Color(r=1., g=0., b=0.))
     block.set_pose(Position(x=0., y=0., z=0.075))
   
-    world = World([platform, block])
-    env = Environment([world], vis_sim=True)
+    return World([platform, block])
+
+
+if __name__ == '__main__':
+    true_com = Position(x=0., y=0., z=0.)
+    true_world = make_world(true_com)
+
+    com_ranges = get_com_ranges(true_world.objects[1])
+    com_particles, _ = create_uniform_particles(20, 3, com_ranges)
+    particle_worlds = [make_world(particle) for particle in com_particles]
+
+    env = Environment([true_world]+particle_worlds, vis_sim=True)
     
-    action = PushAction(world=world, 
-                        direction=(1, 0.1, 0), 
-                        start_pos=Position(-0.1, 0, 0.075),
-                        timesteps=50)
+    actions = []
+    for w in [true_world] + particle_worlds:
+        action = PushAction(world=w, 
+                            direction=(1, 0.1, 0), 
+                            start_pos=Position(-0.1, 0, 0.075),
+                            timesteps=50)
+        actions.append(action)
 
     for ix in range(100):
-        env.step(actions=[action])
+        env.step(actions=actions)
         
 
 
