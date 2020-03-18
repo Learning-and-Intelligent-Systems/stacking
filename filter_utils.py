@@ -36,3 +36,4 @@ def sample_particle_distribution(distribution, num_samples=1):
     idxs = np.random.choice(a=num_samples, size=num_samples, replace=True,
         p=distribution.weights)
     return distribution.particles[idxs]
+

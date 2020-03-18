@@ -61,6 +61,7 @@ class World:
     def __init__(self, objects):
         self.objects = objects
         self.offset = None          # offset in the env (set later)
+        self.hand_id = None
 
     def set_poses(self, poses):
         for object in self.objects:
@@ -85,6 +86,12 @@ class World:
             orn = object.pose.orn
             object.set_pose(Pose(offset_pos, orn))
 
+    def set_hand_id(self, h_id):
+        self.hand_id = h_id
+
+    def get_hand_id(self):
+        return self.hand_id
+
 class Environment:
 
     def __init__(self, worlds, vis_sim=True, vis_frames=False):
@@ -102,13 +109,24 @@ class Environment:
 
         # load objects from each world and set object link ids
         sqrt_nworlds = int(np.ceil(np.sqrt(len(self.worlds))))
-        spacing = 0.5
+        spacing = 1.0
         world_i = 0
         for x_pos in np.linspace(-spacing*(sqrt_nworlds-1)/2, spacing*(sqrt_nworlds-1)/2, sqrt_nworlds):
             for y_pos in np.linspace(-spacing*(sqrt_nworlds-1)/2, spacing*(sqrt_nworlds-1)/2, sqrt_nworlds):
                 if world_i < len(self.worlds):
                     world_center = (x_pos, y_pos)
                     worlds[world_i].set_offset(world_center)
+
+                    # Load the gripper object.
+                    with open(self.tmp_dir+'/hand_'+ str(world_i) + '.urdf', 'w') as handle:
+                        handle.write(str(hand_urdf()))
+                    #hand_pose = Pose(Position(x=x_pos, y=y_pos, z=0.1),
+                    #                 Orientation(x=0., y=0., z=0., w=1.))
+                    hand_pose = Position(x=x_pos, y=y_pos, z=0.25)
+                    hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf',
+                                                             hand_pose)
+                    self.worlds[world_i].set_hand_id(hand_id)
+
                     for obj in self.worlds[world_i].objects:
                         object_urdf = object_to_urdf(obj)
 
@@ -127,7 +145,11 @@ class Environment:
                             self.pybullet_server.vis_frame(pos, quat)
                     world_i += 1
 
-    def step(self, vis_frames=False):
+    def step(self, actions=[], vis_frames=False):
+        # Apply every action.
+        for a in actions:
+            a.step()
+
         # forward step the sim
         self.pybullet_server.step()
 
@@ -150,6 +172,39 @@ class Environment:
     def cleanup(self):
         # remove temp urdf files (they will accumulate quickly)
         shutil.rmtree(self.tmp_dir)
+
+
+def hand_urdf():
+    rgb = (0, 1, 0)
+    link_urdf = odio_urdf.Link('hand',
+                    odio_urdf.Inertial(
+                      odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
+                      odio_urdf.Mass(value=0.1),
+                      odio_urdf.Inertia(ixx=0.001,
+                                        ixy=0,
+                                        ixz=0,
+                                        iyy=0.001,
+                                        iyz=0,
+                                        izz=0.001)
+                  ),
+                  odio_urdf.Collision(
+                      odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
+                      odio_urdf.Geometry(
+                          odio_urdf.Sphere(radius=0.02)
+                      )
+                  ),
+                  odio_urdf.Visual(
+                      odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
+                      odio_urdf.Geometry(
+                          odio_urdf.Sphere(radius=0.02),
+                      ),
+                      odio_urdf.Material('color',
+                                    odio_urdf.Color(rgba=(*rgb, 1.0))
+                                    )
+                  ))
+
+    object_urdf = odio_urdf.Robot(link_urdf)
+    return object_urdf
 
 def object_to_urdf(object):
     rgb = np.random.uniform(0, 1, 3)
