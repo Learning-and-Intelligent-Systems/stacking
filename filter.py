@@ -2,30 +2,60 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import shutil
+import argparse
+import random
 from scipy.stats import multivariate_normal
 from mpl_toolkits.mplot3d import Axes3D
 from filter_utils import create_uniform_particles
 from block_utils import Environment, Object, Position, Dimensions, World, \
-                        Pose, Orientation, Color, get_com_ranges, Contact, \
-                        get_ps_from_contacts
+                        Pose, Quaternion, Color, get_com_ranges, Contact, \
+                        get_poses_from_contacts
 
 true_obs_cov = 0.00004*np.eye(3)
 obs_model_cov = 0.00004*np.eye(3)
 
 # for now an action is a random contact state
+# NOTE: this calculation can only handle 3 realtive orientationsn between objects
+# this is a little hacky. needs to be more general
 def cs_selection(world):
     object_a = world.objects[0]
     object_b = world.objects[1]
 
+    # contact between ground and object a
     p_a_ground = Position(0.,0.,object_a.dimensions.z/2)
-    contact_a_ground = Contact('object_a', 'ground', p_a_ground)
-    p_x_b_a_mag = (object_a.dimensions.x + object_b.dimensions.x)/2
-    p_y_b_a_mag = (object_a.dimensions.y + object_b.dimensions.y)/2
-    p_z_b_a = (object_a.dimensions.z + object_b.dimensions.z)/2
-    p_b_a = Position(np.random.uniform(-p_x_b_a_mag, p_x_b_a_mag),
-                     np.random.uniform(-p_y_b_a_mag, p_y_b_a_mag),
-                     p_z_b_a)
-    contact_b_a = Contact('object_b', 'object_a', p_b_a)
+    q_a_ground = Quaternion(0., 0., 0., 1.)
+    contact_a_ground = Contact('object_a', 'ground', Pose(p_a_ground, q_a_ground))
+
+    # sample a random direction of object b's frame to align with world's +z
+    obj_b_up = random.randrange(3)
+
+    # calc contact Pose of b in a
+    if obj_b_up == 0: # x is up
+        obj_b_orn = Quaternion(0.0, -0.707, 0.0, 0.707)
+        p_x_mag = (object_a.dimensions.x + object_b.dimensions.z)/2
+        p_x = np.random.uniform(-p_x_mag, p_x_mag)
+        p_y_mag = (object_a.dimensions.y + object_b.dimensions.y)/2
+        p_y = np.random.uniform(-p_y_mag, p_y_mag)
+        p_z = (object_a.dimensions.z + object_b.dimensions.x)/2
+        obj_b_pos = Position(p_x, p_y, p_z)
+    elif obj_b_up == 1: # y is up
+        obj_b_orn = Quaternion(0.707, 0.0, 0.0, 0.707)
+        p_x_mag = (object_a.dimensions.x + object_b.dimensions.x)/2
+        p_x = np.random.uniform(-p_x_mag, p_x_mag)
+        p_y_mag = (object_a.dimensions.y + object_b.dimensions.z)/2
+        p_y = np.random.uniform(-p_y_mag, p_y_mag)
+        p_z = (object_a.dimensions.z + object_b.dimensions.y)/2
+        obj_b_pos = Position(p_x, p_y, p_z)
+    elif obj_b_up == 2: # z is up
+        obj_b_orn = Quaternion(0.0, 0.0, 0.0, 1.0)
+        p_x_mag = (object_a.dimensions.x + object_b.dimensions.x)/2
+        p_x = np.random.uniform(-p_x_mag, p_x_mag)
+        p_y_mag = (object_a.dimensions.y + object_b.dimensions.y)/2
+        p_y = np.random.uniform(-p_y_mag, p_y_mag)
+        p_z = (object_a.dimensions.z + object_b.dimensions.z)/2
+        obj_b_pos = Position(p_x, p_y, p_z)
+
+    contact_b_a = Contact('object_b', 'object_a', Pose(obj_b_pos, obj_b_orn))
     cs = [contact_a_ground, contact_b_a]
     return cs
 
@@ -44,10 +74,6 @@ def make_world(com_b):
 def add_noise(pose):
     noisy_pos = Position(*multivariate_normal.rvs(mean=pose.pos, cov=true_obs_cov))
     return Pose(noisy_pos, pose.orn)
-
-plt.ion()
-fig = plt.figure()
-ax = Axes3D(fig)
 
 def plot_particles(particles, weights, t=None):
     for particle, weight in zip(particles, weights):
@@ -77,62 +103,79 @@ def plot_particles(particles, weights, t=None):
     plt.draw()
     plt.pause(0.1)
 
-# make ground truth world
-true_com_b = Position(.0, .0, .0)
-true_world = make_world(true_com_b)
 
-T = 15     # number of steps to simulate per contact state
-I = 10      # number of contact states to try
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--vis', action='store_true')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--plot', action='store_true')
+    args = parser.parse_args()
 
-# make particles to estimate the COM of object b
-N = 300     # number of particles
-D = 3     # dimensions of a single particle
+    if args.debug:
+        import pdb; pdb.set_trace()
 
-# create particle worlds
-com_ranges = get_com_ranges(true_world.objects[1])
-com_particles, weights = create_uniform_particles(N, D, com_ranges)
-particle_worlds = [make_world(particle) for particle in com_particles]
+    if args.plot:
+        plt.ion()
+        fig = plt.figure()
+        ax = Axes3D(fig)
 
-for i in range(I):
-    # select contact state and calculate pose
-    cs = cs_selection(true_world)
-    init_pose = get_ps_from_contacts(cs)
+    # make ground truth world
+    true_com_b = Position(.0, .0, .0)
+    true_world = make_world(true_com_b)
 
-    # set object poses in all worlds
-    true_world.set_poses(init_pose)
-    for particle_world in particle_worlds:
-        particle_world.set_poses(init_pose)
+    T = 15     # number of steps to simulate per contact state
+    I = 10      # number of contact states to try
 
-    # create pyBullet environment for true world and particle worlds
-    env = Environment(particle_worlds+[true_world], vis_sim=False)
+    # make particles to estimate the COM of object b
+    N = 300     # number of particles
+    D = 3     # dimensions of a single particle
 
-    for t in range(T):
-        # step all worlds
-        env.step(vis_frames=False)
+    # create particle worlds
+    com_ranges = get_com_ranges(true_world.objects[1])
+    com_particles, weights = create_uniform_particles(N, D, com_ranges)
+    particle_worlds = [make_world(particle) for particle in com_particles]
 
-        # get ground truth object_b pose (observation)
-        objb_pose = true_world.get_pose(true_world.objects[1])
-        objb_pose = add_noise(objb_pose)
+    for i in range(I):
+        # select contact state and calculate pose
+        cs = cs_selection(true_world)
+        init_poses = get_poses_from_contacts(cs)
 
-        # update all particle weights
-        new_weights = []
+        # set object poses in all worlds
+        true_world.set_poses(init_poses)
+        for particle_world in particle_worlds:
+            particle_world.set_poses(init_poses)
 
-        for pi, (particle_world, old_weight) in enumerate(zip(particle_worlds, weights)):
-            particle_objb_pose = particle_world.get_pose(particle_world.objects[1])
-            obs_model = multivariate_normal.pdf(objb_pose.pos, mean=particle_objb_pose.pos, cov=obs_model_cov)
-            new_weight = old_weight * obs_model
-            new_weights.append(new_weight)
+        # create pyBullet environment for true world and particle worlds
+        env = Environment(particle_worlds+[true_world], vis_sim=args.vis)
 
-        # normalize particle weights
-        weights_sum = sum(new_weights)
-        weights = np.divide(new_weights, weights_sum)
-        print('max particle weight: ', max(weights))
+        for t in range(T):
+            # step all worlds
+            env.step(vis_frames=args.debug)
 
-        # visualize particles
-        plot_particles(com_particles, weights, t=t)
+            # get ground truth object_b pose (observation)
+            objb_pose = true_world.get_pose(true_world.objects[1])
+            objb_pose = add_noise(objb_pose)
+
+            # update all particle weights
+            new_weights = []
+
+            for pi, (particle_world, old_weight) in enumerate(zip(particle_worlds, weights)):
+                particle_objb_pose = particle_world.get_pose(particle_world.objects[1])
+                obs_model = multivariate_normal.pdf(objb_pose.pos, mean=particle_objb_pose.pos, cov=obs_model_cov)
+                new_weight = old_weight * obs_model
+                new_weights.append(new_weight)
+
+            # normalize particle weights
+            weights_sum = sum(new_weights)
+            weights = np.divide(new_weights, weights_sum)
+            print('max particle weight: ', max(weights))
+
+            if args.plot:
+                # visualize particles (it's very slow)
+                plot_particles(com_particles, weights, t=t)
 
 
-    env.disconnect()
+        env.disconnect()
 
-# remove temp urdf files (they will accumulate quickly)
-shutil.rmtree('tmp_urdfs')
+    # remove temp urdf files (they will accumulate quickly)
+    shutil.rmtree('tmp_urdfs')

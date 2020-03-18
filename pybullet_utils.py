@@ -24,8 +24,8 @@ class PyBulletServer():
     def disconnect(self):
         p.disconnect(physicsClientId=self.client)
 
-    def load_urdf(self, urdf_name, pos):
-        return p.loadURDF(urdf_name, pos, physicsClientId=self.client)
+    def load_urdf(self, urdf_name, pos, orn=(0., 0., 0., 1.)):
+        return p.loadURDF(urdf_name, pos, orn, physicsClientId=self.client)
 
     def get_pose(self, object_id):
         return p.getBasePositionAndOrientation(object_id, physicsClientId=self.client)
@@ -101,7 +101,7 @@ def transformation(pos, translation_vec, quat, inverse=False):
     new_pos = np.dot(T, pos)
     return new_pos[:3]
 
-def quat_math(q0, q1, inv0, inv1):
+def quat_math(q0, q1, inv0=False, inv1=False):
     """ Performs addition and subtraction between quaternions
     :param q0: a vector of length 4, quaternion rotation (x,y,z,w)
     :param q1: a vector of length 4, quaternion rotation (x,y,z,w)

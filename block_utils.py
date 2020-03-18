@@ -5,10 +5,10 @@ from collections import namedtuple
 from copy import copy
 
 import odio_urdf
-from pybullet_utils import PyBulletServer
+from pybullet_utils import PyBulletServer, quat_math
 
 Position = namedtuple('Position', 'x y z')
-Orientation = namedtuple('Orientation', 'x y z w')
+Quaternion = namedtuple('Quaternion', 'x y z w')
 Pose = namedtuple('Pose', 'pos orn')
 
 Dimensions = namedtuple('Dimensions', 'x y z')
@@ -23,12 +23,12 @@ Color = namedtuple('Color', 'r g b')
 :param g: float in [0.,1.], green value
 :param b: float in [0.,1.], blue value
 '''
-Contact = namedtuple('Contact', 'objectA_name objectB_name p_a_b')
+Contact = namedtuple('Contact', 'objectA_name objectB_name pose_a_b')
 '''
 :param objectA_name: string, name of object A involved in contact
 :param objectB_name: string, name of object B involved in contact
-:param p_a_b: Position, the position of object A's CENTER (OF GEOMETRY, NOT COM)
-                object B's center
+:param pose_a_b: Pose, the relative pose of object A's CENTER (OF GEOMETRY, NOT COM)
+                in object B's center
 '''
 
 class Object:
@@ -80,7 +80,10 @@ class World:
     def set_offset(self, offset):
         self.offset = offset
         for object in self.objects:
-            object.set_pose(np.add(object.pose, [self.offset[0], self.offset[1], 0.0]))
+            offset_pos = Position(*np.add(object.pose.pos,
+                                    [self.offset[0], self.offset[1], 0.0]))
+            orn = object.pose.orn
+            object.set_pose(Pose(offset_pos, orn))
 
 class Environment:
 
@@ -115,7 +118,9 @@ class Environment:
                         # says the position should be of the inertial frame, but it only
                         # works if you give it the position of the center of geometry, not
                         # the center of mass/inertial frame
-                        obj_id = self.pybullet_server.load_urdf(self.tmp_dir+'/'+str(obj)+'.urdf', obj.pose)
+                        obj_id = self.pybullet_server.load_urdf(self.tmp_dir+'/'+str(obj)+'.urdf',
+                                                                obj.pose.pos,
+                                                                obj.pose.orn)
                         obj.set_id(obj_id)
                         if vis_frames:
                             pos, quat = self.pybullet_server.get_pose(obj_id)
@@ -183,16 +188,20 @@ def object_to_urdf(object):
     return object_urdf
 
 # get positions (center of geometry, not COM) from contact state
-def get_ps_from_contacts(contacts):
-    obj_cog_ps = {'ground': Position(0.,0.,0.)}
+def get_poses_from_contacts(contacts):
+    obj_poses = {'ground': Pose(Position(0.,0.,0.), Quaternion(0., 0., 0., 1.))}
     copy_contacts = copy(contacts)
     while len(copy_contacts) > 0:
         for contact in copy_contacts:
-            if contact.objectB_name in obj_cog_ps:
-                obj_cog_ps[contact.objectA_name] = Position(*np.add(obj_cog_ps[contact.objectB_name], contact.p_a_b))
+            if contact.objectB_name in obj_poses:
+                objA_pos = Position(*np.add(obj_poses[contact.objectB_name].pos,
+                                    contact.pose_a_b.pos))
+                objA_orn = Quaternion(*quat_math(obj_poses[contact.objectB_name].orn,
+                                                contact.pose_a_b.orn))
+                obj_poses[contact.objectA_name] = Pose(objA_pos, objA_orn)
                 copy_contacts.remove(contact)
 
-    return obj_cog_ps
+    return obj_poses
 
 # list of length 3 of (min, max) ranges for each dimension
 def get_com_ranges(object):
