@@ -81,7 +81,9 @@ class World:
     def set_offset(self, offset):
         self.offset = offset
         for object in self.objects:
-            object.set_pose(np.add(object.pose, [self.offset[0], self.offset[1], 0.0]))
+            pose = Pose(pos=Position(*np.add(object.pose.pos, [self.offset[0], self.offset[1], 0.0]).tolist()),
+                        orn=object.pose.orn)
+            object.set_pose(pose)
     
     def set_hand_id(self, h_id):
         self.hand_id = h_id
@@ -133,7 +135,7 @@ class Environment:
                         # says the position should be of the inertial frame, but it only
                         # works if you give it the position of the center of geometry, not
                         # the center of mass/inertial frame
-                        obj_id = self.pybullet_server.load_urdf(self.tmp_dir+'/'+str(obj)+'.urdf', obj.pose)
+                        obj_id = self.pybullet_server.load_urdf(self.tmp_dir+'/'+str(obj)+'.urdf', obj.pose.pos)
                         obj.set_id(obj_id)
                         if vis_frames:
                             pos, quat = self.pybullet_server.get_pose(obj_id)

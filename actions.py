@@ -1,5 +1,5 @@
-from block_utils import Environment, World, Object, Position, \
-                        Dimensions, Color, get_com_ranges
+from block_utils import Environment, World, Object, Position, Pose, \
+                        Orientation, Dimensions, Color, get_com_ranges
 from filter_utils import create_uniform_particles
 import pybullet as p
 import copy
@@ -30,9 +30,10 @@ class PushAction:
         self.direction = direction
         self.timesteps = timesteps
         self.delta = delta
+        self.world = world
         self.tx = 0
         
-        # TODO: Store the world state when executing each action.
+        # Store the world state when executing each action.
         self.trajectory = []
 
     def step(self):
@@ -43,6 +44,7 @@ class PushAction:
                                    z=self.start_pos.z + self.tx*self.delta*self.direction[2])
             p.changeConstraint(userConstraintUniqueId=self.c_id, 
                                jointChildPivot=updated_pos)
+            self.trajectory.append(self.world.get_positions())
             self.tx += 1
 
 
@@ -52,14 +54,16 @@ def make_world(com):
                       mass=100,
                       com=Position(x=0., y=0., z=0.),
                       color=Color(r=0.25, g=0.25, b=0.25))
-    platform.set_pose(Position(x=0., y=0., z=0.025))
+    platform.set_pose(Pose(pos=Position(x=0., y=0., z=0.025),
+                           orn=Orientation(x=0, y=0, z=0, w=1)))
 
     block = Object(name='block',
                    dimensions=Dimensions(x=0.05, y=0.05, z=0.05),
                    mass=1,
                    com=com,
                    color=Color(r=1., g=0., b=0.))
-    block.set_pose(Position(x=0., y=0., z=0.075))
+    block.set_pose(Pose(pos=Position(x=0., y=0., z=0.075),
+                        orn=Orientation(x=0, y=0, z=0, w=1)))
   
     return World([platform, block])
 
@@ -85,6 +89,7 @@ if __name__ == '__main__':
     for ix in range(100):
         env.step(actions=actions)
         
+    print(actions[0].trajectory)
 
 
     
