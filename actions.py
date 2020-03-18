@@ -3,22 +3,25 @@ from block_utils import Environment, World, Object, Position, Pose, \
 from filter_utils import create_uniform_particles
 import pybullet as p
 import copy
+import numpy as np
 
 
 class PushAction:
-    def __init__(self, world, direction, start_pos, timesteps, delta=0.005):
+    def __init__(self, world, block, direction, timesteps, delta=0.005):
         """ PushAction moves the hand in the given world by a fixed distance 
-            every timestep. 
+            every timestep. We assume we will push the block in a direction through
+            the object's geometric center.
         :param world: The world which this action should apply to. Used to get the hand
                       and calculate offsets.
+        :param block: The block we wish to push.
         :param direction: A unit vector direction to push.
-        :param start_pos: The initial position of the hand relative to this world's origin.
         :param timesteps: The number of timesteps to execute the action for.
         :param delta: How far to move each timestep.
         """
-        self.start_pos = Position(x=world.offset[0]+start_pos.x,
-                                  y=world.offset[1]+start_pos.y,
-                                  z=start_pos.z)
+        block_pos = block.pose.pos
+        self.start_pos = Position(x=block_pos.x - direction[0]*delta*20,
+                                  y=block_pos.y - direction[1]*delta*20,
+                                  z=block_pos.z - direction[2]*delta*20)
         self.c_id = p.createConstraint(parentBodyUniqueId=world.get_hand_id(),
                                        parentLinkIndex=-1,
                                        childBodyUniqueId=-1,
@@ -46,6 +49,11 @@ class PushAction:
                                jointChildPivot=updated_pos)
             self.trajectory.append(self.world.get_positions())
             self.tx += 1
+    
+    @staticmethod
+    def get_random_dir():
+        angle = np.random.uniform(0, np.pi)
+        return (np.cos(angle), np.sin(angle), 0)
 
 
 def make_world(com):
@@ -73,16 +81,18 @@ if __name__ == '__main__':
     true_world = make_world(true_com)
 
     com_ranges = get_com_ranges(true_world.objects[1])
-    com_particles, _ = create_uniform_particles(20, 3, com_ranges)
+    com_particles, _ = create_uniform_particles(5, 3, com_ranges)
     particle_worlds = [make_world(particle) for particle in com_particles]
 
     env = Environment([true_world]+particle_worlds, vis_sim=True)
     
+    d = PushAction.get_random_dir()
+
     actions = []
     for w in [true_world] + particle_worlds:
         action = PushAction(world=w, 
-                            direction=(1, 0.1, 0), 
-                            start_pos=Position(-0.1, 0, 0.075),
+                            block=w.objects[1],
+                            direction=d, 
                             timesteps=50)
         actions.append(action)
 
