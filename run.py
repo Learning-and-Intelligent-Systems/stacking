@@ -15,11 +15,17 @@ def main(args):
     world = World(blocks)
     # run the particle filter
     com_filters = filter_world(world, args)
+
+    # NOTE(izzy): All my code takes a dict {name: Object}, because I wrote it
+    # before blocks had name fields. I plan to go back and fix that so it takes
+    # lists of block objects instead
+    block_dict = {b.name: b for b in blocks}
+
     # find the tallest tower
-    _, tallest_contacts = find_tallest_tower(blocks, com_filters)
+    _, tallest_contacts = find_tallest_tower(block_dict, com_filters)
     # and visualize the result
     if args.vis:
-        simulate_from_contacts(blocks, tallest_contacts, vis=True, T=60)
+        simulate_from_contacts(block_dict, tallest_contacts, vis=True, T=60)
 
 
 if __name__ == '__main__':
