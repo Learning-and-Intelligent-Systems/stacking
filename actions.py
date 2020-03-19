@@ -8,7 +8,7 @@ import numpy as np
 
 class PushAction:
     def __init__(self, block_pos, direction, timesteps, delta=0.005):
-        """ PushAction moves the hand in the given world by a fixed distance 
+        """ PushAction moves the hand in the given world by a fixed distance
             every timestep. We assume we will push the block in a direction through
             the object's geometric center.
         :param world: The world which this action should apply to. Used to get the hand
@@ -27,7 +27,7 @@ class PushAction:
         self.tx = 0
 
     def step(self):
-        """ Move the hand forward by delta. 
+        """ Move the hand forward by delta.
         :return: The position of the hand in a local world frame.
         """
         t = self.tx
@@ -38,7 +38,7 @@ class PushAction:
                                z=self.start_pos.z + t*self.delta*self.direction[2])
         self.tx += 1
         return updated_pos
-    
+
     @staticmethod
     def get_random_dir():
         angle = np.random.uniform(0, np.pi)
@@ -61,7 +61,7 @@ def make_world(com):
                    color=Color(r=1., g=0., b=0.))
     block.set_pose(Pose(pos=Position(x=0., y=0., z=0.075),
                         orn=Quaternion(x=0, y=0, z=0, w=1)))
-  
+
     return World([platform, block])
 
 
@@ -74,13 +74,10 @@ if __name__ == '__main__':
     particle_worlds = [make_world(particle) for particle in com_particles]
 
     env = Environment([true_world]+particle_worlds, vis_sim=True)
-    
+
     action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
-                        direction=PushAction.get_random_dir(), 
+                        direction=PushAction.get_random_dir(),
                         timesteps=50)
 
     for ix in range(100):
         env.step(action=action)
-        
-
-    

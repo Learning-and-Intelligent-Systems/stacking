@@ -1,30 +1,25 @@
 import pdb
-# from filter import filter_world
+from filter import filter_world
 import argparse
 from block_utils import Position, Dimensions, Object, World, Color
 from actions import make_world
 from stability import find_tallest_tower
 import numpy as np
 
-def experiment(blocks):
-    pass
-
 def display_tower(tallest_tower):
+    # TODO(izzy)
     pass
 
 def main(args):
-    # # make world
-    # world = make_world([0., 0., 0.])
-    # # run filter
-    # filter_world(world, args)
-    # # find stable arrangement of blocks
     # get a bunch of random blocks
     blocks = [Object.random('obj_%i' % i) for i in range(args.num_blocks)]
-
-    com_filters = experiment(blocks)
-
+    # construct a world containing those blocks
+    world = World(blocks)
+    # run the particle filter
+    com_filters = filter_world(world, args)
+    # find the tallest tower
     _, tallest_tower = find_tallest_tower(blocks, com_filters)
-
+    # and visualize the result
     diplay_tower(tallest_tower)
 
 
