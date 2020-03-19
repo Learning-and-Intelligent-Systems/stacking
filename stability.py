@@ -155,8 +155,10 @@ def find_tallest_tower(objects, com_filters, num_samples=100):
         for i in range(len(tower)-1):
             name_a = tower[i+1]
             name_b = tower[i]
-            x_offset = 0
-            y_offset = 0
+            mean_x, mean_y, _ =\
+                com_filters[name_a].particles.T @ com_filters[name_a].weights
+            x_offset = -mean_x
+            y_offset = -mean_y
             z_offset = objects[name_a].dimensions.z/2 \
                      + objects[name_b].dimensions.z/2
             contact_pose = Pose(Position(x_offset, y_offset, z_offset), no_rot)
