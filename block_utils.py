@@ -56,14 +56,36 @@ class Object:
     def get_id(self):
         return self.id
 
+    def random(name):
+        """ Construct a random object
+
+
+        Arguments:
+            name {str} -- name of the object
+
+        Returns:
+            Object -- a random object
+        """
+        # blocks range in size from 0.1 to 1
+        dims = Dimensions(*(np.random.rand(3) * 0.9 + 0.1))
+        # pick a density and multiply by the volume to get mass
+        density = np.random.rand() * 0.9 + 0.1
+        mass = density * dims.x * dims.y * dims.z
+        # center of mass lies within the middle 0.75 of the block along each axis
+        com = Position(*((np.random.rand(3) - 0.5) * 0.75 * dims))
+        # pick a random color
+        color = Color(*np.random.rand(3))
+        # and add the new block to the list
+        return Object(name, dims, mass, com, color)
+
 
 class Hand:
     def __init__(self):
-        """ Note that Hand will store the global position of the hand (as directly 
-            returned by PyBullet. To get the position of the hand relative to a 
+        """ Note that Hand will store the global position of the hand (as directly
+            returned by PyBullet. To get the position of the hand relative to a
             single world, use the world object.
         """
-        self.hand_id = -1   
+        self.hand_id = -1
         self.c_id = -1
         self.pos = None
 
@@ -83,8 +105,8 @@ class Hand:
                                           childFramePosition=new_pos)
         else:
             p.changeConstraint(userConstraintUniqueId=self.c_id,
-                               jointChildPivot=new_pos)                   
-    
+                               jointChildPivot=new_pos)
+
     def set_id(self, hand_id):
         self.hand_id = hand_id
 
@@ -116,7 +138,7 @@ class World:
                                     [self.offset[0], self.offset[1], 0.0]))
             orn = object.pose.orn
             object.set_pose(Pose(offset_pos, orn))
-        
+
     def set_hand_id(self, h_id):
         self.hand.set_id(h_id)
 
