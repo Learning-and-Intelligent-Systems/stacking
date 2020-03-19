@@ -12,7 +12,7 @@ from stability import *
 import numpy as np
 import shutil
 
-no_rot = Quaternion(1, 0, 0, 0)
+no_rot = Quaternion(0, 0, 0, 1)
 
 def check_stability_with_pybullet(objects, contacts, vis=False, steps=30):
     world = World(objects.values())
