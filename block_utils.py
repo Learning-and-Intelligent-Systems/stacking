@@ -46,9 +46,8 @@ class Object:
     def set_pose(self, pose):
         self.pose = pose
 
-    def get_pose(self, offset=np.zeros(3)):
-        pos = Position(*np.subtract(self.pose.pos, [offset[0], offset[1], 0.0]))
-        return Pose(pos, self.pose.orn)
+    def get_pose(self):
+        return self.pose
 
     def set_id(self, id):
         self.id = id
@@ -61,13 +60,7 @@ class World:
     def __init__(self, objects):
         self.objects = objects
         self.offset = None          # offset in the env (set later)
-        self.hand_id = None
-
-    def set_poses(self, poses):
-        for object in self.objects:
-            for (obj_name, pose) in poses.items():
-                if obj_name == object.name:
-                    object.set_pose(pose)
+        self.hand_id = None         # pybullet ID for hand (set later)
 
     def get_positions(self):
         return {w_obj.name: w_obj.get_pose(offset=self.offset).pos
@@ -76,7 +69,11 @@ class World:
     def get_pose(self, obj):
         for w_obj in self.objects:
             if w_obj == obj:
-                return w_obj.get_pose(offset=self.offset)
+                global_pose = obj.get_pose()
+                world_pos = Position(*np.subtract(global_pose.pos,
+                                                    [self.offset[0], self.offset[1], 0.0]))
+                world_pose = Pose(world_pos, global_pose.orn)
+                return world_pose
 
     def set_offset(self, offset):
         self.offset = offset
@@ -125,7 +122,7 @@ class Environment:
                     if use_hand:
                         hand_pose = Position(x=x_pos, y=y_pos-0.25, z=0.25)
                         hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf', 
-                                                             hand_pose)
+                                                            hand_pose)
                         self.worlds[world_i].set_hand_id(hand_id)
 
                     for obj in self.worlds[world_i].objects:
@@ -157,12 +154,11 @@ class Environment:
         # update all world object poses
         for world in self.worlds:
             for obj in world.objects:
-                pose = Pose(*self.pybullet_server.get_pose(obj.id))
-                obj.set_pose(pose)
+                pos, orn = self.pybullet_server.get_pose(obj.id)
+                obj.set_pose(Pose(Position(*pos), Quaternion(*orn)))
                 if vis_frames:
-                    obj_id = obj.get_id()
-                    pos, quat = self.pybullet_server.get_pose(obj_id)
-                    self.pybullet_server.vis_frame(pos, quat)
+                    pos, quat = obj.get_pose()
+                    self.pybullet_server.vis_frame(pos, orn)
 
         # sleep (for visualization purposes)
         time.sleep(0.05)
