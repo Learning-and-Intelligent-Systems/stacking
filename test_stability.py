@@ -12,7 +12,9 @@ from stability import *
 import numpy as np
 import shutil
 
-def check_stability_with_pybullet(objects, contacts, vis=False, steps=20):
+no_rot = Quaternion(1, 0, 0, 0)
+
+def check_stability_with_pybullet(objects, contacts, vis=False, steps=30):
     world = World(objects.values())
     init_positions = get_poses_from_contacts(contacts)
     world.set_poses(init_positions)
@@ -26,7 +28,7 @@ def check_stability_with_pybullet(objects, contacts, vis=False, steps=20):
     return unmoved(init_positions, final_positions)
 
 # see if the two dicts of positions are roughly equivalent
-def unmoved(init_positions, final_positions, eps=1e-3):
+def unmoved(init_positions, final_positions, eps=3e-3):
     total_dist = 0
     for obj in init_positions:
         if obj != 'ground':
@@ -35,7 +37,7 @@ def unmoved(init_positions, final_positions, eps=1e-3):
     return total_dist < eps
 
 # compare the results of pybullet with our static analysis
-def stable_agrees_with_sim(objects, contacts, vis=False, steps=20):
+def stable_agrees_with_sim(objects, contacts, vis=False, steps=30):
     simulation_is_stable =\
         check_stability_with_pybullet(objects, contacts, vis=vis, steps=steps)
 
@@ -59,12 +61,12 @@ def constructible_agrees_with_stable(objects, contacts):
     print("CONSTRUCTABLE" if piecewise_stable else "UNCONSTRUCTABLE")
     return constructible == piecewise_stable
 
-def test_tower_is_stable(vis=False, T=20):
+def test_tower_is_stable(vis=False, T=30):
     obj_a = Object('obj_a', Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
     obj_b = Object('obj_b', Dimensions(3,1,1), 3, Position(0,0,0), Color(1,0,1))
     obj_c = Object('obj_c', Dimensions(1,1,2), 2, Position(0,0,0), Color(1,1,0))
 
-    pos_a_ground = Position(0.,0.,obj_a.dimensions[2]/2)
+    pos_a_ground = Pose(Position(0.,0.,obj_a.dimensions[2]/2), no_rot)
     con_a_ground = Contact('obj_a', 'ground', pos_a_ground)
 
     # the single block is stable
@@ -73,32 +75,32 @@ def test_tower_is_stable(vis=False, T=20):
     assert stable_agrees_with_sim(objects, contacts, vis=vis, steps=T)
 
     # This tower is stable
-    stable_pos_b_a = Position(0, 0,
-        obj_b.dimensions[2]/2+obj_a.dimensions[2]/2)
+    stable_pos_b_a = Pose(Position(0, 0,
+        obj_b.dimensions[2]/2+obj_a.dimensions[2]/2), no_rot)
     stable_con_b_a = Contact('obj_b', 'obj_a', stable_pos_b_a)
     contacts = [con_a_ground, stable_con_b_a]
     objects = {'obj_a': obj_a, 'obj_b': obj_b}
     assert stable_agrees_with_sim(objects, contacts, vis=vis, steps=T)
 
     # but if we shift the top block it falls off
-    unstable_pos_b_a = Position(1., 0,
-        obj_b.dimensions[2]/2+obj_a.dimensions[2]/2)
+    unstable_pos_b_a = Pose(Position(1., 0,
+        obj_b.dimensions[2]/2+obj_a.dimensions[2]/2), no_rot)
     unstable_con_b_a = Contact('obj_b', 'obj_a', unstable_pos_b_a)
     contacts = [con_a_ground, unstable_con_b_a]
     objects = {'obj_a': obj_a, 'obj_b': obj_b}
     assert stable_agrees_with_sim(objects, contacts, vis=vis, steps=T)
 
     # we can stabilize the previously unstable tower by adding a third block
-    stable_pos_c_b = Position(-1.4, 0,
-        obj_c.dimensions[2]/2+obj_b.dimensions[2]/2)
+    stable_pos_c_b = Pose(Position(-1.4, 0,
+        obj_c.dimensions[2]/2+obj_b.dimensions[2]/2), no_rot)
     stable_con_c_b = Contact('obj_c', 'obj_b', stable_pos_c_b)
     contacts = [con_a_ground, unstable_con_b_a, stable_con_c_b]
     objects = {'obj_a': obj_a, 'obj_b': obj_b, 'obj_c': obj_c}
     assert stable_agrees_with_sim(objects, contacts, vis=vis, steps=T)
 
     # If we go too far it becomes unstable again
-    unstable_pos_c_b = Position(-1.6, 0,
-        obj_c.dimensions[2]/2+obj_b.dimensions[2]/2)
+    unstable_pos_c_b = Pose(Position(-1.6, 0,
+        obj_c.dimensions[2]/2+obj_b.dimensions[2]/2), no_rot)
     unstable_con_c_b = Contact('obj_c', 'obj_b', unstable_pos_c_b)
     contacts = [con_a_ground, unstable_con_b_a, unstable_con_c_b]
     objects = {'obj_a': obj_a, 'obj_b': obj_b, 'obj_c': obj_c}
@@ -112,7 +114,7 @@ def test_tower_is_constructible():
     obj_b = Object('obj_b', Dimensions(3,1,1), 3, Position(0,0,0), Color(1,0,1))
     obj_c = Object('obj_c', Dimensions(1,1,2), 2, Position(0,0,0), Color(1,1,0))
 
-    pos_a_ground = Position(0.,0.,obj_a.dimensions[2]/2)
+    pos_a_ground = Pose(Position(0.,0.,obj_a.dimensions[2]/2), no_rot)
     con_a_ground = Contact('obj_a', 'ground', pos_a_ground)
 
     # the single block is stable
@@ -121,16 +123,16 @@ def test_tower_is_constructible():
     assert constructible_agrees_with_stable(objects, contacts)
 
     # This tower is constructible
-    stable_pos_b_a = Position(0.4, 0,
-        obj_b.dimensions[2]/2+obj_a.dimensions[2]/2)
+    stable_pos_b_a = Pose(Position(0.4, 0,
+        obj_b.dimensions[2]/2+obj_a.dimensions[2]/2), no_rot)
     stable_con_b_a = Contact('obj_b', 'obj_a', stable_pos_b_a)
     contacts = [con_a_ground, stable_con_b_a]
     objects = {'obj_a': obj_a, 'obj_b': obj_b}
     assert constructible_agrees_with_stable(objects, contacts)
 
     # but if we shift the top block it falls off
-    unstable_pos_b_a = Position(1., 0,
-        obj_b.dimensions[2]/2+obj_a.dimensions[2]/2)
+    unstable_pos_b_a = Pose(Position(1., 0,
+        obj_b.dimensions[2]/2+obj_a.dimensions[2]/2), no_rot)
     unstable_con_b_a = Contact('obj_b', 'obj_a', unstable_pos_b_a)
     contacts = [con_a_ground, unstable_con_b_a]
     objects = {'obj_a': obj_a, 'obj_b': obj_b}
@@ -138,8 +140,8 @@ def test_tower_is_constructible():
 
     # we can stabilize the previously unstable tower by adding a third block,
     # however this tower cannot be constructed
-    stable_pos_c_b = Position(-1.4, 0,
-        obj_c.dimensions[2]/2+obj_b.dimensions[2]/2)
+    stable_pos_c_b = Pose(Position(-1.4, 0,
+        obj_c.dimensions[2]/2+obj_b.dimensions[2]/2), no_rot)
     stable_con_c_b = Contact('obj_c', 'obj_b', stable_pos_c_b)
     contacts = [con_a_ground, unstable_con_b_a, stable_con_c_b]
     objects = {'obj_a': obj_a, 'obj_b': obj_b, 'obj_c': obj_c}
@@ -160,17 +162,17 @@ def test_calc_expected_height(num_samples=100):
         create_uniform_particles(num_samples, 3, get_com_ranges(obj))
         for name, obj in objects.items()}
 
-    pos_b_ground = Position(0.,0.,obj_b.dimensions[2]/2)
+    pos_b_ground = Pose(Position(0.,0.,obj_b.dimensions[2]/2), no_rot)
     con_b_ground = Contact('obj_b', 'ground', pos_b_ground)
-    pos_c_ground = Position(0.,0.,obj_c.dimensions[2]/2)
+    pos_c_ground = Pose(Position(0.,0.,obj_c.dimensions[2]/2), no_rot)
     con_c_ground = Contact('obj_c', 'ground', pos_c_ground)
-    pos_a_b = Position(0.,0.,obj_a.dimensions[2]/2+obj_b.dimensions[2]/2)
+    pos_a_b = Pose(Position(0.,0.,obj_a.dimensions[2]/2+obj_b.dimensions[2]/2), no_rot)
     con_a_b = Contact('obj_a', 'obj_b', pos_a_b)
-    pos_b_a = Position(0.,0.,obj_b.dimensions[2]/2+obj_a.dimensions[2]/2)
+    pos_b_a = Pose(Position(0.,0.,obj_b.dimensions[2]/2+obj_a.dimensions[2]/2), no_rot)
     con_b_a = Contact('obj_b', 'obj_a', pos_b_a)
-    pos_c_a = Position(0.,0.,obj_c.dimensions[2]/2+obj_a.dimensions[2]/2)
+    pos_c_a = Pose(Position(0.,0.,obj_c.dimensions[2]/2+obj_a.dimensions[2]/2), no_rot)
     con_c_a = Contact('obj_c', 'obj_a', pos_c_a)
-    pos_a_c = Position(0.,0.,obj_a.dimensions[2]/2+obj_c.dimensions[2]/2)
+    pos_a_c = Pose(Position(0.,0.,obj_a.dimensions[2]/2+obj_c.dimensions[2]/2), no_rot)
     con_a_c = Contact('obj_a', 'obj_c', pos_a_c)
 
     # a tower where each block rests fully on the one below is always stable
@@ -203,7 +205,7 @@ def test_find_tallest_tower():
 
 
 if __name__ == '__main__':
-    test_tower_is_stable(vis=False, T=20)
+    test_tower_is_stable(vis=False, T=30)
     test_tower_is_constructible()
     test_calc_expected_height()
     test_find_tallest_tower()

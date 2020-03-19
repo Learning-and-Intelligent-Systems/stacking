@@ -14,6 +14,7 @@ from itertools import permutations
 # TODO(izzy): right now I'm assuming sequential vertical contacts. This get's a
 # lot more tricky if we want to place blocks adjacent to eachother
 
+no_rot = Quaternion(1, 0, 0, 0)
 
 def tower_is_stable(objects, contacts):
     object_names = object_names_in_order(contacts)
@@ -35,7 +36,8 @@ def tower_is_stable(objects, contacts):
         # contact. The dimensions and color are None, because this describes
         # multiple objects
         top_total_obj = Object('top_total', None, top_total_mass, top_total_com, None)
-        top_total_contact = Contact(obj_name, 'top_total', top_total_pos - pos)
+        top_total_rel_pose = Pose(top_total_pos - pos, no_rot)
+        top_total_contact = Contact(obj_name, 'top_total', top_total_rel_pose)
 
         # check stability
         if not pair_is_stable(obj, top_total_obj, top_total_contact):
@@ -82,7 +84,7 @@ def pair_is_stable(bottom_obj, top_obj, contact):
     # Check if the COM of the top object is within the dimensions of the bottom
     # object. We assume that the two objects are in static planar contact in z,
     # and that the COM of the top object must lie within the object
-    top_rel_com = np.array(top_obj.com) + contact.p_a_b
+    top_rel_com = np.array(top_obj.com) + contact.pose_a_b.pos
     return (np.abs(top_rel_com)*2 - bottom_obj.dimensions <= 0)[:2].all()
 
 
@@ -112,9 +114,9 @@ def find_tallest_tower(objects, com_filters, num_samples=100):
     max_contacts = []
     for tower_idx, tower in enumerate(towers):
         contacts = []
-        ground_contact_position = \
-            Position(0, 0, objects[tower[0]].dimensions.z/2)
-        contacts.append(Contact(tower[0], 'ground', ground_contact_position))
+        ground_contact_pose = \
+            Pose(Position(0, 0, objects[tower[0]].dimensions.z/2), no_rot)
+        contacts.append(Contact(tower[0], 'ground', ground_contact_pose))
         for i in range(len(tower)-1):
             name_a = tower[i+1]
             name_b = tower[i]
@@ -122,8 +124,8 @@ def find_tallest_tower(objects, com_filters, num_samples=100):
             y_offset = 0
             z_offset = objects[name_a].dimensions.z/2 \
                      + objects[name_b].dimensions.z/2
-            contact_position = Position(x_offset, y_offset, z_offset)
-            contacts.append(Contact(name_a, name_b, contact_position))
+            contact_pose = Pose(Position(x_offset, y_offset, z_offset), no_rot)
+            contacts.append(Contact(name_a, name_b, contact_pose))
 
         height = calc_expected_height(objects, contacts, com_filters)
         if height > max_height:
