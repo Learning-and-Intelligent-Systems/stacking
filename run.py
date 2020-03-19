@@ -31,7 +31,7 @@ def main(args):
     # lists of block objects instead
 
     # and visualize the result
-    if True: #args.vis:
+    if args.vis:
         simulate_from_contacts(blocks, tallest_contacts, vis=True, T=60)
 
 
