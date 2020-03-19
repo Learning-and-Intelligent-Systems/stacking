@@ -4,6 +4,7 @@ import os
 from collections import namedtuple
 from copy import copy
 
+import pybullet as p
 import odio_urdf
 from pybullet_utils import PyBulletServer, quat_math
 
@@ -55,12 +56,45 @@ class Object:
     def get_id(self):
         return self.id
 
+
+class Hand:
+    def __init__(self):
+        """ Note that Hand will store the global position of the hand (as directly 
+            returned by PyBullet. To get the position of the hand relative to a 
+            single world, use the world object.
+        """
+        self.hand_id = -1   
+        self.c_id = -1
+        self.pos = None
+
+    def get_pos(self):
+        return self.pos
+
+    def set_pos(self, new_pos):
+        self.pos = new_pos
+        if self.c_id == -1:
+           self.c_id = p.createConstraint(parentBodyUniqueId=self.hand_id,
+                                          parentLinkIndex=-1,
+                                          childBodyUniqueId=-1,
+                                          childLinkIndex=-1,
+                                          jointType=p.JOINT_FIXED,
+                                          jointAxis=(0,0,0),
+                                          parentFramePosition=(0,0,0),
+                                          childFramePosition=new_pos)
+        else:
+            p.changeConstraint(userConstraintUniqueId=self.c_id,
+                               jointChildPivot=new_pos)                   
+    
+    def set_id(self, hand_id):
+        self.hand_id = hand_id
+
+
 class World:
 
     def __init__(self, objects):
         self.objects = objects
         self.offset = None          # offset in the env (set later)
-        self.hand_id = None         # pybullet ID for hand (set later)
+        self.hand = Hand()
 
     def get_poses(self):
         return {w_obj.name: w_obj.get_pose().pos
@@ -82,12 +116,18 @@ class World:
                                     [self.offset[0], self.offset[1], 0.0]))
             orn = object.pose.orn
             object.set_pose(Pose(offset_pos, orn))
-
+        
     def set_hand_id(self, h_id):
-        self.hand_id = h_id
+        self.hand.set_id(h_id)
 
-    def get_hand_id(self):
-        return self.hand_id
+    def set_hand_pos(self, pos):
+        global_pos = Position(*np.add(pos, [self.offset[0], self.offset[1], 0]))
+        self.hand.set_pos(global_pos)
+
+    def get_hand_pos(self):
+        global_pos = self.hand.get_pos()
+        rel_pos = Position(*np.subtract(global_pos, [self.offset[0], self.offset[1], 0]))
+        return rel_pos
 
 class Environment:
 
@@ -115,15 +155,14 @@ class Environment:
                     worlds[world_i].set_offset(world_center)
 
                     # Load the gripper object.
-                    with open(self.tmp_dir+'/hand_'+ str(world_i) + '.urdf', 'w') as handle:
-                        handle.write(str(hand_urdf()))
-                    #hand_pose = Pose(Position(x=x_pos, y=y_pos, z=0.1),
-                    #                 Orientation(x=0., y=0., z=0., w=1.))
                     if use_hand:
+                        with open(self.tmp_dir+'/hand_'+ str(world_i) + '.urdf', 'w') as handle:
+                            handle.write(str(hand_urdf()))
                         hand_pose = Position(x=x_pos, y=y_pos-0.25, z=0.25)
                         hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf',
                                                             hand_pose)
                         self.worlds[world_i].set_hand_id(hand_id)
+                        self.worlds[world_i].set_hand_pos(Position(x=0, y=-0.25, z=0.25))
 
                     for obj in self.worlds[world_i].objects:
                         object_urdf = object_to_urdf(obj)
@@ -143,10 +182,12 @@ class Environment:
                             self.pybullet_server.vis_frame(pos, quat)
                     world_i += 1
 
-    def step(self, actions=[], vis_frames=False):
+    def step(self, action=None, vis_frames=False):
         # Apply every action.
-        for a in actions:
-            a.step()
+        if action:
+            hand_pos = action.step()
+            for world in self.worlds:
+                world.set_hand_pos(hand_pos)
 
         # forward step the sim
         self.pybullet_server.step()

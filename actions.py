@@ -7,48 +7,37 @@ import numpy as np
 
 
 class PushAction:
-    def __init__(self, world, block, direction, timesteps, delta=0.005):
+    def __init__(self, block_pos, direction, timesteps, delta=0.005):
         """ PushAction moves the hand in the given world by a fixed distance 
             every timestep. We assume we will push the block in a direction through
             the object's geometric center.
         :param world: The world which this action should apply to. Used to get the hand
                       and calculate offsets.
-        :param block: The block we wish to push.
+        :param block_pos: The position of the block in a local world frame.
         :param direction: A unit vector direction to push.
         :param timesteps: The number of timesteps to execute the action for.
         :param delta: How far to move each timestep.
         """
-        block_pos = block.pose.pos
         self.start_pos = Position(x=block_pos.x - direction[0]*delta*20,
                                   y=block_pos.y - direction[1]*delta*20,
                                   z=block_pos.z - direction[2]*delta*20)
-        self.c_id = p.createConstraint(parentBodyUniqueId=world.get_hand_id(),
-                                       parentLinkIndex=-1,
-                                       childBodyUniqueId=-1,
-                                       childLinkIndex=-1,
-                                       jointType=p.JOINT_FIXED,
-                                       jointAxis=(0,0,0),
-                                       parentFramePosition=(0, 0, 0),
-                                       childFramePosition=self.start_pos)
         self.direction = direction
         self.timesteps = timesteps
         self.delta = delta
-        self.world = world
         self.tx = 0
-        
-        # Store the world state when executing each action.
-        self.trajectory = []
 
     def step(self):
-        """ Move the hand forward by delta. """
-        if self.tx < self.timesteps:
-            updated_pos = Position(x=self.start_pos.x + self.tx*self.delta*self.direction[0],
-                                   y=self.start_pos.y + self.tx*self.delta*self.direction[1],
-                                   z=self.start_pos.z + self.tx*self.delta*self.direction[2])
-            p.changeConstraint(userConstraintUniqueId=self.c_id, 
-                               jointChildPivot=updated_pos)
-            self.trajectory.append(self.world.get_positions())
-            self.tx += 1
+        """ Move the hand forward by delta. 
+        :return: The position of the hand in a local world frame.
+        """
+        t = self.tx
+        if t > self.timesteps:
+            t = self.timesteps
+        updated_pos = Position(x=self.start_pos.x + t*self.delta*self.direction[0],
+                               y=self.start_pos.y + t*self.delta*self.direction[1],
+                               z=self.start_pos.z + t*self.delta*self.direction[2])
+        self.tx += 1
+        return updated_pos
     
     @staticmethod
     def get_random_dir():
@@ -81,25 +70,17 @@ if __name__ == '__main__':
     true_world = make_world(true_com)
 
     com_ranges = get_com_ranges(true_world.objects[1])
-    com_particles, _ = create_uniform_particles(5, 3, com_ranges)
+    com_particles, _ = create_uniform_particles(50, 3, com_ranges)
     particle_worlds = [make_world(particle) for particle in com_particles]
 
     env = Environment([true_world]+particle_worlds, vis_sim=True)
     
-    d = PushAction.get_random_dir()
-
-    actions = []
-    for w in [true_world] + particle_worlds:
-        action = PushAction(world=w, 
-                            block=w.objects[1],
-                            direction=d, 
-                            timesteps=50)
-        actions.append(action)
+    action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
+                        direction=PushAction.get_random_dir(), 
+                        timesteps=50)
 
     for ix in range(100):
-        env.step(actions=actions)
+        env.step(action=action)
         
-    print(actions[0].trajectory)
-
 
     
