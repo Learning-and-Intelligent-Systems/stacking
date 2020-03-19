@@ -75,8 +75,7 @@ if __name__ == '__main__':
 
     env = Environment([true_world]+particle_worlds, vis_sim=True)
     
-    print('Initial:', true_world.objects[1].get_pose().pos)
-    action = PushAction(block_pos=true_world.objects[1].get_pose().pos,
+    action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
                         direction=PushAction.get_random_dir(), 
                         timesteps=50)
 

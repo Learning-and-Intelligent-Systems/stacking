@@ -89,11 +89,31 @@ def pair_is_stable(bottom_obj, top_obj, contact):
 
 
 def calc_expected_height(objects, contacts, com_filters, num_samples=100):
+    """ Finds the expected height of a tower
+
+    If we are uncertain about the center of mass of blocks, then for any
+    tower there is some probability that it will collapse. This function
+    finds the height of a tower times the probability that it is stable
+
+    Arguments:
+        objects {dict {str: Object}} -- the objects in the tower
+        contacts {list [Contact]} -- the contacts between the tower
+        com_filters {dict {str: ParticleDistibution}} -- COM distributions
+
+    Keyword Arguments:
+        num_samples {number} -- how many times to sample COM configurations
+            (default: {100})
+
+    Returns:
+        [float] -- expected height of the tower
+    """
+    # sample a bunch of COMs for each object in the tower
     com_samples = {obj:
         sample_particle_distribution(com_filters[obj], num_samples)
         for obj in objects}
     stable_count = 0
 
+    # for each possible COM sample, check if such a tower would be stable
     for i in range(num_samples):
         sample_objects = {}
         for name, obj in objects.items():
@@ -108,11 +128,26 @@ def calc_expected_height(objects, contacts, com_filters, num_samples=100):
     return height * stable_count / num_samples
 
 def find_tallest_tower(objects, com_filters, num_samples=100):
-    towers = permutations(objects)
+    """ Finds the tallest tower in expectation given uncertainy over COM
+
+    Arguments:
+        objects {dict {str: Object}} -- [description]
+        com_filters {dict {str: ParticleDistibution}} -- COM distributions
+
+    Keyword Arguments:
+        num_samples {number} -- how many times to sample COM configurations
+            (default: {100})
+
+    Returns:
+        List(str), List(Contact) -- The names of the objects in th tallest
+            tower (from the bottom up), and the contacts between those objects
+    """
+    towers = permutations(objects) # all possible block orderings
     max_height = 0
     max_tower = []
     max_contacts = []
     for tower_idx, tower in enumerate(towers):
+        # construct the contacts for this block ordering
         contacts = []
         ground_contact_pose = \
             Pose(Position(0, 0, objects[tower[0]].dimensions.z/2), no_rot)
@@ -127,7 +162,9 @@ def find_tallest_tower(objects, com_filters, num_samples=100):
             contact_pose = Pose(Position(x_offset, y_offset, z_offset), no_rot)
             contacts.append(Contact(name_a, name_b, contact_pose))
 
+        # and check the expected height of this particular tower
         height = calc_expected_height(objects, contacts, com_filters)
+        # save the tallest tower
         if height > max_height:
             max_tower = tower
             max_height = height
