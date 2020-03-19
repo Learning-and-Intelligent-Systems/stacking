@@ -68,20 +68,15 @@ def filter_world(true_world, args):
 
     env = Environment([true_world]+particle_worlds, vis_sim=args.vis)
 
-    # take I push actions for T steps each
     for i in range(I):
-        d = PushAction.get_random_dir()
-        actions = []
-        for w in [true_world] + particle_worlds:
-            action = PushAction(world=w,
-                                block=w.objects[1],
-                                direction=d,
-                                timesteps=50)
-            actions.append(action)
+        # action to apply to all worlds
+        action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
+                            direction=PushAction.get_random_dir(),
+                            timesteps=50)
 
         for t in range(T):
-            env.step(actions=actions, vis_frames=args.debug)
-
+            env.step(action=action)
+        
             # get ground truth object_b pose (observation)
             objb_pose = true_world.get_pose(true_world.objects[1])
             objb_pose = add_noise(objb_pose)
