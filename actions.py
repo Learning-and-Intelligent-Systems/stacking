@@ -64,6 +64,23 @@ def make_world(com):
 
     return World([platform, block])
 
+def make_platform_world(block):
+    """ Given a block, create a world that has a platform to push that block off of.
+    :param block: The Object which to place on the platform.
+    """
+    platform = Object(name='platform',
+                      dimensions=Dimensions(x=0.3, y=0.2, z=0.05),
+                      mass=100,
+                      com=Position(x=0., y=0., z=0.),
+                      color=Color(r=0.25, g=0.25, b=0.25))
+    platform.set_pose(Pose(pos=Position(x=0., y=0., z=0.025),
+                           orn=Quaternion(x=0, y=0, z=0, w=1)))
+
+    block.set_pose(Pose(pos=Position(x=0., y=0., z=0.05+block.dimensions[2]/2.),
+                        orn=Quaternion(x=0, y=0, z=0, w=1)))
+
+    return World([platform, block])
+
 
 if __name__ == '__main__':
     true_com = Position(x=0., y=0., z=0.)

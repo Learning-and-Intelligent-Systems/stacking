@@ -3,7 +3,7 @@ import numpy as np
 import os
 from collections import namedtuple
 from copy import copy
-
+import shutil
 import pybullet as p
 import odio_urdf
 from pybullet_utils import PyBulletServer, quat_math
@@ -67,7 +67,7 @@ class Object:
             Object -- a random object
         """
         # blocks range in size from 0.1 to 1
-        dims = Dimensions(*(np.random.rand(3) * 0.9 + 0.1))
+        dims = Dimensions(*(np.random.rand(3) * 0.1 + 0.05))
         # pick a density and multiply by the volume to get mass
         density = np.random.rand() * 0.9 + 0.1
         mass = density * dims.x * dims.y * dims.z

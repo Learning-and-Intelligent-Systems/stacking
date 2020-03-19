@@ -14,8 +14,8 @@ from block_utils import Environment, Object, Position, Dimensions, World, \
 
 TRUE_OBS_COV = 0.00004*np.eye(3)    # covariance used when add noise to observations
 OBS_MODEL_COV = 0.00004*np.eye(3)   # covariance used in observation model
-T = 15                              # number of steps to simulate per contact state
-I = 10                              # number of contact states to try
+T = 50                              # number of steps to simulate per contact state
+I = 3                               # number of contact states to try
 N = 100                             # number of particles
 D = 3                               # dimensions of a single particle
 
@@ -52,27 +52,29 @@ def plot_particles(ax, particles, weights, t=None):
     plt.draw()
     plt.pause(0.1)
 
-def filter_world(true_world, args):
+def filter_world(p_true_world, args):
     if args.plot:
         plt.ion()
         fig = plt.figure()
         ax = Axes3D(fig)
-
-    # create particle worlds for obj_b's COM
-    com_ranges = get_com_ranges(true_world.objects[1])
-    com_particle_dist = create_uniform_particles(N, D, com_ranges)
-    weights = com_particle_dist.weights
-    particle_worlds = [copy.deepcopy(true_world) for particle in com_particle_dist.particles]
-    for (com, particle_world) in zip(com_particle_dist.particles, particle_worlds):
-        particle_world.objects[1].com = com
-
-    env = Environment([true_world]+particle_worlds, vis_sim=args.vis)
-
+    
     for i in range(I):
+        true_world = copy.deepcopy(p_true_world)
+
+        # create particle worlds for obj_b's COM
+        com_ranges = get_com_ranges(true_world.objects[1])
+        com_particle_dist = create_uniform_particles(N, D, com_ranges)
+        weights = com_particle_dist.weights
+        particle_worlds = [copy.deepcopy(true_world) for particle in com_particle_dist.particles]
+        for (com, particle_world) in zip(com_particle_dist.particles, particle_worlds):
+            particle_world.objects[1].com = com
+
+        env = Environment([true_world]+particle_worlds, vis_sim=args.vis)
+
         # action to apply to all worlds
         action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
                             direction=PushAction.get_random_dir(),
-                            timesteps=50)
+                            timesteps=T)
 
         for t in range(T):
             env.step(action=action)
@@ -95,13 +97,13 @@ def filter_world(true_world, args):
             # normalize particle weights
             weights_sum = sum(new_weights)
             weights = np.divide(new_weights, weights_sum)
-            print('max particle weight: ', max(weights))
+            # print('max particle weight: ', max(weights))
 
             if args.plot and not t % 5:
                 # visualize particles (it's very slow)
                 plot_particles(ax, com_particle_dist.particles, weights, t=t)
 
-    env.disconnect()
-    env.cleanup()
+        env.disconnect()
+        env.cleanup()
 
     return ParticleDistribution(com_particle_dist.particles, weights)
