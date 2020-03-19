@@ -15,20 +15,8 @@ import shutil
 no_rot = Quaternion(0, 0, 0, 1)
 
 def check_stability_with_pybullet(objects, contacts, vis=False, steps=30):
-    world = World(objects.values())
     init_poses = get_poses_from_contacts(contacts)
-    # set object poses in all worlds
-    for (obj, pose) in init_poses.items():
-        for world_obj in world.objects:
-            if world_obj.name == obj:
-                world_obj.set_pose(pose)
-
-    env = Environment([world], vis_sim=vis, use_hand=False)
-    for t in range(steps):
-        env.step(vis_frames=vis)
-    env.disconnect()
-
-    final_poses = world.get_poses()
+    final_poses = simulate_from_contacts(objects, contacts, vis=vis, T=steps)
     return unmoved(init_poses, final_poses)
 
 # see if the two dicts of positions are roughly equivalent
@@ -192,7 +180,7 @@ def test_calc_expected_height(num_samples=100):
     short_and_stable = calc_expected_height(objects, contacts, com_filters)
     assert tall_and_wobbly < short_and_stable
 
-def test_find_tallest_tower():
+def test_find_tallest_tower(vis=False):
     obj_a = Object('obj_a', Dimensions(1,1,1), 1, Position(0,0,0), Color(0,1,1))
     obj_b = Object('obj_b', Dimensions(2,2,2), 3, Position(0,0,0), Color(1,0,1))
     obj_c = Object('obj_c', Dimensions(3,3,3), 2, Position(0,0,0), Color(1,1,0))
@@ -205,6 +193,10 @@ def test_find_tallest_tower():
 
     oracle_tower = ['obj_' + l for l in 'dcba']
     tallest_tower, tallest_contacts = find_tallest_tower(objects, com_filters)
+
+    if vis:
+        simulate_from_contacts(objects, tallest_contacts)
+
     assert (np.array(tallest_tower) == np.array(oracle_tower)).all()
 
 
@@ -212,7 +204,7 @@ if __name__ == '__main__':
     test_tower_is_stable(vis=False, T=30)
     test_tower_is_constructible()
     test_calc_expected_height()
-    test_find_tallest_tower()
+    test_find_tallest_tower(vis=False)
     print('ALL TESTS PASSED')
 
     # remove temp urdf files (they will accumulate quickly)

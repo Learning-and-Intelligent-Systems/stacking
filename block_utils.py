@@ -235,6 +235,21 @@ class Environment:
         # remove temp urdf files (they will accumulate quickly)
         shutil.rmtree(self.tmp_dir)
 
+def simulate_from_contacts(objects, contacts, vis=True, T=60):
+    world = World(objects.values())
+    init_poses = get_poses_from_contacts(contacts)
+    # set object poses in all worlds
+    for (obj, pose) in init_poses.items():
+        for world_obj in world.objects:
+            if world_obj.name == obj:
+                world_obj.set_pose(pose)
+
+    env = Environment([world], vis_sim=vis, use_hand=False)
+    for t in range(T):
+        env.step(vis_frames=vis)
+    env.disconnect()
+
+    return world.get_poses()
 
 def hand_urdf():
     rgb = (0, 1, 0)

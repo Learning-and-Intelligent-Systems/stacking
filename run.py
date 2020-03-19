@@ -1,14 +1,12 @@
 import pdb
 from filter import filter_world
 import argparse
-from block_utils import Position, Dimensions, Object, World, Color
+from block_utils import Position, Dimensions, Object, World, Color, \
+    simulate_from_contacts
 from actions import make_platform_world
 from stability import find_tallest_tower
 import numpy as np
 
-def display_tower(tallest_tower):
-    # TODO(izzy)
-    pass
 
 def main(args):
     # get a bunch of random blocks
@@ -26,9 +24,15 @@ def main(args):
     
     # find the tallest tower
     print('Finding tallest tower.')
-    _, tallest_tower = find_tallest_tower(blocks, com_filters)
+    _, tallest_contacts = find_tallest_tower(blocks, com_filters)
+    
+    # NOTE(izzy): All my code takes a dict {name: Object}, because I wrote it
+    # before blocks had name fields. I plan to go back and fix that so it takes
+    # lists of block objects instead
+
     # and visualize the result
-    diplay_tower(tallest_tower)
+    if True: #args.vis:
+        simulate_from_contacts(blocks, tallest_contacts, vis=True, T=60)
 
 
 if __name__ == '__main__':
