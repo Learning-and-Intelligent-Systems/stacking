@@ -182,11 +182,12 @@ class Environment:
                             self.pybullet_server.vis_frame(pos, quat)
                     world_i += 1
 
-    def step(self, action, vis_frames=False):
+    def step(self, action=None, vis_frames=False):
         # Apply every action.
-        hand_pos = action.step()
-        for world in self.worlds:
-            world.set_hand_pos(hand_pos)
+        if action:
+            hand_pos = action.step()
+            for world in self.worlds:
+                world.set_hand_pos(hand_pos)
 
         # forward step the sim
         self.pybullet_server.step()
