@@ -218,7 +218,9 @@ class Environment:
         for world in self.worlds:
             for obj in world.objects:
                 pos, orn = self.pybullet_server.get_pose(obj.id)
-                obj.set_pose(Pose(Position(*pos), Quaternion(*orn)))
+                # pyBullet returns the pose of the COM, not COG
+                obj_pos = np.subtract(pos, obj.com)
+                obj.set_pose(Pose(Position(*obj_pos), Quaternion(*orn)))
                 if vis_frames:
                     pos, quat = obj.get_pose()
                     self.pybullet_server.vis_frame(pos, orn)

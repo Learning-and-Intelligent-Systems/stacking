@@ -97,7 +97,7 @@ def filter_world(true_world, args):
             weights = np.divide(new_weights, weights_sum)
             print('max particle weight: ', max(weights))
 
-            if args.plot:
+            if args.plot and not t % 5:
                 # visualize particles (it's very slow)
                 plot_particles(ax, com_particle_dist.particles, weights, t=t)
 
