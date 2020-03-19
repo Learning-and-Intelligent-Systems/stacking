@@ -1,14 +1,12 @@
 import pdb
 from filter import filter_world
 import argparse
-from block_utils import Position, Dimensions, Object, World, Color
+from block_utils import Position, Dimensions, Object, World, Color,
+    simulate_from_contacts
 from actions import make_world
 from stability import find_tallest_tower
 import numpy as np
 
-def display_tower(tallest_tower):
-    # TODO(izzy)
-    pass
 
 def main(args):
     # get a bunch of random blocks
@@ -18,9 +16,10 @@ def main(args):
     # run the particle filter
     com_filters = filter_world(world, args)
     # find the tallest tower
-    _, tallest_tower = find_tallest_tower(blocks, com_filters)
+    _, tallest_contacts = find_tallest_tower(blocks, com_filters)
     # and visualize the result
-    diplay_tower(tallest_tower)
+    if args.vis:
+        simulate_from_contacts(blocks, tallest_contacts, vis=True, T=60)
 
 
 if __name__ == '__main__':
