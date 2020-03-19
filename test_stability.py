@@ -16,24 +16,28 @@ no_rot = Quaternion(1, 0, 0, 0)
 
 def check_stability_with_pybullet(objects, contacts, vis=False, steps=30):
     world = World(objects.values())
-    init_positions = get_poses_from_contacts(contacts)
-    world.set_poses(init_positions)
+    init_poses = get_poses_from_contacts(contacts)
+    # set object poses in all worlds
+    for (obj, pose) in init_poses.items():
+        for world_obj in world.objects:
+            if world_obj.name == obj:
+                world_obj.set_pose(pose)
 
     env = Environment([world], vis_sim=vis, use_hand=False)
     for t in range(steps):
         env.step(vis_frames=vis)
     env.disconnect()
 
-    final_positions = world.get_positions()
-    return unmoved(init_positions, final_positions)
+    final_poses = world.get_poses()
+    return unmoved(init_poses, final_poses)
 
 # see if the two dicts of positions are roughly equivalent
-def unmoved(init_positions, final_positions, eps=3e-3):
+def unmoved(init_poses, final_poses, eps=3e-3):
     total_dist = 0
-    for obj in init_positions:
+    for obj in init_poses:
         if obj != 'ground':
-            total_dist += np.linalg.norm(np.array(init_positions[obj].pos)
-                - np.array(final_positions[obj]))
+            total_dist += np.linalg.norm(np.array(init_poses[obj].pos)
+                - np.array(final_poses[obj]))
     return total_dist < eps
 
 # compare the results of pybullet with our static analysis

@@ -62,8 +62,8 @@ class World:
         self.offset = None          # offset in the env (set later)
         self.hand_id = None         # pybullet ID for hand (set later)
 
-    def get_positions(self):
-        return {w_obj.name: w_obj.get_pose(offset=self.offset).pos
+    def get_poses(self):
+        return {w_obj.name: w_obj.get_pose().pos
             for w_obj in self.objects}
 
     def get_pose(self, obj):
@@ -121,7 +121,7 @@ class Environment:
                     #                 Orientation(x=0., y=0., z=0., w=1.))
                     if use_hand:
                         hand_pose = Position(x=x_pos, y=y_pos-0.25, z=0.25)
-                        hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf', 
+                        hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf',
                                                             hand_pose)
                         self.worlds[world_i].set_hand_id(hand_id)
 
