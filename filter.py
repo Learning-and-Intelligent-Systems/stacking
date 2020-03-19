@@ -7,7 +7,7 @@ import copy
 from scipy.stats import multivariate_normal
 from mpl_toolkits.mplot3d import Axes3D
 from actions import PushAction
-from filter_utils import create_uniform_particles
+from filter_utils import create_uniform_particles, ParticleDistribution
 from block_utils import Environment, Object, Position, Dimensions, World, \
                         Pose, Quaternion, Color, get_com_ranges, Contact, \
                         get_poses_from_contacts
@@ -103,3 +103,5 @@ def filter_world(true_world, args):
 
     env.disconnect()
     env.cleanup()
+
+    return ParticleDistribution(com_particle_dist.particles, weights)

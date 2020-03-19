@@ -14,7 +14,7 @@ from itertools import permutations
 # TODO(izzy): right now I'm assuming sequential vertical contacts. This get's a
 # lot more tricky if we want to place blocks adjacent to eachother
 
-no_rot = Quaternion(1, 0, 0, 0)
+no_rot = Quaternion(0, 0, 0, 1)
 
 def tower_is_stable(objects, contacts):
     object_names = object_names_in_order(contacts)
