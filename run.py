@@ -1,26 +1,20 @@
-import pdb
-from filter import filter_world
-import argparse
-from block_utils import Position, Dimensions, Object, World, Color
-from actions import make_world
+from block_utils import *
+from stability import find_tallest_tower
 
-def main(args):
-    if args.debug:
-        import pdb; pdb.set_trace()
+def create_blocks():
+	pass
 
-    # make world
-    world = make_world([0., 0., 0.])
+def experiment(blocks):
+	pass
 
-    # run filter
-    filter_world(world, args)
-
-    # find stable arrangement of blocks
+def display_tower(tallest_tower):
+	pass
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--vis', action='store_true')
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--plot', action='store_true')
-    args = parser.parse_args()
+	blocks = create_blocks()
 
-    main(args)
+	com_filters = experiment(blocks)
+
+	_, tallest_tower = find_tallest_tower(blocks, com_filters)
+
+	diplay_tower(tallest_tower)
