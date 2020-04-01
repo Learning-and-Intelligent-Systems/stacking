@@ -26,12 +26,21 @@ BRAINSTORM/TODO for rewriting stability with quaterions
 """
 
 def tower_is_stable(tower):
+    """ Check that the tower is stable
+
+    NOTE: This function expects blocks in the tower to have zero rotation
+
+    Arguments:
+        blocks {List(Object)} -- the tower from bottom to top
+
+    Returns:
+        bool -- Whether or not the tower is stable
+    """
+    top_group = tower[-1]
     # iterate down the tower, checking stability along the way. Is the group of
     # blocks above the current block stable on the current block?
-    top_group = tower[-1]
     # we don't check the top block because there's nothing on top of it
     for block in reversed(tower[:-1]):
-
         # check stability
         if not pair_is_stable(block, top_group):
             return False
@@ -44,6 +53,8 @@ def tower_is_stable(tower):
 def tower_is_constructible(blocks):
     """ Check that each block can be placed on the tower from bottom to top
     without knocking the tower over
+
+    NOTE: This function expects blocks in the tower to have zero rotation
 
     Arguments:
         blocks {List(Object)} -- the tower from bottom to top
@@ -75,16 +86,18 @@ def pair_is_stable(bottom, top):
     return (np.abs(top_rel_com)*2 - bottom.dimensions <= 0)[:2].all()
 
 
-def calc_expected_height(objects, contacts, com_filters, num_samples=100):
+def calc_expected_height(tower, com_filters, num_samples=100):
     """ Finds the expected height of a tower
 
     If we are uncertain about the center of mass of blocks, then for any
     tower there is some probability that it will collapse. This function
-    finds the height of a tower times the probability that it is stable
+    finds the height of a tower times the probability that it is stable.
+
+    NOTE: This funcion modifies the com field of the blocks in tower.
+    NOTE: This function expects blocks in the tower to have zero rotation
 
     Arguments:
-        objects {dict {str: Object}} -- the objects in the tower
-        contacts {list [Contact]} -- the contacts between the tower
+        tower {List(Object)} -- the objects in the tower
         com_filters {dict {str: ParticleDistibution}} -- COM distributions
 
     Keyword Arguments:
@@ -102,16 +115,13 @@ def calc_expected_height(objects, contacts, com_filters, num_samples=100):
 
     # for each possible COM sample, check if such a tower would be stable
     for i in range(num_samples):
-        sample_objects = {}
-        for name, obj in objects.items():
-            com = Position(*com_samples[name][i])
-            sample_objects[name] = \
-                Object(name, obj.dimensions, obj.mass, com, obj.color)
+        for block in tower:
+            block.com = com_samples[block.name]
 
-        stable_count += tower_is_stable(sample_objects, contacts) \
-            * tower_is_constructible(sample_objects, contacts)
+        stable_count += tower_is_stable(tower) \
+            * tower_is_constructible(tower)
 
-    height = np.sum([obj.dimensions.z for obj in objects.values()])
+    height = np.sum([block.dimensions.z for block in tower])
     return height * stable_count / num_samples
 
 def find_tallest_tower(objects, com_filters, num_samples=100):

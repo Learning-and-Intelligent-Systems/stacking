@@ -370,16 +370,16 @@ def get_contact_dict(contacts, bottom_up=True):
 
 # follow a list of contacts up from the ground to construct a list of object
 # names that describe a tower
-def object_names_in_order(contacts):
-    contact_dict = get_contact_dict(contacts)
-    object_names = ['ground']
-    current_object = 'ground'
+# def object_names_in_order(contacts):
+#     contact_dict = get_contact_dict(contacts)
+#     object_names = ['ground']
+#     current_object = 'ground'
 
-    for _ in range(len(contacts)):
-        current_object = contact_dict[current_object]
-        object_names.append(current_object)
+#     for _ in range(len(contacts)):
+#         current_object = contact_dict[current_object]
+#         object_names.append(current_object)
 
-    return object_names
+#     return object_names
 
 def group_blocks(bottom, top):
     total_mass = bottom.mass + top.mass
