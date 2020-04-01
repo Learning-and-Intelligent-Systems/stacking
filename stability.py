@@ -21,7 +21,6 @@ BRAINSTORM/TODO for rewriting stability with quaterions
  * we should standardize on scipy rotation version of quaternions
 
  Functions to fix
- * pair_is_stable
  * tower_is_stable
  * tower_is_constructible
  * calc_expected_height
@@ -87,19 +86,20 @@ def tower_is_constructible(objects, contacts):
 
     return True
 
-def pair_is_stable(bottom_obj, top_obj, contact):
+def pair_is_stable(bottom, top):
     """ Return True if the top object is stable on the bottom object
 
     Arguments:
-        bottom_obj {Object} -- [description]
-        top_obj {Object} -- [description]
-        contact {Contact} -- [description]
+        bottom {Object} -- [description]
+        top {Object} -- [description]
     """
     # Check if the COM of the top object is within the dimensions of the bottom
     # object. We assume that the two objects are in static planar contact in z,
     # and that the COM of the top object must lie within the object
-    top_rel_com = np.array(top_obj.com) + contact.pose_a_b.pos
-    return (np.abs(top_rel_com)*2 - bottom_obj.dimensions <= 0)[:2].all()
+
+    top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
+    top_rel_com = top_total_pos + top.com
+    return (np.abs(top_rel_com)*2 - bottom.dimensions <= 0)[:2].all()
 
 
 def calc_expected_height(objects, contacts, com_filters, num_samples=100):
