@@ -32,6 +32,10 @@ Contact = namedtuple('Contact', 'objectA_name objectB_name pose_a_b')
                 in object B's center
 '''
 
+ZERO_ROT = Quaternion(0, 0, 0, 1)
+ZERO_POS = Position(0, 0, 0)
+ZERO_POSE = Pose(ZERO_POS, ZERO_ROT)
+
 class Object:
 
     def __init__(self, name, dimensions, mass, com, color):
@@ -41,7 +45,7 @@ class Object:
         self.com = com                  # Position, position of COM relative to
                                         # center of object
         self.color = color              # Color
-        self.pose = None                # Pose (set later)
+        self.pose = ZERO_POSE           # Pose (set later)
         self.id = None                  # int (set later)
 
     def set_pose(self, pose):
@@ -235,14 +239,8 @@ class Environment:
         # remove temp urdf files (they will accumulate quickly)
         shutil.rmtree(self.tmp_dir)
 
-def simulate_from_contacts(objects, contacts, vis=True, T=60):
-    world = World(objects.values())
-    init_poses = get_poses_from_contacts(contacts)
-    # set object poses in all worlds
-    for (obj, pose) in init_poses.items():
-        for world_obj in world.objects:
-            if world_obj.name == obj:
-                world_obj.set_pose(pose)
+def simulate_tower(tower, vis=True, T=60):
+    world = World(tower)
 
     env = Environment([world], vis_sim=vis, use_hand=False)
     for t in range(T):
@@ -250,6 +248,22 @@ def simulate_from_contacts(objects, contacts, vis=True, T=60):
     env.disconnect()
 
     return world.get_poses()
+
+# def simulate_from_contacts(objects, contacts, vis=True, T=60):
+#     world = World(objects.values())
+#     init_poses = get_poses_from_contacts(contacts)
+#     # set object poses in all worlds
+#     for (obj, pose) in init_poses.items():
+#         for world_obj in world.objects:
+#             if world_obj.name == obj:
+#                 world_obj.set_pose(pose)
+
+#     env = Environment([world], vis_sim=vis, use_hand=False)
+#     for t in range(T):
+#         env.step(vis_frames=vis)
+#     env.disconnect()
+
+#     return world.get_poses()
 
 def hand_urdf():
     rgb = (0, 1, 0)

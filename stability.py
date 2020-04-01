@@ -21,13 +21,11 @@ BRAINSTORM/TODO for rewriting stability with quaterions
  * we should standardize on scipy rotation version of quaternions
 
  Functions to fix
- * tower_is_stable
  * tower_is_constructible
  * calc_expected_height
  * find_tallest_tower
 """
 
-no_rot = Quaternion(0, 0, 0, 1)
 
 def tower_is_stable(objects, contacts):
     object_names = object_names_in_order(contacts)
@@ -67,26 +65,25 @@ def tower_is_stable(objects, contacts):
 
     return True # we've verified the whole tower is stable
 
-def tower_is_constructible(objects, contacts):
-    contact_dict = get_contact_dict(contacts)
+def tower_is_constructible(blocks):
+    """ Check that each block can be placed on the tower from bottom to top
+    without knocking the tower over
 
-    # iterate up the top to check constructability: Can each block be placed on
-    # the last?
-    prev_obj_name = contact_dict['ground']
+    Arguments:
+        blocks {List(Object)} -- the tower from bottom to top
 
-    # start with the second object, which is the first non-ground object
-    for _ in range(len(contacts)-1):
-        # get the name of the object on top of the previous one
-        obj_name = contact_dict[prev_obj_name]
-        # and get the relevant contact from the list (there should only be one)
-        con = [c for c in contacts if c.objectA_name == obj_name][0]
-
-        if not pair_is_stable(objects[prev_obj_name], objects[obj_name], con):
-            return False
+    Returns:
+        bool -- Whether or not the tower can be built stably
+    """
+    for i in range(len(blocks) - 1):
+        # check that each pair of blocks is stably individually
+        top = blocks[i+1]
+        bottom = blocks[i]
+        if not pair_is_stable(top, bottom): return False
 
     return True
 
-def pair_is_stable(bottom, top):
+def pair_is_stable(top, bottom):
     """ Return True if the top object is stable on the bottom object
 
     Arguments:
@@ -98,7 +95,7 @@ def pair_is_stable(bottom, top):
     # and that the COM of the top object must lie within the object
 
     top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
-    top_rel_com = top_total_pos + top.com
+    top_rel_com = top_rel_pos + top.com
     return (np.abs(top_rel_com)*2 - bottom.dimensions <= 0)[:2].all()
 
 
