@@ -1,2 +1,5 @@
+.DS_store
 tmp_urdfs/
 __pycache__/
+*.pyc
+*.mov
