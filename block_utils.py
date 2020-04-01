@@ -239,7 +239,9 @@ class Environment:
         # remove temp urdf files (they will accumulate quickly)
         shutil.rmtree(self.tmp_dir)
 
-def simulate_tower(tower, vis=True, T=60):
+def simulate_tower(tower, vis=True, T=60, copy_blocks=True):
+    if copy_blocks:
+        tower = [copy(block) for block in tower]
     world = World(tower)
 
     env = Environment([world], vis_sim=vis, use_hand=False)
@@ -379,6 +381,23 @@ def object_names_in_order(contacts):
 
     return object_names
 
+def group_blocks(bottom, top):
+    total_mass = bottom.mass + top.mass
+    # we'll use the pos from the bottom block as the center of geometry
+    new_pos = bottom.pose.pos
+    # take a weighted average of the COM vectors
+    bottom_vec = np.array(bottom.com) + np.array(bottom.pose.pos)
+    bottom_frac = bottom.mass / total_mass
+    top_vec = np.array(top.com) + np.array(top.pose.pos)
+    top_frac = top.mass / total_mass
+    # bring the COM vector back into the coordinate frame of the group
+    # by subtracting new_pos
+    new_com = bottom_vec*bottom_frac + top_vec*top_frac - new_pos
+    # construct a new block with the attributes of the group
+    new_block = Object('group', None, total_mass, Position(*new_com), None)
+    new_block.pose = Pose(new_pos, ZERO_ROT)
+
+    return new_block
 
 def get_rotated_block(block):
     """ Take a block which is rotated by an element of the rotation group of a

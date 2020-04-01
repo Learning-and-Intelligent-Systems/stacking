@@ -21,47 +21,23 @@ BRAINSTORM/TODO for rewriting stability with quaterions
  * we should standardize on scipy rotation version of quaternions
 
  Functions to fix
- * tower_is_constructible
  * calc_expected_height
  * find_tallest_tower
 """
 
-
-def tower_is_stable(objects, contacts):
-    object_names = object_names_in_order(contacts)
-    positions = get_poses_from_contacts(contacts)
-
-    # iterate down the tower, checking stability along the way. Is the entire
-    # tower above the current block stable on the current block?
-    top_total_com = np.array(objects[object_names[-1]].com)
-    top_total_mass = objects[object_names[-1]].mass
-    top_total_pos = np.array(positions[object_names[-1]].pos)
-
-    # we don't check the top block because there's nothing on top of it, and
-    # we don't check the bottom block because it's the ground!
-    for obj_name in reversed(object_names[1:-1]):
-        obj = objects[obj_name]
-        pos = np.array(positions[obj_name].pos)
-
-        # summarize the mass above the current block with an object and a
-        # contact. The dimensions and color are None, because this describes
-        # multiple objects
-        top_total_obj = Object('top_total', None, top_total_mass, top_total_com, None)
-        top_total_rel_pose = Pose(top_total_pos - pos, no_rot)
-        top_total_contact = Contact(obj_name, 'top_total', top_total_rel_pose)
+def tower_is_stable(tower):
+    # iterate down the tower, checking stability along the way. Is the group of
+    # blocks above the current block stable on the current block?
+    top_group = tower[-1]
+    # we don't check the top block because there's nothing on top of it
+    for block in reversed(tower[:-1]):
 
         # check stability
-        if not pair_is_stable(obj, top_total_obj, top_total_contact):
+        if not pair_is_stable(block, top_group):
             return False
 
-        # add the obj to the accumulating COM and mass for the top
-        new_top_total_mass = obj.mass + top_total_mass
-        new_top_total_global_com = ((top_total_com + top_total_pos)\
-            * top_total_mass + (obj.com + pos) * obj.mass) \
-            / new_top_total_mass
-        top_total_com = new_top_total_global_com - pos
-        top_total_mass = new_top_total_mass
-        top_total_pos = pos
+        # add the block to the group
+        top_group = group_blocks(block, top_group)
 
     return True # we've verified the whole tower is stable
 
@@ -83,7 +59,7 @@ def tower_is_constructible(blocks):
 
     return True
 
-def pair_is_stable(top, bottom):
+def pair_is_stable(bottom, top):
     """ Return True if the top object is stable on the bottom object
 
     Arguments:
