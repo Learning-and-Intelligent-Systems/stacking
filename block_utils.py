@@ -364,3 +364,29 @@ def object_names_in_order(contacts):
         object_names.append(current_object)
 
     return object_names
+
+
+def get_rotated_block(block):
+    """ Take a block which is rotated by an element of the rotation group of a
+    cube, and produce a new block with no rotation, but with changed COM and
+    dimensions such that it is equivalent to the previous block
+
+    Arguments:
+        block {Object} -- the original block
+
+    Returns:
+        Object -- the rotated block
+    """
+    # create a new block
+    new_block = copy(block)
+    # set it to to have the same pos with no rotation
+    new_pose = Pose(block.pose.pos, Quaternion(0,0,0,1))
+    new_block.set_pose(new_pose)
+    # get the original block's rotation
+    r = R.from_quat(block.pose.rot)
+    # rotate the old center of mass
+    new_block.com = Position(*r.apply(block.com))
+    # rotate the old dimensions
+    new_block.dimensions = Dimensions(*np.abs(r.apply.block.dimensions))
+
+    return new_block

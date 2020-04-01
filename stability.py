@@ -8,11 +8,25 @@ from filter_utils import *
 import numpy as np
 from copy import copy
 from itertools import permutations
-# TODO(izzy): at some point we will want to be able to be able to place a block
-# in any orientation. For now we assume the only choice is (x,y) translation
+
 
 # TODO(izzy): right now I'm assuming sequential vertical contacts. This get's a
 # lot more tricky if we want to place blocks adjacent to eachother
+
+
+"""
+BRAINSTORM/TODO for rewriting stability with quaterions
+ * A tower should be a list of blocks
+ * the poses of those blocks should be set in global space
+ * we should standardize on scipy rotation version of quaternions
+
+ Functions to fix
+ * pair_is_stable
+ * tower_is_stable
+ * tower_is_constructible
+ * calc_expected_height
+ * find_tallest_tower
+"""
 
 no_rot = Quaternion(0, 0, 0, 1)
 
