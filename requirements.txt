@@ -1,6 +1,21 @@
-pybullet
-numpy
-matplotlib
-catkin-pkg
-git+git://github.com/hauptmech/odio_urdf.git#egg=odio_urdf
-scipy
+attrs==19.3.0
+catkin-pkg==0.4.16
+cycler==0.10.0
+docutils==0.16
+importlib-metadata==1.6.0
+kiwisolver==1.1.0
+matplotlib==3.2.0
+more-itertools==8.2.0
+numpy==1.18.1
+-e git://github.com/hauptmech/odio_urdf.git@1f9ecb4e7833957c11cc707fa4c1b781ceb70ae8#egg=odio_urdf
+packaging==20.3
+pluggy==0.13.1
+py==1.8.1
+pybullet==2.6.6
+pyparsing==2.4.6
+pytest==5.4.1
+python-dateutil==2.8.1
+scipy==1.4.1
+six==1.14.0
+wcwidth==0.1.9
+zipp==3.1.0
