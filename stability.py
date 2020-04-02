@@ -140,7 +140,7 @@ def find_tallest_tower(blocks, num_samples=100):
     # for each ordering of blocks
     for tower in permutations(blocks):
         # for each combination of rotations
-        for block_orientations in permutations(R.create_group('O'), r=n):
+        for block_orientations in permutations(rotation_group(), r=n):
             # set the orientation of each block in the tower
             for block, orn in zip(tower, block_orientations):
                 block.pose = Pose(ZERO_POS, Quaternion(*orn.as_quat()))
@@ -191,7 +191,7 @@ def set_stack_poses(blocks):
     return blocks
 
 if __name__ == '__main__':
-    blocks = [Object.random('abcd'[i]) for i in range(2)]
+    blocks = [Object.random('abcd'[i]) for i in range(3)]
     for block in blocks:
         block.com_filter = create_uniform_particles(100, 3, get_com_ranges(block))
     tower = find_tallest_tower(blocks)

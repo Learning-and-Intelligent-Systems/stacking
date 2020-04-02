@@ -430,3 +430,10 @@ def get_rotated_block(block):
             r.apply(block.com_filter.particles), block.com_filter.weights)
 
     return new_block
+
+def rotation_group():
+    for i in range(3):
+        for r in [np.pi/2, np.pi]:
+            v = np.zeros(3)
+            v[i] = r
+            yield R.from_rotvec(v)
