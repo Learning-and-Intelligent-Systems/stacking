@@ -112,7 +112,7 @@ def calc_expected_height(tower, num_samples=100):
     # for each possible COM sample, check if such a tower would be stable
     for i in range(num_samples):
         for block in tower:
-            block.com = com_samples[block.name]
+            block.com = com_samples[block.name][i]
 
         stable_count += tower_is_stable(tower) \
             * tower_is_constructible(tower)
@@ -142,8 +142,8 @@ def find_tallest_tower(blocks, num_samples=100):
         # for each combination of rotations
         for block_orientations in permutations(R.create_group('O'), r=n):
             # set the orientation of each block in the tower
-            for block, orn in zerip(tower, block_orientations):
-                block.pose = Pose(ZERO_POS, Orientation(*orn.as_quat()))
+            for block, orn in zip(tower, block_orientations):
+                block.pose = Pose(ZERO_POS, Quaternion(*orn.as_quat()))
             # unrotate the blocks and calculate their poses in the tower
             stacked_tower = set_stack_poses(tower)
             # and check the expected height of this particular tower
@@ -154,3 +154,45 @@ def find_tallest_tower(blocks, num_samples=100):
                 max_height = height
 
     return max_tower
+
+def set_stack_poses(blocks):
+    """ Find the pose of each block if we were to stack the blocks
+
+    Stacks the blocks in the given order (bottom up). Aligns blocks such that
+    the center of mass (or mean of the estimated center of mass given a
+    com_filter) are all colinear
+
+    NOTE: if the blocks have a rotation, get_rotated_block will be applied to
+    each, so the returned blocks have zero rotation
+
+    Arguments:
+        blocks {List(Object)} -- the list of blocks in the tower
+
+    Returns:
+        blocks {List(Object)} -- the list of blocks in the tower
+    """
+    # rotate all the blocks (COM, dimensions) by their defined rotations
+    blocks = [get_rotated_block(block) for block in blocks]
+    prev_z = 0
+    for block in blocks:
+        pos = np.zeros(3)
+        # set the x,y position of the block
+        if block.com_filter is not None:
+            pos[:2] = get_mean(block.com_filter)[:2]
+        else:
+            pos[:2] = block.com[:2]
+        # set the relative z position of the block
+        pos[2] = prev_z + block.dimensions.z/2
+        # and update the block with the desired pose
+        block.pose = Pose(Position(*pos), ZERO_ROT)
+        # save the height of the top of the block
+        prev_z += block.dimensions.z
+
+    return blocks
+
+if __name__ == '__main__':
+    blocks = [Object.random('abcd'[i]) for i in range(2)]
+    for block in blocks:
+        block.com_filter = create_uniform_particles(100, 3, get_com_ranges(block))
+    tower = find_tallest_tower(blocks)
+    simulate_tower(tower, vis=True)

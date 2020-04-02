@@ -6,6 +6,7 @@ from copy import copy
 import shutil
 import pybullet as p
 import odio_urdf
+from filter_utils import ParticleDistribution
 from pybullet_utils import PyBulletServer, quat_math
 from scipy.spatial.transform import Rotation as R
 
@@ -418,49 +419,14 @@ def get_rotated_block(block):
     new_pose = Pose(block.pose.pos, Quaternion(0,0,0,1))
     new_block.set_pose(new_pose)
     # get the original block's rotation
-    r = R.from_quat(block.pose.rot)
+    r = R.from_quat(block.pose.orn)
     # rotate the old center of mass
     new_block.com = Position(*r.apply(block.com))
     # rotate the old dimensions
-    new_block.dimensions = Dimensions(*np.abs(r.apply.block.dimensions))
+    new_block.dimensions = Dimensions(*np.abs(r.apply(block.dimensions)))
     # rotate the particle filter for the com if there is one
     if block.com_filter is not None:
         new_block.com_filter = ParticleDistribution(
             r.apply(block.com_filter.particles), block.com_filter.weights)
 
     return new_block
-
-def set_stack_poses(blocks):
-    """ Find the pose of each block if we were to stack the blocks
-
-    Stacks the blocks in the given order (bottom up). Aligns blocks such that
-    the center of mass (or mean of the estimated center of mass given a
-    com_filter) are all colinear
-
-    NOTE: if the blocks have a rotation, get_rotated_block will be applied to
-    each, so the returned blocks have zero rotation
-
-    Arguments:
-        blocks {List(Object)} -- the list of blocks in the tower
-
-    Returns:
-        blocks {List(Object)} -- the list of blocks in the tower
-    """
-    # rotate all the blocks (COM, dimensions) by their defined rotations
-    blocks = [get_rotated_block(block) for block in blocks]
-    prev_z = 0
-    for block in blocks:
-        pos = np.zeros(3)
-        # set the x,y position of the block
-        if block.com_filter is not None:
-            pos[:2] = get_mean(block.com_filter)[:2]
-        else:
-            pos[:2] = block.com[:2]
-        # set the relative z position of the block
-        pos[2] = prev_z + block.dimensions.z/2
-        # and update the block with the desired pose
-        block.pose = Pose(Position(*pos), ZERO_ROT)
-        # save the height of the top of the block
-        prev_z += block.dimensions.z/2
-
-    return blocks
