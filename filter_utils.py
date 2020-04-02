@@ -37,3 +37,17 @@ def sample_particle_distribution(distribution, num_samples=1):
         p=distribution.weights)
     return distribution.particles[idxs]
 
+def get_mean(distribution):
+    """ Find the mean of a weighted particle distribution
+
+    [description]
+
+    Arguments:
+        distribution {ParticleDistribution} -- the input distribution
+
+    Returns:
+        np.array -- the mean particle
+    """
+    # make sure the weights are normalized to sum to 1
+    w = distribution.weights / distribution.weights.sum()
+    return w @ distribution.particles

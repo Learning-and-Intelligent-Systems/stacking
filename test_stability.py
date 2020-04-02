@@ -1,3 +1,8 @@
+"""
+Copyright 2020 Massachusetts Insititute of Technology
+
+Izzy Brand
+"""
 import pytest
 
 from stability import *
