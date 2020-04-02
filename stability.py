@@ -19,10 +19,6 @@ BRAINSTORM/TODO for rewriting stability with quaterions
  * A tower should be a list of blocks
  * the poses of those blocks should be set in global space
  * we should standardize on scipy rotation version of quaternions
-
- Functions to fix
- * calc_expected_height
- * find_tallest_tower
 """
 
 def tower_is_stable(tower):
@@ -36,6 +32,7 @@ def tower_is_stable(tower):
     Returns:
         bool -- Whether or not the tower is stable
     """
+
     top_group = tower[-1]
     # iterate down the tower, checking stability along the way. Is the group of
     # blocks above the current block stable on the current block?
@@ -86,7 +83,7 @@ def pair_is_stable(bottom, top):
     return (np.abs(top_rel_com)*2 - bottom.dimensions <= 0)[:2].all()
 
 
-def calc_expected_height(tower, com_filters, num_samples=100):
+def calc_expected_height(tower, num_samples=100):
     """ Finds the expected height of a tower
 
     If we are uncertain about the center of mass of blocks, then for any
@@ -98,7 +95,6 @@ def calc_expected_height(tower, com_filters, num_samples=100):
 
     Arguments:
         tower {List(Object)} -- the objects in the tower
-        com_filters {dict {str: ParticleDistibution}} -- COM distributions
 
     Keyword Arguments:
         num_samples {number} -- how many times to sample COM configurations
@@ -107,10 +103,10 @@ def calc_expected_height(tower, com_filters, num_samples=100):
     Returns:
         [float] -- expected height of the tower
     """
-    # sample a bunch of COMs for each object in the tower
-    com_samples = {obj:
-        sample_particle_distribution(com_filters[obj], num_samples)
-        for obj in objects}
+    # sample a bunch of COMs for each block in the tower
+    com_samples = {block.name:
+        sample_particle_distribution(block.com_filter, num_samples)
+        for block in tower}
     stable_count = 0
 
     # for each possible COM sample, check if such a tower would be stable
@@ -124,12 +120,11 @@ def calc_expected_height(tower, com_filters, num_samples=100):
     height = np.sum([block.dimensions.z for block in tower])
     return height * stable_count / num_samples
 
-def find_tallest_tower(objects, com_filters, num_samples=100):
+def find_tallest_tower(blocks, num_samples=100):
     """ Finds the tallest tower in expectation given uncertainy over COM
 
     Arguments:
         objects {dict {str: Object}} -- [description]
-        com_filters {dict {str: ParticleDistibution}} -- COM distributions
 
     Keyword Arguments:
         num_samples {number} -- how many times to sample COM configurations
@@ -139,34 +134,23 @@ def find_tallest_tower(objects, com_filters, num_samples=100):
         List(str), List(Contact) -- The names of the objects in th tallest
             tower (from the bottom up), and the contacts between those objects
     """
-    towers = permutations(objects) # all possible block orderings
+    n = len(blocks)
     max_height = 0
     max_tower = []
-    max_contacts = []
-    for tower_idx, tower in enumerate(towers):
-        # construct the contacts for this block ordering
-        contacts = []
-        ground_contact_pose = \
-            Pose(Position(0, 0, objects[tower[0]].dimensions.z/2), no_rot)
-        contacts.append(Contact(tower[0], 'ground', ground_contact_pose))
-        for i in range(len(tower)-1):
-            name_a = tower[i+1]
-            name_b = tower[i]
-            mean_x, mean_y, _ =\
-                com_filters[name_a].particles.T @ com_filters[name_a].weights
-            x_offset = -mean_x
-            y_offset = -mean_y
-            z_offset = objects[name_a].dimensions.z/2 \
-                     + objects[name_b].dimensions.z/2
-            contact_pose = Pose(Position(x_offset, y_offset, z_offset), no_rot)
-            contacts.append(Contact(name_a, name_b, contact_pose))
+    # for each ordering of blocks
+    for tower in permutations(blocks):
+        # for each combination of rotations
+        for block_orientations in permutations(R.create_group('O'), r=n):
+            # set the orientation of each block in the tower
+            for block, orn in zerip(tower, block_orientations):
+                block.pose = Pose(ZERO_POS, Orientation(*orn.as_quat()))
+            # unrotate the blocks and calculate their poses in the tower
+            stacked_tower = set_stack_poses(tower)
+            # and check the expected height of this particular tower
+            height = calc_expected_height(stacked_tower)
+            # save the tallest tower
+            if height > max_height:
+                max_tower = stacked_tower
+                max_height = height
 
-        # and check the expected height of this particular tower
-        height = calc_expected_height(objects, contacts, com_filters)
-        # save the tallest tower
-        if height > max_height:
-            max_tower = tower
-            max_height = height
-            max_contacts = contacts
-
-    return max_tower, max_contacts
+    return max_tower

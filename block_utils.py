@@ -7,6 +7,7 @@ import shutil
 import pybullet as p
 import odio_urdf
 from pybullet_utils import PyBulletServer, quat_math
+from scipy.spatial.transform import Rotation as R
 
 Position = namedtuple('Position', 'x y z')
 Quaternion = namedtuple('Quaternion', 'x y z w')
@@ -47,6 +48,7 @@ class Object:
         self.color = color              # Color
         self.pose = ZERO_POSE           # Pose (set later)
         self.id = None                  # int (set later)
+        self.com_filter = None          # ParticleDistribution (set later)
 
     def set_pose(self, pose):
         self.pose = pose
@@ -336,20 +338,20 @@ def object_to_urdf(object):
     return object_urdf
 
 # get positions (center of geometry, not COM) from contact state
-def get_poses_from_contacts(contacts):
-    obj_poses = {'ground': Pose(Position(0.,0.,0.), Quaternion(0., 0., 0., 1.))}
-    copy_contacts = copy(contacts)
-    while len(copy_contacts) > 0:
-        for contact in copy_contacts:
-            if contact.objectB_name in obj_poses:
-                objA_pos = Position(*np.add(obj_poses[contact.objectB_name].pos,
-                                    contact.pose_a_b.pos))
-                objA_orn = Quaternion(*quat_math(obj_poses[contact.objectB_name].orn,
-                                                contact.pose_a_b.orn))
-                obj_poses[contact.objectA_name] = Pose(objA_pos, objA_orn)
-                copy_contacts.remove(contact)
+# def get_poses_from_contacts(contacts):
+#     obj_poses = {'ground': Pose(Position(0.,0.,0.), Quaternion(0., 0., 0., 1.))}
+#     copy_contacts = copy(contacts)
+#     while len(copy_contacts) > 0:
+#         for contact in copy_contacts:
+#             if contact.objectB_name in obj_poses:
+#                 objA_pos = Position(*np.add(obj_poses[contact.objectB_name].pos,
+#                                     contact.pose_a_b.pos))
+#                 objA_orn = Quaternion(*quat_math(obj_poses[contact.objectB_name].orn,
+#                                                 contact.pose_a_b.orn))
+#                 obj_poses[contact.objectA_name] = Pose(objA_pos, objA_orn)
+#                 copy_contacts.remove(contact)
 
-    return obj_poses
+#     return obj_poses
 
 # list of length 3 of (min, max) ranges for each dimension
 def get_com_ranges(object):
@@ -358,15 +360,15 @@ def get_com_ranges(object):
 
 # throw away contact geometry. Return dict of pairwise relations between
 # objects. By convention, we assume object A is on top of object B
-def get_contact_dict(contacts, bottom_up=True):
-    contact_dict = {}
-    for contact in contacts:
-        if bottom_up:
-            contact_dict[contact.objectB_name] = contact.objectA_name
-        else:
-            contact_dict[contact.objectA_name] = contact.objectB_name
+# def get_contact_dict(contacts, bottom_up=True):
+#     contact_dict = {}
+#     for contact in contacts:
+#         if bottom_up:
+#             contact_dict[contact.objectB_name] = contact.objectA_name
+#         else:
+#             contact_dict[contact.objectA_name] = contact.objectB_name
 
-    return contact_dict
+#     return contact_dict
 
 # follow a list of contacts up from the ground to construct a list of object
 # names that describe a tower
@@ -421,5 +423,44 @@ def get_rotated_block(block):
     new_block.com = Position(*r.apply(block.com))
     # rotate the old dimensions
     new_block.dimensions = Dimensions(*np.abs(r.apply.block.dimensions))
+    # rotate the particle filter for the com if there is one
+    if block.com_filter is not None:
+        new_block.com_filter = ParticleDistribution(
+            r.apply(block.com_filter.particles), block.com_filter.weights)
 
     return new_block
+
+def set_stack_poses(blocks):
+    """ Find the pose of each block if we were to stack the blocks
+
+    Stacks the blocks in the given order (bottom up). Aligns blocks such that
+    the center of mass (or mean of the estimated center of mass given a
+    com_filter) are all colinear
+
+    NOTE: if the blocks have a rotation, get_rotated_block will be applied to
+    each, so the returned blocks have zero rotation
+
+    Arguments:
+        blocks {List(Object)} -- the list of blocks in the tower
+
+    Returns:
+        blocks {List(Object)} -- the list of blocks in the tower
+    """
+    # rotate all the blocks (COM, dimensions) by their defined rotations
+    blocks = [get_rotated_block(block) for block in blocks]
+    prev_z = 0
+    for block in blocks:
+        pos = np.zeros(3)
+        # set the x,y position of the block
+        if block.com_filter is not None:
+            pos[:2] = get_mean(block.com_filter)[:2]
+        else:
+            pos[:2] = block.com[:2]
+        # set the relative z position of the block
+        pos[2] = prev_z + block.dimensions.z/2
+        # and update the block with the desired pose
+        block.pose = Pose(Position(*pos), ZERO_ROT)
+        # save the height of the top of the block
+        prev_z += block.dimensions.z/2
+
+    return blocks
