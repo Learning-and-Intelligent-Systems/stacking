@@ -254,22 +254,6 @@ def simulate_tower(tower, vis=True, T=60, copy_blocks=True):
 
     return world.get_poses()
 
-# def simulate_from_contacts(objects, contacts, vis=True, T=60):
-#     world = World(objects.values())
-#     init_poses = get_poses_from_contacts(contacts)
-#     # set object poses in all worlds
-#     for (obj, pose) in init_poses.items():
-#         for world_obj in world.objects:
-#             if world_obj.name == obj:
-#                 world_obj.set_pose(pose)
-
-#     env = Environment([world], vis_sim=vis, use_hand=False)
-#     for t in range(T):
-#         env.step(vis_frames=vis)
-#     env.disconnect()
-
-#     return world.get_poses()
-
 def hand_urdf():
     rgb = (0, 1, 0)
     link_urdf = odio_urdf.Link('hand',
@@ -338,51 +322,10 @@ def object_to_urdf(object):
     object_urdf = odio_urdf.Robot(link_urdf)
     return object_urdf
 
-# get positions (center of geometry, not COM) from contact state
-# def get_poses_from_contacts(contacts):
-#     obj_poses = {'ground': Pose(Position(0.,0.,0.), Quaternion(0., 0., 0., 1.))}
-#     copy_contacts = copy(contacts)
-#     while len(copy_contacts) > 0:
-#         for contact in copy_contacts:
-#             if contact.objectB_name in obj_poses:
-#                 objA_pos = Position(*np.add(obj_poses[contact.objectB_name].pos,
-#                                     contact.pose_a_b.pos))
-#                 objA_orn = Quaternion(*quat_math(obj_poses[contact.objectB_name].orn,
-#                                                 contact.pose_a_b.orn))
-#                 obj_poses[contact.objectA_name] = Pose(objA_pos, objA_orn)
-#                 copy_contacts.remove(contact)
-
-#     return obj_poses
-
 # list of length 3 of (min, max) ranges for each dimension
 def get_com_ranges(object):
     half_dims = np.array(object.dimensions) * 0.5
     return np.array([-half_dims, half_dims]).T
-
-# throw away contact geometry. Return dict of pairwise relations between
-# objects. By convention, we assume object A is on top of object B
-# def get_contact_dict(contacts, bottom_up=True):
-#     contact_dict = {}
-#     for contact in contacts:
-#         if bottom_up:
-#             contact_dict[contact.objectB_name] = contact.objectA_name
-#         else:
-#             contact_dict[contact.objectA_name] = contact.objectB_name
-
-#     return contact_dict
-
-# follow a list of contacts up from the ground to construct a list of object
-# names that describe a tower
-# def object_names_in_order(contacts):
-#     contact_dict = get_contact_dict(contacts)
-#     object_names = ['ground']
-#     current_object = 'ground'
-
-#     for _ in range(len(contacts)):
-#         current_object = contact_dict[current_object]
-#         object_names.append(current_object)
-
-#     return object_names
 
 def group_blocks(bottom, top):
     total_mass = bottom.mass + top.mass
