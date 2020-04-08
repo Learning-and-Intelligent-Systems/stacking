@@ -7,7 +7,7 @@ from block_utils import *
 from filter_utils import *
 import numpy as np
 from copy import copy
-from itertools import permutations
+from itertools import permutations, combinations_with_replacement
 
 
 # TODO(izzy): right now I'm assuming sequential vertical contacts. This get's a
@@ -114,12 +114,12 @@ def calc_expected_height(tower, num_samples=100):
         for block in tower:
             block.com = com_samples[block.name][i]
 
-        stable_count += tower_is_stable(tower) \
-            * tower_is_constructible(tower)
+        stable_count += tower_is_stable(tower)
+            # * tower_is_constructible(tower))
 
     height = np.sum([block.dimensions.z for block in tower])
     p_stable = stable_count / float(num_samples)
-    print('\t\t\t\t', height, p_stable)
+    print('\t\t\t\t', height, stable_count)
     return height * p_stable
 
 def find_tallest_tower(blocks, num_samples=100):
@@ -142,19 +142,19 @@ def find_tallest_tower(blocks, num_samples=100):
     # for each ordering of blocks
     for tower in permutations(blocks):
         # for each combination of rotations
-        # for block_orientations in permutations(rotation_group(), r=n):
-        #     # set the orientation of each block in the tower
-        #     for block, orn in zip(tower, block_orientations):
-        #         block.pose = Pose(ZERO_POS, Quaternion(*orn.as_quat()))
-        # unrotate the blocks and calculate their poses in the tower
-        stacked_tower = set_stack_poses(tower)
-        simulate_tower(stacked_tower, vis=True, T=15)
-        # and check the expected height of this particular tower
-        height = calc_expected_height(stacked_tower)
-        # save the tallest tower
-        if height > max_height:
-            max_tower = stacked_tower
-            max_height = height
+        for block_orientations in combinations_with_replacement(rotation_group(), r=n):
+            # set the orientation of each block in the tower
+            for block, orn in zip(tower, block_orientations):
+                block.pose = Pose(ZERO_POS, Quaternion(*orn.as_quat()))
+            # unrotate the blocks and calculate their poses in the tower
+            stacked_tower = set_stack_poses(tower)
+            # simulate_tower(stacked_tower, vis=True, T=25)
+            # and check the expected height of this particular tower
+            height = calc_expected_height(stacked_tower, num_samples=num_samples)
+            # save the tallest tower
+            if height > max_height:
+                max_tower = stacked_tower
+                max_height = height
 
     return max_tower
 
@@ -194,22 +194,23 @@ def set_stack_poses(blocks):
     return blocks
 
 if __name__ == '__main__':
-    # blocks = [Object.random('abcd'[i]) for i in range(3)]
+    # blocks = [Object.random('abcdefg'[i]) for i in range(2)]
 
-    from matplotlib import pyplot as plt
+    # from matplotlib import pyplot as plt
     blocks = []
     for s in [0.1, 0.2, 0.3]:
-        blocks.append(Object(str(s), Dimensions(s,s,s), s**3, Position(0,0,0), Color(1-s,1-s,1-s)))
+        d = np.array([0.1,0.15,0.3])
+        blocks.append(Object(str(s), Dimensions(*(d*(s+1))), s**3, Position(0,0,0), Color(1-s,1-s,1-s)))
     for block in blocks:
-        block.com_filter = create_uniform_particles(100, 3, get_com_ranges(block))
-        plt.scatter(*block.com_filter.particles[:,:2].T, label=block.name, alpha=0.5)
+        block.com_filter = create_uniform_particles(1000, 3, get_com_ranges(block))
+    #     plt.scatter(*block.com_filter.particles[:,:2].T, label=block.name, alpha=0.5)
 
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
 
 
-    # tower = find_tallest_tower(blocks)
-    # simulate_tower(tower, vis=True, T=60)
+    tower = find_tallest_tower(blocks, num_samples=1000)
+    simulate_tower(tower, vis=True, T=60)
 
     # block = Object('bleh', Dimensions(0.1, 0.2, 0.3), 1, Position(0,0,0), Color(0,1,0))
     # blocks = []

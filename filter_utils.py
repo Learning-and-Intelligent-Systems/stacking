@@ -33,7 +33,8 @@ def create_gaussian_particles(N, D, means, stds):
     return particles
 
 def sample_particle_distribution(distribution, num_samples=1):
-    idxs = np.random.choice(a=num_samples, size=num_samples, replace=True,
+    idxs = np.array(distribution.particles.shape[0])
+    idxs = np.random.choice(a=idxs, size=num_samples, replace=True,
         p=distribution.weights)
     return distribution.particles[idxs]
 
