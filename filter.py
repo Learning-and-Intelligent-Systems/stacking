@@ -9,8 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from actions import PushAction
 from filter_utils import create_uniform_particles, ParticleDistribution
 from block_utils import Environment, Object, Position, Dimensions, World, \
-                        Pose, Quaternion, Color, get_com_ranges, Contact, \
-                        get_poses_from_contacts
+                        Pose, Quaternion, Color, get_com_ranges, Contact
 
 TRUE_OBS_COV = 0.00004*np.eye(3)    # covariance used when add noise to observations
 OBS_MODEL_COV = 0.00004*np.eye(3)   # covariance used in observation model

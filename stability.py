@@ -194,11 +194,11 @@ def set_stack_poses(blocks):
     return blocks
 
 if __name__ == '__main__':
+
     blocks = []
     for s in [0.1, 0.2, 0.3]:
         d = np.array([0.1,0.15,0.3])
         blocks.append(Object(str(s), Dimensions(*(d*(s+1))), s**3, Position(0,0,0), Color(1-s,1-s,1-s)))
-
     for block in blocks:
         block.com_filter = create_uniform_particles(1000, 3, get_com_ranges(block))
 
