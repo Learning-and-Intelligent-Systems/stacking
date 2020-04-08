@@ -52,8 +52,39 @@ def test_stability_tower_is_stable():
     obj_c.pose = Pose(Position(0.0, 0, 0.3), ZERO_ROT)
     assert tower_is_stable([obj_a, obj_b, obj_c])
 
+    # this tower is constructible, but not stable
+    obj_b.pose = Pose(Position(0, 0.04, 0.15), ZERO_ROT)
+    obj_c.pose = Pose(Position(0, 0.08, 0.3), ZERO_ROT)
+    assert not tower_is_stable([obj_a, obj_b, obj_c])
+
+def test_stability_tower_is_constructible():
+    obj_a = Object('a', Dimensions(0.1,0.1,0.1), 1, Position(0,0,0), Color(0,1,1))
+    obj_b = Object('b', Dimensions(0.3,0.1,0.1), 3, Position(0,0,0), Color(1,0,1))
+    obj_c = Object('c', Dimensions(0.1,0.1,0.2), 2, Position(0,0,0), Color(1,1,0))
+
+    # the single block is constructible
+    obj_a.pose = Pose(Position(0, 0, 0.05), ZERO_ROT)
+    assert tower_is_constructible([obj_a])
+
+    # this is constructible
+    obj_b.pose = Pose(Position(0, 0, 0.15), ZERO_ROT)
+    assert tower_is_constructible([obj_a, obj_b])
+
+    # this is unconstructible
+    obj_b.pose = Pose(Position(0.06, 0, 0.15), ZERO_ROT)
+    assert not tower_is_constructible([obj_a, obj_b])
+
+    # it becomes stable, but remains unconstructible when we add another block
+    obj_c.pose = Pose(Position(0.0, 0, 0.3), ZERO_ROT)
+    assert not tower_is_constructible([obj_a, obj_b, obj_c])
+
+    # this tower is constructible, but not stable
+    obj_b.pose = Pose(Position(0, 0.04, 0.15), ZERO_ROT)
+    obj_c.pose = Pose(Position(0, 0.08, 0.3), ZERO_ROT)
+    assert tower_is_constructible([obj_a, obj_b, obj_c])
+
 def test_stability_tower_is_stable_with_sim(vis):
-    for _ in range(10):
+    for _ in range(5):
         # sample three random blocks
         blocks = [Object.random(str(i)) for i in range(3)]
         # stack all the blocks on top of eachother (center of geometry, not COM)

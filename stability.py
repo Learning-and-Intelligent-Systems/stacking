@@ -63,7 +63,7 @@ def tower_is_constructible(blocks):
         # check that each pair of blocks is stably individually
         top = blocks[i+1]
         bottom = blocks[i]
-        if not pair_is_stable(top, bottom): return False
+        if not pair_is_stable(bottom, top): return False
 
     return True
 
@@ -114,8 +114,8 @@ def calc_expected_height(tower, num_samples=100):
         for block in tower:
             block.com = com_samples[block.name][i]
 
-        stable_count += tower_is_stable(tower)
-            # * tower_is_constructible(tower))
+        stable_count += tower_is_stable(tower)\
+            * tower_is_constructible(tower)
 
     height = np.sum([block.dimensions.z for block in tower])
     p_stable = stable_count / float(num_samples)
@@ -194,29 +194,13 @@ def set_stack_poses(blocks):
     return blocks
 
 if __name__ == '__main__':
-    # blocks = [Object.random('abcdefg'[i]) for i in range(2)]
-
-    # from matplotlib import pyplot as plt
     blocks = []
     for s in [0.1, 0.2, 0.3]:
         d = np.array([0.1,0.15,0.3])
         blocks.append(Object(str(s), Dimensions(*(d*(s+1))), s**3, Position(0,0,0), Color(1-s,1-s,1-s)))
+
     for block in blocks:
         block.com_filter = create_uniform_particles(1000, 3, get_com_ranges(block))
-    #     plt.scatter(*block.com_filter.particles[:,:2].T, label=block.name, alpha=0.5)
-
-    # plt.legend()
-    # plt.show()
-
 
     tower = find_tallest_tower(blocks, num_samples=1000)
     simulate_tower(tower, vis=True, T=60)
-
-    # block = Object('bleh', Dimensions(0.1, 0.2, 0.3), 1, Position(0,0,0), Color(0,1,0))
-    # blocks = []
-    # for i,r in enumerate(rotation_group()):
-    #     block.pose = Pose(Position(0,0.4*i, 1), Quaternion(*r.as_quat()))
-    #     blocks.append(copy(block))
-
-    # simulate_tower(blocks, vis=True, T=60)
-
