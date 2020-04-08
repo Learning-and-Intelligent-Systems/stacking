@@ -63,7 +63,7 @@ class Object:
     def get_id(self):
         return self.id
 
-    def random(name):
+    def random(name=None):
         """ Construct a random object
 
 
@@ -78,8 +78,8 @@ class Object:
         # pick a density and multiply by the volume to get mass
         density = np.random.rand() * 0.9 + 0.1
         mass = density * dims.x * dims.y * dims.z
-        # center of mass lies within the middle 0.75 of the block along each axis
-        com = Position(*((np.random.rand(3) - 0.5) * 0.75 * dims))
+        # center of mass lies within the middle 0.9 of the block along each axis
+        com = Position(*((np.random.rand(3) - 0.5) * 0.9 * dims))
         # pick a random color
         color = Color(*np.random.rand(3))
         # and add the new block to the list
@@ -251,8 +251,20 @@ def simulate_tower(tower, vis=True, T=60, copy_blocks=True):
     for t in range(T):
         env.step(vis_frames=vis)
     env.disconnect()
+    env.cleanup()
 
     return world.get_poses()
+
+def tower_is_stable_in_pybullet(tower, vis=False, T=30):
+    init_poses = {block.name: block.pose for block in tower}
+    final_poses = simulate_tower(tower, vis=vis, T=T)
+    return pos_unchanged(init_poses, final_poses)
+
+# see if the two dicts of positions are roughly equivalent
+def pos_unchanged(init_poses, final_poses, eps=2e-3):
+    dists = [np.linalg.norm(np.array(init_poses[obj].pos)
+            - np.array(final_poses[obj])) for obj in init_poses]
+    return max(dists) < eps
 
 def hand_urdf():
     rgb = (0, 1, 0)
@@ -375,8 +387,8 @@ def get_rotated_block(block):
     return new_block
 
 def rotation_group():
-    for i in range(3):
-        for r in [np.pi/2, np.pi]:
-            v = np.zeros(3)
-            v[i] = r
-            yield R.from_rotvec(v)
+    V = np.eye(3) * np.pi/2
+    for v in V:
+        for r in [0, np.pi/2]:
+            v[0] = r
+            yield R.from_euler('zyx', v)

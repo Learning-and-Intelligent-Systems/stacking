@@ -118,7 +118,9 @@ def calc_expected_height(tower, num_samples=100):
             * tower_is_constructible(tower)
 
     height = np.sum([block.dimensions.z for block in tower])
-    return height * stable_count / num_samples
+    p_stable = stable_count / float(num_samples)
+    print('\t\t\t\t', height, p_stable)
+    return height * p_stable
 
 def find_tallest_tower(blocks, num_samples=100):
     """ Finds the tallest tower in expectation given uncertainy over COM
@@ -140,18 +142,19 @@ def find_tallest_tower(blocks, num_samples=100):
     # for each ordering of blocks
     for tower in permutations(blocks):
         # for each combination of rotations
-        for block_orientations in permutations(rotation_group(), r=n):
-            # set the orientation of each block in the tower
-            for block, orn in zip(tower, block_orientations):
-                block.pose = Pose(ZERO_POS, Quaternion(*orn.as_quat()))
-            # unrotate the blocks and calculate their poses in the tower
-            stacked_tower = set_stack_poses(tower)
-            # and check the expected height of this particular tower
-            height = calc_expected_height(stacked_tower)
-            # save the tallest tower
-            if height > max_height:
-                max_tower = stacked_tower
-                max_height = height
+        # for block_orientations in permutations(rotation_group(), r=n):
+        #     # set the orientation of each block in the tower
+        #     for block, orn in zip(tower, block_orientations):
+        #         block.pose = Pose(ZERO_POS, Quaternion(*orn.as_quat()))
+        # unrotate the blocks and calculate their poses in the tower
+        stacked_tower = set_stack_poses(tower)
+        simulate_tower(stacked_tower, vis=True, T=15)
+        # and check the expected height of this particular tower
+        height = calc_expected_height(stacked_tower)
+        # save the tallest tower
+        if height > max_height:
+            max_tower = stacked_tower
+            max_height = height
 
     return max_tower
 
@@ -178,9 +181,9 @@ def set_stack_poses(blocks):
         pos = np.zeros(3)
         # set the x,y position of the block
         if block.com_filter is not None:
-            pos[:2] = get_mean(block.com_filter)[:2]
+            pos[:2] = -get_mean(block.com_filter)[:2]
         else:
-            pos[:2] = block.com[:2]
+            pos[:2] = -np.array(block.com)[:2]
         # set the relative z position of the block
         pos[2] = prev_z + block.dimensions.z/2
         # and update the block with the desired pose
@@ -191,8 +194,28 @@ def set_stack_poses(blocks):
     return blocks
 
 if __name__ == '__main__':
-    blocks = [Object.random('abcd'[i]) for i in range(3)]
+    # blocks = [Object.random('abcd'[i]) for i in range(3)]
+
+    from matplotlib import pyplot as plt
+    blocks = []
+    for s in [0.1, 0.2, 0.3]:
+        blocks.append(Object(str(s), Dimensions(s,s,s), s**3, Position(0,0,0), Color(1-s,1-s,1-s)))
     for block in blocks:
         block.com_filter = create_uniform_particles(100, 3, get_com_ranges(block))
-    tower = find_tallest_tower(blocks)
-    simulate_tower(tower, vis=True)
+        plt.scatter(*block.com_filter.particles[:,:2].T, label=block.name, alpha=0.5)
+
+    plt.legend()
+    plt.show()
+
+
+    # tower = find_tallest_tower(blocks)
+    # simulate_tower(tower, vis=True, T=60)
+
+    # block = Object('bleh', Dimensions(0.1, 0.2, 0.3), 1, Position(0,0,0), Color(0,1,0))
+    # blocks = []
+    # for i,r in enumerate(rotation_group()):
+    #     block.pose = Pose(Position(0,0.4*i, 1), Quaternion(*r.as_quat()))
+    #     blocks.append(copy(block))
+
+    # simulate_tower(blocks, vis=True, T=60)
+
