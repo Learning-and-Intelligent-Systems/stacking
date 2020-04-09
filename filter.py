@@ -23,31 +23,26 @@ def add_noise(pose):
     orn = pose.orn
     return Pose(pos, orn)
 
+def setup_ax(ax, obj):
+    ax.clear()
+    halfdim = max(obj.dimensions)
+    ax.set_xlim(-halfdim, halfdim)
+    ax.set_ylim(-halfdim, halfdim)
+    ax.set_zlim(-halfdim, halfdim)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+
 def plot_particles(ax, particles, weights, t=None, true_com=None):
     for particle, weight in zip(particles, weights):
         ax.scatter(*particle, s=10, color=(weight,0,1-weight))
 
-    X = particles[:,0]
-    Y = particles[:,1]
-    Z = particles[:,2]
-
-    max_range = np.array([X.max()-X.min(), Y.max()-Y.min(), Z.max()-Z.min()]).max() / 2.0
-
-    mid_x = (X.max()+X.min()) * 0.5
-    mid_y = (Y.max()+Y.min()) * 0.5
-    mid_z = (Z.max()+Z.min()) * 0.5
-    ax.set_xlim(mid_x - max_range, mid_x + max_range)
-    ax.set_ylim(mid_y - max_range, mid_y + max_range)
-    ax.set_zlim(mid_z - max_range, mid_z + max_range)
-
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
     ax.set_title('t='+str(t))  # need to stop from scrolling down figure
     #ax.view_init(elev=100., azim=0.0)  # top down view of x-y plane
-    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
-    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
-    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+
     plt.draw()
     plt.pause(0.1)
 
@@ -56,11 +51,12 @@ def filter_world(p_true_world, args):
         plt.ion()
         fig = plt.figure()
         ax = Axes3D(fig)
-    
+
     com_particle_dist = None
 
     for i in range(I):
         true_world = copy.deepcopy(p_true_world)
+        if args.plot: setup_ax(ax, true_world.objects[1])
 
         # create particle worlds for obj_b's COM
         com_ranges = get_com_ranges(true_world.objects[1])
