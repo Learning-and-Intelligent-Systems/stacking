@@ -119,7 +119,6 @@ def calc_expected_height(tower, num_samples=100):
 
     height = np.sum([block.dimensions.z for block in tower])
     p_stable = stable_count / float(num_samples)
-    print('\t\t\t\t', height, stable_count)
     return height * p_stable
 
 def find_tallest_tower(blocks, num_samples=100):

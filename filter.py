@@ -7,14 +7,14 @@ import copy
 from scipy.stats import multivariate_normal
 from mpl_toolkits.mplot3d import Axes3D
 from actions import PushAction
-from filter_utils import create_uniform_particles, ParticleDistribution
+from filter_utils import create_uniform_particles, ParticleDistribution, sample_and_wiggle
 from block_utils import Environment, Object, Position, Dimensions, World, \
                         Pose, Quaternion, Color, get_com_ranges, Contact
 
 TRUE_OBS_COV = 0.00004*np.eye(3)    # covariance used when add noise to observations
 OBS_MODEL_COV = 0.00004*np.eye(3)   # covariance used in observation model
-T = 50                              # number of steps to simulate per contact state
-I = 3                               # number of contact states to try
+T = 20                              # number of steps to simulate per contact state
+I = 5                               # number of contact states to try
 N = 100                             # number of particles
 D = 3                               # dimensions of a single particle
 
@@ -23,9 +23,9 @@ def add_noise(pose):
     orn = pose.orn
     return Pose(pos, orn)
 
-def plot_particles(ax, particles, weights, t=None):
+def plot_particles(ax, particles, weights, t=None, true_com=None):
     for particle, weight in zip(particles, weights):
-        ax.scatter(*particle, s=10, c=str(1-weight))
+        ax.scatter(*particle, s=10, color=(weight,0,1-weight))
 
     X = particles[:,0]
     Y = particles[:,1]
@@ -57,12 +57,21 @@ def filter_world(p_true_world, args):
         fig = plt.figure()
         ax = Axes3D(fig)
     
+    com_particle_dist = None
+
     for i in range(I):
         true_world = copy.deepcopy(p_true_world)
 
         # create particle worlds for obj_b's COM
         com_ranges = get_com_ranges(true_world.objects[1])
-        com_particle_dist = create_uniform_particles(N, D, com_ranges)
+        if com_particle_dist is None:
+            com_particle_dist = create_uniform_particles(N, D, com_ranges)
+        else:
+            # update the distribution with the new weights
+            com_particle_dist = ParticleDistribution(com_particle_dist.particles, weights)
+            # and resample the distribution
+            com_particle_dist = sample_and_wiggle(com_particle_dist, com_ranges)
+
         weights = com_particle_dist.weights
         particle_worlds = [copy.deepcopy(true_world) for particle in com_particle_dist.particles]
         for (com, particle_world) in zip(com_particle_dist.particles, particle_worlds):

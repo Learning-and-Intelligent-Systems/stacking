@@ -52,3 +52,23 @@ def get_mean(distribution):
     # make sure the weights are normalized to sum to 1
     w = distribution.weights / distribution.weights.sum()
     return w @ distribution.particles
+
+def sample_and_wiggle(distribution, ranges=None):
+    N, D = distribution.particles.shape
+    # NOTE(izzy): note sure if this is an ok way to get the covariance matrix...
+    # If the weights has collapsed onto a single particle, then the covariance
+    # will collapse too and we won't perturb the particles very much after we 
+    # sample them. Maybe this should be a uniform covariance with the magnitude
+    # being equal to the largest variance?
+    cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights)
+    particles = sample_particle_distribution(distribution, num_samples=N)
+    # cov = np.cov(particles, rowvar=False)
+    particles += np.random.multivariate_normal(mean=np.zeros(D), cov=cov, size=N)
+
+    # constrain the particles to be within the block if we are given block dimensions
+    if ranges is not None:
+        for i, (lower, upper) in enumerate(ranges):
+            particles[:,i] = np.clip(particles[:,i], lower, upper)
+
+    weights = np.ones(N)/float(N) # weights become uniform again
+    return ParticleDistribution(particles, weights)
