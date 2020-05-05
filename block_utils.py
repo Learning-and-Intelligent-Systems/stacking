@@ -1,6 +1,9 @@
 import time
 import numpy as np
 import os
+from shutil import copyfile
+from datetime import datetime
+import csv
 from collections import namedtuple
 from copy import copy
 import shutil
@@ -160,7 +163,8 @@ class World:
 
 class Environment:
 
-    def __init__(self, worlds, vis_sim=True, vis_frames=False, use_hand=True):
+    def __init__(self, worlds, vis_sim=True, vis_frames=False, use_hand=True, save_tower=False):
+        self.vis_sim = vis_sim
         self.worlds = worlds
         self.pybullet_server = PyBulletServer(vis_sim)
 
@@ -211,6 +215,26 @@ class Environment:
                             self.pybullet_server.vis_frame(pos, quat)
                     world_i += 1
 
+        if save_tower:
+            # save urdfs
+            timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
+            tower_dir = 'tower-'+timestamp
+            os.mkdir(tower_dir)
+            urdfs_dir = os.path.join(tower_dir, 'urdfs')
+            os.mkdir(urdfs_dir)
+            for obj in self.worlds[0].objects:
+                copyfile(os.path.join(self.tmp_dir, str(obj)+'.urdf'),
+                        os.path.join(urdfs_dir, str(obj)+'.urdf'))
+
+            # save list of urdf_names and poses to csv file
+            filepath = tower_dir+'/obj_poses.csv'
+            with open(filepath, 'w') as handle:
+                obj_writer = csv.writer(handle)
+                for obj in self.worlds[0].objects:
+                    row = [str(obj)+'.urdf']+[str(p) for p in obj.pose.pos]+[str(p) for p in obj.pose.orn]
+                    obj_writer.writerow(row)
+            print('Saved tower URDFs and pose .csv to: ', tower_dir)
+
     def step(self, action=None, vis_frames=False):
         # Apply every action.
         if action:
@@ -242,12 +266,12 @@ class Environment:
         # remove temp urdf files (they will accumulate quickly)
         shutil.rmtree(self.tmp_dir)
 
-def simulate_tower(tower, vis=True, T=60, copy_blocks=True):
+def simulate_tower(tower, vis=True, T=60, copy_blocks=True, save_tower=False):
     if copy_blocks:
         tower = [copy(block) for block in tower]
     world = World(tower)
 
-    env = Environment([world], vis_sim=vis, use_hand=False)
+    env = Environment([world], vis_sim=vis, use_hand=False, save_tower=save_tower)
     for t in range(T):
         env.step(vis_frames=vis)
     env.disconnect()

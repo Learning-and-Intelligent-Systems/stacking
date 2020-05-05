@@ -47,7 +47,7 @@ def main(args):
     tallest_tower = find_tallest_tower(blocks)
 
     # and visualize the result
-    simulate_tower(tallest_tower, vis=True, T=100)
+    simulate_tower(tallest_tower, vis=True, T=100, save_tower=args.save_tower)
 
 
 if __name__ == '__main__':
@@ -56,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--num_blocks', type=int, default=3)
+    parser.add_argument('--save-tower', action='store_true')
 
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
