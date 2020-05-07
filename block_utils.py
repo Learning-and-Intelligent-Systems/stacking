@@ -231,7 +231,10 @@ class Environment:
             with open(filepath, 'w') as handle:
                 obj_writer = csv.writer(handle)
                 for obj in self.worlds[0].objects:
-                    row = [str(obj)+'.urdf']+[str(p) for p in obj.pose.pos]+[str(p) for p in obj.pose.orn]
+                    row = [str(obj)+'.urdf']+\
+                            [str(p) for p in obj.pose.pos]+\
+                            [str(o) for o in obj.pose.orn]+\
+                            [str(d) for d in obj.dimensions]
                     obj_writer.writerow(row)
             print('Saved tower URDFs and pose .csv to: ', tower_dir)
 
