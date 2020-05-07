@@ -8,22 +8,22 @@ from stability import find_tallest_tower
 import numpy as np
 def get_adversarial_blocks():
     b1 = Object(name='block1',
-                dimensions=Dimensions(0.1, 0.3, 0.1),
+                dimensions=Dimensions(0.02, 0.06, 0.02),
                 mass=1.,
                 com=Position(0.045, 0.145, 0),
                 color=Color(0, 0, 1))
     b2 = Object(name='block2',
-                dimensions=Dimensions(0.05, 0.3, 0.1),
+                dimensions=Dimensions(0.01, 0.06, 0.02),
                 mass=1.,
                 com=Position(-0.024, -0.145, 0),
                 color=Color(1, 0, 1))
     b3 = Object(name='block3',
-                dimensions=Dimensions(0.05, 0.05, 0.5),
+                dimensions=Dimensions(0.01, 0.01, 0.1),
                 mass=1.,
                 com=Position(0, 0, 0.2),
                 color=Color(0, 1, 1))
     b4 = Object(name='block4',
-                dimensions=Dimensions(0.3, 0.05, 0.1),
+                dimensions=Dimensions(0.06, 0.01, 0.02),
                 mass=1.,
                 com=Position(-0.145, 0, -0.03),
                 color=Color(0, 1, 0))
