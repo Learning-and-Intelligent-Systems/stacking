@@ -37,9 +37,10 @@ def main(args):
     utils.enable_gravity()
     
     # Add floor object 
-    floor_file = 'models/short_floor.urdf'
-    floor = pb_robot.body.createBody(rel_path=floor_file)
-    
+    #floor_file = 'models/short_floor.urdf'
+    #floor = pb_robot.body.createBody(rel_path=floor_file)
+    plane_id = p.loadURDF("plane_files/plane.urdf", (0.,0.,0.))
+                        
     # Create robot object 
     robot = pb_robot.panda.Panda()
     
@@ -98,7 +99,7 @@ def main(args):
         #pb_robot.viz.draw_pose(pb_robot.geometry.pose_from_tform(pose), length=0.5, width=10)        
 
     # let blocks settle
-    for t in range(50):
+    for t in range(500):
         p.stepSimulation()
         
     #for i in range(p.getNumJoints(robot.id)):
@@ -169,9 +170,7 @@ def main(args):
                                                 angles=euler_from_quaternion(q_ee_world))
         #pb_robot.viz.draw_pose(pb_robot.geometry.pose_from_tform(grasp_ee_world_final[block]), length=0.5, width=10)
         #utils.wait_for_user()
-        
     
-        
     # build tower
     init_q = robot.arm.GetJointValues()
     for block, obj_goal in sorted_obj_goals.items():
@@ -201,6 +200,9 @@ def main(args):
         utils.wait_for_user("Release obj?")
         robot.arm.Release(block)
         robot.arm.hand.Open()
+        
+        for _ in range(1000):
+            p.stepSimulation()
         
     # move back to home configuration
     robot.arm.SetJointValues(init_q)
