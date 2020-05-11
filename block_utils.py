@@ -231,9 +231,10 @@ class Environment:
             with open(filepath, 'w') as handle:
                 obj_writer = csv.writer(handle)
                 for obj in self.worlds[0].objects:
+                    pos, orn = self.pybullet_server.get_pose(obj.id)
                     row = [str(obj)+'.urdf']+\
-                            [str(p) for p in obj.pose.pos]+\
-                            [str(o) for o in obj.pose.orn]+\
+                            [str(p) for p in pos]+\
+                            [str(o) for o in orn]+\
                             [str(d) for d in obj.dimensions]
                     obj_writer.writerow(row)
             print('Saved tower URDFs and pose .csv to: ', tower_dir)
