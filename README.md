@@ -13,7 +13,8 @@ The particle filter and tower solver run in Python3 and the robot runs in Python
         1. ```pip2 install numpy pybullet recordclassc catkin_pkg IPython```
         2. ```pip2 install git+https://github.com/personalrobotics/tsr.git```
     2. Clone pb_robot from [here](https://github.com/rachelholladay/pb_robot)
-    3. Compile the IKFast library for the panda
+    3. Comment out line 6 of pb_robot/src/pb_robot/__init__.py (```import vobj```) 
+    4. Compile the IKFast library for the panda
         1. ```cd pb_robot/src/pb_robot/ikfast/franka_panda```
         2. ```python2 setup.py build```
 2. Install stacking
