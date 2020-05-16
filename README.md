@@ -10,7 +10,7 @@ The particle filter and tower solver run in Python3 and the robot runs in Python
 
 1. Install pb_robot
     1. Install pb_robot dependencies
-        1. ```pip2 install numpy pybullet recordclassc catkin_pkg IPython```
+        1. ```pip2 install numpy pybullet recordclass catkin_pkg IPython```
         2. ```pip2 install git+https://github.com/personalrobotics/tsr.git```
     2. Clone pb_robot from [here](https://github.com/rachelholladay/pb_robot)
     3. Comment out line 6 of pb_robot/src/pb_robot/\__init__.py (```import vobj```) 
