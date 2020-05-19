@@ -9,10 +9,10 @@ from copy import copy
 import shutil
 import pybullet as p
 import odio_urdf
-from filter_utils import ParticleDistribution
 from pybullet_utils import PyBulletServer, quat_math
 from scipy.spatial.transform import Rotation as R
 
+ParticleDistribution = namedtuple('ParticleDistribution', 'particles weights')
 Position = namedtuple('Position', 'x y z')
 Quaternion = namedtuple('Quaternion', 'x y z w')
 Pose = namedtuple('Pose', 'pos orn')

@@ -1,10 +1,43 @@
 from block_utils import Environment, World, Object, Position, Pose, \
                         Quaternion, Dimensions, Color, get_com_ranges, \
                         rotation_group, get_rotated_block
-from filter_utils import create_uniform_particles
+# from filter_utils import create_uniform_particles
 import pybullet as p
 import copy
 import numpy as np
+from operator import itemgetter
+
+
+def plan_action(particle_blocks, k=3):
+    """ Given a set of particles, choose the action that maximizes the observed variance. 
+    :param particle_block: A list of the current set of particles instantiated as blocks.
+    :param k: Number of pushes to do for each orientation.
+    """
+    print('Finding Action')
+    results = []
+    for rot in rotation_group():
+        for _ in range(k):
+            particle_worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
+            env = Environment(particle_worlds, vis_sim=False)
+            action = PushAction(block_pos=particle_worlds[0].get_pose(particle_worlds[0].objects[1]).pos,
+                                direction=PushAction.get_random_dir(),
+                                timesteps=50)
+
+            for t in range(50):
+                env.step(action=action)
+            
+            # Get end pose of all particle blocks.
+            poses = np.array([w.get_pose(w.objects[1]).pos for w in particle_worlds])
+            var = np.var(poses, axis=0)
+            score = np.mean(var)
+            print(var, score)
+            results.append(((rot, action.direction), score))
+            
+            env.disconnect()
+            env.cleanup()
+
+    return max(results, key=itemgetter(1))[0]
+
 
 
 class PushAction:

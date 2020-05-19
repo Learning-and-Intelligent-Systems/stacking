@@ -6,6 +6,9 @@ from block_utils import Position, Dimensions, Object, World, Color, \
 from actions import make_platform_world
 from stability import find_tallest_tower
 import numpy as np
+import matplotlib.pyplot as plt
+
+
 def get_adversarial_blocks():
     b1 = Object(name='block1',
                 dimensions=Dimensions(0.02, 0.06, 0.02),
@@ -30,18 +33,46 @@ def get_adversarial_blocks():
     return [b1, b2, b3, b4]
 
 
+def plot_com_error(errors_random, errors_var):
+
+    for tx in range(0, len(errors_var[0][0])):
+        err_rand, err_var = 0, 0
+        for bx in range(0, len(errors_var)):
+            true = np.array(errors_var[bx][1])
+            guess_rand = errors_random[bx][0][tx]
+            guess_var = errors_var[bx][0][tx]
+            err_var += np.linalg.norm(true-guess_var)
+            err_rand += np.linalg.norm(true-guess_rand)
+        plt.scatter(tx, err_rand/len(errors_var), c='r')
+        plt.scatter(tx, err_var/len(errors_var), c='b')
+    plt.show()
+
+
+def test_exploration(args):
+    blocks = [Object.random('obj_%i' % i) for i in range(args.num_blocks)]
+    
+    errors_random, errors_var = [], []
+    for block in blocks:
+        print('Running filter for block', block.name)
+        _, estimates = filter_block(block, 'random', args)
+        errors_random.append((estimates, block.com))
+        _, estimates = filter_block(block, 'reduce_var', args)
+        errors_var.append((estimates, block.com))
+    plot_com_error(errors_random, errors_var)
+
+
 def main(args):
     # get a bunch of random blocks
-    blocks = [Object.random('obj_%i' % i) for i in range(args.num_blocks)]
     blocks = get_adversarial_blocks()
 
     # construct a world containing those blocks
     for block in blocks:
         print('Running filter for', block.name)
         # run the particle filter
-        block.com_filter = filter_block(block, args)
+        
+        block.com_filter, _ = filter_block(block, 'reduce_var', args)
         ix = np.argmax(block.com_filter.weights)
-        print(block.name, block.com_filter.weights[ix], block.com_filter.particles[ix])
+        print(block.name, np.array(block.com_filter.particles).T@block.com_filter.weights)
     # find the tallest tower
     print('Finding tallest tower.')
     tallest_tower = find_tallest_tower(blocks)
@@ -60,5 +91,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
+    
+    test_exploration(args)
 
-    main(args)
+    # main(args)
