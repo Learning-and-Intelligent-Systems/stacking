@@ -34,10 +34,10 @@ task should be its own class that implements
 
 ### TODO
 
- * *Both* Grok PDDLstream spec
+ * <s>*Both* Grok PDDLstream spec</s>
  * *Together* Write a Planner base class
  * *Together* Refactor filter.py into ParticleBelief
- * *Izzy* refactor stability.py into TowerPlanner
+ * <s>*Izzy* refactor stability.py into TowerPlanner</s>
  * *Mike* refactor actions.py into InfoPlanner
  * *Maybe* rewrite run.py to work with new class structure and take PPDLStream
  * *Maybe* Move from namedtuples to np arrays for Position, Rotation, etc
