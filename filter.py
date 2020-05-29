@@ -68,6 +68,7 @@ def filter_block(p_true_block, exp_type, args):
             com_particle_dist = create_uniform_particles(N, D, com_ranges)
         else:
             # update the distribution with the new weights
+            print(weights)
             com_particle_dist = ParticleDistribution(com_particle_dist.particles, weights)
             # and resample the distribution
             com_particle_dist = sample_and_wiggle(com_particle_dist, experience, OBS_MODEL_COV, true_block, com_ranges)

@@ -88,6 +88,9 @@ def run_action(belief, real_block, T=50):
         end_pose = add_noise(end_pose)
         observation = (action, rot, T, end_pose)
 
+        env.disconnect()
+        env.cleanup()
+
         return observation
 
 def main(args):
@@ -96,11 +99,19 @@ def main(args):
 
     # construct a world containing those blocks
     for block in blocks:
+        # new code
         print('Running filter for', block.name)
         belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
-        # run the particle filter
-        observation = run_action(belief, block)
-        belief.update(observation)
+        for interaction_num in range(1):
+            print("Interaction number: ", interaction_num)
+            observation = run_action(belief, block)
+            belief.update(observation)
+            block.com_filter = belief.particles
+
+        # old code
+        # from filter import filter_block
+        # filter_block(block, exp_type='random', args=args)
+
     # find the tallest tower
     print('Finding tallest tower.')
     tp = TowerPlanner()

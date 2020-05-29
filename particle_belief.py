@@ -84,7 +84,7 @@ class ParticleBelief:
         # update all particle weights
         new_weights = []
 
-        for pi, (particle_world, old_weight) in enumerate(zip(particle_worlds, weights)):
+        for pi, (particle_world, old_weight) in enumerate(zip(particle_worlds, self.particles.weights)):
             particle_end_pose = particle_world.get_pose(particle_world.objects[1])
             obs_model = multivariate_normal.pdf(end_pose.pos,
                                                 mean=particle_end_pose.pos,
@@ -93,25 +93,24 @@ class ParticleBelief:
             new_weights.append(new_weight)
 
         # normalize particle weights
-        weights_sum = sum(new_weights)
-        weights = np.divide(new_weights, weights_sum)
+        new_weights = np.array(new_weights)/np.sum(new_weights)
         # and update the particle distribution with the new weights
-        self.particles = ParticleDistribution(self.particles.particles, weights)
+        self.particles = ParticleDistribution(self.particles.particles, new_weights)
 
         if self.plot and not t % 5:
             # visualize particles (it's very slow)
             self.plot_particles(ax, self.particles.particles, weights, t=t)
 
-        com = np.array(self.particles.particles).T
-        print('Mean COM', com@weights, np.diag(np.cov(self.particles.particles, rowvar=False, aweights=weights+1e-3)))
+        mean = np.array(self.particles.particles).T@np.array(self.particles.weights)
+        # print('Mean COM', mean, np.diag(np.cov(self.particles.particles, rowvar=False, aweights=self.particles.weights+1e-3)))
 
-        if self.block.com is not None:
-            print('True COM', self.block.com)
-            print('Error COM', np.linalg.norm(self.block.com-com@weights))
+        # if self.block.com is not None:
+        #     print('True COM', self.block.com)
+        #     print('Error COM', np.linalg.norm(self.block.com-mean))
 
-        self.estimated_coms.append(com@weights)
+        self.estimated_coms.append(mean)
 
-        # env.disconnect()
-        # env.cleanup()
+        env.disconnect()
+        env.cleanup()
 
         return self.particles, self.estimated_coms
