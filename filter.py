@@ -71,7 +71,7 @@ def filter_block(p_true_block, exp_type, args):
             com_particle_dist = ParticleDistribution(com_particle_dist.particles, weights)
             # and resample the distribution
             com_particle_dist = sample_and_wiggle(com_particle_dist, experience, OBS_MODEL_COV, true_block, com_ranges)
-        
+
         weights = com_particle_dist.weights
         particle_blocks = [copy.deepcopy(true_block) for particle in com_particle_dist.particles]
         for (com, particle_block) in zip(com_particle_dist.particles, particle_blocks):
@@ -96,7 +96,7 @@ def filter_block(p_true_block, exp_type, args):
 
         for t in range(T):
             env.step(action=action)
-        
+
         # get ground truth object_b pose (observation)
         objb_pose = true_world.get_pose(true_world.objects[1])
         objb_pose = add_noise(objb_pose)
@@ -121,7 +121,7 @@ def filter_block(p_true_block, exp_type, args):
         if args.plot and not t % 5:
             # visualize particles (it's very slow)
             plot_particles(ax, com_particle_dist.particles, weights, t=t)
-        
+
         com = np.array(com_particle_dist.particles).T
         print('Mean COM', com@weights, np.diag(np.cov(com_particle_dist.particles, rowvar=False, aweights=weights+1e-3)))
         print('True COM', true_block.com)

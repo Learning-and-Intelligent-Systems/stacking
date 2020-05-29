@@ -1,7 +1,7 @@
 from collections import namedtuple
 import numpy as np
 from numpy.random import uniform, randn
-from scipy.stats import multivariate_normal 
+from scipy.stats import multivariate_normal
 import copy
 from actions import make_platform_world
 from block_utils import ParticleDistribution, Environment
@@ -61,30 +61,31 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
     N, D = distribution.particles.shape
     # NOTE(izzy): note sure if this is an ok way to get the covariance matrix...
     # If the weights has collapsed onto a single particle, then the covariance
-    # will collapse too and we won't perturb the particles very much after we 
+    # will collapse too and we won't perturb the particles very much after we
     # sample them. Maybe this should be a uniform covariance with the magnitude
     # being equal to the largest variance?
-    # NOTE: (mike): I added a small noise term and a M-H update step which hopefully 
+    # NOTE: (mike): I added a small noise term and a M-H update step which hopefully
     # prevents complete collapse. The M-H update is useful so that we don't sample
     # something completely unlikely by chance.
+    # NOTE(izzy): we do not access the COM of true_block. it's just for geometry
     cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3)
     # print(distribution.particles[:20,:])
     particles = sample_particle_distribution(distribution, num_samples=N)
     # cov = np.cov(particles, rowvar=False)
     mean = np.mean(particles, axis=0)
     proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
-    
+
     # Old particles and new particles.
     likelihoods = np.zeros((N,2))
     # TODO: Compute likelihood of particles over history so far.
     for action, rot, T, true_pose in experience:
-        sim_poses = simulate(np.concatenate([particles, proposed_particles], axis=0), 
-                             action, 
-                             rot, 
+        sim_poses = simulate(np.concatenate([particles, proposed_particles], axis=0),
+                             action,
+                             rot,
                              T,
                              true_block)
         for ix in range(N):
-            likelihoods[ix,0] += np.log(multivariate_normal.pdf(true_pose.pos, 
+            likelihoods[ix,0] += np.log(multivariate_normal.pdf(true_pose.pos,
                                                         mean=sim_poses[ix, :],
                                                         cov=obs_model_cov)+1e-8)
             likelihoods[ix,1] += np.log(multivariate_normal.pdf(true_pose.pos,
@@ -107,7 +108,7 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
     # print('Before:', particles[indices[0:10]])
     particles[indices] = proposed_particles[indices]
     # print('After:', particles[indices[0:10]])
-    
+
     # constrain the particles to be within the block if we are given block dimensions
     if ranges is not None:
         for i, (lower, upper) in enumerate(ranges):
@@ -123,10 +124,10 @@ def simulate(particles, action, rot, T, true_block):
 
     worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
     env = Environment(worlds, vis_sim=False)
-    
+
     for t in range(T):
         env.step(action=action)
-    
+
     poses = []
     for particle_world in worlds:
         pose = particle_world.get_pose(particle_world.objects[1])

@@ -270,6 +270,11 @@ class Environment:
         # remove temp urdf files (they will accumulate quickly)
         shutil.rmtree(self.tmp_dir)
 
+def add_noise(pose, cov=0.0015*np.eye(3)):
+        pos = Position(*np.random.multivariate_normal(mean=pose.pos, cov=cov))
+        orn = pose.orn
+        return Pose(pos, orn)
+
 def simulate_tower(tower, vis=True, T=60, copy_blocks=True, save_tower=False):
     if copy_blocks:
         tower = [copy(block) for block in tower]

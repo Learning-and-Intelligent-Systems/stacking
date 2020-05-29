@@ -8,35 +8,43 @@ import numpy as np
 from operator import itemgetter
 
 
-def plan_action(particle_blocks, k=3):
-    """ Given a set of particles, choose the action that maximizes the observed variance. 
+def plan_action(particle_blocks, k=3, exp_type='reduce_var'):
+    """ Given a set of particles, choose the action that maximizes the observed variance.
     :param particle_block: A list of the current set of particles instantiated as blocks.
     :param k: Number of pushes to do for each orientation.
     """
-    print('Finding Action')
-    results = []
-    for rot in rotation_group():
-        for _ in range(k):
-            particle_worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
-            env = Environment(particle_worlds, vis_sim=False)
-            action = PushAction(block_pos=particle_worlds[0].get_pose(particle_worlds[0].objects[1]).pos,
-                                direction=PushAction.get_random_dir(),
-                                timesteps=50)
+    if exp_type == 'reduce_var':
+        print('Finding variance reducing action')
+        results = []
+        for rot in rotation_group():
+            for _ in range(k):
+                particle_worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
+                env = Environment(particle_worlds, vis_sim=False)
+                action = PushAction(block_pos=particle_worlds[0].get_pose(particle_worlds[0].objects[1]).pos,
+                                    direction=PushAction.get_random_dir(),
+                                    timesteps=50)
 
-            for t in range(50):
-                env.step(action=action)
-            
-            # Get end pose of all particle blocks.
-            poses = np.array([w.get_pose(w.objects[1]).pos for w in particle_worlds])
-            var = np.var(poses, axis=0)
-            score = np.mean(var)
-            print(var, score)
-            results.append(((rot, action.direction), score))
-            
-            env.disconnect()
-            env.cleanup()
+                for t in range(50):
+                    env.step(action=action)
 
-    return max(results, key=itemgetter(1))[0]
+                # Get end pose of all particle blocks.
+                poses = np.array([w.get_pose(w.objects[1]).pos for w in particle_worlds])
+                var = np.var(poses, axis=0)
+                score = np.mean(var)
+                print(var, score)
+                results.append(((rot, action.direction), score))
+
+                env.disconnect()
+                env.cleanup()
+
+        return max(results, key=itemgetter(1))[0]
+    else:
+        print('Finding random action')
+        rs = [r for r in rotation_group()]
+        ix = np.random.choice(np.arange(len(rs)))
+        rot = rs[ix]
+        direc = PushAction.get_random_dir()
+        return rot, direc
 
 
 
@@ -90,7 +98,7 @@ def make_platform_world(p_block, rot):
                       color=Color(r=0.25, g=0.25, b=0.25))
     platform.set_pose(Pose(pos=Position(x=0., y=0., z=0.025),
                            orn=Quaternion(x=0, y=0, z=0, w=1)))
-    
+
     p_block.set_pose(Pose(Position(0, 0, 0), Quaternion(*rot.as_quat())))
 
     block = get_rotated_block(p_block)
@@ -108,7 +116,7 @@ if __name__ == '__main__':
                    mass=1,
                    com=true_com,
                    color=Color(r=1., g=0., b=0.))
-    
+
     for r in rotation_group():
         true_world = make_platform_world(block, r)
         com_ranges = get_com_ranges(true_world.objects[1])

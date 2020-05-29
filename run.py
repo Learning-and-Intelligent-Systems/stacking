@@ -1,12 +1,12 @@
 import pdb
-from filter import filter_block
 import argparse
-from block_utils import Position, Dimensions, Object, World, Color, \
-    simulate_tower
-from actions import make_platform_world
-from stability import find_tallest_tower
+from block_utils import *
+from actions import *
+from tower_planner import TowerPlanner
+from particle_belief import ParticleBelief
 import numpy as np
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 
 def get_adversarial_blocks():
@@ -48,18 +48,47 @@ def plot_com_error(errors_random, errors_var):
     plt.show()
 
 
-def test_exploration(args):
-    blocks = [Object.random('obj_%i' % i) for i in range(args.num_blocks)]
-    
-    errors_random, errors_var = [], []
-    for block in blocks:
-        print('Running filter for block', block.name)
-        _, estimates = filter_block(block, 'random', args)
-        errors_random.append((estimates, block.com))
-        _, estimates = filter_block(block, 'reduce_var', args)
-        errors_var.append((estimates, block.com))
-    plot_com_error(errors_random, errors_var)
+# def test_exploration(args):
+#     blocks = [Object.random('obj_%i' % i) for i in range(args.num_blocks)]
 
+#     errors_random, errors_var = [], []
+#     for block in blocks:
+
+#         print('Running filter for block', block.name)
+#         _, estimates = filter_block(block, 'random', args)
+#         errors_random.append((estimates, block.com))
+#         _, estimates = filter_block(block, 'reduce_var', args)
+#         errors_var.append((estimates, block.com))
+#     plot_com_error(errors_random, errors_var)
+
+
+def run_action(belief, real_block, T=50):
+        particle_blocks = [deepcopy(belief.block) for particle in belief.particles.particles]
+        for (com, particle_block) in zip(belief.particles.particles, particle_blocks):
+            particle_block.com = com
+
+        #Choose action to maximize variance of particles.
+        rot, direc = plan_action(particle_blocks, exp_type='random')
+
+        true_world = make_platform_world(real_block, rot)
+        # particle_worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
+
+        env = Environment([true_world], vis_sim=belief.vis_sim)
+
+        # action to apply to all worlds
+        action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
+                            direction=direc,
+                            timesteps=T)
+
+        for t in range(T):
+            env.step(action=action)
+
+        # get ground truth object_b pose (observation)
+        end_pose = true_world.get_pose(true_world.objects[1])
+        end_pose = add_noise(end_pose)
+        observation = (action, rot, T, end_pose)
+
+        return observation
 
 def main(args):
     # get a bunch of random blocks
@@ -68,14 +97,14 @@ def main(args):
     # construct a world containing those blocks
     for block in blocks:
         print('Running filter for', block.name)
+        belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
         # run the particle filter
-        
-        block.com_filter, _ = filter_block(block, 'reduce_var', args)
-        ix = np.argmax(block.com_filter.weights)
-        print(block.name, np.array(block.com_filter.particles).T@block.com_filter.weights)
+        observation = run_action(belief, block)
+        belief.update(observation)
     # find the tallest tower
     print('Finding tallest tower.')
-    tallest_tower = find_tallest_tower(blocks)
+    tp = TowerPlanner()
+    tallest_tower = tp.plan(blocks)
 
     # and visualize the result
     simulate_tower(tallest_tower, vis=True, T=100, save_tower=args.save_tower)
@@ -91,7 +120,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
-    
-    test_exploration(args)
 
-    # main(args)
+    # test_exploration(args)
+
+    main(args)
