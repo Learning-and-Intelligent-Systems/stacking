@@ -61,36 +61,36 @@ def plot_com_error(errors_random, errors_var):
 #         errors_var.append((estimates, block.com))
 #     plot_com_error(errors_random, errors_var)
 
+def select_action(belief, exp_type='random'):
+    # create a bunch of blocks with the same geometry where each COM is set to one of the 
+    # particles
+    particle_blocks = [deepcopy(belief.block) for particle in belief.particles.particles]
+    for (com, particle_block) in zip(belief.particles.particles, particle_blocks):
+        particle_block.com = com
+    #Choose action to maximize variance of particles.
+    return plan_action(particle_blocks, exp_type=exp_type)
 
-def run_action(belief, real_block, T=50):
-        particle_blocks = [deepcopy(belief.block) for particle in belief.particles.particles]
-        for (com, particle_block) in zip(belief.particles.particles, particle_blocks):
-            particle_block.com = com
-
-        #Choose action to maximize variance of particles.
-        rot, direc = plan_action(particle_blocks, exp_type='random')
-
+def simulate_action(action, real_block, T=50, vis_sim=False):
+        # the action is composed of an initial rotation and a direction to push
+        rot, direc = action
+        # set up the environment
         true_world = make_platform_world(real_block, rot)
-        # particle_worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
-
-        env = Environment([true_world], vis_sim=belief.vis_sim)
-
-        # action to apply to all worlds
-        action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
+        env = Environment([true_world], vis_sim=vis_sim)
+        # construct an action object to apply
+        push_action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
                             direction=direc,
                             timesteps=T)
-
+        # run the simulator
         for t in range(T):
-            env.step(action=action)
-
+            env.step(action=push_action)
         # get ground truth object_b pose (observation)
         end_pose = true_world.get_pose(true_world.objects[1])
         end_pose = add_noise(end_pose)
-        observation = (action, rot, T, end_pose)
-
+        observation = (push_action, rot, T, end_pose)
+        # turn off the sim
         env.disconnect()
         env.cleanup()
-
+        # and return the observed trajectory
         return observation
 
 def main(args):
@@ -104,7 +104,8 @@ def main(args):
         belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
         for interaction_num in range(1):
             print("Interaction number: ", interaction_num)
-            observation = run_action(belief, block)
+            action = select_action(belief) # TODO
+            observation = simulate_action(action, block)
             belief.update(observation)
             block.com_filter = belief.particles
 
