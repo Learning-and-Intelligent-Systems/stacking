@@ -6,7 +6,6 @@ from tower_planner import TowerPlanner
 from particle_belief import ParticleBelief
 import numpy as np
 import matplotlib.pyplot as plt
-from copy import deepcopy
 
 
 def get_adversarial_blocks():
@@ -47,7 +46,6 @@ def plot_com_error(errors_random, errors_var):
         plt.scatter(tx, err_var/len(errors_var), c='b')
     plt.show()
 
-
 # def test_exploration(args):
 #     blocks = [Object.random('obj_%i' % i) for i in range(args.num_blocks)]
 
@@ -60,15 +58,6 @@ def plot_com_error(errors_random, errors_var):
 #         _, estimates = filter_block(block, 'reduce_var', args)
 #         errors_var.append((estimates, block.com))
 #     plot_com_error(errors_random, errors_var)
-
-def select_action(belief, exp_type='random'):
-    # create a bunch of blocks with the same geometry where each COM is set to one of the 
-    # particles
-    particle_blocks = [deepcopy(belief.block) for particle in belief.particles.particles]
-    for (com, particle_block) in zip(belief.particles.particles, particle_blocks):
-        particle_block.com = com
-    #Choose action to maximize variance of particles.
-    return plan_action(particle_blocks, exp_type=exp_type)
 
 def simulate_action(action, real_block, T=50, vis_sim=False):
         # the action is composed of an initial rotation and a direction to push
@@ -104,7 +93,7 @@ def main(args):
         belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
         for interaction_num in range(1):
             print("Interaction number: ", interaction_num)
-            action = select_action(belief) # TODO
+            action = plan_action(belief, exp_type='random') # TODO
             observation = simulate_action(action, block)
             belief.update(observation)
             block.com_filter = belief.particles

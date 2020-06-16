@@ -8,7 +8,7 @@ import numpy as np
 from operator import itemgetter
 
 
-def plan_action(particle_blocks, k=3, exp_type='reduce_var'):
+def plan_action(belief, k=3, exp_type='reduce_var'):
     """ Given a set of particles, choose the action that maximizes the observed variance.
     :param particle_block: A list of the current set of particles instantiated as blocks.
     :param k: Number of pushes to do for each orientation.
@@ -18,6 +18,11 @@ def plan_action(particle_blocks, k=3, exp_type='reduce_var'):
         results = []
         for rot in rotation_group():
             for _ in range(k):
+                # create a bunch of blocks with the same geometry where each COM
+                # for each block is set to one of the particles
+                particle_blocks = [copy.deepcopy(belief.block) for particle in belief.particles.particles]
+                for (com, particle_block) in zip(belief.particles.particles, particle_blocks):
+                    particle_block.com = com
                 particle_worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
                 env = Environment(particle_worlds, vis_sim=False)
                 action = PushAction(block_pos=particle_worlds[0].get_pose(particle_worlds[0].objects[1]).pos,
