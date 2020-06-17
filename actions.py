@@ -42,19 +42,21 @@ def plan_action(belief, k=3, exp_type='reduce_var'):
                 env.disconnect()
                 env.cleanup()
 
-        return max(results, key=itemgetter(1))[0]
+        rot, direc = max(results, key=itemgetter(1))[0]
     else:
         print('Finding random action')
         rs = [r for r in rotation_group()]
         ix = np.random.choice(np.arange(len(rs)))
         rot = rs[ix]
         direc = PushAction.get_random_dir()
-        return rot, direc
+
+    return PushAction(direction=direc, rotation=rot)
+
 
 
 
 class PushAction:
-    def __init__(self, block_pos, direction, timesteps, delta=0.005):
+    def __init__(self, block_pos=None, direction=None, timesteps=50, rotation=None, delta=0.005):
         """ PushAction moves the hand in the given world by a fixed distance
             every timestep. We assume we will push the block in a direction through
             the object's geometric center.
@@ -65,13 +67,13 @@ class PushAction:
         :param timesteps: The number of timesteps to execute the action for.
         :param delta: How far to move each timestep.
         """
-        self.start_pos = Position(x=block_pos.x - direction[0]*delta*20,
-                                  y=block_pos.y - direction[1]*delta*20,
-                                  z=block_pos.z - direction[2]*delta*20)
+        self.rotation = rotation
         self.direction = direction
         self.timesteps = timesteps
         self.delta = delta
         self.tx = 0
+        if block_pos is not None:
+            self.set_start_pos(block_pos)
 
     def step(self):
         """ Move the hand forward by delta.
@@ -90,6 +92,11 @@ class PushAction:
     def get_random_dir():
         angle = np.random.uniform(0, np.pi)
         return (np.cos(angle), np.sin(angle), 0)
+
+    def set_start_pos(self, block_pos):
+        self.start_pos = Position(x=block_pos.x - self.direction[0]*self.delta*20,
+                          y=block_pos.y - self.direction[1]*self.delta*20,
+                          z=block_pos.z - self.direction[2]*self.delta*20)
 
 
 def make_platform_world(p_block, rot):

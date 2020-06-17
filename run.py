@@ -60,22 +60,21 @@ def plot_com_error(errors_random, errors_var):
 #     plot_com_error(errors_random, errors_var)
 
 def simulate_action(action, real_block, T=50, vis_sim=False):
-        # the action is composed of an initial rotation and a direction to push
-        rot, direc = action
-        # set up the environment
+        # get the initial rotation of the block as specified by the action
+        rot = action.rotation
+        # set up the environment with the real block
         true_world = make_platform_world(real_block, rot)
         env = Environment([true_world], vis_sim=vis_sim)
-        # construct an action object to apply
-        push_action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
-                            direction=direc,
-                            timesteps=T)
+        # configure the starting position and duration of the action
+        action.set_start_pos(true_world.get_pose(true_world.objects[1]).pos)
+        action.timesteps = T
         # run the simulator
         for t in range(T):
-            env.step(action=push_action)
+            env.step(action=action)
         # get ground truth object_b pose (observation)
         end_pose = true_world.get_pose(true_world.objects[1])
         end_pose = add_noise(end_pose)
-        observation = (push_action, rot, T, end_pose)
+        observation = (action, rot, T, end_pose)
         # turn off the sim
         env.disconnect()
         env.cleanup()
@@ -93,7 +92,7 @@ def main(args):
         belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
         for interaction_num in range(1):
             print("Interaction number: ", interaction_num)
-            action = plan_action(belief, exp_type='random') # TODO
+            action = plan_action(belief, exp_type='reduce_var')
             observation = simulate_action(action, block)
             belief.update(observation)
             block.com_filter = belief.particles
