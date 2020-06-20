@@ -5,6 +5,7 @@ Izzy Brand
 """
 from block_utils import *
 from filter_utils import *
+from base_class import PlannerBase
 import numpy as np
 from copy import copy
 from itertools import permutations, combinations_with_replacement
@@ -13,7 +14,8 @@ from itertools import permutations, combinations_with_replacement
 # TODO(izzy): right now I'm assuming sequential vertical contacts. This get's a
 # lot more tricky if we want to place blocks adjacent to eachother
 
-class TowerPlanner:
+class TowerPlanner(PlannerBase):
+
     def tower_is_stable(self, tower):
         """ Check that the tower is stable
 

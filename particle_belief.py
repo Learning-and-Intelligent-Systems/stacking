@@ -14,8 +14,9 @@ from mpl_toolkits.mplot3d import Axes3D
 from actions import *
 from filter_utils import *
 from block_utils import *
+from base_class import BeliefBase
 
-class ParticleBelief:
+class ParticleBelief(BeliefBase):
     def __init__(self, block, N=200, plot=False, vis_sim=False):
         self.block = deepcopy(block)
         self.plot = plot                        # plot the particles

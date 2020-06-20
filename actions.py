@@ -1,5 +1,5 @@
 from block_utils import *
-# from filter_utils import create_uniform_particles
+from base_class import ActionBase
 import pybullet as p
 import copy
 import numpy as np
@@ -54,7 +54,7 @@ def plan_action(belief, k=3, exp_type='reduce_var'):
     return push_action
 
 
-class PushAction:
+class PushAction(ActionBase):
     def __init__(self, block_pos=None, direction=None, timesteps=50, rot=None, delta=0.005):
         """ PushAction moves the hand in the given world by a fixed distance
             every timestep. We assume we will push the block in a direction through
@@ -66,8 +66,9 @@ class PushAction:
         :param timesteps: The number of timesteps to execute the action for.
         :param delta: How far to move each timestep.
         """
-        self.rot = rot # set the rotation of the block
-        self.pos = ZERO_POS # a push action doest change the position of the block
+        super(PushAction, self).__init__()
+
+        self.rot = rot
         self.timesteps = timesteps
         self.delta = delta
         self.tx = 0
@@ -102,12 +103,11 @@ class PushAction:
                                        y=block_pos.y - self.direction[1]*self.delta*20,
                                        z=block_pos.z - self.direction[2]*self.delta*20)
 
-class PlaceAction:
+class PlaceAction(ActionBase):
     def __init__(self, position=None, rot=None):
         """ place_action simply specifies the desired intial block position
         """
-        self.rot = rot
-        self.start_pos = position
+        super(PlaceAction, self).__init__()
 
 def make_platform_world(p_block, action):
     """ Given a block, create a world that has a platform to push that block off of.
