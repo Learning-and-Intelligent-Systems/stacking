@@ -71,7 +71,7 @@ class ParticleBelief:
             self.OBS_MODEL_COV, self.block, self.com_ranges)
 
         self.experience.append(observation)
-        action, rot, T, end_pose = observation
+        action, T, end_pose = observation
 
         particle_blocks = [deepcopy(self.block) for particle in self.particles.particles]
         for (com, particle_block) in zip(self.particles.particles, particle_blocks):

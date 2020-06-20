@@ -74,7 +74,7 @@ def simulate_action(action, real_block, T=50, vis_sim=False):
         # get ground truth object_b pose (observation)
         end_pose = true_world.get_pose(true_world.objects[1])
         end_pose = add_noise(end_pose)
-        observation = (action, rot, T, end_pose)
+        observation = (action, T, end_pose)
         # turn off the sim
         env.disconnect()
         env.cleanup()
@@ -92,7 +92,7 @@ def main(args):
         belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
         for interaction_num in range(1):
             print("Interaction number: ", interaction_num)
-            action = plan_action(belief, exp_type='random')
+            action = plan_action(belief, exp_type='reduce_var')
             observation = simulate_action(action, block)
             belief.update(observation)
             block.com_filter = belief.particles
