@@ -88,6 +88,16 @@ class Object:
         # and add the new block to the list
         return Object(name, dims, mass, com, color)
 
+    def platform():
+        platform_block = Object(name='platform',
+                      dimensions=Dimensions(x=0.3, y=0.2, z=0.05),
+                      mass=100,
+                      com=Position(x=0., y=0., z=0.),
+                      color=Color(r=0.25, g=0.25, b=0.25))
+        platform_block.set_pose(Pose(pos=Position(x=0., y=0., z=0.025),
+                           orn=Quaternion(x=0, y=0, z=0, w=1)))
+        return platform_block
+
 
 class Hand:
     def __init__(self):
@@ -241,8 +251,8 @@ class Environment:
 
     def step(self, action=None, vis_frames=False):
         # Apply every action.
-        if action:
-            hand_pos = action.step()
+        if action and action.__class__.__name__ == 'PushAction':
+            hand_pos = action.step(
             for world in self.worlds:
                 world.set_hand_pos(hand_pos)
 

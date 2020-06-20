@@ -46,27 +46,11 @@ def plot_com_error(errors_random, errors_var):
         plt.scatter(tx, err_var/len(errors_var), c='b')
     plt.show()
 
-# def test_exploration(args):
-#     blocks = [Object.random('obj_%i' % i) for i in range(args.num_blocks)]
-
-#     errors_random, errors_var = [], []
-#     for block in blocks:
-
-#         print('Running filter for block', block.name)
-#         _, estimates = filter_block(block, 'random', args)
-#         errors_random.append((estimates, block.com))
-#         _, estimates = filter_block(block, 'reduce_var', args)
-#         errors_var.append((estimates, block.com))
-#     plot_com_error(errors_random, errors_var)
-
 def simulate_action(action, real_block, T=50, vis_sim=False):
-        # get the initial rotation of the block as specified by the action
-        rot = action.rot
         # set up the environment with the real block
         true_world = make_platform_world(real_block, action)
         env = Environment([true_world], vis_sim=vis_sim)
-        # configure the starting position and duration of the action
-        action.set_push_start_pos(true_world.get_pose(true_world.objects[1]).pos)
+        # configure the duration of the action
         action.timesteps = T
         # run the simulator
         for t in range(T):
@@ -92,14 +76,10 @@ def main(args):
         belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
         for interaction_num in range(1):
             print("Interaction number: ", interaction_num)
-            action = plan_action(belief, exp_type='reduce_var')
+            action = plan_action(belief, exp_type='random', action_type='pushush')
             observation = simulate_action(action, block)
             belief.update(observation)
             block.com_filter = belief.particles
-
-        # old code
-        # from filter import filter_block
-        # filter_block(block, exp_type='random', args=args)
 
     # find the tallest tower
     print('Finding tallest tower.')
