@@ -76,7 +76,7 @@ class ParticleBelief:
         particle_blocks = [deepcopy(self.block) for particle in self.particles.particles]
         for (com, particle_block) in zip(self.particles.particles, particle_blocks):
             particle_block.com = com
-        particle_worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
+        particle_worlds = [make_platform_world(pb, action) for pb in particle_blocks]
         env = Environment(particle_worlds, vis_sim=self.vis_sim)
         for t in range(T):
             env.step(action=action)

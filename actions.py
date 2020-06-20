@@ -1,6 +1,4 @@
-from block_utils import Environment, World, Object, Position, Pose, \
-                        Quaternion, Dimensions, Color, get_com_ranges, \
-                        rotation_group, get_rotated_block
+from block_utils import *
 # from filter_utils import create_uniform_particles
 import pybullet as p
 import copy
@@ -18,16 +16,18 @@ def plan_action(belief, k=3, exp_type='reduce_var'):
         results = []
         for rot in rotation_group():
             for _ in range(k):
+                action = PushAction(rot=rot, timesteps=50)
+
                 # create a bunch of blocks with the same geometry where each COM
                 # for each block is set to one of the particles
                 particle_blocks = [copy.deepcopy(belief.block) for particle in belief.particles.particles]
                 for (com, particle_block) in zip(belief.particles.particles, particle_blocks):
                     particle_block.com = com
-                particle_worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
+                particle_worlds = [make_platform_world(pb, action) for pb in particle_blocks]
                 env = Environment(particle_worlds, vis_sim=False)
-                action = PushAction(block_pos=particle_worlds[0].get_pose(particle_worlds[0].objects[1]).pos,
-                                    direction=PushAction.get_random_dir(),
-                                    timesteps=50)
+
+                # get the the position of the block to set the start position of the push action
+                action.set_push_start_pos(particle_worlds[0].get_pose(particle_worlds[0].objects[1]).pos)
 
                 for t in range(50):
                     env.step(action=action)
@@ -37,26 +37,25 @@ def plan_action(belief, k=3, exp_type='reduce_var'):
                 var = np.var(poses, axis=0)
                 score = np.mean(var)
                 print(var, score)
-                results.append(((rot, action.direction), score))
+                results.append((action, score))
 
                 env.disconnect()
                 env.cleanup()
 
-        rot, direc = max(results, key=itemgetter(1))[0]
+        return max(results, key=itemgetter(1))[0]
+
     else:
         print('Finding random action')
         rs = [r for r in rotation_group()]
         ix = np.random.choice(np.arange(len(rs)))
         rot = rs[ix]
-        direc = PushAction.get_random_dir()
+        push_action = PushAction(rot=rot)
 
-    return PushAction(direction=direc, rotation=rot)
-
-
+    return push_action
 
 
 class PushAction:
-    def __init__(self, block_pos=None, direction=None, timesteps=50, rotation=None, delta=0.005):
+    def __init__(self, block_pos=None, direction=None, timesteps=50, rot=None, delta=0.005):
         """ PushAction moves the hand in the given world by a fixed distance
             every timestep. We assume we will push the block in a direction through
             the object's geometric center.
@@ -67,13 +66,19 @@ class PushAction:
         :param timesteps: The number of timesteps to execute the action for.
         :param delta: How far to move each timestep.
         """
-        self.rotation = rotation
-        self.direction = direction
+        self.rot = rot # set the rotation of the block
+        self.pos = ZERO_POS # a push action doest change the position of the block
         self.timesteps = timesteps
         self.delta = delta
         self.tx = 0
+
         if block_pos is not None:
-            self.set_start_pos(block_pos)
+            self.set_push_start_pos(block_pos)
+
+        if direction is None:
+            self.direction = self.get_random_dir()
+        else:
+            self.direction = direction
 
     def step(self):
         """ Move the hand forward by delta.
@@ -82,24 +87,29 @@ class PushAction:
         t = self.tx
         if t > self.timesteps:
             t = self.timesteps
-        updated_pos = Position(x=self.start_pos.x + t*self.delta*self.direction[0],
-                               y=self.start_pos.y + t*self.delta*self.direction[1],
-                               z=self.start_pos.z + t*self.delta*self.direction[2])
+        push_pos = Position(x=self.push_start_pos.x + t*self.delta*self.direction[0],
+                            y=self.push_start_pos.y + t*self.delta*self.direction[1],
+                            z=self.push_start_pos.z + t*self.delta*self.direction[2])
         self.tx += 1
-        return updated_pos
+        return push_pos
 
-    @staticmethod
-    def get_random_dir():
+    def get_random_dir(self):
         angle = np.random.uniform(0, np.pi)
         return (np.cos(angle), np.sin(angle), 0)
 
-    def set_start_pos(self, block_pos):
-        self.start_pos = Position(x=block_pos.x - self.direction[0]*self.delta*20,
-                          y=block_pos.y - self.direction[1]*self.delta*20,
-                          z=block_pos.z - self.direction[2]*self.delta*20)
+    def set_push_start_pos(self, block_pos):
+        self.push_start_pos = Position(x=block_pos.x - self.direction[0]*self.delta*20,
+                                       y=block_pos.y - self.direction[1]*self.delta*20,
+                                       z=block_pos.z - self.direction[2]*self.delta*20)
 
+class PlaceAction:
+    def __init__(self, position=None, rot=None):
+        """ place_action simply specifies the desired intial block position
+        """
+        self.rot = rot
+        self.start_pos = position
 
-def make_platform_world(p_block, rot):
+def make_platform_world(p_block, action):
     """ Given a block, create a world that has a platform to push that block off of.
     :param block: The Object which to place on the platform.
     """
@@ -111,43 +121,43 @@ def make_platform_world(p_block, rot):
     platform.set_pose(Pose(pos=Position(x=0., y=0., z=0.025),
                            orn=Quaternion(x=0, y=0, z=0, w=1)))
 
-    p_block.set_pose(Pose(Position(0, 0, 0), Quaternion(*rot.as_quat())))
+    p_block.set_pose(Pose(Position(0, 0, 0), Quaternion(*action.rot.as_quat())))
 
     block = get_rotated_block(p_block)
-    block.set_pose(Pose(pos=Position(x=0., y=0., z=0.05+block.dimensions[2]/2.),
+    block.set_pose(Pose(pos=Position(x=action.pos.x, y=action.pos.y, z=0.05+block.dimensions[2]/2.),
                         orn=Quaternion(0, 0, 0, 1)))
 
     return World([platform, block])
 
 
-if __name__ == '__main__':
-    true_com = Position(x=0., y=0., z=0.)
+# if __name__ == '__main__':
+#     true_com = Position(x=0., y=0., z=0.)
 
-    block = Object(name='block',
-                   dimensions=Dimensions(x=0.05, y=0.1, z=0.05),
-                   mass=1,
-                   com=true_com,
-                   color=Color(r=1., g=0., b=0.))
+#     block = Object(name='block',
+#                    dimensions=Dimensions(x=0.05, y=0.1, z=0.05),
+#                    mass=1,
+#                    com=true_com,
+#                    color=Color(r=1., g=0., b=0.))
 
-    for r in rotation_group():
-        true_world = make_platform_world(block, r)
-        com_ranges = get_com_ranges(true_world.objects[1])
-        com_particles, _ = create_uniform_particles(10, 3, com_ranges)
+#     for r in rotation_group():
+#         true_world = make_platform_world(block, r)
+#         com_ranges = get_com_ranges(true_world.objects[1])
+#         com_particles, _ = create_uniform_particles(10, 3, com_ranges)
 
-        particle_blocks = []
-        for com in com_particles:
-            particle_block = copy.deepcopy(block)
-            particle_block.com = com
-            particle_blocks.append(particle_block)
+#         particle_blocks = []
+#         for com in com_particles:
+#             particle_block = copy.deepcopy(block)
+#             particle_block.com = com
+#             particle_blocks.append(particle_block)
 
-        particle_worlds = [make_platform_world(pb, r) for pb in particle_blocks]
+#         particle_worlds = [make_platform_world(pb, r) for pb in particle_blocks]
 
-        env = Environment([true_world]+particle_worlds, vis_sim=True)
+#         env = Environment([true_world]+particle_worlds, vis_sim=True)
 
-        action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
-                            direction=PushAction.get_random_dir(),
-                            timesteps=50)
+#         action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
+#                             direction=PushAction.get_random_dir(),
+#                             timesteps=50)
 
-        for ix in range(100):
-            env.step(action=action)
-        p.disconnect()
+#         for ix in range(100):
+#             env.step(action=action)
+#         p.disconnect()
