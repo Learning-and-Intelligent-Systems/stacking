@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<robot  name="block_b" >
+ <link  name="block_b" >
+  <inertial >
+   <origin  xyz="0 0 0"  rpy="0 0 0" />
+   <mass  value="1.0" />
+   <inertia  iyy="0.001"  ixx="0.001"  iyz="0"  izz="0.001"  ixy="0"  ixz="0" />
+  </inertial>
+  <collision >
+   <origin  xyz="0 0 0"  rpy="0 0 0" />
+   <geometry >
+    <box  size="0.025 0.025 0.08" />
+   </geometry>
+  </collision>
+  <visual >
+   <origin  xyz="0 0 0"  rpy="0 0 0" />
+   <geometry >
+    <box  size="0.025 0.025 0.08" />
+   </geometry>
+   <material  name="color" >
+    <color  rgba="0 1 1 1.0" />
+   </material>
+  </visual>
+ </link>
+</robot>

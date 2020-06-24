@@ -1,0 +1,41 @@
+(define (stream panda-tamp)
+  ; Sample a pose for Block ?o1 when placed on top of Block ?o2 at Pose ?p2.
+  (:stream sample-pose-block
+    :inputs (?o1 ?o2 ?p2 ?rp)
+    :domain (and (Block ?o1) (Block ?o2) (Pose ?o2 ?p2) (RelPose ?o1 ?o2 ?rp))
+    :outputs (?p1)
+    :certified (and (Pose ?o1 ?p1) (Supported ?o1 ?p1 ?o2 ?p2))
+  )
+  (:stream sample-pose-table
+    :inputs (?o1 ?o2 ?p2)
+    :domain (and (Block ?o1) (Table ?o2) (Pose ?o2 ?p2))
+    :outputs (?p1)
+    :certified (and (Pose ?o1 ?p1) (Supported ?o1 ?p1 ?o2 ?p2))
+  )
+  (:stream sample-grasp
+    :inputs (?o)
+    :domain (Graspable ?o)
+    :outputs (?g)
+    :certified (Grasp ?o ?g)
+  ) 
+  (:stream inverse-kinematics
+    :inputs (?o ?p ?g)
+    :domain (and (Pose ?o ?p) (Grasp ?o ?g))
+    :outputs (?q ?t)
+    :certified (and (Conf ?q) (Kin ?o ?p ?g ?q ?t))
+  )
+  (:stream plan-free-motion
+    :inputs (?q1 ?q2)
+    :domain (and (Conf ?q1) (Conf ?q2))
+    :fluents (AtPose)
+    :outputs (?t)
+    :certified (FreeMotion ?q1 ?t ?q2)
+  )
+  (:stream plan-holding-motion
+    :inputs (?q1 ?q2 ?o ?g)
+    :domain (and (Conf ?q1) (Conf ?q2) (Grasp ?o ?g))
+    :fluents (AtPose)
+    :outputs (?t)
+    :certified (HoldingMotion ?q1 ?t ?q2 ?o ?g)
+  )   
+)

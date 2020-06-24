@@ -42,3 +42,7 @@ python2 -m build_tower --tower-dir TOWER_DIR
 ```
 
 The ```--tower-dir``` is required, and ```TOWER_DIR``` is the directory output from the previous step (if the --save-tower argument was used).
+
+## PDDLStream Integration
+
+Another way to have the robot build a tower is by using the PDDLStream planner once a tower configuration has been output. Please follow the README in the `tamp` folder. PDDLStream uses Python3.
