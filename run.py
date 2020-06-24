@@ -76,7 +76,7 @@ def main(args):
         belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
         for interaction_num in range(1):
             print("Interaction number: ", interaction_num)
-            action = plan_action(belief, exp_type='random', action_type='pushush')
+            action = plan_action(belief, exp_type='random', action_type='place')
             observation = simulate_action(action, block)
             belief.update(observation)
             block.com_filter = belief.particles
