@@ -3,3 +3,6 @@ tmp_urdfs/
 __pycache__/
 *.pyc
 *.mov
+venv/
+pb_robot/
+pddlstream/
