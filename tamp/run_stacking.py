@@ -6,7 +6,8 @@ import os
 import shutil
 import numpy
 import pb_robot
-import tamp
+import tamp.misc as misc
+import tamp.primitives as primitives
 
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.language.generator import from_gen_fn, from_fn, from_test 
@@ -16,19 +17,19 @@ from pddlstream.language.constants import print_solution
 EPS = 1e-5
 
 def pddlstream_from_problem(robot, movable):
-    domain_pddl = read('domain_stacking.pddl') 
-    stream_pddl = read('stream_stacking.pddl') 
+    domain_pddl = read('tamp/domain_stacking.pddl') 
+    stream_pddl = read('tamp/stream_stacking.pddl') 
     constant_map = {}
     
-    fixed = tamp.misc.get_fixed(robot, movable)
+    fixed = misc.get_fixed(robot, movable)
 
     stream_map = {
-        'sample-pose-table': from_gen_fn(tamp.primitives.get_stable_gen_table(fixed)),
-        'sample-pose-block': from_fn(tamp.primitives.get_stable_gen_block(fixed)),
-        'sample-grasp': from_gen_fn(tamp.primitives.get_grasp_gen(robot)),
-        'inverse-kinematics': from_fn(tamp.primitives.get_ik_fn(robot, fixed)), 
-        'plan-free-motion': from_fn(tamp.primitives.get_free_motion_gen(robot, fixed)),
-        'plan-holding-motion': from_fn(tamp.primitives.get_holding_motion_gen(robot, fixed)),
+        'sample-pose-table': from_gen_fn(primitives.get_stable_gen_table(fixed)),
+        'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
+        'sample-grasp': from_gen_fn(primitives.get_grasp_gen(robot)),
+        'inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed)), 
+        'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
+        'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
     }
 
     return domain_pddl, constant_map, stream_pddl, stream_map
@@ -46,8 +47,7 @@ def setup_blocks_and_robot(robot):
     # copying files to where pb_robot expects them to be
     curr_path = os.getcwd()
     objects_path = 'models'
-    models_path = os.path.join(os.path.dirname(curr_path), 'models')
-    
+    models_path = os.path.join(curr_path, 'tamp', 'models')
     for bname in block_names:
         block_path = os.path.join(models_path, bname)
         shutil.copyfile(block_path, os.path.join(curr_path, 'pb_robot/models/%s' % bname))
@@ -78,7 +78,7 @@ def initialize_in_towers(robot, blocks):
             ('AtConf', conf),
             ('HandEmpty',)]
 
-    fixed = tamp.misc.get_fixed(robot, blocks)
+    fixed = misc.get_fixed(robot, blocks)
     print('Blocks:', [b.get_name() for b in blocks])
     print('Fixed:', [f.get_name() for f in fixed])
     for body in blocks:
@@ -124,7 +124,7 @@ def initialize_flat(robot, blocks):
             ('AtConf', conf),
             ('HandEmpty',)]
 
-    fixed = tamp.misc.get_fixed(robot, blocks)
+    fixed = misc.get_fixed(robot, blocks)
     print('Blocks:', [b.get_name() for b in blocks])
     print('Fixed:', [f.get_name() for f in fixed])
     for body in blocks:
@@ -173,7 +173,7 @@ def initialize_rot_test(robot, blocks):
             ('AtConf', conf),
             ('HandEmpty',)]
 
-    fixed = tamp.misc.get_fixed(robot, blocks)
+    fixed = misc.get_fixed(robot, blocks)
     print('Blocks:', [b.get_name() for b in blocks])
     print('Fixed:', [f.get_name() for f in fixed])
     for body in blocks:
@@ -240,7 +240,7 @@ if __name__ == '__main__':
     else:
         saved_world.restore()
         input("Execute?")
-        tamp.misc.ExecuteActions(robot.arm, plan)
+        misc.ExecuteActions(robot.arm, plan)
 
     input('Finish?')
     pb_robot.utils.disconnect()

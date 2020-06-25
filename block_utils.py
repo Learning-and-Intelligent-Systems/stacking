@@ -252,7 +252,7 @@ class Environment:
     def step(self, action=None, vis_frames=False):
         # Apply every action.
         if action and action.__class__.__name__ == 'PushAction':
-            hand_pos = action.step(
+            hand_pos = action.step()
             for world in self.worlds:
                 world.set_hand_pos(hand_pos)
 

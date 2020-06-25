@@ -1,6 +1,6 @@
 import numpy
 import pb_robot
-import tamp
+import tamp.misc as misc
 import pybullet as p
 
 DEBUG_FAILURE = False 
@@ -48,7 +48,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=10):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
-        approach_tform = tamp.misc.ComputePrePose(grasp_worldF, [0, 0, -0.05])
+        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.05])
 
         for _ in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)

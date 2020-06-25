@@ -7,7 +7,6 @@ from particle_belief import ParticleBelief
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 def get_adversarial_blocks():
     b1 = Object(name='block1',
                 dimensions=Dimensions(0.02, 0.06, 0.02),
@@ -47,23 +46,23 @@ def plot_com_error(errors_random, errors_var):
     plt.show()
 
 def simulate_action(action, real_block, T=50, vis_sim=False):
-        # set up the environment with the real block
-        true_world = make_platform_world(real_block, action)
-        env = Environment([true_world], vis_sim=vis_sim)
-        # configure the duration of the action
-        action.timesteps = T
-        # run the simulator
-        for t in range(T):
-            env.step(action=action)
-        # get ground truth object_b pose (observation)
-        end_pose = true_world.get_pose(true_world.objects[1])
-        end_pose = add_noise(end_pose)
-        observation = (action, T, end_pose)
-        # turn off the sim
-        env.disconnect()
-        env.cleanup()
-        # and return the observed trajectory
-        return observation
+    # set up the environment with the real block
+    true_world = make_platform_world(real_block, action)
+    env = Environment([true_world], vis_sim=vis_sim)
+    # configure the duration of the action
+    action.timesteps = T
+    # run the simulator
+    for t in range(T):
+        env.step(action=action)
+    # get ground truth object_b pose (observation)
+    end_pose = true_world.get_pose(true_world.objects[1])
+    end_pose = add_noise(end_pose)
+    observation = (action, T, end_pose)
+    # turn off the sim
+    env.disconnect()
+    env.cleanup()
+    # and return the observed trajectory
+    return observation
 
 def main(args):
     # get a bunch of random blocks
