@@ -1,10 +1,15 @@
-from block_utils import *
-from base_class import ActionBase
-import pybullet as p
+import argparse
 import copy
 import numpy as np
 from operator import itemgetter
+import pybullet as p
 
+from base_class import ActionBase
+from block_utils import Environment, World, Object, Position, Pose, \
+                        Quaternion, Dimensions, Color, \
+                        rotation_group, get_com_ranges, \
+                        ZERO_POS, ZERO_ROT
+from filter_utils import create_uniform_particles, make_platform_world
 
 def plan_action(belief, k=3, exp_type='reduce_var', action_type='push'):
     """ Given a set of particles, choose the action that maximizes the observed variance.
@@ -30,7 +35,7 @@ def plan_action(belief, k=3, exp_type='reduce_var', action_type='push'):
                     # get the the position of the block to set the start position of the push action
                     # action.set_push_start_pos(particle_worlds[0].get_pose(particle_worlds[0].objects[1]).pos)
 
-                    for t in range(50):
+                    for _ in range(50):
                         env.step(action=action)
 
                     # Get end pose of all particle blocks.
@@ -60,14 +65,9 @@ def plan_action(belief, k=3, exp_type='reduce_var', action_type='push'):
         rs = [r for r in rotation_group()]
         ix = np.random.choice(np.arange(len(rs)))
         rot = rs[ix]
-        # rotate the block by that rotation to get the dimensions in x,y
-        new_dims = np.abs(rot.apply(belief.block.dimensions))
-        # and sample a position within the block to place on the corner of the platform
-        place_pos = new_dims*(np.random.rand(3) - 0.5)
-        x, y, _ = place_pos + np.array(Object.platform().dimensions)/2
-        pos = Position(x, y, 0)
+        
         # construct the corresponding place action
-        place_action = PlaceAction(rot=rot, pos=pos)
+        place_action = PlaceAction(rot=rot, pos=None, block=belief.block)
         return place_action
 
 
@@ -121,59 +121,75 @@ class PushAction(ActionBase):
         return (np.cos(angle), np.sin(angle), 0)
 
 
-
 class PlaceAction(ActionBase):
-    def __init__(self, pos=None, rot=None):
+    def __init__(self, pos=None, rot=None, block=None):
         """ place_action simply specifies the desired intial block position
         """
         super(PlaceAction, self).__init__()
+        if pos is None:
+            pos = self.get_random_pos(rot)
+
         self.pos = pos
         self.rot = rot
 
-def make_platform_world(p_block, action):
-    """ Given a block, create a world that has a platform to push that block off of.
-    :param block: The Object which to place on the platform.
-    """
-    platform = Object.platform()
-
-    p_block.set_pose(Pose(ZERO_POS, Quaternion(*action.rot.as_quat())))
-    block = get_rotated_block(p_block)
-    block.set_pose(Pose(pos=Position(x=action.pos.x,
-                                     y=action.pos.y,
-                                     z=platform.dimensions.z+block.dimensions.z/2.),
-                        orn=ZERO_ROT))
-
-    return World([platform, block])
+    def get_random_pos(self, rot):
+        """ Sample a random offset from a single corner of the platform.
+        :param rot: The rotation the block will be placed with.
+        """
+        # rotate the block by that rotation to get the dimensions in x,y
+        new_dims = np.abs(rot.apply(block.dimensions))
+        # and sample a position within the block to place on the corner of the platform
+        place_pos = new_dims*(np.random.rand(3) - 0.5)
+        x, y, _ = place_pos + np.array(Object.platform().dimensions)/2
+        return Position(x, y, 0)
 
 
-# if __name__ == '__main__':
-#     true_com = Position(x=0., y=0., z=0.)
+"""
+Test the specified action by creating a test world and performing a random action.
+We also test here the the same action is applied across all particle worlds.
+"""
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--action-type', choices=['push', 'place'], required=True)
+    args = parser.parse_args()
 
-#     block = Object(name='block',
-#                    dimensions=Dimensions(x=0.05, y=0.1, z=0.05),
-#                    mass=1,
-#                    com=true_com,
-#                    color=Color(r=1., g=0., b=0.))
+    # Create the block.
+    true_com = Position(x=0., y=0., z=0.)
+    block = Object(name='block',
+                   dimensions=Dimensions(x=0.05, y=0.1, z=0.05),
+                   mass=1,
+                   com=true_com,
+                   color=Color(r=1., g=0., b=0.))
 
-#     for r in rotation_group():
-#         true_world = make_platform_world(block, r)
-#         com_ranges = get_com_ranges(true_world.objects[1])
-#         com_particles, _ = create_uniform_particles(10, 3, com_ranges)
+    # Test the action for all rotations.
+    for r in rotation_group():
+        # Create the action.
+        if args.action_type == 'push':
+            action = PushAction(direction=None, 
+                                timesteps=50, 
+                                rot=r, 
+                                block=block)
+        elif args.action_type == 'place':
+            action = PlaceAction(pos=None,
+                                 rot=r)
+        else:
+            raise NotImplementedError()
+        
+        # Make worlds for each block.
+        true_world = make_platform_world(block, action)
+        com_ranges = get_com_ranges(true_world.objects[1])
+        com_particles, _ = create_uniform_particles(10, 3, com_ranges)
 
-#         particle_blocks = []
-#         for com in com_particles:
-#             particle_block = copy.deepcopy(block)
-#             particle_block.com = com
-#             particle_blocks.append(particle_block)
+        particle_blocks = []
+        for com in com_particles:
+            particle_block = copy.deepcopy(block)
+            particle_block.com = com
+            particle_blocks.append(particle_block)
 
-#         particle_worlds = [make_platform_world(pb, r) for pb in particle_blocks]
+        particle_worlds = [make_platform_world(pb, action) for pb in particle_blocks]
 
-#         env = Environment([true_world]+particle_worlds, vis_sim=True)
+        env = Environment([true_world]+particle_worlds, vis_sim=True)
 
-#         action = PushAction(block_pos=true_world.get_pose(true_world.objects[1]).pos,
-#                             direction=PushAction.get_random_dir(),
-#                             timesteps=50)
-
-#         for ix in range(100):
-#             env.step(action=action)
-#         p.disconnect()
+        for ix in range(100):
+            env.step(action=action)
+        p.disconnect()

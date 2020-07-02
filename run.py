@@ -1,11 +1,14 @@
 import pdb
 import argparse
-from block_utils import *
-from actions import *
-from tower_planner import TowerPlanner
-from particle_belief import ParticleBelief
 import numpy as np
 import matplotlib.pyplot as plt
+
+from actions import plan_action
+from agents.teleport_agent import TeleportAgent
+from block_utils import Object, Dimensions, Position, Color
+from particle_belief import ParticleBelief
+from tower_planner import TowerPlanner
+
 
 def get_adversarial_blocks():
     b1 = Object(name='block1',
@@ -43,40 +46,27 @@ def plot_com_error(errors_random, errors_var):
             err_rand += np.linalg.norm(true-guess_rand)
         plt.scatter(tx, err_rand/len(errors_var), c='r')
         plt.scatter(tx, err_var/len(errors_var), c='b')
-    plt.show()
+    plt.show()    
 
-def simulate_action(action, real_block, T=50, vis_sim=False):
-    # set up the environment with the real block
-    true_world = make_platform_world(real_block, action)
-    env = Environment([true_world], vis_sim=vis_sim)
-    # configure the duration of the action
-    action.timesteps = T
-    # run the simulator
-    for t in range(T):
-        env.step(action=action)
-    # get ground truth object_b pose (observation)
-    end_pose = true_world.get_pose(true_world.objects[1])
-    end_pose = add_noise(end_pose)
-    observation = (action, T, end_pose)
-    # turn off the sim
-    env.disconnect()
-    env.cleanup()
-    # and return the observed trajectory
-    return observation
 
 def main(args):
     # get a bunch of random blocks
     blocks = get_adversarial_blocks()
+
+    if args.agent == 'teleport':
+        agent = TeleportAgent()
+    else:
+        raise NotImplementedError()
 
     # construct a world containing those blocks
     for block in blocks:
         # new code
         print('Running filter for', block.name)
         belief = ParticleBelief(block, N=10, plot=args.plot, vis_sim=args.vis)
-        for interaction_num in range(1):
+        for interaction_num in range(2):
             print("Interaction number: ", interaction_num)
             action = plan_action(belief, exp_type='random', action_type='place')
-            observation = simulate_action(action, block)
+            observation = agent.simulate_action(action, block)
             belief.update(observation)
             block.com_filter = belief.particles
 
@@ -86,7 +76,7 @@ def main(args):
     tallest_tower = tp.plan(blocks)
 
     # and visualize the result
-    simulate_tower(tallest_tower, vis=True, T=100, save_tower=args.save_tower)
+    agent.simulate_tower(tallest_tower, vis=True, T=100, save_tower=args.save_tower)
 
 
 if __name__ == '__main__':
@@ -96,7 +86,7 @@ if __name__ == '__main__':
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--num_blocks', type=int, default=3)
     parser.add_argument('--save-tower', action='store_true')
-
+    parser.add_argument('--agent', choices=['teleport', 'panda'], default='teleport')
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
 

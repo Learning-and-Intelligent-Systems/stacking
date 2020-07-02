@@ -1,10 +1,12 @@
-from collections import namedtuple
-import numpy as np
-from numpy.random import uniform, randn
-from scipy.stats import multivariate_normal
 import copy
-from actions import make_platform_world
-from block_utils import ParticleDistribution, Environment
+import numpy as np
+
+from collections import namedtuple
+from scipy.stats import multivariate_normal
+
+from block_utils import ParticleDistribution, Environment, Object, World, \
+                        Pose, Position, Quaternion, \
+                        get_rotated_block, ZERO_POS, ZERO_ROT
 
 
 '''
@@ -21,7 +23,7 @@ def create_uniform_particles(N, D, ranges):
     particles = np.empty((N, D))
     weights = np.ones(N)*(1/N)
     for d in range(D):
-        particles[:, d] = uniform(*ranges[d], size=N)
+        particles[:, d] = np.random.uniform(*ranges[d], size=N)
     return ParticleDistribution(particles, weights)
 
 def create_gaussian_particles(N, D, means, stds):
@@ -33,7 +35,7 @@ def create_gaussian_particles(N, D, means, stds):
     '''
     particles = np.empty((N, D))
     for d in range(D):
-        particles[:, d] = means[d] + (randn(N) * stds[d])
+        particles[:, d] = means[d] + (np.random.randn(N) * stds[d])
     return particles
 
 def sample_particle_distribution(distribution, num_samples=1):
@@ -69,7 +71,6 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
     # something completely unlikely by chance.
     # NOTE(izzy): we do not access the COM of true_block. it's just for geometry
     cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3)
-    # print(distribution.particles[:20,:])
     particles = sample_particle_distribution(distribution, num_samples=N)
     # cov = np.cov(particles, rowvar=False)
     mean = np.mean(particles, axis=0)
@@ -77,11 +78,10 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
 
     # Old particles and new particles.
     likelihoods = np.zeros((N,2))
-    # TODO: Compute likelihood of particles over history so far.
-    for action, rot, T, true_pose in experience:
+    # Compute likelihood of particles over history so far.
+    for action, T, true_pose in experience:
         sim_poses = simulate(np.concatenate([particles, proposed_particles], axis=0),
                              action,
-                             rot,
                              T,
                              true_block)
         for ix in range(N):
@@ -91,7 +91,7 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
             likelihoods[ix,1] += np.log(multivariate_normal.pdf(true_pose.pos,
                                                         mean=sim_poses[N+ix,:],
                                                         cov=obs_model_cov)+1e-8)
-    # TODO: Calculate M-H acceptance prob.
+    # Calculate M-H acceptance prob.
     prop_probs = np.zeros((N,2))
     for ix in range(N):
         prop_probs[ix,0] = np.log(multivariate_normal.pdf(particles[ix,:], mean=mean, cov=cov)+1e-8)
@@ -101,13 +101,10 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
     accept = np.zeros((N,2))
     accept = np.min(accept, axis=1)
 
-    # TODO: Keep particles based on acceptance probability.
+    # Keep particles based on acceptance probability.
     u = np.random.uniform(size=N)
     indices = np.argwhere(u > 1-np.exp(accept)).flatten()
-    # print(indices, accept.shape)
-    # print('Before:', particles[indices[0:10]])
     particles[indices] = proposed_particles[indices]
-    # print('After:', particles[indices[0:10]])
 
     # constrain the particles to be within the block if we are given block dimensions
     if ranges is not None:
@@ -117,15 +114,15 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
     weights = np.ones(N)/float(N) # weights become uniform again
     return ParticleDistribution(particles, weights)
 
-def simulate(particles, action, rot, T, true_block):
+def simulate(particles, action, T, true_block):
     particle_blocks = [copy.deepcopy(true_block) for particle in particles]
     for (com, particle_block) in zip(particles, particle_blocks):
         particle_block.com = com
 
-    worlds = [make_platform_world(pb, rot) for pb in particle_blocks]
+    worlds = [make_platform_world(pb, action) for pb in particle_blocks]
     env = Environment(worlds, vis_sim=False)
 
-    for t in range(T):
+    for _ in range(T):
         env.step(action=action)
 
     poses = []
@@ -135,3 +132,19 @@ def simulate(particles, action, rot, T, true_block):
     env.disconnect()
     env.cleanup()
     return np.array(poses)
+
+
+def make_platform_world(p_block, action):
+    """ Given a block, create a world that has a platform to push that block off of.
+    :param block: The Object which to place on the platform.
+    """
+    platform = Object.platform()
+
+    p_block.set_pose(Pose(ZERO_POS, Quaternion(*action.rot.as_quat())))
+    block = get_rotated_block(p_block)
+    block.set_pose(Pose(pos=Position(x=action.pos.x,
+                                     y=action.pos.y,
+                                     z=platform.dimensions.z+block.dimensions.z/2.),
+                        orn=ZERO_ROT))
+
+    return World([platform, block])

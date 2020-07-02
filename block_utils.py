@@ -1,16 +1,18 @@
-import time
-import numpy as np
-import os
-from shutil import copyfile
-from datetime import datetime
 import csv
+import numpy as np
+import odio_urdf
+import os
+import pybullet as p
+import shutil
+import time
+
 from collections import namedtuple
 from copy import copy
-import shutil
-import pybullet as p
-import odio_urdf
-from pybullet_utils import PyBulletServer, quat_math
+from datetime import datetime
 from scipy.spatial.transform import Rotation as R
+
+from pybullet_utils import PyBulletServer, quat_math
+
 
 ParticleDistribution = namedtuple('ParticleDistribution', 'particles weights')
 Position = namedtuple('Position', 'x y z')
@@ -41,6 +43,7 @@ ZERO_ROT = Quaternion(0, 0, 0, 1)
 ZERO_POS = Position(0, 0, 0)
 ZERO_POSE = Pose(ZERO_POS, ZERO_ROT)
 
+
 class Object:
 
     def __init__(self, name, dimensions, mass, com, color):
@@ -66,9 +69,9 @@ class Object:
     def get_id(self):
         return self.id
 
+    @staticmethod
     def random(name=None):
         """ Construct a random object
-
 
         Arguments:
             name {str} -- name of the object
@@ -88,6 +91,7 @@ class Object:
         # and add the new block to the list
         return Object(name, dims, mass, com, color)
 
+    @staticmethod
     def platform():
         platform_block = Object(name='platform',
                       dimensions=Dimensions(x=0.3, y=0.2, z=0.05),
@@ -233,8 +237,8 @@ class Environment:
             urdfs_dir = os.path.join(tower_dir, 'urdfs')
             os.mkdir(urdfs_dir)
             for obj in self.worlds[0].objects:
-                copyfile(os.path.join(self.tmp_dir, str(obj)+'.urdf'),
-                        os.path.join(urdfs_dir, str(obj)+'.urdf'))
+                shutil.copyfile(os.path.join(self.tmp_dir, str(obj)+'.urdf'),
+                                os.path.join(urdfs_dir, str(obj)+'.urdf'))
 
             # save list of urdf_names and poses to csv file
             filepath = tower_dir+'/obj_poses.csv'
@@ -284,19 +288,6 @@ def add_noise(pose, cov=0.0015*np.eye(3)):
         pos = Position(*np.random.multivariate_normal(mean=pose.pos, cov=cov))
         orn = pose.orn
         return Pose(pos, orn)
-
-def simulate_tower(tower, vis=True, T=60, copy_blocks=True, save_tower=False):
-    if copy_blocks:
-        tower = [copy(block) for block in tower]
-    world = World(tower)
-
-    env = Environment([world], vis_sim=vis, use_hand=False, save_tower=save_tower)
-    for t in range(T):
-        env.step(vis_frames=vis)
-    env.disconnect()
-    env.cleanup()
-
-    return world.get_poses()
 
 def tower_is_stable_in_pybullet(tower, vis=False, T=30):
     init_poses = {block.name: block.pose for block in tower}
