@@ -11,11 +11,13 @@ from tower_planner import TowerPlanner
 
 
 def main(args):
+    NOISE=0.00005
+
     # get a bunch of random blocks
     blocks = get_adversarial_blocks()
 
     if args.agent == 'teleport':
-        agent = TeleportAgent()
+        agent = TeleportAgent(NOISE)
     else:
         raise NotImplementedError()
 
@@ -23,7 +25,11 @@ def main(args):
     for block in blocks:
         # new code
         print('Running filter for', block.name)
-        belief = ParticleBelief(block, N=100, plot=args.plot, vis_sim=args.vis)
+        belief = ParticleBelief(block, 
+                                N=100, 
+                                plot=args.plot, 
+                                vis_sim=args.vis,
+                                noise=NOISE)
         for interaction_num in range(5):
             print("Interaction number: ", interaction_num)
             action = plan_action(belief, exp_type='random', action_type='place')

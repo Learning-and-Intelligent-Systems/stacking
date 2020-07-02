@@ -3,10 +3,12 @@ from block_utils import Environment, World, add_noise
 
 from copy import copy
 
+import numpy as np
+
 
 class TeleportAgent:
-    def __init__(self):
-        pass
+    def __init__(self, noise):
+        self.noise = noise
 
     def simulate_action(self, action, real_block, T=50, vis_sim=False):
         # set up the environment with the real block
@@ -19,7 +21,7 @@ class TeleportAgent:
             env.step(action=action)
         # get ground truth object_b pose (observation)
         end_pose = true_world.get_pose(true_world.objects[1])
-        end_pose = add_noise(end_pose)
+        end_pose = add_noise(end_pose, self.noise*np.eye(3))
         observation = (action, T, end_pose)
         # turn off the sim
         env.disconnect()

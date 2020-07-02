@@ -285,7 +285,7 @@ class Environment:
         # remove temp urdf files (they will accumulate quickly)
         shutil.rmtree(self.tmp_dir)
 
-def add_noise(pose, cov=0.0015*np.eye(3)):
+def add_noise(pose, cov):
         pos = Position(*np.random.multivariate_normal(mean=pose.pos, cov=cov))
         orn = pose.orn
         return Pose(pos, orn)

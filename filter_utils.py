@@ -69,9 +69,9 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
     # NOTE: (mike): I added a small noise term and a M-H update step which hopefully
     # prevents complete collapse. The M-H update is useful so that we don't sample
     # something completely unlikely by chance. It's okay for the noise term to be larger 
-    # as the M-H step should reject bad particles - it may be inefficient if too large.
+    # as the M-H step should reject bad particles - it may be inefficient if too large (and not accept often).
     # NOTE(izzy): we do not access the COM of true_block. it's just for geometry
-    cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3) + np.eye(D)*1e-4
+    cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3)# + np.eye(D)*2.5e-5
     particles = sample_particle_distribution(distribution, num_samples=N)
     # cov = np.cov(particles, rowvar=False)
     mean = np.mean(particles, axis=0)
@@ -87,11 +87,11 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
                              true_block)
         for ix in range(N):
             likelihoods[ix,0] += np.log(multivariate_normal.pdf(true_pose.pos,
-                                                        mean=sim_poses[ix, :],
-                                                        cov=obs_model_cov)+1e-8)
+                                                                mean=sim_poses[ix, :],
+                                                                cov=obs_model_cov)+1e-8)
             likelihoods[ix,1] += np.log(multivariate_normal.pdf(true_pose.pos,
-                                                        mean=sim_poses[N+ix,:],
-                                                        cov=obs_model_cov)+1e-8)
+                                                                mean=sim_poses[N+ix,:],
+                                                                cov=obs_model_cov)+1e-8)
     # Calculate M-H acceptance prob.
     prop_probs = np.zeros((N,2))
     for ix in range(N):
@@ -108,9 +108,10 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
     particles[indices] = proposed_particles[indices]
 
     # constrain the particles to be within the block if we are given block dimensions
-    if ranges is not None:
-        for i, (lower, upper) in enumerate(ranges):
-            particles[:,i] = np.clip(particles[:,i], lower, upper)
+    # Clipping biases the CoM to be towards the center of the block.
+    # if ranges is not None:
+    #     for i, (lower, upper) in enumerate(ranges):
+    #         particles[:,i] = np.clip(particles[:,i], lower, upper)
 
     weights = np.ones(N)/float(N) # weights become uniform again
     return ParticleDistribution(particles, weights)

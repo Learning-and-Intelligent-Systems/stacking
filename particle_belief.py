@@ -23,17 +23,21 @@ from filter_utils import create_uniform_particles, sample_and_wiggle
 
 
 class ParticleBelief(BeliefBase):
-    def __init__(self, block, N=200, plot=False, vis_sim=False):
+    def __init__(self, block, noise, N=200, plot=False, vis_sim=False):
         self.block = deepcopy(block)
         self.plot = plot                        # plot the particles
         self.vis_sim = vis_sim                  # display the pybullet simulator
 
-        self.TRUE_OBS_COV = 0.0001*np.eye(3)/2    # covariance used when add noise to observations
-        self.OBS_MODEL_COV = 0.0001*np.eye(3)/2   # covariance used in observation model
+        self.TRUE_OBS_COV = noise*np.eye(3)     # covariance used when add noise to observations
+        self.OBS_MODEL_COV = noise*np.eye(3)    # covariance used in observation model
         self.N = N                              # number of particles
         self.D = 3                              # dimensions of a single particle
 
         self.setup()
+        if self.plot:
+            plt.ion()
+            fig = plt.figure()
+            self.ax = Axes3D(fig)
 
     def setup(self):
         self.com_ranges = get_com_ranges(self.block)
@@ -56,9 +60,11 @@ class ParticleBelief(BeliefBase):
 
     def plot_particles(self, ax, particles, weights, t=None, true_com=None):
         for particle, weight in zip(particles, weights):
-            ax.scatter(*particle, s=10, color=(weight,0,1-weight))
+            alpha = 0.25 + 0.75 * weight
+            ax.scatter(*particle, s=10, color=(0, 0, 1), alpha=alpha)
 
-        ax.set_title('t='+str(t))  # need to stop from scrolling down figure
+        ax.scatter(*self.block.com, s=10, color=(1,0,0))
+        ax.set_title('Particle Dist')  # need to stop from scrolling down figure
         #ax.view_init(elev=100., azim=0.0)  # top down view of x-y plane
 
         plt.draw()
@@ -66,12 +72,7 @@ class ParticleBelief(BeliefBase):
 
     def update(self, observation):
         # observation is a tuple (action, rot, timesteps, pose)
-        if self.plot:
-            plt.ion()
-            fig = plt.figure()
-            ax = Axes3D(fig)
-
-        if self.plot: self.setup_ax(ax, true_world.objects[1])
+        
         # resample the distribution
         self.particles = sample_and_wiggle(self.particles, self.experience,
             self.OBS_MODEL_COV, self.block, self.com_ranges)
@@ -103,9 +104,13 @@ class ParticleBelief(BeliefBase):
         # and update the particle distribution with the new weights
         self.particles = ParticleDistribution(self.particles.particles, new_weights)
 
-        if self.plot and not t % 5:
+        if self.plot:
             # visualize particles (it's very slow)
-            self.plot_particles(ax, self.particles.particles, weights, t=t)
+            #plt.ion()
+            #fig = plt.figure()
+            #self.ax = Axes3D(fig)
+            self.setup_ax(self.ax, self.block)
+            self.plot_particles(self.ax, self.particles.particles, new_weights)
 
         mean = np.array(self.particles.particles).T@np.array(self.particles.weights)
         # print('Mean COM', mean, np.diag(np.cov(self.particles.particles, rowvar=False, aweights=self.particles.weights+1e-3)))
@@ -141,30 +146,43 @@ def plot_com_error(errors_random, errors_var):
         plt.scatter(tx, err_var/len(errors_var), c='b')
     plt.show()    
 
-
+"""
+Notes on tuning the particle filter.
+- When plot=True for ParticleBelief, we want to see the particles (blue) become 
+  more tightly distributed around the true CoM (red). 
+- Make sure some particles are initialized near the true CoM.
+- Check resampling-step if particles don't converge to true CoM.
+-- Are M-H steps being accepted? Are we removing unlikely samples?
+- I have observed that for PlaceAction, n_particles=200, and n_actions=10, 
+  the distribution converges pretty tightly for all adversarial blocks.
+- If the particles jump around too much, the true noise might be too large.
+"""
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--agent', choices=['teleport', 'panda'], default='teleport')
     parser.add_argument('--n-particles', type=int, default=10)
     parser.add_argument('--n-actions', type=int, default=2)
     args = parser.parse_args()
+    NOISE=0.00005
 
     # get a bunch of random blocks
     blocks = get_adversarial_blocks()
 
     if args.agent == 'teleport':
-        agent = TeleportAgent()
+        agent = TeleportAgent(NOISE)
     else:
         raise NotImplementedError()
-
+    
+    
     # construct a world containing those blocks
     for block in blocks:
         # new code
         print('Running filter for', block.name, block.dimensions)
         belief = ParticleBelief(block, 
                                 N=args.n_particles, 
-                                plot=False, 
-                                vis_sim=False)
+                                plot=True, 
+                                vis_sim=False,
+                                noise=NOISE)
         for interaction_num in range(args.n_actions):
             print('----------')
             # print(belief.particles.particles[::4, :])
