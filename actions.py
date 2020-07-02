@@ -127,14 +127,16 @@ class PlaceAction(ActionBase):
         """
         super(PlaceAction, self).__init__()
         if pos is None:
-            pos = self.get_random_pos(rot)
+            pos = self.get_random_pos(rot, block)
 
         self.pos = pos
         self.rot = rot
+        
 
-    def get_random_pos(self, rot):
+    def get_random_pos(self, rot, block):
         """ Sample a random offset from a single corner of the platform.
         :param rot: The rotation the block will be placed with.
+        :param block: Used to get the dimensions of the block to place.
         """
         # rotate the block by that rotation to get the dimensions in x,y
         new_dims = np.abs(rot.apply(block.dimensions))
@@ -175,7 +177,7 @@ if __name__ == '__main__':
         else:
             raise NotImplementedError()
         
-        # Make worlds for each block.
+        # Make worlds for each block and test using different CoMs.
         true_world = make_platform_world(block, action)
         com_ranges = get_com_ranges(true_world.objects[1])
         com_particles, _ = create_uniform_particles(10, 3, com_ranges)

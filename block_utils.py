@@ -426,3 +426,26 @@ def rotation_group():
         for r in [0, np.pi/2]:
             v[0] = r
             yield R.from_euler('zyx', v)
+
+def get_adversarial_blocks():
+    b1 = Object(name='block1',
+                dimensions=Dimensions(0.02, 0.06, 0.02),
+                mass=1.,
+                com=Position(0.009, 0.029, 0),
+                color=Color(0, 0, 1))
+    b2 = Object(name='block2',
+                dimensions=Dimensions(0.01, 0.06, 0.02),
+                mass=1.,
+                com=Position(-0.0048, -0.029, 0),
+                color=Color(1, 0, 1))
+    b3 = Object(name='block3',
+                dimensions=Dimensions(0.01, 0.01, 0.1),
+                mass=1.,
+                com=Position(0, 0, 0.04),
+                color=Color(0, 1, 1))
+    b4 = Object(name='block4',
+                dimensions=Dimensions(0.06, 0.01, 0.02),
+                mass=1.,
+                com=Position(-0.029, 0, -0.004),
+                color=Color(0, 1, 0))
+    return [b1, b2, b3, b4]

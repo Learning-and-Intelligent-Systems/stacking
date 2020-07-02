@@ -68,9 +68,10 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
     # being equal to the largest variance?
     # NOTE: (mike): I added a small noise term and a M-H update step which hopefully
     # prevents complete collapse. The M-H update is useful so that we don't sample
-    # something completely unlikely by chance.
+    # something completely unlikely by chance. It's okay for the noise term to be larger 
+    # as the M-H step should reject bad particles - it may be inefficient if too large.
     # NOTE(izzy): we do not access the COM of true_block. it's just for geometry
-    cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3)
+    cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3) + np.eye(D)*1e-4
     particles = sample_particle_distribution(distribution, num_samples=N)
     # cov = np.cov(particles, rowvar=False)
     mean = np.mean(particles, axis=0)

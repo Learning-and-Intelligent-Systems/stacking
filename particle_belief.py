@@ -3,18 +3,24 @@ Copyright 2020 Massachusetts Insititute of Technology
 
 Izzy Brand
 """
-import numpy as np
+import argparse
 import matplotlib.pyplot as plt
+import numpy as np
 import os
-import shutil
 import random
+import shutil
+
 from copy import deepcopy
-from scipy.stats import multivariate_normal
 from mpl_toolkits.mplot3d import Axes3D
-from actions import *
-from filter_utils import *
-from block_utils import *
+from scipy.stats import multivariate_normal
+
+from actions import make_platform_world, plan_action
+from agents.teleport_agent import TeleportAgent
 from base_class import BeliefBase
+from block_utils import get_adversarial_blocks, get_com_ranges, \
+                        Environment, ParticleDistribution
+from filter_utils import create_uniform_particles, sample_and_wiggle
+
 
 class ParticleBelief(BeliefBase):
     def __init__(self, block, N=200, plot=False, vis_sim=False):
@@ -22,8 +28,8 @@ class ParticleBelief(BeliefBase):
         self.plot = plot                        # plot the particles
         self.vis_sim = vis_sim                  # display the pybullet simulator
 
-        self.TRUE_OBS_COV = 0.0015*np.eye(3)    # covariance used when add noise to observations
-        self.OBS_MODEL_COV = 0.0015*np.eye(3)   # covariance used in observation model
+        self.TRUE_OBS_COV = 0.0001*np.eye(3)/2    # covariance used when add noise to observations
+        self.OBS_MODEL_COV = 0.0001*np.eye(3)/2   # covariance used in observation model
         self.N = N                              # number of particles
         self.D = 3                              # dimensions of a single particle
 
@@ -66,7 +72,6 @@ class ParticleBelief(BeliefBase):
             ax = Axes3D(fig)
 
         if self.plot: self.setup_ax(ax, true_world.objects[1])
-
         # resample the distribution
         self.particles = sample_and_wiggle(self.particles, self.experience,
             self.OBS_MODEL_COV, self.block, self.com_ranges)
@@ -79,14 +84,14 @@ class ParticleBelief(BeliefBase):
             particle_block.com = com
         particle_worlds = [make_platform_world(pb, action) for pb in particle_blocks]
         env = Environment(particle_worlds, vis_sim=self.vis_sim)
-        for t in range(T):
+        for _ in range(T):
             env.step(action=action)
 
         # update all particle weights
         new_weights = []
 
         for pi, (particle_world, old_weight) in enumerate(zip(particle_worlds, self.particles.weights)):
-            particle_end_pose = particle_world.get_pose(particle_world.objects[1])
+            particle_end_pose = particle_world.get_pose(particle_world.objects[1])            
             obs_model = multivariate_normal.pdf(end_pose.pos,
                                                 mean=particle_end_pose.pos,
                                                 cov=self.OBS_MODEL_COV)
@@ -115,3 +120,66 @@ class ParticleBelief(BeliefBase):
         env.cleanup()
 
         return self.particles, self.estimated_coms
+
+
+# =============================================================
+"""
+A script that tests the particle filter by reporting the error on
+the CoM estimate as we get more observations.
+"""
+def plot_com_error(errors_random, errors_var):
+
+    for tx in range(0, len(errors_var[0][0])):
+        err_rand, err_var = 0, 0
+        for bx in range(0, len(errors_var)):
+            true = np.array(errors_var[bx][1])
+            guess_rand = errors_random[bx][0][tx]
+            guess_var = errors_var[bx][0][tx]
+            err_var += np.linalg.norm(true-guess_var)
+            err_rand += np.linalg.norm(true-guess_rand)
+        plt.scatter(tx, err_rand/len(errors_var), c='r')
+        plt.scatter(tx, err_var/len(errors_var), c='b')
+    plt.show()    
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--agent', choices=['teleport', 'panda'], default='teleport')
+    parser.add_argument('--n-particles', type=int, default=10)
+    parser.add_argument('--n-actions', type=int, default=2)
+    args = parser.parse_args()
+
+    # get a bunch of random blocks
+    blocks = get_adversarial_blocks()
+
+    if args.agent == 'teleport':
+        agent = TeleportAgent()
+    else:
+        raise NotImplementedError()
+
+    # construct a world containing those blocks
+    for block in blocks:
+        # new code
+        print('Running filter for', block.name, block.dimensions)
+        belief = ParticleBelief(block, 
+                                N=args.n_particles, 
+                                plot=False, 
+                                vis_sim=False)
+        for interaction_num in range(args.n_actions):
+            print('----------')
+            # print(belief.particles.particles[::4, :])
+            print("Interaction number: ", interaction_num)
+            action = plan_action(belief, exp_type='random', action_type='place')
+            observation = agent.simulate_action(action, block, vis_sim=False)
+            belief.update(observation)
+            block.com_filter = belief.particles  
+
+            est = belief.estimated_coms[-1]
+            true = np.array(block.com)
+            error = np.linalg.norm(est-true)
+            print('Estimated CoM:', est)
+            print('True:', true)  
+            print('Error:', error)
+
+        
+
