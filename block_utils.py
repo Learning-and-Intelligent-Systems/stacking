@@ -275,7 +275,8 @@ class Environment:
                     self.pybullet_server.vis_frame(pos, orn)
 
         # sleep (for visualization purposes)
-        time.sleep(0.05)
+        if self.vis_sim:
+            time.sleep(0.05)
 
     def disconnect(self):
         self.pybullet_server.disconnect()
