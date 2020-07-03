@@ -26,16 +26,17 @@ def main(args):
         # new code
         print('Running filter for', block.name)
         belief = ParticleBelief(block, 
-                                N=100, 
+                                N=200, 
                                 plot=args.plot, 
                                 vis_sim=args.vis,
                                 noise=NOISE)
-        for interaction_num in range(5):
+        for interaction_num in range(10):
             print("Interaction number: ", interaction_num)
             action = plan_action(belief, exp_type='random', action_type='place')
             observation = agent.simulate_action(action, block)
             belief.update(observation)
             block.com_filter = belief.particles
+        print(belief.estimated_coms[-1], block.com)
 
     # find the tallest tower
     print('Finding tallest tower.')
@@ -43,7 +44,7 @@ def main(args):
     tallest_tower = tp.plan(blocks)
 
     # and visualize the result
-    agent.simulate_tower(tallest_tower, vis=True, T=100, save_tower=args.save_tower)
+    agent.simulate_tower(tallest_tower, vis=True, T=250, save_tower=args.save_tower)
 
 
 if __name__ == '__main__':

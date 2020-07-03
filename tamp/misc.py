@@ -1,6 +1,10 @@
-import pb_robot
 import numpy
-#from catkin.find_in_workspaces import find_in_workspaces
+import pb_robot
+import os
+import shutil
+
+from block_utils import object_to_urdf
+
 
 def getDirectory():
     '''Get the file path for the location of kinbody
@@ -46,3 +50,40 @@ def ComputePrePose(og_pose, directionVector, relation=None):
     if relation is not None:
         prepose = numpy.dot(prepose, relation)
     return prepose
+
+def setup_panda_world(robot, blocks):
+    # Adjust robot position such that measurements match real robot reference frame
+    robot_pose = numpy.eye(4)
+    robot_pose[2, 3] -= 0.1
+    robot.set_transform(robot_pose)
+
+    pddl_blocks = []
+
+    full_urdf_folder = 'pb_robot/tmp_urdfs'
+    pb_urdf_folder = 'tmp_urdfs'
+
+    if not os.path.exists(full_urdf_folder):
+        os.makedirs(full_urdf_folder)
+
+    for block in blocks:
+        block_urdf = object_to_urdf(block)
+        block_fname = os.path.join(full_urdf_folder, str(block)+'.urdf')
+        with open(block_fname, 'w') as handle:
+            handle.write(str(block_urdf))
+
+        pb_block_fname = os.path.join(pb_urdf_folder, str(block)+'.urdf')
+        pddl_block = pb_robot.body.createBody(pb_block_fname)
+        pddl_blocks.append(pddl_block)
+    
+    floor_path = 'tamp/models/short_floor.urdf'
+    shutil.copyfile(floor_path, 'pb_robot/models/short_floor.urdf')
+    table_file = os.path.join('models', 'short_floor.urdf')
+    table = pb_robot.body.createBody(table_file)
+    table.set_point([0.2, 0, -0.11])
+
+    # Set the initial positions randomly.
+    table_top_z = -0.11 + 1e-5
+    for block in pddl_blocks:
+        block.set_base_link_point([0.6, 0.0, table_top_z + 0.02])
+    
+    return pddl_blocks
