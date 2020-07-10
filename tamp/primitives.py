@@ -1,10 +1,13 @@
 import numpy
-import pb_robot
 import random
-import tamp.misc as misc
 import pybullet as p
 
+import pb_robot
+import tamp.misc as misc
+
 from block_utils import rotation_group, ZERO_POS
+
+from scipy.spatial.transform import Rotation as R
 
 DEBUG_FAILURE = False 
 
@@ -25,14 +28,16 @@ def get_grasp_gen(robot):
 
 
 def get_stable_gen_table(fixed=[]):
-    def gen(body, surface, surface_pos, rotation=None):
+    def gen(body, surface, surface_pos, protation=None):
         """
         Generate a random pose (possibly rotated) on a surface. Rotation
         can be specified for debugging.
         """
-        all_rotations = list(rotation_group())
+        all_rotations = list(rotation_group()) + [R.from_euler('zyx', [0., -numpy.pi/2, 0.])]
         while True:
-            if rotation is None:
+            if protation is not None:
+                rotation = protation
+            else:
                 # Don't use rotations around the z-axis. Not as useful for regrasping.
                 rotation = random.choice(all_rotations[2:])
             pose = (ZERO_POS, rotation.as_quat())
@@ -58,7 +63,7 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=1):
+def get_ik_fn(robot, fixed=[], num_attempts=2):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
@@ -75,7 +80,6 @@ def get_ik_fn(robot, fixed=[], num_attempts=1):
                 continue
 
             path = robot.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
-
             if path is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue

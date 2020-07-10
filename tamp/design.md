@@ -12,7 +12,7 @@ In the future it may help to figure out how to better sample poses that are usef
 
 It is also helpful for regrasping attempts to make the long end of the block sufficiently large (> 8cm) so that a side-grasp from this side does not result in a table collision.
 
-Since we have a lot of grasps, it is useful to have a high `search_sample_ratio` so that we spend more time trying to sample placements that work (as opposed to coming up with more complex plans). This makes it hard to find plans where blocks need to be moved out of each other's way. We might need a better solution to handle this (i.e., create more efficient streams). 
+Since we have a lot of grasps, it is useful to have a high `search_sample_ratio` so that we spend more time trying to sample placements that work (as opposed to coming up with more complex plans). This makes it hard to find plans where blocks need to be moved out of each other's way. We might need a better solution to handle this (i.e., create more efficient streams). One way to do this would be to be more careful about grasp generation. We could make sure we never try to grasp in orientations that do not fit in the gripper.
 
 
 

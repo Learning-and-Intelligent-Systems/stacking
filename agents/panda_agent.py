@@ -28,6 +28,8 @@ class PandaAgent:
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
 
+        self.belief_blocks = blocks
+
         self.pddl_blocks, self.platform, self.table = setup_panda_world(self.robot, blocks)
         self.pddl_info = get_pddlstream_info(self.robot,[self.table, self.platform], self.pddl_blocks)
 
@@ -70,9 +72,12 @@ class PandaAgent:
         :param vis_sim: Ununsed.
         :return: (action, T, end_pose) End pose should be TODO: what frame?
         """
+        #real_block = self.belief_blocks[block_ix]
+        pddl_block = self.pddl_blocks[0]
+
         # Set up the PDDLStream problem for the placing the given block on the
         # platform with the specified action.
-        init = agent._get_initial_pddl_state()
+        init = self._get_initial_pddl_state()
 
         #  Figure out the correct transformation matrix based on the action.
         real_block.set_pose(Pose(ZERO_POS, Quaternion(*action.rot.as_quat())))
@@ -102,18 +107,18 @@ class PandaAgent:
             p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime)
             p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime)
         
-        init += [('RelPose', agent.pddl_blocks[0], agent.platform, tform)]
-        goal = ('On', agent.pddl_blocks[0], agent.platform)
+        init += [('RelPose', pddl_block, self.platform, tform)]
+        goal = ('On', pddl_block, self.platform)
 
         # Solve the PDDLStream problem.
         print('Init:', init)
         print('Goal:', goal)
 
-        agent.robot.arm.hand.Open()
+        self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
 
-        pddlstream_problem = tuple([*agent.pddl_info, init, goal])
-        plan, cost, evaluations = solve_focused(pddlstream_problem, success_cost=numpy.inf, search_sample_ratio=100.)
+        pddlstream_problem = tuple([*self.pddl_info, init, goal])
+        plan, cost, evaluations = solve_focused(pddlstream_problem, success_cost=numpy.inf, search_sample_ratio=1000.)
 
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
@@ -123,7 +128,7 @@ class PandaAgent:
             saved_world.restore()
             input("Execute?")
 
-            ExecuteActions(agent.robot.arm, plan)
+            ExecuteActions(self.robot.arm, plan)
 
         # TODO: Execture the action.
 
@@ -132,15 +137,15 @@ class PandaAgent:
     def simulate_tower(self):
         pass
 
-def test_place_action(agent, blocks):
+def test_place_action(agent, blocks, block_ix):
     """
     Test method to try placing the given blocks on the platform.
     """
     for r in list(rotation_group())[4:]:
         action = PlaceAction(pos=None,
                              rot=r,
-                             block=blocks[0])
-        agent.simulate_action(action, blocks[0])
+                             block=blocks[block_ix])
+        agent.simulate_action(action, blocks[block_ix])
         break
 
 def test_placement_ik(agent, blocks):
@@ -153,6 +158,7 @@ def test_placement_ik(agent, blocks):
     get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform, agent.table])
     
     for r in list(rotation_group()):
+        r = list(rotation_group())[4]
         action = PlaceAction(pos=None,
                              rot=r,
                              block=blocks[0])
@@ -197,6 +203,8 @@ def test_placement_ik(agent, blocks):
             print('Found IK.')
         else:
             print('No IK.')
+
+        break
 
 def test_table_pose_ik(agent, blocks):
     """
@@ -263,18 +271,19 @@ def visualize_grasps(agent, blocks):
         start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[0], 
                                             pose)
         agent.pddl_blocks[0].set_base_link_pose(pose)
-
-        for grasp in list(get_grasp(agent.pddl_blocks[0]))[0:4]:
+        ix = 0
+        for grasp in list(get_grasp(agent.pddl_blocks[0])):
             ik_start = get_ik(agent.pddl_blocks[0], start_pose, grasp[0])
             import time
-            time.sleep(5)
             if ik_start is not None:
-                print('Y', end='')
+                print(ix, 'Y')
                 agent.robot.arm.SetJointValues(ik_start[0].configuration)
                 import time
-                time.sleep(5)
+                time.sleep(2)
             else:
-                print('N', end='')
+                print(ix, 'N')
+            ix += 1
+
 
 
 def test_placement_on_platform(agent):
@@ -316,8 +325,9 @@ if __name__ == '__main__':
     agent = PandaAgent(blocks)
     #visualize_grasps(agent, blocks)
     #test_table_pose_ik(agent, blocks)
-    #test_placement_ik(agent, blocks)
-    test_place_action(agent, blocks)
+    test_placement_ik(agent, blocks)
+    input('Continue?')
+    test_place_action(agent, blocks, 0)
     #test_placement_on_platform(agent)
 
     time.sleep(5.0)
