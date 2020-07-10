@@ -12,7 +12,7 @@
   (:predicates
     ; Types
     (Block ?b)
-    (Table ?o)      
+    (Table ?o)
     (Pose ?o ?p) 
     (RelPose ?o1 ?o2 ?rp)   
     (Grasp ?o ?g)

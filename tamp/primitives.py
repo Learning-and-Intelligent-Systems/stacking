@@ -1,7 +1,10 @@
 import numpy
 import pb_robot
+import random
 import tamp.misc as misc
 import pybullet as p
+
+from block_utils import rotation_group, ZERO_POS
 
 DEBUG_FAILURE = False 
 
@@ -15,22 +18,33 @@ def get_grasp_gen(robot):
             sampled_tsr = grasp_tsr[top_grasp_ix]
             grasp_worldF = sampled_tsr.sample()
 
-            grasp_objF = numpy.dot(numpy.linalg.inv(body.get_transform()), grasp_worldF)
+            grasp_objF = numpy.dot(numpy.linalg.inv(body.get_base_link_transform()), grasp_worldF)
             body_grasp = pb_robot.vobj.BodyGrasp(body, grasp_objF, robot.arm)
             yield (body_grasp,)
     return gen
 
-def get_stable_gen_table(fixed=[]):
-    def gen(body, surface, surface_pose):
-        while True:
-            pose = pb_robot.placements.sample_placement(body, surface) 
 
+def get_stable_gen_table(fixed=[]):
+    def gen(body, surface, surface_pos, rotation=None):
+        """
+        Generate a random pose (possibly rotated) on a surface. Rotation
+        can be specified for debugging.
+        """
+        all_rotations = list(rotation_group())
+        while True:
+            if rotation is None:
+                # Don't use rotations around the z-axis. Not as useful for regrasping.
+                rotation = random.choice(all_rotations[2:])
+            pose = (ZERO_POS, rotation.as_quat())
+            pose = pb_robot.placements.sample_placement(body, surface, top_pose=pose) 
+            
             if (pose is None) or any(pb_robot.collisions.pairwise_collision(body, b) for b in fixed):
                 continue
             body_pose = pb_robot.vobj.BodyPose(body, pose)
             yield (body_pose,)
     return gen
 
+    
 def get_stable_gen_block(fixed=[]):
     def fn(body, surface, surface_pose, rel_pose):
         """
@@ -43,7 +57,8 @@ def get_stable_gen_block(fixed=[]):
         return (body_pose,)
     return fn
 
-def get_ik_fn(robot, fixed=[], num_attempts=10):
+
+def get_ik_fn(robot, fixed=[], num_attempts=1):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
@@ -70,6 +85,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=10):
         return None
     return fn
 
+
 def assign_fluent_state(fluents):
     obstacles = []
     for fluent in fluents:
@@ -81,6 +97,7 @@ def assign_fluent_state(fluents):
         else:
             raise ValueError(name)
     return obstacles
+
 
 def get_free_motion_gen(robot, fixed=[]):
     def fn(conf1, conf2, fluents=[]):
@@ -107,6 +124,7 @@ def get_holding_motion_gen(robot, fixed=[]):
         return (command,)
     return fn
 
+
 def get_movable_collision_test(robot):
     def test(command, body, pose):
         body.set_base_link_pose(pose.pose)
@@ -122,5 +140,3 @@ def get_movable_collision_test(robot):
                 print('HERE')
         return True
     return test
-
-

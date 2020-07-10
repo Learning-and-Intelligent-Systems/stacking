@@ -18,6 +18,8 @@ Agents are entities that are responsible for manipulating the "real world". Each
 
 `PandaAgent` is a simulated Panda robot. It instatiates the block world and any actions are implemented by the manipulator. To aid this, a simple pick and place domain is modeled using PDDLStream (see `tamp/design.md`).
 
+We currently have two `Block` representations. `block_utils.Object` models the geometry and center of mass of a block and is used in the filtering/tower planner/teleport agent/info planner. In the PDDL-world, blocks are represented by a `pb_robot.body.Body` object. For now we will use both...
+
 ### ParticleBelief(Belief) –- Belief Update (filter.py)
 
 Given an observation, update the belief. This is a particle filter for each object. Has a pybullet server. The belief uses a "platform world" to simulate updates. The only objects that exist in the world are a platform and the block of interest.

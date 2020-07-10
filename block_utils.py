@@ -94,7 +94,7 @@ class Object:
     @staticmethod
     def platform():
         platform_block = Object(name='platform',
-                      dimensions=Dimensions(x=0.3, y=0.2, z=0.05),
+                      dimensions=Dimensions(x=0.3, y=0.2, z=0.15),
                       mass=100,
                       com=Position(x=0., y=0., z=0.),
                       color=Color(r=0.25, g=0.25, b=0.25))
@@ -276,7 +276,7 @@ class Environment:
 
         # sleep (for visualization purposes)
         if self.vis_sim:
-            time.sleep(0.05)
+            time.sleep(0.01)
 
     def disconnect(self):
         self.pybullet_server.disconnect()
@@ -366,7 +366,7 @@ def object_to_urdf(object):
                                     )
                   ))
 
-    object_urdf = odio_urdf.Robot(link_urdf)
+    object_urdf = odio_urdf.Robot(link_urdf, name=object.name)
     return object_urdf
 
 # list of length 3 of (min, max) ranges for each dimension
@@ -430,9 +430,9 @@ def rotation_group():
 
 def get_adversarial_blocks():
     b1 = Object(name='block1',
-                dimensions=Dimensions(0.02, 0.06, 0.02),
+                dimensions=Dimensions(0.02, 0.1, 0.02),
                 mass=1.,
-                com=Position(0.009, 0.029, 0),
+                com=Position(0.009, 0.049, 0),
                 color=Color(0, 0, 1))
     b2 = Object(name='block2',
                 dimensions=Dimensions(0.01, 0.06, 0.02),

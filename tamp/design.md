@@ -1,5 +1,21 @@
 # Notes on Demain Design
 
+## Platform Representation
+
+We use a platform object to aid in experimental setup. In PDDLStream, we simply represent this as another `Block` but do not assign it the `Graspable` predicate. This ensures we don't try to move the platform but inherits other useful properties of being a block (e.g., the ability to sample a position on top of it using a relative pose).
+
+## Grasping Considerations
+
+It is useful for the platform to be tall as this increases the likelihood that a sampled grasp and pose won't cause collisions with the table. If the planner appears to be taking a while to place a block on the platform, it is worth manually evaluating the streams (`agents/panda_agent.py:test_placement_on_platform,test_table_pose_ik`) to make sure valid IK solutions can be found. 
+
+In the future it may help to figure out how to better sample poses that are useful for regrasping (sampling random poses on top of the table is not efficient and can easily lead to collisions as the gripper is near the table).
+
+It is also helpful for regrasping attempts to make the long end of the block sufficiently large (> 8cm) so that a side-grasp from this side does not result in a table collision.
+
+Since we have a lot of grasps, it is useful to have a high `search_sample_ratio` so that we spend more time trying to sample placements that work (as opposed to coming up with more complex plans). This makes it hard to find plans where blocks need to be moved out of each other's way. We might need a better solution to handle this (i.e., create more efficient streams). 
+
+
+
 ## Relative vs. Aboslute Poses
 
 Absolute poses are useful for solving IK as we need to know the location of the object in the robot frame. However, when expressing the tower to build, we only care about the relative poses between blocks - the base of the tower can exist anywhere on the table.

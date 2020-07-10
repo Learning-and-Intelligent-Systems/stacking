@@ -153,6 +153,7 @@ We also test here the the same action is applied across all particle worlds.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--action-type', choices=['push', 'place'], required=True)
+    parser.add_argument('--agent-type', choices=['teleport', 'panda'], required=True)
     args = parser.parse_args()
 
     # Create the block.
@@ -176,7 +177,7 @@ if __name__ == '__main__':
                                  rot=r)
         else:
             raise NotImplementedError()
-        
+
         # Make worlds for each block and test using different CoMs.
         true_world = make_platform_world(block, action)
         com_ranges = get_com_ranges(true_world.objects[1])
