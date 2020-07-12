@@ -43,8 +43,11 @@ def get_stable_gen_table(fixed=[]):
             pose = (ZERO_POS, rotation.as_quat())
             pose = pb_robot.placements.sample_placement(body, surface, top_pose=pose) 
             
+            start_pose = body.get_base_link_pose()
+            body.set_base_link_pose(pose)
             if (pose is None) or any(pb_robot.collisions.pairwise_collision(body, b) for b in fixed):
                 continue
+            body.set_base_link_pose(start_pose)
             body_pose = pb_robot.vobj.BodyPose(body, pose)
             yield (body_pose,)
     return gen

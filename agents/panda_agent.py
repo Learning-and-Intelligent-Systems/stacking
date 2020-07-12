@@ -31,7 +31,7 @@ class PandaAgent:
         self.belief_blocks = blocks
 
         self.pddl_blocks, self.platform, self.table = setup_panda_world(self.robot, blocks)
-        self.pddl_info = get_pddlstream_info(self.robot,[self.table, self.platform], self.pddl_blocks)
+        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform], self.pddl_blocks)
 
     def _get_initial_pddl_state(self):
         """
@@ -56,13 +56,17 @@ class PandaAgent:
                     ('Block', body),
                     ('On', body, self.table)]
 
-        for surface in fixed:
-            pose = pb_robot.vobj.BodyPose(surface, surface.get_base_link_pose())
-            init += [('Pose', surface, pose), ('AtPose', surface, pose)]
+
+        self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
+        init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
+
+        self.platform_pose = pb_robot.vobj.BodyPose(self.platform, self.platform.get_base_link_pose())
+        init += [('Pose', self.platform, self.platform_pose), ('AtPose', self.platform, self.platform_pose)]
+
         init += [('Table', self.table), ('Block', self.platform)]
         return init
 
-    def simulate_action(self, action, real_block, T=50, vis_sim=False, vis_placement=False):
+    def simulate_action(self, action, block_ix, T=50, vis_sim=False, vis_placement=False):
         """
         Perform the given action to with the given block. An observation 
         should be returned in the reference frame of the platform.
@@ -72,8 +76,10 @@ class PandaAgent:
         :param vis_sim: Ununsed.
         :return: (action, T, end_pose) End pose should be TODO: what frame?
         """
-        #real_block = self.belief_blocks[block_ix]
-        pddl_block = self.pddl_blocks[0]
+        real_block = self.belief_blocks[block_ix]
+        pddl_block = self.pddl_blocks[block_ix]
+
+        original_pose = pddl_block.get_base_link_pose()
 
         # Set up the PDDLStream problem for the placing the given block on the
         # platform with the specified action.
@@ -130,23 +136,68 @@ class PandaAgent:
 
             ExecuteActions(self.robot.arm, plan)
 
-        # TODO: Execture the action.
+        # TODO: Execture the action. 
+        # TODO: Check gravity compensation in the arm.
+        p.setGravity(0,0,-10)
+        for _ in range(500):
+            p.stepSimulation()
+            time.sleep(0.01)
+        for b in [self.platform, self.table]:
+            print(p.getClosestPoints(bodyA=pddl_block.id, bodyB=b.id, distance=-1e-3))
+        input('Continue?')
 
         # TODO: Move the block back to the other side of the table.
+        # Put block back in original position.
+
+        # TODO: Check if block is on the table or platform to start.         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform], self.pddl_blocks)
+        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform], self.pddl_blocks)
+
+        init = self._get_initial_pddl_state()
+        goal_pose = pb_robot.vobj.BodyPose(pddl_block, original_pose)
+        init += [('Pose', pddl_block, goal_pose),
+                 ('Supported', pddl_block, goal_pose, self.table, self.table_pose)]
+        goal = ('and', ('AtPose', pddl_block, goal_pose), 
+                       ('On', pddl_block, self.table))
+        
+        print(original_pose)
+
+        # Solve the PDDLStream problem.
+        print('Init:', init)
+        print('Goal:', goal)
+        input('Solve?')
+
+        self.robot.arm.hand.Open()
+        saved_world = pb_robot.utils.WorldSaver()
+
+        pddlstream_problem = tuple([*self.pddl_info, init, goal])
+        plan, cost, evaluations = solve_focused(pddlstream_problem, success_cost=numpy.inf, search_sample_ratio=1000.)
+
+        # Execute the PDDLStream solution to setup the world.
+        if plan is None:
+            print("No plan found")
+        else:
+            # TODO: Have this execute instead of prompt for input.
+            saved_world.restore()
+            input("Execute?")
+
+            ExecuteActions(self.robot.arm, plan)
 
     def simulate_tower(self):
         pass
 
-def test_place_action(agent, blocks, block_ix):
+def test_place_action(blocks, block_ix):
     """
     Test method to try placing the given blocks on the platform.
     """
-    for r in list(rotation_group())[4:]:
+    agent = PandaAgent(blocks)
+    for r in list(rotation_group())[0:]:
+        
         action = PlaceAction(pos=None,
                              rot=r,
                              block=blocks[block_ix])
-        agent.simulate_action(action, blocks[block_ix])
-        break
+        agent.simulate_action(action, block_ix)
+        # p.disconnect()
+        # break
 
 def test_placement_ik(agent, blocks):
     """
@@ -322,12 +373,12 @@ if __name__ == '__main__':
     # TODO: Test the panda agent.
     blocks = get_adversarial_blocks()
 
-    agent = PandaAgent(blocks)
+    # agent = PandaAgent(blocks)
     #visualize_grasps(agent, blocks)
     #test_table_pose_ik(agent, blocks)
-    test_placement_ik(agent, blocks)
-    input('Continue?')
-    test_place_action(agent, blocks, 0)
+    # test_placement_ik(agent, blocks)
+    # input('Continue?')
+    test_place_action(blocks, 1)
     #test_placement_on_platform(agent)
 
     time.sleep(5.0)

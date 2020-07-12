@@ -435,9 +435,9 @@ def get_adversarial_blocks():
                 com=Position(0.009, 0.049, 0),
                 color=Color(0, 0, 1))
     b2 = Object(name='block2',
-                dimensions=Dimensions(0.01, 0.06, 0.02),
+                dimensions=Dimensions(0.02, 0.1, 0.02),
                 mass=1.,
-                com=Position(-0.0048, -0.029, 0),
+                com=Position(-0.0098, -0.049, 0),
                 color=Color(1, 0, 1))
     b3 = Object(name='block3',
                 dimensions=Dimensions(0.01, 0.01, 0.1),
