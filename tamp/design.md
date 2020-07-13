@@ -6,6 +6,8 @@ We use a platform object to aid in experimental setup. In PDDLStream, we simply 
 
 ## Grasping Considerations
 
+### Grasping for Platform Placements 
+
 It is useful for the platform to be tall as this increases the likelihood that a sampled grasp and pose won't cause collisions with the table. If the planner appears to be taking a while to place a block on the platform, it is worth manually evaluating the streams (`agents/panda_agent.py:test_placement_on_platform,test_table_pose_ik`) to make sure valid IK solutions can be found. 
 
 In the future it may help to figure out how to better sample poses that are useful for regrasping (sampling random poses on top of the table is not efficient and can easily lead to collisions as the gripper is near the table).
@@ -14,7 +16,20 @@ It is also helpful for regrasping attempts to make the long end of the block suf
 
 Since we have a lot of grasps, it is useful to have a high `search_sample_ratio` so that we spend more time trying to sample placements that work (as opposed to coming up with more complex plans). This makes it hard to find plans where blocks need to be moved out of each other's way. We might need a better solution to handle this (i.e., create more efficient streams). One way to do this would be to be more careful about grasp generation. We could make sure we never try to grasp in orientations that do not fit in the gripper.
 
+### Grasping for Moving Fallen Blocks
 
+Once a block falls off the platform, its position is often too close to the platform to be able to pick up. Even if a grasp is available, it's also likely later aspects of the plan will fail because it collides with the platform when initially moving the block.
+
+Some ideas:
+- Make platform more of a table.
+- Add 45 degree angle grasps.
+- Change approach to first move block away from table.
+- Add pushing action.
+
+Current Plan:
+- First make the platform more of a table so the block can fall under without being stuck against a wall.
+- Next define grasps that pick up the block at an angle.
+- Make the angle low enough and combine with a larger approach which moves the block away from the table.
 
 ## Relative vs. Aboslute Poses
 

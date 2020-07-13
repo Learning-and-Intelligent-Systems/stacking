@@ -94,8 +94,8 @@ class Object:
     @staticmethod
     def platform():
         platform_block = Object(name='platform',
-                      dimensions=Dimensions(x=0.3, y=0.2, z=0.15),
-                      mass=100,
+                      dimensions=Dimensions(x=0.3, y=0.2, z=0.01),  # z=0.15
+                      mass=0,  # 100.
                       com=Position(x=0., y=0., z=0.),
                       color=Color(r=0.25, g=0.25, b=0.25))
         platform_block.set_pose(Pose(pos=Position(x=0., y=0., z=0.025),
@@ -440,9 +440,9 @@ def get_adversarial_blocks():
                 com=Position(-0.0098, -0.049, 0),
                 color=Color(1, 0, 1))
     b3 = Object(name='block3',
-                dimensions=Dimensions(0.01, 0.01, 0.1),
+                dimensions=Dimensions(0.01, 0.1, 0.01),
                 mass=1.,
-                com=Position(0, 0, 0.04),
+                com=Position(0, 0.04, 0.),
                 color=Color(0, 1, 1))
     b4 = Object(name='block4',
                 dimensions=Dimensions(0.06, 0.01, 0.02),

@@ -6,6 +6,7 @@ import pb_robot
 import tamp.misc as misc
 
 from block_utils import rotation_group, ZERO_POS
+from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
 
@@ -72,6 +73,18 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
         approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.05])
+
+        if False:
+            length, lifeTime = 0.2, 0.0
+            
+            pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
+            new_x = transformation([length, 0.0, 0.0], pos, quat)
+            new_y = transformation([0.0, length, 0.0], pos, quat)
+            new_z = transformation([0.0, 0.0, length], pos, quat)
+
+            p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime)
+            p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime)
+            p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime)
 
         for _ in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)

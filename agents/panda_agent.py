@@ -120,23 +120,9 @@ class PandaAgent:
         print('Init:', init)
         print('Goal:', goal)
 
-        self.robot.arm.hand.Open()
-        saved_world = pb_robot.utils.WorldSaver()
+        self._solve_and_execute_pddl(init, goal)
 
-        pddlstream_problem = tuple([*self.pddl_info, init, goal])
-        plan, cost, evaluations = solve_focused(pddlstream_problem, success_cost=numpy.inf, search_sample_ratio=1000.)
-
-        # Execute the PDDLStream solution to setup the world.
-        if plan is None:
-            print("No plan found")
-        else:
-            # TODO: Have this execute instead of prompt for input.
-            saved_world.restore()
-            input("Execute?")
-
-            ExecuteActions(self.robot.arm, plan)
-
-        # TODO: Execture the action. 
+        # Execture the action. 
         # TODO: Check gravity compensation in the arm.
         p.setGravity(0,0,-10)
         for _ in range(500):
@@ -144,7 +130,6 @@ class PandaAgent:
             time.sleep(0.01)
         for b in [self.platform, self.table]:
             print(p.getClosestPoints(bodyA=pddl_block.id, bodyB=b.id, distance=-1e-3))
-        input('Continue?')
 
         # TODO: Move the block back to the other side of the table.
         # Put block back in original position.
@@ -164,26 +149,30 @@ class PandaAgent:
         # Solve the PDDLStream problem.
         print('Init:', init)
         print('Goal:', goal)
-        input('Solve?')
+        success = self._solve_and_execute_pddl(init, goal)
+        if not success:
+            print('Plan failed: Teleporting block to intial position.')
+            pddl_block.set_base_link_pose(original_pose)
+        
+    def simulate_tower(self):
+        pass
 
+    def _solve_and_execute_pddl(self, init, goal):
         self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
 
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
-        plan, cost, evaluations = solve_focused(pddlstream_problem, success_cost=numpy.inf, search_sample_ratio=1000.)
+        plan, _, _ = solve_focused(pddlstream_problem, success_cost=numpy.inf, search_sample_ratio=1000.)
 
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
             print("No plan found")
+            return False
         else:
             # TODO: Have this execute instead of prompt for input.
             saved_world.restore()
-            input("Execute?")
-
-            ExecuteActions(self.robot.arm, plan)
-
-    def simulate_tower(self):
-        pass
+            ExecuteActions(self.robot.arm, plan, pause=False)
+            return True
 
 def test_place_action(blocks, block_ix):
     """
@@ -304,7 +293,6 @@ def test_table_pose_ik(agent, blocks):
         else:
             print('No IK.')
 
-
 def visualize_grasps(agent, blocks):
     """
     Test method to visualize the grasps. Helps check for potential problems
@@ -335,7 +323,71 @@ def visualize_grasps(agent, blocks):
                 print(ix, 'N')
             ix += 1
 
+def check_ungraspable_block(agent):
 
+    platform_pose = agent.platform.get_base_link_pose()
+    for pddl_block in agent.pddl_blocks:
+        block_pose = pddl_block.get_base_link_pose()
+
+
+def test_return_to_start(blocks, n_placements=5, rot_ix=0, block_ix=1):
+    """
+    Let a block fall off the platform and check that we can successfully 
+    pick it up and return it to the starting position.
+    """
+    numpy.random.seed(10)
+    rot = list(rotation_group())[rot_ix]
+    for _ in range(n_placements):
+        # Create agent.
+        agent = PandaAgent(blocks)
+        original_pose = agent.pddl_blocks[block_ix].get_base_link_pose()
+        # Create a random action.
+        new_dims = numpy.abs(rot.apply(blocks[block_ix].dimensions))
+        place_pos = new_dims*(-0.5*numpy.random.rand(3))
+        x, y, _ = place_pos + numpy.array(agent.platform.get_dimensions())/2
+        action = PlaceAction(pos=None,
+                             rot=rot,
+                             block=blocks[block_ix])
+
+        # Teleport block to platform.
+        blocks[block_ix].set_pose(Pose(ZERO_POS, Quaternion(*action.rot.as_quat())))
+        rotated_block = get_rotated_block(blocks[block_ix])
+        platform_pose = agent.platform.get_base_link_pose()
+        platform_tform = pb_robot.geometry.tform_from_pose(platform_pose)
+        z = agent.platform.get_dimensions()[2]/2 + rotated_block.dimensions[2]/2 + 1e-5
+        tform = numpy.array([[1., 0., 0., action.pos[0]],
+                             [0., 1., 0., action.pos[1]],
+                             [0., 0., 1., z],
+                             [0., 0., 0., 1.]])
+        tform[0:3, 0:3] = action.rot.as_matrix()
+        body_tform = platform_tform@tform
+        pose = pb_robot.geometry.pose_from_tform(body_tform)        
+
+        agent.pddl_blocks[block_ix].set_base_link_pose(pose)
+
+        # Execute action.
+        p.setGravity(0,0,-10)
+        for _ in range(500):
+            p.stepSimulation()
+            time.sleep(0.01)
+
+        check_ungraspable_block(agent)
+
+        # Solve PDDL Problem.
+        pddl_block = agent.pddl_blocks[block_ix]
+        init = agent._get_initial_pddl_state()
+        goal_pose = pb_robot.vobj.BodyPose(pddl_block, original_pose)
+        init += [('Pose', pddl_block, goal_pose),
+                 ('Supported', pddl_block, goal_pose, agent.table, agent.table_pose)]
+        goal = ('and', ('AtPose', pddl_block, goal_pose), 
+                       ('On', pddl_block, agent.table))
+        
+        # Solve the PDDLStream problem.
+        print('Init:', init)
+        print('Goal:', goal)
+        agent._solve_and_execute_pddl(init, goal)
+
+        p.disconnect()
 
 def test_placement_on_platform(agent):
     """
@@ -374,11 +426,12 @@ if __name__ == '__main__':
     blocks = get_adversarial_blocks()
 
     # agent = PandaAgent(blocks)
-    #visualize_grasps(agent, blocks)
+    # visualize_grasps(agent, blocks)
     #test_table_pose_ik(agent, blocks)
     # test_placement_ik(agent, blocks)
     # input('Continue?')
     test_place_action(blocks, 1)
+    #test_return_to_start(blocks, rot_ix=3)
     #test_placement_on_platform(agent)
 
     time.sleep(5.0)

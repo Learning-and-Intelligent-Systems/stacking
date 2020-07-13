@@ -2,6 +2,7 @@ import numpy
 import pb_robot
 import os
 import shutil
+import time
 
 import tamp.primitives as primitives
 
@@ -34,7 +35,7 @@ def get_fixed(robot, movable):
     fixed = [body for body in rigid if body.id not in movable_ids]
     return fixed
 
-def ExecuteActions(manip, plan):
+def ExecuteActions(manip, plan, pause=True):
     for name, args in plan:
         pb_robot.viz.remove_all_debug()
         bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
@@ -44,7 +45,10 @@ def ExecuteActions(manip, plan):
         executionItems = args[-1]
         for e in executionItems:
             e.simulate()
-            input("Next?")
+            if pause:
+                input("Next?")
+            else:
+                time.sleep(0.5)
 
 def ComputePrePose(og_pose, directionVector, relation=None):
     backup = numpy.eye(4)
@@ -114,7 +118,9 @@ def setup_panda_world(robot, blocks):
 
     rotation = pb_robot.geometry.Euler(yaw=numpy.pi/2)
     pddl_platform.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_platform.get_base_link_pose()))
-    pddl_platform.set_base_link_point([0.7, -0.4, pb_robot.placements.stable_z(pddl_platform, pddl_table)])
+    # pddl_platform.set_base_link_point([0.7, -0.4, pb_robot.placements.stable_z(pddl_platform, pddl_table)])
+    table_z = pddl_table.get_base_link_pose()[0][2]
+    pddl_platform.set_base_link_point([0.7, -0.4, table_z + 0.15])
 
 
     return pddl_blocks, pddl_platform, pddl_table
