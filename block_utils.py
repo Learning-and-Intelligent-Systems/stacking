@@ -93,14 +93,25 @@ class Object:
 
     @staticmethod
     def platform():
+        leg_height = 0.15
+
         platform_block = Object(name='platform',
                       dimensions=Dimensions(x=0.3, y=0.2, z=0.01),  # z=0.15
                       mass=0,  # 100.
                       com=Position(x=0., y=0., z=0.),
                       color=Color(r=0.25, g=0.25, b=0.25))
-        platform_block.set_pose(Pose(pos=Position(x=0., y=0., z=0.025),
-                           orn=Quaternion(x=0, y=0, z=0, w=1)))
-        return platform_block
+        platform_block.set_pose(Pose(pos=Position(x=0., y=0., z=leg_height + 0.005),
+                                orn=Quaternion(x=0, y=0, z=0, w=1)))
+
+        platform_leg = Object(name='platform-leg',
+                      dimensions=Dimensions(x=0.05, y=0.05, z=leg_height),  # z=0.15
+                      mass=0,  
+                      com=Position(x=0., y=0., z=0.),
+                      color=Color(r=0.25, g=0.25, b=0.25))
+        platform_leg.set_pose(Pose(pos=Position(x=0., y=0., z=leg_height/2.),
+                                orn=Quaternion(x=0, y=0, z=0, w=1)))
+
+        return platform_block, platform_leg
 
 
 class Hand:
@@ -116,7 +127,7 @@ class Hand:
     def get_pos(self):
         return self.pos
 
-    def set_pos(self, new_pos):
+    def set_pos(self, new_pos, client):
         self.pos = new_pos
         if self.c_id == -1:
            self.c_id = p.createConstraint(parentBodyUniqueId=self.hand_id,
@@ -126,10 +137,12 @@ class Hand:
                                           jointType=p.JOINT_FIXED,
                                           jointAxis=(0,0,0),
                                           parentFramePosition=(0,0,0),
-                                          childFramePosition=new_pos)
+                                          childFramePosition=new_pos,
+                                          physicsClientId=client)
         else:
             p.changeConstraint(userConstraintUniqueId=self.c_id,
-                               jointChildPivot=new_pos)
+                               jointChildPivot=new_pos,
+                               physicsClientId=client)
 
     def set_id(self, hand_id):
         self.hand_id = hand_id
@@ -166,9 +179,9 @@ class World:
     def set_hand_id(self, h_id):
         self.hand.set_id(h_id)
 
-    def set_hand_pos(self, pos):
+    def set_hand_pos(self, pos, client):
         global_pos = Position(*np.add(pos, [self.offset[0], self.offset[1], 0]))
-        self.hand.set_pos(global_pos)
+        self.hand.set_pos(global_pos, client)
 
     def get_hand_pos(self):
         global_pos = self.hand.get_pos()
@@ -209,7 +222,8 @@ class Environment:
                         hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf',
                                                             hand_pose)
                         self.worlds[world_i].set_hand_id(hand_id)
-                        self.worlds[world_i].set_hand_pos(Position(x=0, y=-0.25, z=0.25))
+                        self.worlds[world_i].set_hand_pos(Position(x=0, y=-0.25, z=0.25),
+                                                          self.pybullet_server.client)
 
                     for obj in self.worlds[world_i].objects:
                         object_urdf = object_to_urdf(obj)
@@ -267,9 +281,15 @@ class Environment:
         for world in self.worlds:
             for obj in world.objects:
                 pos, orn = self.pybullet_server.get_pose(obj.id)
+                dynamics = p.getDynamicsInfo(bodyUniqueId=obj.id,
+                                             linkIndex=-1,
+                                             physicsClientId=self.pybullet_server.client)
+                (point, quat) = p.multiplyTransforms(pos,
+                                                     orn,
+                                                     *p.invertTransform(dynamics[3],
+                                                     dynamics[4]))
                 # pyBullet returns the pose of the COM, not COG
-                obj_pos = np.subtract(pos, obj.com)
-                obj.set_pose(Pose(Position(*obj_pos), Quaternion(*orn)))
+                obj.set_pose(Pose(Position(*point), Quaternion(*quat)))
                 if vis_frames:
                     pos, quat = obj.get_pose()
                     self.pybullet_server.vis_frame(pos, orn)

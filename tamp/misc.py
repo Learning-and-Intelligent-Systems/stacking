@@ -112,18 +112,22 @@ def setup_panda_world(robot, blocks):
             break
 
     # Setup platform.
-    platform = Object.platform()
+    platform, leg = Object.platform()
     pb_platform_fname = create_pb_robot_urdf(platform, 'platform.urdf')
+    pb_leg_fname = create_pb_robot_urdf(leg, 'leg.urdf')
     pddl_platform = pb_robot.body.createBody(pb_platform_fname)
+    pddl_leg = pb_robot.body.createBody(pb_leg_fname)
 
     rotation = pb_robot.geometry.Euler(yaw=numpy.pi/2)
     pddl_platform.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_platform.get_base_link_pose()))
-    # pddl_platform.set_base_link_point([0.7, -0.4, pb_robot.placements.stable_z(pddl_platform, pddl_table)])
+    pddl_leg.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_leg.get_base_link_pose()))
+    
     table_z = pddl_table.get_base_link_pose()[0][2]
-    pddl_platform.set_base_link_point([0.7, -0.4, table_z + 0.15])
+    pddl_leg.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z/2])
+    pddl_platform.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z + platform.dimensions.z/2.])
 
 
-    return pddl_blocks, pddl_platform, pddl_table
+    return pddl_blocks, pddl_platform, pddl_leg, pddl_table
 
 
 def get_pddlstream_info(robot, fixed, movable):

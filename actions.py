@@ -95,7 +95,9 @@ class PushAction(ActionBase):
             self.direction = direction
 
         _, _, block_height = np.abs(rot.apply(block.dimensions))
-        platform_height = Object.platform().dimensions.z
+
+        table, leg = Object.platform()
+        platform_height = table.dimensions.z + leg.dimensions.z
 
         self.push_start_pos = Position(x=0 - self.direction[0]*self.delta*20,
                                        y=0 - self.direction[1]*self.delta*20,
@@ -142,7 +144,8 @@ class PlaceAction(ActionBase):
         new_dims = np.abs(rot.apply(block.dimensions))
         # and sample a position within the block to place on the corner of the platform
         place_pos = new_dims*(np.random.rand(3) - 0.5)
-        x, y, _ = place_pos + np.array(Object.platform().dimensions)/2
+        table, _ = Object.platform()
+        x, y, _ = place_pos + np.array(table.dimensions)/2
         return Position(x, y, 0)
 
 

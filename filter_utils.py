@@ -140,13 +140,13 @@ def make_platform_world(p_block, action):
     """ Given a block, create a world that has a platform to push that block off of.
     :param block: The Object which to place on the platform.
     """
-    platform = Object.platform()
+    platform_table, platform_leg = Object.platform()
 
     p_block.set_pose(Pose(ZERO_POS, Quaternion(*action.rot.as_quat())))
     block = get_rotated_block(p_block)
     block.set_pose(Pose(pos=Position(x=action.pos.x,
                                      y=action.pos.y,
-                                     z=platform.dimensions.z+block.dimensions.z/2.),
+                                     z=platform_table.get_pose().pos.z+platform_table.dimensions.z/2.+block.dimensions.z/2.),
                         orn=ZERO_ROT))
 
-    return World([platform, block])
+    return World([platform_table, block, platform_leg])

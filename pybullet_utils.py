@@ -16,7 +16,7 @@ class PyBulletServer():
             cameraYaw=45,
             cameraPitch=-15,
             cameraTargetPosition=(0., 0., 0.))
-        p.setGravity(0, 0, -10)
+        p.setGravity(0, 0, -10, physicsClientId=self.client)
 
     def step(self):
         p.stepSimulation(physicsClientId=self.client)

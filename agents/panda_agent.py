@@ -2,19 +2,21 @@ import numpy
 import pybullet as p
 import time
 
+from copy import deepcopy
+
 import pb_robot
 import tamp.primitives
 
-from actions import PlaceAction
+from actions import PlaceAction, make_platform_world
 from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
-                        Quaternion, get_rotated_block, Pose
+                        Quaternion, get_rotated_block, Pose, add_noise, Environment 
 from pddlstream.algorithms.focused import solve_focused
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks):
+    def __init__(self, blocks, noise):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a 
@@ -30,8 +32,10 @@ class PandaAgent:
 
         self.belief_blocks = blocks
 
-        self.pddl_blocks, self.platform, self.table = setup_panda_world(self.robot, blocks)
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform], self.pddl_blocks)
+        self.pddl_blocks, self.platform_table, self.platform_leg, self.table = setup_panda_world(self.robot, blocks)
+        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
+
+        self.noise = noise
 
     def _get_initial_pddl_state(self):
         """
@@ -40,7 +44,7 @@ class PandaAgent:
         up" an experiment by moving blocks away from the platform after an 
         experiment.
         """
-        fixed = [self.table, self.platform]
+        fixed = [self.table, self.platform_table, self.platform_leg]
         conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
         init = [('CanMove',),
                 ('Conf', conf),
@@ -60,10 +64,10 @@ class PandaAgent:
         self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
         init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
 
-        self.platform_pose = pb_robot.vobj.BodyPose(self.platform, self.platform.get_base_link_pose())
-        init += [('Pose', self.platform, self.platform_pose), ('AtPose', self.platform, self.platform_pose)]
+        self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
+        init += [('Pose', self.platform_table, self.platform_pose), ('AtPose', self.platform_table, self.platform_pose)]
 
-        init += [('Table', self.table), ('Block', self.platform)]
+        init += [('Table', self.table), ('Block', self.platform_table)]
         return init
 
     def simulate_action(self, action, block_ix, T=50, vis_sim=False, vis_placement=False):
@@ -91,7 +95,7 @@ class PandaAgent:
         
         x = action.pos[0]
         y = action.pos[1]
-        z = self.platform.get_dimensions()[2]/2 + rotated_block.dimensions[2]/2 + 1e-5
+        z = self.platform_table.get_dimensions()[2]/2. + rotated_block.dimensions[2]/2 #+ 1e-5
         tform = numpy.array([[1., 0., 0., x],
                              [0., 1., 0., y],
                              [0., 0., 1., z],
@@ -100,7 +104,7 @@ class PandaAgent:
 
         # Code to visualize where the block will be placed.
         if vis_placement:
-            surface_tform = pb_robot.geometry.tform_from_pose(self.platform.get_base_link_pose())
+            surface_tform = pb_robot.geometry.tform_from_pose(self.platform_table.get_base_link_pose())
             body_tform = surface_tform@tform
             length, lifeTime = 0.2, 0.0
             
@@ -113,8 +117,8 @@ class PandaAgent:
             p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime)
             p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime)
         
-        init += [('RelPose', pddl_block, self.platform, tform)]
-        goal = ('On', pddl_block, self.platform)
+        init += [('RelPose', pddl_block, self.platform_table, tform)]
+        goal = ('On', pddl_block, self.platform_table)
 
         # Solve the PDDLStream problem.
         print('Init:', init)
@@ -125,17 +129,21 @@ class PandaAgent:
         # Execture the action. 
         # TODO: Check gravity compensation in the arm.
         p.setGravity(0,0,-10)
-        for _ in range(500):
+        for tx in range(500):
             p.stepSimulation()
             time.sleep(0.01)
-        for b in [self.platform, self.table]:
-            print(p.getClosestPoints(bodyA=pddl_block.id, bodyB=b.id, distance=-1e-3))
 
-        # TODO: Move the block back to the other side of the table.
+            # Save the result of the experiment after T steps of simulation.
+            if tx == T-1:
+                end_pose = self._get_observed_pose(pddl_block, action)
+                # TODO: Add noise to the observation.
+
+                observation = (action, T, end_pose)
+        
         # Put block back in original position.
 
         # TODO: Check if block is on the table or platform to start.         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform], self.pddl_blocks)
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform], self.pddl_blocks)
+        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
 
         init = self._get_initial_pddl_state()
         goal_pose = pb_robot.vobj.BodyPose(pddl_block, original_pose)
@@ -144,8 +152,6 @@ class PandaAgent:
         goal = ('and', ('AtPose', pddl_block, goal_pose), 
                        ('On', pddl_block, self.table))
         
-        print(original_pose)
-
         # Solve the PDDLStream problem.
         print('Init:', init)
         print('Goal:', goal)
@@ -153,9 +159,27 @@ class PandaAgent:
         if not success:
             print('Plan failed: Teleporting block to intial position.')
             pddl_block.set_base_link_pose(original_pose)
-        
+
+        return observation
+
     def simulate_tower(self):
         pass
+
+    def _get_observed_pose(self, pddl_block, action):
+        """
+        This pose should be relative to the base of the platform leg to
+        agree with the simulation. The two block representations will have
+        different orientation but their positions should be the same.
+        """
+        block_transform = pddl_block.get_base_link_transform()
+        platform_transform = self.platform_leg.get_base_link_transform()
+        platform_transform[2,3] -= self.platform_leg.get_dimensions()[2]/2.
+
+        rel_transform = numpy.linalg.inv(platform_transform)@block_transform
+        end_pose = pb_robot.geometry.pose_from_tform(rel_transform)
+        # TODO: Add noise to the observation.
+
+        return end_pose
 
     def _solve_and_execute_pddl(self, init, goal):
         self.robot.arm.hand.Open()
@@ -174,11 +198,53 @@ class PandaAgent:
             ExecuteActions(self.robot.arm, plan, pause=False)
             return True
 
+def test_observations(blocks, block_ix):
+    """
+    Test method to try placing the given blocks on the platform.
+    """
+    agent = PandaAgent(blocks, NOISE)
+    for r in list(rotation_group())[0:]:
+        action = PlaceAction(pos=None,
+                             rot=r,
+                             block=blocks[block_ix])
+        obs = agent.simulate_action(action, block_ix, T=50)
+        
+        # TODO: Check that the simulated observation agrees with the true observation.
+        particle_block = deepcopy(blocks[block_ix])
+        world = make_platform_world(particle_block, action)
+        env = Environment([world], vis_sim=False)
+
+        if False:
+            env.step(action=action)
+            length, lifeTime = 0.2, 0.0
+            pos = end_pose = world.get_pose(world.objects[1])[0]
+            quat = action.rot.as_quat()
+            new_x = transformation([length, 0.0, 0.0], pos, quat)
+            new_y = transformation([0.0, length, 0.0], pos, quat)
+            new_z = transformation([0.0, 0.0, length], pos, quat)
+
+            p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime)
+            p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime)
+            p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime)
+            input('Continue')
+
+        for _ in range(50):
+            env.step(action=action)
+        
+        end_pose = world.get_pose(world.objects[1])
+
+        
+
+        print('Simulated Pose:', end_pose)
+        print('TAMP Pose:', obs[2])
+
+        input('Continue?')
+
 def test_place_action(blocks, block_ix):
     """
     Test method to try placing the given blocks on the platform.
     """
-    agent = PandaAgent(blocks)
+    agent = PandaAgent(blocks, NOISE)
     for r in list(rotation_group())[0:]:
         
         action = PlaceAction(pos=None,
@@ -421,6 +487,7 @@ def test_placement_on_platform(agent):
         input("Execute?")
         ExecuteActions(agent.robot.arm, plan)
 
+NOISE=0.00005
 if __name__ == '__main__':
     # TODO: Test the panda agent.
     blocks = get_adversarial_blocks()
@@ -430,7 +497,8 @@ if __name__ == '__main__':
     #test_table_pose_ik(agent, blocks)
     # test_placement_ik(agent, blocks)
     # input('Continue?')
-    test_place_action(blocks, 1)
+    #test_place_action(blocks, 1)
+    test_observations(blocks, 1)
     #test_return_to_start(blocks, rot_ix=3)
     #test_placement_on_platform(agent)
 
