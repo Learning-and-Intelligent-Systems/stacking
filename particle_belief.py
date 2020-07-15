@@ -75,7 +75,7 @@ class ParticleBelief(BeliefBase):
         # observation is a tuple (action, rot, timesteps, pose)
         
         # resample the distribution
-        self.particles = sample_and_wiggle(self.particles, self.experience,
+        self.particles = sample_and_wiggle(self.particles, self.experience[-5:],
             self.OBS_MODEL_COV, self.block, self.com_ranges)
 
         self.experience.append(observation)
@@ -172,8 +172,7 @@ if __name__ == '__main__':
     if args.agent == 'teleport':
         agent = TeleportAgent(blocks, NOISE)
     else:
-        agent = PandaAgent(blocks, NOISE)
-    
+        agent = PandaAgent(blocks, NOISE, teleport=False)
     
     # construct a world containing those blocks
     for b_ix, block in enumerate(blocks):

@@ -17,11 +17,13 @@ from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise):
+    def __init__(self, blocks, noise, teleport=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a 
         platform which can be used in experimentation.
+        :param teleport: Debugging parameter used to skip planning while moving
+                         blocks around this world.
         """
         # TODO: Check that having this as client 0 is okay when interacting 
         # with everything else.
@@ -37,6 +39,7 @@ class PandaAgent:
         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
 
         self.noise = noise
+        self.teleport = teleport
 
     def _get_initial_pddl_state(self):
         """
@@ -125,7 +128,15 @@ class PandaAgent:
         print('Init:', init)
         print('Goal:', goal)
 
-        self._solve_and_execute_pddl(init, goal)
+        if not self.teleport:
+            self._solve_and_execute_pddl(init, goal)
+        else:
+            goal_pose_fn = tamp.primitives.get_stable_gen_block()
+            goal_pose = goal_pose_fn(pddl_block, 
+                                     self.platform_table, 
+                                     self.platform_pose,
+                                     tform)[0].pose
+            pddl_block.set_base_link_pose(goal_pose)
 
         # Execture the action. 
         # TODO: Check gravity compensation in the arm.
@@ -156,9 +167,13 @@ class PandaAgent:
         # Solve the PDDLStream problem.
         print('Init:', init)
         print('Goal:', goal)
-        success = self._solve_and_execute_pddl(init, goal)
-        if not success:
-            print('Plan failed: Teleporting block to intial position.')
+
+        if not self.teleport:
+            success = self._solve_and_execute_pddl(init, goal)
+            if not success:
+                print('Plan failed: Teleporting block to intial position.')
+                pddl_block.set_base_link_pose(original_pose)
+        else:
             pddl_block.set_base_link_pose(original_pose)
 
         return observation
@@ -181,6 +196,7 @@ class PandaAgent:
         # TODO: Add noise to the observation.
 
         end_pose = Pose(Position(*end_pose[0]), Quaternion(*end_pose[1]))
+        end_pose = add_noise(end_pose, self.noise*numpy.eye(3))
 
         return end_pose
 
@@ -189,7 +205,10 @@ class PandaAgent:
         saved_world = pb_robot.utils.WorldSaver()
 
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
-        plan, _, _ = solve_focused(pddlstream_problem, success_cost=numpy.inf, search_sample_ratio=1000.)
+        plan, _, _ = solve_focused(pddlstream_problem, 
+                                   success_cost=numpy.inf, 
+                                   search_sample_ratio=1000.,
+                                   max_time=30.)
 
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
