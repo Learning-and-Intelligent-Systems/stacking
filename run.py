@@ -17,12 +17,12 @@ def main(args):
     blocks = get_adversarial_blocks()
 
     if args.agent == 'teleport':
-        agent = TeleportAgent(NOISE)
+        agent = TeleportAgent(blocks, NOISE)
     else:
         raise NotImplementedError()
 
     # construct a world containing those blocks
-    for block in blocks:
+    for b_ix, block in enumerate(blocks):
         # new code
         print('Running filter for', block.name)
         belief = ParticleBelief(block, 
@@ -33,7 +33,7 @@ def main(args):
         for interaction_num in range(10):
             print("Interaction number: ", interaction_num)
             action = plan_action(belief, exp_type='random', action_type='place')
-            observation = agent.simulate_action(action, block)
+            observation = agent.simulate_action(action, b_ix)
             belief.update(observation)
             block.com_filter = belief.particles
         print(belief.estimated_coms[-1], block.com)

@@ -9,7 +9,8 @@ import tamp.primitives
 
 from actions import PlaceAction, make_platform_world
 from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
-                        Quaternion, get_rotated_block, Pose, add_noise, Environment 
+                        Quaternion, get_rotated_block, Pose, add_noise, \
+                        Environment, Position 
 from pddlstream.algorithms.focused import solve_focused
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
@@ -178,6 +179,8 @@ class PandaAgent:
         rel_transform = numpy.linalg.inv(platform_transform)@block_transform
         end_pose = pb_robot.geometry.pose_from_tform(rel_transform)
         # TODO: Add noise to the observation.
+
+        end_pose = Pose(Position(*end_pose[0]), Quaternion(*end_pose[1]))
 
         return end_pose
 

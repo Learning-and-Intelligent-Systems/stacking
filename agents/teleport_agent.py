@@ -7,10 +7,13 @@ import numpy as np
 
 
 class TeleportAgent:
-    def __init__(self, noise):
+    def __init__(self, blocks, noise):
         self.noise = noise
+        self.blocks = blocks
 
-    def simulate_action(self, action, real_block, T=50, vis_sim=False):
+    def simulate_action(self, action, block_ix, T=50, vis_sim=False):
+        real_block = self.blocks[block_ix]
+        
         # set up the environment with the real block
         true_world = make_platform_world(real_block, action)
         env = Environment([true_world], vis_sim=vis_sim)

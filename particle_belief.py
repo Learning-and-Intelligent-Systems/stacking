@@ -15,6 +15,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.stats import multivariate_normal
 
 from actions import make_platform_world, plan_action
+from agents.panda_agent import PandaAgent
 from agents.teleport_agent import TeleportAgent
 from base_class import BeliefBase
 from block_utils import get_adversarial_blocks, get_com_ranges, \
@@ -169,13 +170,13 @@ if __name__ == '__main__':
     blocks = get_adversarial_blocks()
 
     if args.agent == 'teleport':
-        agent = TeleportAgent(NOISE)
+        agent = TeleportAgent(blocks, NOISE)
     else:
-        raise NotImplementedError()
+        agent = PandaAgent(blocks, NOISE)
     
     
     # construct a world containing those blocks
-    for block in blocks:
+    for b_ix, block in enumerate(blocks):
         # new code
         print('Running filter for', block.name, block.dimensions)
         belief = ParticleBelief(block, 
@@ -188,7 +189,7 @@ if __name__ == '__main__':
             # print(belief.particles.particles[::4, :])
             print("Interaction number: ", interaction_num)
             action = plan_action(belief, exp_type='random', action_type='place')
-            observation = agent.simulate_action(action, block, vis_sim=False)
+            observation = agent.simulate_action(action, b_ix, vis_sim=False)
             belief.update(observation)
             block.com_filter = belief.particles  
 
