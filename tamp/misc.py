@@ -105,7 +105,7 @@ def setup_panda_world(robot, blocks):
             # Check that there is no collision with already placed blocks.
             collision = False
             for jx in range(0, ix):
-                if pb_robot.collisions.body_collision(block, pddl_blocks[jx], max_distance=0.1):
+                if pb_robot.collisions.body_collision(block, pddl_blocks[jx], max_distance=0.05):
                     collision = True
             if collision:
                 continue

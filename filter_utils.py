@@ -109,9 +109,9 @@ def sample_and_wiggle(distribution, experience, obs_model_cov, true_block, range
 
     # constrain the particles to be within the block if we are given block dimensions
     # Clipping biases the CoM to be towards the center of the block.
-    # if ranges is not None:
-    #     for i, (lower, upper) in enumerate(ranges):
-    #         particles[:,i] = np.clip(particles[:,i], lower, upper)
+    if ranges is not None:
+        for i, (lower, upper) in enumerate(ranges):
+            particles[:,i] = np.clip(particles[:,i], lower, upper)
 
     weights = np.ones(N)/float(N) # weights become uniform again
     return ParticleDistribution(particles, weights)

@@ -291,12 +291,12 @@ class Environment:
                 # pyBullet returns the pose of the COM, not COG
                 obj.set_pose(Pose(Position(*point), Quaternion(*quat)))
                 if vis_frames:
-                    pos, quat = obj.get_pose()
+                    #pos, quat = obj.get_pose()
                     self.pybullet_server.vis_frame(pos, orn)
 
         # sleep (for visualization purposes)
         if self.vis_sim:
-            time.sleep(0.01)
+            time.sleep(0.005)
 
     def disconnect(self):
         self.pybullet_server.disconnect()
@@ -355,16 +355,17 @@ def hand_urdf():
 
 def object_to_urdf(object):
     rgb = np.random.uniform(0, 1, 3)
+    I = 0.001
     link_urdf = odio_urdf.Link(object.name,
                   odio_urdf.Inertial(
                       odio_urdf.Origin(xyz=tuple(object.com), rpy=(0, 0, 0)),
                       odio_urdf.Mass(value=object.mass),
-                      odio_urdf.Inertia(ixx=0.001,
+                      odio_urdf.Inertia(ixx=I,
                                         ixy=0,
                                         ixz=0,
-                                        iyy=0.001,
+                                        iyy=I,
                                         iyz=0,
-                                        izz=0.001)
+                                        izz=I)
                   ),
                   odio_urdf.Collision(
                       odio_urdf.Origin(xyz=(0, 0, 0), rpy=(0, 0, 0)),
@@ -460,13 +461,24 @@ def get_adversarial_blocks():
                 com=Position(-0.0098, -0.049, 0),
                 color=Color(1, 0, 1))
     b3 = Object(name='block3',
-                dimensions=Dimensions(0.01, 0.1, 0.01),
+                dimensions=Dimensions(0.04, 0.12, 0.04),
                 mass=1.,
-                com=Position(0, 0.04, 0.),
+                com=Position(0, 0.05, 0.),
                 color=Color(0, 1, 1))
     b4 = Object(name='block4',
-                dimensions=Dimensions(0.06, 0.01, 0.02),
+                dimensions=Dimensions(0.12, 0.02, 0.04),
                 mass=1.,
-                com=Position(-0.029, 0, -0.004),
+                com=Position(-0.058, 0, -0.008),
                 color=Color(0, 1, 0))
     return [b1, b2, b3, b4]
+
+
+if __name__ == '__main__':
+    blocks = get_adversarial_blocks()
+
+    for r in rotation_group():
+        b = copy(blocks[0])
+        b.pose = Pose(ZERO_POS, Quaternion(*r.as_quat()))
+        b = get_rotated_block(b)
+
+        print(b.com, b.dimensions)

@@ -25,7 +25,7 @@ class PyBulletServer():
     def disconnect(self):
         p.disconnect(physicsClientId=self.client)
 
-    def load_urdf(self, urdf_name, pos, orn=(0., 0., 0., 1.)):
+    def load_urdf(self, urdf_name, pos, orn=(0., 0., 0., 1.)):   
         return p.loadURDF(urdf_name, pos, orn, physicsClientId=self.client)
 
     def get_pose(self, object_id):
