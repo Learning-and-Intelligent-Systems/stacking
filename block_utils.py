@@ -440,6 +440,8 @@ def get_rotated_block(block):
         new_block.com_filter = ParticleDistribution(
             r.apply(block.com_filter.particles), block.com_filter.weights)
 
+    new_block.rotation = block.pose.orn
+
     return new_block
 
 def rotation_group():

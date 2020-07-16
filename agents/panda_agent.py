@@ -12,6 +12,7 @@ from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
                         Quaternion, get_rotated_block, Pose, add_noise, \
                         Environment, Position 
 from pddlstream.algorithms.focused import solve_focused
+from pddlstream.utils import INF
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
@@ -129,7 +130,7 @@ class PandaAgent:
         print('Goal:', goal)
 
         if not self.teleport:
-            self._solve_and_execute_pddl(init, goal)
+            self._solve_and_execute_pddl(init, goal, max_time=30., search_sample_ratio=1000)
         else:
             goal_pose_fn = tamp.primitives.get_stable_gen_block()
             goal_pose = goal_pose_fn(pddl_block, 
@@ -148,8 +149,6 @@ class PandaAgent:
             # Save the result of the experiment after T steps of simulation.
             if tx == T-1:
                 end_pose = self._get_observed_pose(pddl_block, action)
-                # TODO: Add noise to the observation.
-
                 observation = (action, T, end_pose)
         
         # Put block back in original position.
@@ -169,7 +168,7 @@ class PandaAgent:
         print('Goal:', goal)
 
         if not self.teleport:
-            success = self._solve_and_execute_pddl(init, goal)
+            success = self._solve_and_execute_pddl(init, goal, max_time=30., search_sample_ratio=1000)
             if not success:
                 print('Plan failed: Teleporting block to intial position.')
                 pddl_block.set_base_link_pose(original_pose)
@@ -178,8 +177,74 @@ class PandaAgent:
 
         return observation
 
-    def simulate_tower(self):
-        pass
+    def simulate_tower(self, tower, vis, T, save_tower=False):
+        """
+        :param tower: list of belief blocks that are rotated to have no 
+                      orientation in the tower. These are in the order of 
+                      the tower starting at the base.
+        """
+        for block in tower:
+            print('Block:', block.name)
+            print('Pose:', block.pose)
+            print('Dims:', block.dimensions)
+            print('CoM:', block.com)
+            print('-----')
+
+        init = self._get_initial_pddl_state()
+        goal_terms = []
+
+        # Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn)
+        pddl_block_lookup = {}
+        for block in tower:
+            for pddl_block in self.pddl_blocks:
+                if block.name in pddl_block.get_name():
+                    pddl_block_lookup[block] = pddl_block
+
+        # TODO: Set base block to be rotated in its current position.
+        base_block = pddl_block_lookup[tower[0]]
+        base_pos = base_block.get_base_link_pose()[0]
+        table_z = self.table_pose.pose[0][2] + 1e-5
+        base_pose = ((base_pos[0], base_pos[1], table_z + tower[0].pose.pos.z), tower[0].rotation)
+
+        print(base_pose)
+        # base_block.set_base_link_pose(base_pose)
+        input('Continue?')
+
+        base_pose = pb_robot.vobj.BodyPose(pddl_block, base_pose)
+        init += [('Pose', base_block, base_pose),
+                 ('Supported', base_block, base_pose, self.table, self.table_pose)]
+        goal_terms.append(('AtPose', base_block, base_pose)) 
+        goal_terms.append(('On', base_block, self.table))
+
+        poses = [base_pose]
+        # TODO: Calculate each blocks pose relative to the block beneath.
+        for b_ix in range(1, len(tower)):
+            bottom_block = tower[b_ix-1]
+            bottom_pose = (bottom_block.pose.pos, bottom_block.rotation)
+            bottom_tform = pb_robot.geometry.tform_from_pose(bottom_pose)
+            top_block = tower[b_ix]
+            top_pose = (top_block.pose.pos, top_block.rotation)
+            top_tform = pb_robot.geometry.tform_from_pose(top_pose)
+
+            rel_tform = numpy.linalg.inv(bottom_tform)@top_tform
+            top_pddl = pddl_block_lookup[top_block]
+            bottom_pddl = pddl_block_lookup[bottom_block]
+
+            init += [('RelPose', top_pddl, bottom_pddl, rel_tform)]
+            goal_terms.append(('On', top_pddl, bottom_pddl))
+            # get_pose = tamp.primitives.get_stable_gen_block()
+            # pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
+            # poses.append(pose)
+            # #print(base_pose.pose)
+            # print(pose.pose)
+            # base_block.set_base_link_pose(base_pose.pose)
+            # top_pddl.set_base_link_pose(pose.pose)
+            # input('Continue?')
+
+        # TODO: Build PDDL Goal Spec with RelPose between all blocks.
+        goal = tuple(['and'] + goal_terms)
+        self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+
 
     def _get_observed_pose(self, pddl_block, action):
         """
@@ -200,15 +265,15 @@ class PandaAgent:
 
         return end_pose
 
-    def _solve_and_execute_pddl(self, init, goal):
+    def _solve_and_execute_pddl(self, init, goal, max_time=INF, search_sample_ratio=0.):
         self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
 
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem, 
                                    success_cost=numpy.inf, 
-                                   search_sample_ratio=1000.,
-                                   max_time=30.)
+                                   search_sample_ratio=search_sample_ratio,
+                                   max_time=max_time)
 
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
@@ -219,310 +284,3 @@ class PandaAgent:
             saved_world.restore()
             ExecuteActions(self.robot.arm, plan, pause=False)
             return True
-
-def test_observations(blocks, block_ix):
-    """
-    Test method to try placing the given blocks on the platform.
-    """
-    agent = PandaAgent(blocks, NOISE)
-    for r in list(rotation_group())[0:]:
-        action = PlaceAction(pos=None,
-                             rot=r,
-                             block=blocks[block_ix])
-        obs = agent.simulate_action(action, block_ix, T=50)
-        
-        # TODO: Check that the simulated observation agrees with the true observation.
-        particle_block = deepcopy(blocks[block_ix])
-        world = make_platform_world(particle_block, action)
-        env = Environment([world], vis_sim=False)
-
-        if False:
-            env.step(action=action)
-            length, lifeTime = 0.2, 0.0
-            pos = end_pose = world.get_pose(world.objects[1])[0]
-            quat = action.rot.as_quat()
-            new_x = transformation([length, 0.0, 0.0], pos, quat)
-            new_y = transformation([0.0, length, 0.0], pos, quat)
-            new_z = transformation([0.0, 0.0, length], pos, quat)
-
-            p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime)
-            p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime)
-            p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime)
-            input('Continue')
-
-        for _ in range(50):
-            env.step(action=action)
-        
-        end_pose = world.get_pose(world.objects[1])
-
-        
-
-        print('Simulated Pose:', end_pose)
-        print('TAMP Pose:', obs[2])
-
-        input('Continue?')
-
-def test_place_action(blocks, block_ix):
-    """
-    Test method to try placing the given blocks on the platform.
-    """
-    agent = PandaAgent(blocks, NOISE)
-    for r in list(rotation_group())[0:]:
-        
-        action = PlaceAction(pos=None,
-                             rot=r,
-                             block=blocks[block_ix])
-        agent.simulate_action(action, block_ix)
-        # p.disconnect()
-        # break
-
-def test_placement_ik(agent, blocks):
-    """
-    To make sure that the platform is in a good position, make sure the
-    IK is feasible for some grasp position.
-    """
-    get_block_pose = tamp.primitives.get_stable_gen_block([agent.table, agent.platform])
-    get_grasp = tamp.primitives.get_grasp_gen(agent.robot)
-    get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform, agent.table])
-    
-    for r in list(rotation_group()):
-        r = list(rotation_group())[4]
-        action = PlaceAction(pos=None,
-                             rot=r,
-                             block=blocks[0])
-        blocks[0].set_pose(Pose(ZERO_POS, Quaternion(*action.rot.as_quat())))
-        rotated_block = get_rotated_block(blocks[0])
-        x = action.pos[0]
-        y = action.pos[1]
-        z = agent.platform.get_dimensions()[2]/2 + rotated_block.dimensions[2]/2 + 1e-5
-        tform = numpy.array([[1., 0., 0., x],
-                             [0., 1., 0., y],
-                             [0., 0., 1., z],
-                             [0., 0., 0., 1.]])
-        tform[0:3, 0:3] = action.rot.as_matrix()
-
-        platform_pose = pb_robot.vobj.BodyPose(agent.platform, 
-                                               agent.platform.get_base_link_pose())
-        
-        start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[0], 
-                                            agent.pddl_blocks[0].get_base_link_pose())
-        placement_pose = get_block_pose(agent.pddl_blocks[0], 
-                              agent.platform, 
-                              platform_pose, 
-                              tform)[0]
-
-        ik_found = False
-        for grasp in get_grasp(agent.pddl_blocks[0]):
-            ik_start = get_ik(agent.pddl_blocks[0], start_pose, grasp[0])
-            ik_placement = get_ik(agent.pddl_blocks[0], placement_pose, grasp[0])
-            
-            if ik_start is not None:
-                print('Y', end='')
-            else:
-                print('N', end='')
-            
-            if ik_placement is not None:
-                ik_found = True
-                print('Y', end=' ')
-            else:
-                print('N', end=' ')
-
-        if ik_found:
-            print('Found IK.')
-        else:
-            print('No IK.')
-
-        break
-
-def test_table_pose_ik(agent, blocks):
-    """
-    To make sure that the platform is in a good position, make sure the
-    IK is feasible for some grasp position.
-    """
-    get_block_pose = tamp.primitives.get_stable_gen_table([agent.table, agent.platform])
-    get_grasp = tamp.primitives.get_grasp_gen(agent.robot)
-    get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform, agent.table])
-    
-    for r in list(rotation_group())[5:]:
-        
-        table_pose = pb_robot.vobj.BodyPose(agent.table, 
-                                            agent.table.get_base_link_pose())
-        
-        start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[0], 
-                                            agent.pddl_blocks[0].get_base_link_pose())
-        placement_pose = next(get_block_pose(agent.pddl_blocks[0], 
-                                             agent.table, 
-                                             table_pose, rotation=r))[0]
-
-        ik_found = False
-        for grasp in get_grasp(agent.pddl_blocks[0]):
-            ik_start = get_ik(agent.pddl_blocks[0], start_pose, grasp[0])
-           
-            
-            if ik_start is not None:
-                print('Y', end='')
-                agent.robot.arm.SetJointValues(ik_start[0].configuration)
-                import time
-                time.sleep(5)
-            else:
-                print('N', end='')
-                #continue
-            ik_placement = get_ik(agent.pddl_blocks[0], placement_pose, grasp[0])
-            if ik_placement is not None:
-                ik_found = True
-                print('Y', end=' ')
-                agent.robot.arm.SetJointValues(ik_placement[0].configuration)
-                import time
-                time.sleep(5)
-            else:
-                print('N', end=' ')
-        if ik_found:
-            print('Found IK.')
-        else:
-            print('No IK.')
-
-def visualize_grasps(agent, blocks):
-    """
-    Test method to visualize the grasps. Helps check for potential problems
-    due to collisions with table or underspecified grasp set.
-    """
-    get_block_pose = tamp.primitives.get_stable_gen_table([agent.table, agent.platform])
-    get_grasp = tamp.primitives.get_grasp_gen(agent.robot)
-    get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform, agent.table])
-    
-    for r in list(rotation_group())[5:]:
-        table_pose = pb_robot.vobj.BodyPose(agent.table, 
-                                            agent.table.get_base_link_pose())
-        pose = agent.pddl_blocks[0].get_base_link_pose()
-        pose = ((pose[0][0], pose[0][1], pose[0][2] + 0.2), pose[1])
-        start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[0], 
-                                            pose)
-        agent.pddl_blocks[0].set_base_link_pose(pose)
-        ix = 0
-        for grasp in list(get_grasp(agent.pddl_blocks[0])):
-            ik_start = get_ik(agent.pddl_blocks[0], start_pose, grasp[0])
-            import time
-            if ik_start is not None:
-                print(ix, 'Y')
-                agent.robot.arm.SetJointValues(ik_start[0].configuration)
-                import time
-                time.sleep(2)
-            else:
-                print(ix, 'N')
-            ix += 1
-
-def check_ungraspable_block(agent):
-
-    platform_pose = agent.platform.get_base_link_pose()
-    for pddl_block in agent.pddl_blocks:
-        block_pose = pddl_block.get_base_link_pose()
-
-
-def test_return_to_start(blocks, n_placements=5, rot_ix=0, block_ix=1):
-    """
-    Let a block fall off the platform and check that we can successfully 
-    pick it up and return it to the starting position.
-    """
-    numpy.random.seed(10)
-    rot = list(rotation_group())[rot_ix]
-    for _ in range(n_placements):
-        # Create agent.
-        agent = PandaAgent(blocks)
-        original_pose = agent.pddl_blocks[block_ix].get_base_link_pose()
-        # Create a random action.
-        new_dims = numpy.abs(rot.apply(blocks[block_ix].dimensions))
-        place_pos = new_dims*(-0.5*numpy.random.rand(3))
-        x, y, _ = place_pos + numpy.array(agent.platform.get_dimensions())/2
-        action = PlaceAction(pos=None,
-                             rot=rot,
-                             block=blocks[block_ix])
-
-        # Teleport block to platform.
-        blocks[block_ix].set_pose(Pose(ZERO_POS, Quaternion(*action.rot.as_quat())))
-        rotated_block = get_rotated_block(blocks[block_ix])
-        platform_pose = agent.platform.get_base_link_pose()
-        platform_tform = pb_robot.geometry.tform_from_pose(platform_pose)
-        z = agent.platform.get_dimensions()[2]/2 + rotated_block.dimensions[2]/2 + 1e-5
-        tform = numpy.array([[1., 0., 0., action.pos[0]],
-                             [0., 1., 0., action.pos[1]],
-                             [0., 0., 1., z],
-                             [0., 0., 0., 1.]])
-        tform[0:3, 0:3] = action.rot.as_matrix()
-        body_tform = platform_tform@tform
-        pose = pb_robot.geometry.pose_from_tform(body_tform)        
-
-        agent.pddl_blocks[block_ix].set_base_link_pose(pose)
-
-        # Execute action.
-        p.setGravity(0,0,-10)
-        for _ in range(500):
-            p.stepSimulation()
-            time.sleep(0.01)
-
-        check_ungraspable_block(agent)
-
-        # Solve PDDL Problem.
-        pddl_block = agent.pddl_blocks[block_ix]
-        init = agent._get_initial_pddl_state()
-        goal_pose = pb_robot.vobj.BodyPose(pddl_block, original_pose)
-        init += [('Pose', pddl_block, goal_pose),
-                 ('Supported', pddl_block, goal_pose, agent.table, agent.table_pose)]
-        goal = ('and', ('AtPose', pddl_block, goal_pose), 
-                       ('On', pddl_block, agent.table))
-        
-        # Solve the PDDLStream problem.
-        print('Init:', init)
-        print('Goal:', goal)
-        agent._solve_and_execute_pddl(init, goal)
-
-        p.disconnect()
-
-def test_placement_on_platform(agent):
-    """
-    Tests setting up a PDDL problem with each block on the platform.
-    Intended to ensure the given domain/stream can complete the experiment
-    setup.
-    """
-    init = agent._get_initial_pddl_state()
-    
-    # Create the problem for one block on the platform.
-    tform = numpy.array([[1., 0., 0., 0.],
-                         [0., 1., 0., 0.],
-                         [0., 0., 1., 0.1],
-                         [0., 0., 0., 1.]])
-    init += [('RelPose', agent.pddl_blocks[1], agent.platform, tform)]
-    goal = ('On', agent.pddl_blocks[1], agent.platform)
-
-    print('Blocks:', [b.get_name() for b in agent.pddl_blocks])
-    print('Init:', init)
-    print('Goal:', goal)
-    agent.robot.arm.hand.Open()
-    saved_world = pb_robot.utils.WorldSaver()
-
-    pddlstream_problem = tuple([*agent.pddl_info, init, goal])
-    plan, cost, evaluations = solve_focused(pddlstream_problem, success_cost=numpy.inf)
-
-    if plan is None:
-        print("No plan found")
-    else:
-        saved_world.restore()
-        input("Execute?")
-        ExecuteActions(agent.robot.arm, plan)
-
-NOISE=0.00005
-if __name__ == '__main__':
-    # TODO: Test the panda agent.
-    blocks = get_adversarial_blocks()
-
-    # agent = PandaAgent(blocks)
-    # visualize_grasps(agent, blocks)
-    #test_table_pose_ik(agent, blocks)
-    # test_placement_ik(agent, blocks)
-    # input('Continue?')
-    #test_place_action(blocks, 1)
-    test_observations(blocks, 1)
-    #test_return_to_start(blocks, rot_ix=3)
-    #test_placement_on_platform(agent)
-
-    time.sleep(5.0)
-    pb_robot.utils.disconnect()

@@ -43,10 +43,8 @@ class TeleportAgent:
                           save_tower=save_tower)
         for _ in range(T):
             env.step(vis_frames=vis)
-            
+
         env.disconnect()
         env.cleanup()
 
         return world.get_poses()
-
-

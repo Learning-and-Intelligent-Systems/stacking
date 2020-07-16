@@ -23,7 +23,6 @@ def main(args):
 
     # construct a world containing those blocks
     for b_ix, block in enumerate(blocks):
-        # new code
         print('Running filter for', block.name)
         belief = ParticleBelief(block, 
                                 N=200, 
