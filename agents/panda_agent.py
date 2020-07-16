@@ -230,7 +230,9 @@ class PandaAgent:
             top_pddl = pddl_block_lookup[top_block]
             bottom_pddl = pddl_block_lookup[bottom_block]
 
+            init = self._get_initial_pddl_state()
             init += [('RelPose', top_pddl, bottom_pddl, rel_tform)]
+            goal_terms = []
             goal_terms.append(('On', top_pddl, bottom_pddl))
             # get_pose = tamp.primitives.get_stable_gen_block()
             # pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -241,9 +243,9 @@ class PandaAgent:
             # top_pddl.set_base_link_pose(pose.pose)
             # input('Continue?')
 
-        # TODO: Build PDDL Goal Spec with RelPose between all blocks.
-        goal = tuple(['and'] + goal_terms)
-        self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+            # TODO: Build PDDL Goal Spec with RelPose between all blocks.
+            goal = tuple(['and'] + goal_terms)
+            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
 
 
     def _get_observed_pose(self, pddl_block, action):
