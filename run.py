@@ -14,7 +14,7 @@ def main(args):
     NOISE=0.00005
 
     # get a bunch of random blocks
-    blocks = get_adversarial_blocks()
+    blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
     if args.agent == 'teleport':
         agent = TeleportAgent(blocks, NOISE)
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('--vis', action='store_true')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--plot', action='store_true')
-    parser.add_argument('--num_blocks', type=int, default=3)
+    parser.add_argument('--num-blocks', type=int, default=3)
     parser.add_argument('--save-tower', action='store_true')
     parser.add_argument('--agent', choices=['teleport', 'panda'], default='teleport')
     args = parser.parse_args()
