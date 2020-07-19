@@ -48,6 +48,28 @@ class PyBulletServer():
         p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=self.client)
         p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=self.client)
 
+    def vis_particle_belief(self, obj, alpha=0.5, length=0.01, lifeTime=0.04):
+        """ Turns the block slightly transparent and visualizes the COM
+        particle filter using addUserDebugLine
+        """
+        # only try to draw the COM filter it it exists for this block
+        if obj.com_filter:
+            # make the block transparent
+            red = obj.color.r
+            green = obj.color.g
+            blue = obj.color.b
+            p.changeVisualShape(obj.id, -1, rgbaColor=[red, green, blue, alpha])
+
+            # and draw each particle using userDebugLine
+            obj_pos, obj_quat = self.get_pose(obj.id) # get the pose of the object
+            delta = np.array([length/2., 0, 0]) # define a small length to give the line
+
+            for particle_pos, particle_weight in zip(*obj.com_filter):
+                line_from = transformation(particle_pos + delta, obj_pos, obj_quat)
+                line_to = transformation(particle_pos - detla, obj_pos, obj_quat)
+                color = np.ones(3)*particle_weight
+                p.addUserDebugLine(line_from, line_to, color, lifeTime=lifeTime, physicsClientId=self.client)
+
 def pause():
     try:
         print('press any key to continue execution')

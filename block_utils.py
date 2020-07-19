@@ -241,6 +241,8 @@ class Environment:
                         if vis_frames:
                             pos, quat = self.pybullet_server.get_pose(obj_id)
                             self.pybullet_server.vis_frame(pos, quat)
+                            # NOTE(izzy): I haven't tested this yet!
+                            self.pybullet_server.vis_particles(obj)
                     world_i += 1
 
         if save_tower:

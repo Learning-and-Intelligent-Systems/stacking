@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 from actions import plan_action
 from agents.teleport_agent import TeleportAgent
+from agents.panda_agent import PandaAgent
 from block_utils import Object, Dimensions, Position, Color, get_adversarial_blocks
 from particle_belief import ParticleBelief
 from tower_planner import TowerPlanner
@@ -18,6 +19,8 @@ def main(args):
 
     if args.agent == 'teleport':
         agent = TeleportAgent(blocks, NOISE)
+    elif args.agent == 'panda':
+        agent = PandaAgent(blocks, NOISE)
     else:
         raise NotImplementedError()
 
