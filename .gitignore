@@ -4,5 +4,8 @@ __pycache__/
 *.pyc
 *.mov
 venv/
-pb_robot/
-pddlstream/
+pb_robot
+pddlstream
+statistics
+temp
+tower-*
