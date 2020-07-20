@@ -66,7 +66,7 @@ def test_place_action(blocks, block_ix):
     """
     Test method to try placing the given blocks on the platform.
     """
-    agent = PandaAgent(blocks, NOISE)
+    agent = PandaAgent(blocks, NOISE, teleport=True)
     for r in list(rotation_group())[0:]:
         
         action = PlaceAction(pos=None,
@@ -134,46 +134,47 @@ def test_placement_ik(agent, blocks):
 
         break
 
-def test_table_pose_ik(agent, blocks):
+def test_table_pose_ik(agent, blocks, block_ix=3):
     """
     To make sure that the platform is in a good position, make sure the
     IK is feasible for some grasp position.
     """
-    get_block_pose = tamp.primitives.get_stable_gen_table([agent.table, agent.platform])
+    get_block_pose = tamp.primitives.get_stable_gen_table([agent.table, agent.platform_leg, agent.platform_table])
     get_grasp = tamp.primitives.get_grasp_gen(agent.robot)
-    get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform, agent.table])
+    get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform_leg, agent.platform_table, agent.table])
     
-    for r in list(rotation_group())[5:]:
-        
-        table_pose = pb_robot.vobj.BodyPose(agent.table, 
+    table_pose = pb_robot.vobj.BodyPose(agent.table, 
                                             agent.table.get_base_link_pose())
         
-        start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[0], 
-                                            agent.pddl_blocks[0].get_base_link_pose())
-        placement_pose = next(get_block_pose(agent.pddl_blocks[0], 
-                                             agent.table, 
-                                             table_pose, rotation=r))[0]
-
+    start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[block_ix], 
+                                        agent.pddl_blocks[block_ix].get_base_link_pose())
+    placement_poses = get_block_pose(agent.pddl_blocks[block_ix], 
+                                            agent.table, 
+                                            table_pose)
+    print(len(placement_poses))
+    for placement_pose in placement_poses:
+        placement_pose = placement_pose[0]
         ik_found = False
-        for grasp in get_grasp(agent.pddl_blocks[0]):
-            ik_start = get_ik(agent.pddl_blocks[0], start_pose, grasp[0])
+        for grasp in get_grasp(agent.pddl_blocks[block_ix]):
+            ik_start = get_ik(agent.pddl_blocks[block_ix], start_pose, grasp[0])
            
             
             if ik_start is not None:
                 print('Y', end='')
                 agent.robot.arm.SetJointValues(ik_start[0].configuration)
-                import time
-                time.sleep(5)
+                # import time
+                # time.sleep(5)
             else:
                 print('N', end='')
-                #continue
-            ik_placement = get_ik(agent.pddl_blocks[0], placement_pose, grasp[0])
+                continue
+
+            ik_placement = get_ik(agent.pddl_blocks[block_ix], placement_pose, grasp[0], bprint=True)
             if ik_placement is not None:
                 ik_found = True
                 print('Y', end=' ')
-                agent.robot.arm.SetJointValues(ik_placement[0].configuration)
-                import time
-                time.sleep(5)
+                # agent.robot.arm.SetJointValues(ik_placement[0].configuration)
+                # import time
+                # time.sleep(5)
             else:
                 print('N', end=' ')
         if ik_found:
@@ -186,21 +187,21 @@ def visualize_grasps(agent, blocks):
     Test method to visualize the grasps. Helps check for potential problems
     due to collisions with table or underspecified grasp set.
     """
-    get_block_pose = tamp.primitives.get_stable_gen_table([agent.table, agent.platform])
+    get_block_pose = tamp.primitives.get_stable_gen_table([agent.table, agent.platform_leg, agent.platform_table])
     get_grasp = tamp.primitives.get_grasp_gen(agent.robot)
-    get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform, agent.table])
+    get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform_leg, agent.platform_table, agent.table])
     
     for r in list(rotation_group())[5:]:
         table_pose = pb_robot.vobj.BodyPose(agent.table, 
                                             agent.table.get_base_link_pose())
-        pose = agent.pddl_blocks[0].get_base_link_pose()
-        pose = ((pose[0][0], pose[0][1], pose[0][2] + 0.2), pose[1])
-        start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[0], 
+        pose = agent.pddl_blocks[3].get_base_link_pose()
+        pose = ((pose[0][0], pose[0][1], pose[0][2]), pose[1])
+        start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[3], 
                                             pose)
-        agent.pddl_blocks[0].set_base_link_pose(pose)
+        agent.pddl_blocks[3].set_base_link_pose(pose)
         ix = 0
-        for grasp in list(get_grasp(agent.pddl_blocks[0])):
-            ik_start = get_ik(agent.pddl_blocks[0], start_pose, grasp[0])
+        for grasp in list(get_grasp(agent.pddl_blocks[3])):
+            ik_start = get_ik(agent.pddl_blocks[3], start_pose, grasp[0])
             import time
             if ik_start is not None:
                 print(ix, 'Y')
@@ -324,22 +325,22 @@ def test_tower_simulation(blocks):
     tallest_tower = tp.plan(blocks, num_samples=10)
 
     # and visualize the result
-    agent.simulate_tower(tallest_tower, vis=True, T=250)
+    agent.simulate_tower(tallest_tower, vis=True, T=2500)
 
 NOISE=0.00005
 if __name__ == '__main__':
     # TODO: Test the panda agent.
     blocks = get_adversarial_blocks()
 
-    # agent = PandaAgent(blocks)
-    # visualize_grasps(agent, blocks)
+    #agent = PandaAgent(blocks, NOISE)
+    #visualize_grasps(agent, blocks)
     #test_table_pose_ik(agent, blocks)
     # test_placement_ik(agent, blocks)
     # input('Continue?')
-    #test_place_action(blocks, 3)
+    test_place_action(blocks, 3)
     #test_observations(blocks, 1)
     #test_return_to_start(blocks, rot_ix=3)
     #test_placement_on_platform(agent)
-    test_tower_simulation(blocks)
+    #test_tower_simulation(blocks)
     time.sleep(5.0)
     pb_robot.utils.disconnect()

@@ -35,7 +35,7 @@ def get_fixed(robot, movable):
     fixed = [body for body in rigid if body.id not in movable_ids]
     return fixed
 
-def ExecuteActions(manip, plan, pause=True):
+def ExecuteActions(manip, plan, pause=True, wait=True):
     for name, args in plan:
         pb_robot.viz.remove_all_debug()
         bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
@@ -45,9 +45,9 @@ def ExecuteActions(manip, plan, pause=True):
         executionItems = args[-1]
         for e in executionItems:
             e.simulate()
-            if pause:
+            if wait:
                 input("Next?")
-            else:
+            elif pause:
                 time.sleep(0.5)
 
 def ComputePrePose(og_pose, directionVector, relation=None):
@@ -70,7 +70,7 @@ def create_pb_robot_urdf(obj, fname):
     pb_path = os.path.join(pb_urdf_folder, fname)
     return pb_path
 
-def setup_panda_world(robot, blocks):
+def setup_panda_world(robot, blocks, poses=None):
     # Adjust robot position such that measurements match real robot reference frame
     robot_pose = numpy.eye(4)
     robot_pose[2, 3] -= 0.1
@@ -95,21 +95,25 @@ def setup_panda_world(robot, blocks):
     pddl_table.set_point([0.2, 0, -0.11])
 
     # Set the initial positions randomly on table.
-    for ix, block in enumerate(pddl_blocks):
-        while True:
-            z = pb_robot.placements.stable_z(block, pddl_table)
-            x = numpy.random.uniform(0.4, 0.7)
-            y = numpy.random.uniform(0.1, 0.4)
-            block.set_base_link_point([x, y, z])
+    if poses is None:
+        for ix, block in enumerate(pddl_blocks):
+            while True:
+                z = pb_robot.placements.stable_z(block, pddl_table)
+                x = numpy.random.uniform(0.4, 0.7) # 0.4 0.7
+                y = numpy.random.uniform(0.1, 0.4) # 0.1 0.4
+                block.set_base_link_point([x, y, z])
 
-            # Check that there is no collision with already placed blocks.
-            collision = False
-            for jx in range(0, ix):
-                if pb_robot.collisions.body_collision(block, pddl_blocks[jx], max_distance=0.075):
-                    collision = True
-            if collision:
-                continue
-            break
+                # Check that there is no collision with already placed blocks.
+                collision = False
+                for jx in range(0, ix):
+                    if pb_robot.collisions.body_collision(block, pddl_blocks[jx], max_distance=0.075):
+                        collision = True
+                if collision:
+                    continue
+                break
+    else:
+        for block, pose in zip(pddl_blocks, poses):
+            block.set_base_link_pose(pose)
 
     # Setup platform.
     platform, leg = Object.platform()
@@ -138,7 +142,7 @@ def get_pddlstream_info(robot, fixed, movable):
     stream_map = {
         'sample-pose-table': from_gen_fn(primitives.get_stable_gen_table(fixed)),
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
-        'sample-grasp': from_gen_fn(primitives.get_grasp_gen(robot)),
+        'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot)),
         'inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed)), 
         'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
         'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
