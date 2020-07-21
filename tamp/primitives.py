@@ -39,8 +39,19 @@ def get_stable_gen_table(fixed=[]):
         can be specified for debugging.
         """
         all_rotations = list(rotation_group()) + [R.from_euler('zyx', [0., -numpy.pi/2, 0.])]
+        
+        # These poses are useful for regrasping. Poses are more useful for grasping
+        # if they are upright.
+        dims = body.get_dimensions()
+        if dims[1] > dims[0]:
+            all_rotations = [R.from_euler('zyx', [0., 0., numpy.pi/2]),
+                             R.from_euler('zyx', [0., 0., -numpy.pi/2])]
+        else:
+            all_rotations = [R.from_euler('zyx', [0., -numpy.pi/2, 0.]),
+                             R.from_euler('zyx', [0., numpy.pi/2, 0.])]
+        
         while True:
-            for rotation in all_rotations[2:]:
+            for rotation in all_rotations:
                 pose = (ZERO_POS, rotation.as_quat())
                 pose = pb_robot.placements.sample_placement(body, surface, top_pose=pose) 
                 
