@@ -66,8 +66,8 @@ def test_place_action(blocks, block_ix):
     """
     Test method to try placing the given blocks on the platform.
     """
-    agent = PandaAgent(blocks, NOISE, teleport=True)
-    for r in list(rotation_group())[0:]:
+    agent = PandaAgent(blocks, NOISE, teleport=False)
+    for r in list(rotation_group())[5:]:
         
         action = PlaceAction(pos=None,
                              rot=r,
@@ -151,7 +151,6 @@ def test_table_pose_ik(agent, blocks, block_ix=3):
     placement_poses = get_block_pose(agent.pddl_blocks[block_ix], 
                                             agent.table, 
                                             table_pose)
-    print(len(placement_poses))
     for placement_pose in placement_poses:
         placement_pose = placement_pose[0]
         ik_found = False
@@ -168,13 +167,16 @@ def test_table_pose_ik(agent, blocks, block_ix=3):
                 print('N', end='')
                 continue
 
-            ik_placement = get_ik(agent.pddl_blocks[block_ix], placement_pose, grasp[0], bprint=True)
+            ik_placement = get_ik(agent.pddl_blocks[block_ix], placement_pose, grasp[0])
             if ik_placement is not None:
                 ik_found = True
                 print('Y', end=' ')
-                # agent.robot.arm.SetJointValues(ik_placement[0].configuration)
-                # import time
-                # time.sleep(5)
+                agent.execute()
+                print(ik_placement)
+                agent.execution_robot.arm.SetJointValues(ik_placement[1][0].path[-1])
+                agent.plan()
+                import time
+                time.sleep(5)
             else:
                 print('N', end=' ')
         if ik_found:
@@ -337,7 +339,7 @@ if __name__ == '__main__':
     #test_table_pose_ik(agent, blocks)
     # test_placement_ik(agent, blocks)
     # input('Continue?')
-    test_place_action(blocks, 3)
+    test_place_action(blocks, 0)
     #test_observations(blocks, 1)
     #test_return_to_start(blocks, rot_ix=3)
     #test_placement_on_platform(agent)

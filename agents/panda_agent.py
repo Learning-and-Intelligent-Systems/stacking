@@ -199,7 +199,7 @@ class PandaAgent:
         print('Goal:', goal)
 
         if not self.teleport:
-            success = self._solve_and_execute_pddl(init, goal, max_time=30., search_sample_ratio=1000)
+            success = self._solve_and_execute_pddl(init, goal, max_time=60., search_sample_ratio=1000)
             if not success:
                 print('Plan failed: Teleporting block to intial position.')
                 self.teleport_block(pddl_block, original_pose)

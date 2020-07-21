@@ -95,7 +95,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
             q_grasp = robot.arm.ComputeIK(grasp_worldF, seed_q=q_approach)
             if (q_grasp is None) or not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
                 continue
-
+            
             path = robot.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
             if path is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
