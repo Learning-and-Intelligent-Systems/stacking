@@ -38,7 +38,11 @@ class ParticleBelief(BeliefBase):
         if self.plot:
             plt.ion()
             fig = plt.figure()
+            fig.set_size_inches((4,4))
             self.ax = Axes3D(fig)
+            self.setup_ax(self.ax, self.block)
+            self.plot_particles(self.ax, self.particles.particles, self.particles.weights)
+
 
     def setup(self):
         self.com_ranges = get_com_ranges(self.block)
@@ -48,13 +52,14 @@ class ParticleBelief(BeliefBase):
 
     def setup_ax(self, ax, obj):
         ax.clear()
-        halfdim = max(obj.dimensions)
+        halfdim = max(obj.dimensions)/2
         ax.set_xlim(-halfdim, halfdim)
         ax.set_ylim(-halfdim, halfdim)
         ax.set_zlim(-halfdim, halfdim)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.set_zlabel('z')
+        ax.set_title(obj.name + ' Center of Mass')
         ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
         ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
         ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
@@ -64,9 +69,8 @@ class ParticleBelief(BeliefBase):
             alpha = 0.25 + 0.75 * weight
             ax.scatter(*particle, s=10, color=(0, 0, 1), alpha=alpha)
 
-        ax.scatter(*self.block.com, s=10, color=(1,0,0))
-        ax.set_title('Particle Dist')  # need to stop from scrolling down figure
-        #ax.view_init(elev=100., azim=0.0)  # top down view of x-y plane
+        ax.scatter(*self.block.com, s=10, color=(1,0,0), label='True CoM')
+        ax.legend()
 
         plt.draw()
         plt.pause(0.1)
@@ -107,18 +111,10 @@ class ParticleBelief(BeliefBase):
 
         if self.plot:
             # visualize particles (it's very slow)
-            #plt.ion()
-            #fig = plt.figure()
-            #self.ax = Axes3D(fig)
             self.setup_ax(self.ax, self.block)
             self.plot_particles(self.ax, self.particles.particles, new_weights)
 
         mean = np.array(self.particles.particles).T@np.array(self.particles.weights)
-        # print('Mean COM', mean, np.diag(np.cov(self.particles.particles, rowvar=False, aweights=self.particles.weights+1e-3)))
-
-        # if self.block.com is not None:
-        #     print('True COM', self.block.com)
-        #     print('Error COM', np.linalg.norm(self.block.com-mean))
 
         self.estimated_coms.append(mean)
 

@@ -53,6 +53,13 @@ class PandaAgent:
         self.noise = noise
         self.teleport = teleport
 
+        self.txt_id = None
+
+    def _add_text(self, txt):
+        self.execute()
+        pb_robot.viz.remove_all_debug()
+        self.txt_id = pb_robot.viz.add_text(txt, position=(0, 0.25, 0.75), size=2)
+        self.plan()
 
     def execute(self):
         pb_robot.aabb.set_client(self._execution_client_id)
@@ -60,6 +67,7 @@ class PandaAgent:
         pb_robot.joint.set_client(self._execution_client_id)
         pb_robot.link.set_client(self._execution_client_id)
         pb_robot.utils.set_client(self._execution_client_id)
+        pb_robot.viz.set_client(self._execution_client_id)
 
     def plan(self):
         pb_robot.aabb.set_client(self._planning_client_id)
@@ -67,6 +75,7 @@ class PandaAgent:
         pb_robot.joint.set_client(self._planning_client_id)
         pb_robot.link.set_client(self._planning_client_id)
         pb_robot.utils.set_client(self._planning_client_id)
+        pb_robot.viz.set_client(self._planning_client_id)
 
     def _get_initial_pddl_state(self):
         """
@@ -156,7 +165,7 @@ class PandaAgent:
         print('Goal:', goal)
 
         if not self.teleport:
-            self._solve_and_execute_pddl(init, goal, max_time=30., search_sample_ratio=1000)
+            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000)
         else:
             goal_pose_fn = tamp.primitives.get_stable_gen_block()
             goal_pose = goal_pose_fn(pddl_block, 
@@ -233,7 +242,7 @@ class PandaAgent:
         # TODO: Set base block to be rotated in its current position.
         base_block = pddl_block_lookup[tower[0]]
         base_pos = base_block.get_base_link_pose()[0]
-        table_z = self.table_pose.pose[0][2] + 1e-5
+        table_z = self.table_pose.pose[0][2] #+ 1e-5
         base_pos = (0., 0.5, 0.)
         base_pose = ((base_pos[0], base_pos[1], table_z + tower[0].pose.pos.z), tower[0].rotation)
 
@@ -331,6 +340,7 @@ class PandaAgent:
         return end_pose
 
     def _solve_and_execute_pddl(self, init, goal, max_time=INF, search_sample_ratio=0.):
+        self._add_text('Planning block placement')
         self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
         
@@ -339,13 +349,12 @@ class PandaAgent:
                                    success_cost=numpy.inf, 
                                    search_sample_ratio=search_sample_ratio,
                                    max_time=max_time)
-        
+        self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
             print("No plan found")
             return False
         else:
-            # TODO: Have this execute instead of prompt for input.
             saved_world.restore()
             self.execute()
             ExecuteActions(self.execution_robot.arm, plan, pause=True, wait=False)

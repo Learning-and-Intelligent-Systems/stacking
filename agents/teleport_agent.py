@@ -41,6 +41,7 @@ class TeleportAgent:
                           vis_sim=vis, 
                           use_hand=False, 
                           save_tower=save_tower)
+                          
         for _ in range(T):
             env.step(vis_frames=vis)
 

@@ -37,10 +37,10 @@ def get_fixed(robot, movable):
 
 def ExecuteActions(manip, plan, pause=True, wait=True):
     for name, args in plan:
-        pb_robot.viz.remove_all_debug()
-        bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
-        txt = '{} - {}'.format(name, bodyNames)
-        pb_robot.viz.add_text(txt, position=(0, 0.25, 0.5), size=2)
+        # pb_robot.viz.remove_all_debug()
+        # bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
+        # txt = '{} - {}'.format(name, bodyNames)
+        # pb_robot.viz.add_text(txt, position=(0, 0.25, 0.5), size=2)
 
         executionItems = args[-1]
         for e in executionItems:

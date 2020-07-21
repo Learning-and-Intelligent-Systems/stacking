@@ -51,7 +51,6 @@ def get_stable_gen_table(fixed=[]):
                 body.set_base_link_pose(start_pose)
                 body_pose = pb_robot.vobj.BodyPose(body, pose)
                 yield (body_pose,)
-        return poses
 
     return gen
 
@@ -74,7 +73,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
-        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.05])
+        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125])
 
         if False:
             length, lifeTime = 0.2, 0.0
