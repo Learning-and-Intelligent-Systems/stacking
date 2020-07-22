@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 *.mov
 venv/
+movies
 pb_robot
 pddlstream
 statistics
