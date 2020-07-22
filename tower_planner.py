@@ -134,6 +134,7 @@ class TowerPlanner(PlannerBase):
         n = len(blocks)
         max_height = 0
         max_tower = []
+
         # for each ordering of blocks
         for tower in permutations(blocks):
             # for each combination of rotations

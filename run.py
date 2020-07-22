@@ -20,7 +20,7 @@ def main(args):
     if args.agent == 'teleport':
         agent = TeleportAgent(blocks, NOISE)
     elif args.agent == 'panda':
-        agent = PandaAgent(blocks, NOISE, teleport=False)
+        agent = PandaAgent(blocks, NOISE, teleport=True)
     else:
         raise NotImplementedError()
 
@@ -36,8 +36,8 @@ def main(args):
         print('Running filter for', block.name)
         for interaction_num in range(5):
             print("Interaction number: ", interaction_num)
-            action = plan_action(belief, exp_type='random', action_type='place')
-            observation = agent.simulate_action(action, b_ix)
+            action = plan_action(belief, exp_type='reduce_var', action_type='place')
+            observation = agent.simulate_action(action, b_ix, T=50)
             # agent._add_text('Updating particle belief')
             belief.update(observation)
             block.com_filter = belief.particles

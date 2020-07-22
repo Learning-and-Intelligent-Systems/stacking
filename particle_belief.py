@@ -183,8 +183,8 @@ if __name__ == '__main__':
             print('----------')
             # print(belief.particles.particles[::4, :])
             print("Interaction number: ", interaction_num)
-            action = plan_action(belief, exp_type='random', action_type='place')
-            observation = agent.simulate_action(action, b_ix, vis_sim=False)
+            action = plan_action(belief, exp_type='reduce_var', action_type='place')
+            observation = agent.simulate_action(action, b_ix, T=50, vis_sim=False)
             belief.update(observation)
             block.com_filter = belief.particles  
 

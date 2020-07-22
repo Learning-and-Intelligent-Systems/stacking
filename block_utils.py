@@ -218,11 +218,11 @@ class Environment:
                     if use_hand:
                         with open(self.tmp_dir+'/hand_'+ str(world_i) + '.urdf', 'w') as handle:
                             handle.write(str(hand_urdf()))
-                        hand_pose = Position(x=x_pos, y=y_pos-0.25, z=0.25)
+                        hand_pose = Position(x=x_pos, y=y_pos-0.25, z=2.25)
                         hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf',
                                                             hand_pose)
                         self.worlds[world_i].set_hand_id(hand_id)
-                        self.worlds[world_i].set_hand_pos(Position(x=0, y=-0.25, z=0.25),
+                        self.worlds[world_i].set_hand_pos(Position(x=0, y=-0.25, z=2.25),
                                                           self.pybullet_server.client)
 
                     for obj in self.worlds[world_i].objects:
