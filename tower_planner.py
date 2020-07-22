@@ -15,15 +15,21 @@ from itertools import permutations, combinations_with_replacement
 # lot more tricky if we want to place blocks adjacent to eachother
 
 class TowerPlanner(PlannerBase):
-    def __init__(self, stability_mode='angle'):
+    def __init__(self, stability_mode='angle', plan_mode='confidence'):
         """
         Keyword Arguments:
             stability_mode {str} -- set the mode for checking stability
                 'angle': check the angle from the pivot to the top COM
                 'contains': check whether the top COM is in the bottom geom
+            plan_mode {str} -- set the mode for the tower planning objective
+                'expectation': build the tallest tower in expectation
+                'confidence':  bulid the tallest tower with a certain stability
         """
         self.stability_mode = stability_mode
-        self.angle_eps = 3 # degrees
+        self.plan_mode = plan_mode
+
+        self.angle_thresh = 3    # degrees
+        self.confidence_thresh = 0.9 # how likely is the tallest tower stable
 
 
     def tower_is_stable(self, tower):
@@ -107,7 +113,7 @@ class TowerPlanner(PlannerBase):
             angles = np.degrees(np.arctan2(y, xs))
             # and check stability
             print(angles)
-            return (angles < 90 - self.angle_eps).all()
+            return (angles < 90 - self.angle_thresh).all()
         else:
             # Check if the COM of the top object is within the dimensions of the bottom
             # object. We assume that the two objects are in static planar contact in z,
@@ -154,7 +160,6 @@ class TowerPlanner(PlannerBase):
         height = np.sum([block.dimensions.z for block in tower])
         p_stable = stable_count / float(num_samples)
         return height, p_stable
-        return height * p_stable
 
     def plan(self, blocks, num_samples=100):
         """ Finds the tallest tower in expectation given uncertainy over COM
@@ -186,10 +191,17 @@ class TowerPlanner(PlannerBase):
                 # simulate_tower(stacked_tower, vis=True, T=25)
                 # and check the expected height of this particular tower
                 height, p_stable = self.calc_expected_height(stacked_tower, num_samples=num_samples)
+
                 # save the tallest tower
-                if height > max_height and p_stable > 0.9:
-                    max_tower = stacked_tower
-                    max_height = height
+                if self.plan_mode == 'confidence':
+                    if height > max_height and p_stable > self.confidence_thresh:
+                        max_tower = stacked_tower
+                        max_height = height
+                else:
+                    expected_height = height * p_stable
+                    if expected_height > max_height:
+                        max_tower = stacked_tower
+                        max_height = height
 
         return max_tower
 
