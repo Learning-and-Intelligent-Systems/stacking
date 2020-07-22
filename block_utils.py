@@ -218,11 +218,11 @@ class Environment:
                     if use_hand:
                         with open(self.tmp_dir+'/hand_'+ str(world_i) + '.urdf', 'w') as handle:
                             handle.write(str(hand_urdf()))
-                        hand_pose = Position(x=x_pos, y=y_pos-0.25, z=0.25)
+                        hand_pose = Position(x=x_pos, y=y_pos-0.25, z=2.25)
                         hand_id = self.pybullet_server.load_urdf(self.tmp_dir+'/hand_'+str(world_i)+'.urdf',
                                                             hand_pose)
                         self.worlds[world_i].set_hand_id(hand_id)
-                        self.worlds[world_i].set_hand_pos(Position(x=0, y=-0.25, z=0.25),
+                        self.worlds[world_i].set_hand_pos(Position(x=0, y=-0.25, z=2.25),
                                                           self.pybullet_server.client)
 
                     for obj in self.worlds[world_i].objects:
@@ -457,12 +457,12 @@ def get_adversarial_blocks(num_blocks=4):
     b1 = Object(name='block1',
                 dimensions=Dimensions(0.02, 0.1, 0.02),
                 mass=1.,
-                com=Position(0.009, 0.049, 0),
+                com=Position(0.0075, 0.0475, 0),
                 color=Color(0, 0, 1))
     b2 = Object(name='block2',
                 dimensions=Dimensions(0.02, 0.1, 0.02),
                 mass=1.,
-                com=Position(-0.0098, -0.049, 0),
+                com=Position(-0.0075, -0.0475, 0),
                 color=Color(1, 0, 1))
     b3 = Object(name='block3',
                 dimensions=Dimensions(0.04, 0.12, 0.04),
@@ -472,7 +472,7 @@ def get_adversarial_blocks(num_blocks=4):
     b4 = Object(name='block4',
                 dimensions=Dimensions(0.12, 0.02, 0.04),
                 mass=1.,
-                com=Position(-0.058, 0, -0.008),
+                com=Position(-0.0575, 0, -0.008),
                 color=Color(0, 1, 0))
     return [b1, b2, b3, b4][:num_blocks]
 

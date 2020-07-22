@@ -114,6 +114,7 @@ class TowerPlanner(PlannerBase):
 
         height = np.sum([block.dimensions.z for block in tower])
         p_stable = stable_count / float(num_samples)
+        return height, p_stable
         return height * p_stable
 
     def plan(self, blocks, num_samples=100):
@@ -133,6 +134,7 @@ class TowerPlanner(PlannerBase):
         n = len(blocks)
         max_height = 0
         max_tower = []
+
         # for each ordering of blocks
         for tower in permutations(blocks):
             # for each combination of rotations
@@ -144,9 +146,9 @@ class TowerPlanner(PlannerBase):
                 stacked_tower = self.set_stack_poses(tower)
                 # simulate_tower(stacked_tower, vis=True, T=25)
                 # and check the expected height of this particular tower
-                height = self.calc_expected_height(stacked_tower, num_samples=num_samples)
+                height, p_stable = self.calc_expected_height(stacked_tower, num_samples=num_samples)
                 # save the tallest tower
-                if height > max_height:
+                if height > max_height and p_stable > 0.9:
                     max_tower = stacked_tower
                     max_height = height
 

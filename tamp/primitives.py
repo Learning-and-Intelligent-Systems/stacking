@@ -17,6 +17,7 @@ def get_grasp_gen(robot):
     # with your favorite grasp generator
     def gen(body):
         grasp_tsr = pb_robot.tsrs.panda_box.grasp(body)
+        grasps = []
         # Only use a top grasp (2, 4) and side grasps (7).
         for top_grasp_ix in range(len(grasp_tsr)):#[2, 4, 7, 6, 0, 1]: 
             sampled_tsr = grasp_tsr[top_grasp_ix]
@@ -24,7 +25,10 @@ def get_grasp_gen(robot):
 
             grasp_objF = numpy.dot(numpy.linalg.inv(body.get_base_link_transform()), grasp_worldF)
             body_grasp = pb_robot.vobj.BodyGrasp(body, grasp_objF, robot.arm)
-            yield (body_grasp,)
+            grasps.append((body_grasp,))
+            # yield (body_grasp,)
+        return grasps
+        
     return gen
 
 
@@ -35,25 +39,33 @@ def get_stable_gen_table(fixed=[]):
         can be specified for debugging.
         """
         all_rotations = list(rotation_group()) + [R.from_euler('zyx', [0., -numpy.pi/2, 0.])]
+        
+        # These poses are useful for regrasping. Poses are more useful for grasping
+        # if they are upright.
+        dims = body.get_dimensions()
+        if dims[1] > dims[0]:
+            all_rotations = [R.from_euler('zyx', [0., 0., numpy.pi/2]),
+                             R.from_euler('zyx', [0., 0., -numpy.pi/2])]
+        else:
+            all_rotations = [R.from_euler('zyx', [0., -numpy.pi/2, 0.]),
+                             R.from_euler('zyx', [0., numpy.pi/2, 0.])]
+        
         while True:
-            if protation is not None:
-                rotation = protation
-            else:
-                # Don't use rotations around the z-axis. Not as useful for regrasping.
-                rotation = random.choice(all_rotations[2:])
-            pose = (ZERO_POS, rotation.as_quat())
-            pose = pb_robot.placements.sample_placement(body, surface, top_pose=pose) 
-            
-            start_pose = body.get_base_link_pose()
-            body.set_base_link_pose(pose)
-            if (pose is None) or any(pb_robot.collisions.pairwise_collision(body, b) for b in fixed):
-                continue
-            body.set_base_link_pose(start_pose)
-            body_pose = pb_robot.vobj.BodyPose(body, pose)
-            yield (body_pose,)
+            for rotation in all_rotations:
+                pose = (ZERO_POS, rotation.as_quat())
+                pose = pb_robot.placements.sample_placement(body, surface, top_pose=pose) 
+                
+                start_pose = body.get_base_link_pose()
+                body.set_base_link_pose(pose)
+                if (pose is None) or any(pb_robot.collisions.pairwise_collision(body, b) for b in fixed):
+                    continue
+                body.set_base_link_pose(start_pose)
+                body_pose = pb_robot.vobj.BodyPose(body, pose)
+                yield (body_pose,)
+
     return gen
 
-    
+
 def get_stable_gen_block(fixed=[]):
     def fn(body, surface, surface_pose, rel_pose):
         """
@@ -72,7 +84,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
-        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.05])
+        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125])
 
         if False:
             length, lifeTime = 0.2, 0.0
@@ -94,7 +106,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
             q_grasp = robot.arm.ComputeIK(grasp_worldF, seed_q=q_approach)
             if (q_grasp is None) or not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
                 continue
-
+            
             path = robot.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
             if path is None:
                 if DEBUG_FAILURE: input('Approach motion failed')

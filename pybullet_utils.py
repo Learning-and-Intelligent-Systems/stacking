@@ -66,7 +66,7 @@ class PyBulletServer():
 
             for particle_pos, particle_weight in zip(*obj.com_filter):
                 line_from = transformation(particle_pos + delta, obj_pos, obj_quat)
-                line_to = transformation(particle_pos - detla, obj_pos, obj_quat)
+                line_to = transformation(particle_pos - delta, obj_pos, obj_quat)
                 color = np.ones(3)*particle_weight
                 p.addUserDebugLine(line_from, line_to, color, lifeTime=lifeTime, physicsClientId=self.client)
 

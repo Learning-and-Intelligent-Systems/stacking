@@ -20,33 +20,40 @@ def main(args):
     if args.agent == 'teleport':
         agent = TeleportAgent(blocks, NOISE)
     elif args.agent == 'panda':
-        agent = PandaAgent(blocks, NOISE)
+        agent = PandaAgent(blocks, NOISE, teleport=False)
     else:
         raise NotImplementedError()
 
     # construct a world containing those blocks
-    for b_ix, block in enumerate(blocks):
+    beliefs = [ParticleBelief(block, 
+                              N=200, 
+                              plot=True, 
+                              vis_sim=args.vis,
+                              noise=NOISE) for block in blocks]
+    # agent._add_text('Ready?')
+    input('Start?')
+    for b_ix, (block, belief) in enumerate(zip(blocks, beliefs)):
         print('Running filter for', block.name)
-        belief = ParticleBelief(block, 
-                                N=200, 
-                                plot=args.plot, 
-                                vis_sim=args.vis,
-                                noise=NOISE)
-        for interaction_num in range(10):
+        for interaction_num in range(5):
             print("Interaction number: ", interaction_num)
-            action = plan_action(belief, exp_type='random', action_type='place')
-            observation = agent.simulate_action(action, b_ix)
+            action = plan_action(belief, exp_type='reduce_var', action_type='place')
+            observation = agent.simulate_action(action, b_ix, T=50)
+            # agent._add_text('Updating particle belief')
             belief.update(observation)
             block.com_filter = belief.particles
+
         print(belief.estimated_coms[-1], block.com)
+
+        
 
     # find the tallest tower
     print('Finding tallest tower.')
+    # agent._add_text('Planning tallest tower')
     tp = TowerPlanner()
     tallest_tower = tp.plan(blocks)
 
     # and visualize the result
-    agent.simulate_tower(tallest_tower, vis=True, T=250, save_tower=args.save_tower)
+    agent.simulate_tower(tallest_tower, vis=True, T=2500, save_tower=args.save_tower)
 
 
 if __name__ == '__main__':

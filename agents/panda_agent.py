@@ -11,7 +11,9 @@ from actions import PlaceAction, make_platform_world
 from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
                         Quaternion, get_rotated_block, Pose, add_noise, \
                         Environment, Position 
+from pddlstream.algorithms.constraints import PlanConstraints, WILD
 from pddlstream.algorithms.focused import solve_focused
+from pddlstream.language.stream import StreamInfo
 from pddlstream.utils import INF
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
@@ -28,19 +30,52 @@ class PandaAgent:
         """
         # TODO: Check that having this as client 0 is okay when interacting 
         # with everything else.
-        self.client_id = pb_robot.utils.connect(use_gui=True)
+        self._planning_client_id = pb_robot.utils.connect(use_gui=False)
+        self.plan()
         pb_robot.utils.set_default_camera()
 
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
-
         self.belief_blocks = blocks
-
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table = setup_panda_world(self.robot, blocks)
         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
+        poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
+
+        self._execution_client_id = pb_robot.utils.connect(use_gui=True)
+        self.execute()
+        pb_robot.utils.set_default_camera()
+        self.execution_robot = pb_robot.panda.Panda()
+        self.execution_robot.arm.hand.Open()
+        setup_panda_world(self.execution_robot, blocks, poses)
+
+        self.plan()
         self.noise = noise
         self.teleport = teleport
+
+        self.txt_id = None
+
+    def _add_text(self, txt):
+        self.execute()
+        pb_robot.viz.remove_all_debug()
+        self.txt_id = pb_robot.viz.add_text(txt, position=(0, 0.25, 0.75), size=2)
+        self.plan()
+
+    def execute(self):
+        pb_robot.aabb.set_client(self._execution_client_id)
+        pb_robot.body.set_client(self._execution_client_id)
+        pb_robot.joint.set_client(self._execution_client_id)
+        pb_robot.link.set_client(self._execution_client_id)
+        pb_robot.utils.set_client(self._execution_client_id)
+        pb_robot.viz.set_client(self._execution_client_id)
+
+    def plan(self):
+        pb_robot.aabb.set_client(self._planning_client_id)
+        pb_robot.body.set_client(self._planning_client_id)
+        pb_robot.joint.set_client(self._planning_client_id)
+        pb_robot.link.set_client(self._planning_client_id)
+        pb_robot.utils.set_client(self._planning_client_id)
+        pb_robot.viz.set_client(self._planning_client_id)
 
     def _get_initial_pddl_state(self):
         """
@@ -130,30 +165,26 @@ class PandaAgent:
         print('Goal:', goal)
 
         if not self.teleport:
-            self._solve_and_execute_pddl(init, goal, max_time=30., search_sample_ratio=1000)
+            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000)
         else:
             goal_pose_fn = tamp.primitives.get_stable_gen_block()
             goal_pose = goal_pose_fn(pddl_block, 
                                      self.platform_table, 
                                      self.platform_pose,
                                      tform)[0].pose
-            pddl_block.set_base_link_pose(goal_pose)
+            self.teleport_block(pddl_block, goal_pose)
 
         # Execture the action. 
         # TODO: Check gravity compensation in the arm.
-        p.setGravity(0,0,-10)
-        for tx in range(500):
-            p.stepSimulation()
-            time.sleep(0.01)
-
-            # Save the result of the experiment after T steps of simulation.
-            if tx == T-1:
-                end_pose = self._get_observed_pose(pddl_block, action)
-                observation = (action, T, end_pose)
         
+        self.step_simulation(T)
+        end_pose = self._get_observed_pose(pddl_block, action)
+        observation = (action, T, end_pose)
+        self.step_simulation(500-T)
+
         # Put block back in original position.
 
-        # TODO: Check if block is on the table or platform to start.         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform], self.pddl_blocks)
+        # TODO: Check if block is on the table or platform to start. 
         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
 
         init = self._get_initial_pddl_state()
@@ -168,16 +199,22 @@ class PandaAgent:
         print('Goal:', goal)
 
         if not self.teleport:
-            success = self._solve_and_execute_pddl(init, goal, max_time=30., search_sample_ratio=1000)
+            success = self._solve_and_execute_pddl(init, goal, max_time=60., search_sample_ratio=1000)
             if not success:
                 print('Plan failed: Teleporting block to intial position.')
-                pddl_block.set_base_link_pose(original_pose)
+                self.teleport_block(pddl_block, original_pose)
         else:
-            pddl_block.set_base_link_pose(original_pose)
+            self.teleport_block(pddl_block, original_pose)
 
         return observation
 
-    def simulate_tower(self, tower, vis, T, save_tower=False):
+    def teleport_block(self, block, pose):
+        self.execute()
+        block.set_base_link_pose(pose)
+        self.plan()
+        block.set_base_link_pose(pose)
+
+    def simulate_tower(self, tower, vis, T, save_tower=False, solve_joint=False):
         """
         :param tower: list of belief blocks that are rotated to have no 
                       orientation in the tower. These are in the order of 
@@ -189,6 +226,8 @@ class PandaAgent:
             print('Dims:', block.dimensions)
             print('CoM:', block.com)
             print('-----')
+
+        original_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
         init = self._get_initial_pddl_state()
         goal_terms = []
@@ -203,18 +242,22 @@ class PandaAgent:
         # TODO: Set base block to be rotated in its current position.
         base_block = pddl_block_lookup[tower[0]]
         base_pos = base_block.get_base_link_pose()[0]
-        table_z = self.table_pose.pose[0][2] + 1e-5
+        table_z = self.table_pose.pose[0][2] #+ 1e-5
+        base_pos = (0., 0.5, 0.)
         base_pose = ((base_pos[0], base_pos[1], table_z + tower[0].pose.pos.z), tower[0].rotation)
-
-        print(base_pose)
-        # base_block.set_base_link_pose(base_pose)
-        input('Continue?')
 
         base_pose = pb_robot.vobj.BodyPose(pddl_block, base_pose)
         init += [('Pose', base_block, base_pose),
                  ('Supported', base_block, base_pose, self.table, self.table_pose)]
         goal_terms.append(('AtPose', base_block, base_pose)) 
         goal_terms.append(('On', base_block, self.table))
+
+        if not solve_joint:
+            if not self.teleport:
+                goal = tuple(['and'] + goal_terms)
+                self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+            else:
+                self.teleport_block(base_block, base_pose.pose)
 
         poses = [base_pose]
         # TODO: Calculate each blocks pose relative to the block beneath.
@@ -230,23 +273,52 @@ class PandaAgent:
             top_pddl = pddl_block_lookup[top_block]
             bottom_pddl = pddl_block_lookup[bottom_block]
 
-            init = self._get_initial_pddl_state()
+            if not solve_joint:
+                init = self._get_initial_pddl_state()
+                goal_terms = []
+
             init += [('RelPose', top_pddl, bottom_pddl, rel_tform)]
-            goal_terms = []
             goal_terms.append(('On', top_pddl, bottom_pddl))
-            # get_pose = tamp.primitives.get_stable_gen_block()
-            # pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
-            # poses.append(pose)
-            # #print(base_pose.pose)
-            # print(pose.pose)
-            # base_block.set_base_link_pose(base_pose.pose)
-            # top_pddl.set_base_link_pose(pose.pose)
-            # input('Continue?')
 
-            # TODO: Build PDDL Goal Spec with RelPose between all blocks.
+            if not solve_joint:
+                if not self.teleport:
+                    goal = tuple(['and'] + goal_terms)
+                    self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+                else:
+                    get_pose = tamp.primitives.get_stable_gen_block()
+                    pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
+                    poses.append(pose)
+                    self.teleport_block(top_pddl, pose.pose)
+
+        if solve_joint:
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
 
+        self.step_simulation(T)
+
+
+        # TODO: Reset Environment. Need to handle conditions where the blocks are still a stable tower.
+        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
+        for b, pose in zip(self.pddl_blocks, original_poses):
+            goal_pose = pb_robot.vobj.BodyPose(b, pose)
+
+            init = self._get_initial_pddl_state()
+            init += [('Pose', b, goal_pose),
+                     ('Supported', b, goal_pose, self.table, self.table_pose)]
+            goal_terms = []
+            goal_terms.append(('AtPose', b, goal_pose))
+            goal_terms.append(('On', b, self.table))
+
+            goal = tuple(['and'] + goal_terms)
+            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+
+    def step_simulation(self, T):
+        p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
+        p.setGravity(0, 0, -10, physicsClientId=self._planning_client_id)
+        for _ in range(T):
+            p.stepSimulation(physicsClientId=self._execution_client_id)
+            p.stepSimulation(physicsClientId=self._planning_client_id)
+            time.sleep(1/240.)
 
     def _get_observed_pose(self, pddl_block, action):
         """
@@ -268,21 +340,46 @@ class PandaAgent:
         return end_pose
 
     def _solve_and_execute_pddl(self, init, goal, max_time=INF, search_sample_ratio=0.):
+        self._add_text('Planning block placement')
         self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
-
+        
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem, 
                                    success_cost=numpy.inf, 
                                    search_sample_ratio=search_sample_ratio,
                                    max_time=max_time)
-
+        self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
             print("No plan found")
             return False
         else:
-            # TODO: Have this execute instead of prompt for input.
             saved_world.restore()
-            ExecuteActions(self.robot.arm, plan, pause=False)
+            self.execute()
+            ExecuteActions(self.execution_robot.arm, plan, pause=True, wait=False)
+            self.plan()
+            ExecuteActions(self.robot.arm, plan, pause=False, wait=False)
             return True
+
+    def _get_regrasp_skeleton(self, max_replacements=2):
+        skeleton_tries = [[1, 1, 1, 1],
+                          [1, 1, 1, 2],
+                          [1, 1, 2, 2],
+                          [1, 2, 2, 2],
+                          [2, 2, 2, 2]]
+        skeletons = []
+        for attempt in skeleton_tries:
+            s = []
+            for ix in range(len(self.pddl_blocks)):
+                bname = '?b%d' % ix
+                for _ in range(attempt[ix]):
+                    s += [('move_free', [WILD, WILD, WILD])]
+                    s += [('pick', [bname, WILD, WILD, WILD, WILD, WILD])]
+                    s += [('move_holding', [WILD, WILD, bname, WILD, WILD])]
+                    s += [('place', [bname, WILD, WILD, WILD, WILD, WILD, WILD])]
+            skeletons.append(s)
+        print(skeletons[0])
+        return [skeletons[3]]
+
+    

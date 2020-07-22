@@ -11,7 +11,7 @@ from block_utils import Environment, World, Object, Position, Pose, \
                         ZERO_POS, ZERO_ROT
 from filter_utils import create_uniform_particles, make_platform_world
 
-def plan_action(belief, k=3, exp_type='reduce_var', action_type='push'):
+def plan_action(belief, k=1, exp_type='reduce_var', action_type='push'):
     """ Given a set of particles, choose the action that maximizes the observed variance.
     :param particle_block: A list of the current set of particles instantiated as blocks.
     :param k: Number of pushes to do for each orientation.
@@ -50,7 +50,7 @@ def plan_action(belief, k=3, exp_type='reduce_var', action_type='push'):
 
             return max(results, key=itemgetter(1))[0]
 
-        else:
+        else: 
             print('Finding random push action')
             rs = [r for r in rotation_group()]
             ix = np.random.choice(np.arange(len(rs)))
@@ -60,15 +60,51 @@ def plan_action(belief, k=3, exp_type='reduce_var', action_type='push'):
         return push_action
 
     else:
-        print('Finding random place action')
-        # pick a random rotation
-        rs = [r for r in rotation_group()]
-        ix = np.random.choice(np.arange(len(rs)))
-        rot = rs[ix]
-        
-        # construct the corresponding place action
-        place_action = PlaceAction(rot=rot, pos=None, block=belief.block)
-        return place_action
+        if exp_type == 'reduce_var':
+            print('Finding variance reducing place action')
+            results = []
+            for rot in rotation_group():
+                for _ in range(k):
+                    action = PlaceAction(rot=rot, pos=None, block=belief.block)
+
+                    # create a bunch of blocks with the same geometry where each COM
+                    # for each block is set to one of the particles
+                    particle_blocks = [copy.deepcopy(belief.block) for particle in belief.particles.particles]
+                    for (com, particle_block) in zip(belief.particles.particles, particle_blocks):
+                        particle_block.com = com
+                    particle_worlds = [make_platform_world(pb, action) for pb in particle_blocks]
+                    env = Environment(particle_worlds, vis_sim=False)
+
+                    # get the the position of the block to set the start position of the push action
+                    # action.set_push_start_pos(particle_worlds[0].get_pose(particle_worlds[0].objects[1]).pos)
+
+                    for _ in range(50):
+                        env.step(action=action)
+                    # Get end pose of all particle blocks.
+                    poses = np.array([w.get_pose(w.objects[1]).pos for w in particle_worlds])
+                    var = np.var(poses, axis=0)
+                    score = np.max(var)
+                    cov = np.cov(poses, rowvar=False)
+                    w, v = np.linalg.eig(cov)
+                    #print(w)
+                    score = np.max(w)
+                    #print(var, score)
+                    results.append((action, score))
+
+                    env.disconnect()
+                    env.cleanup()
+
+            return max(results, key=itemgetter(1))[0]
+        else:
+            print('Finding random place action')
+            # pick a random rotation
+            rs = [r for r in rotation_group()]
+            ix = np.random.choice(np.arange(len(rs)))
+            rot = rs[ix]
+            
+            # construct the corresponding place action
+            place_action = PlaceAction(rot=rot, pos=None, block=belief.block)
+            return place_action
 
 
 class PushAction(ActionBase):
