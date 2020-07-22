@@ -15,6 +15,16 @@ from itertools import permutations, combinations_with_replacement
 # lot more tricky if we want to place blocks adjacent to eachother
 
 class TowerPlanner(PlannerBase):
+    def __init__(self, stability_mode='angle'):
+        """
+        Keyword Arguments:
+            stability_mode {str} -- set the mode for checking stability
+                'angle': check the angle from the pivot to the top COM
+                'contains': check whether the top COM is in the bottom geom
+        """
+        self.stability_mode = stability_mode
+        self.angle_eps = 3 # degrees
+
 
     def tower_is_stable(self, tower):
         """ Check that the tower is stable
@@ -69,13 +79,42 @@ class TowerPlanner(PlannerBase):
             bottom {Object} -- [description]
             top {Object} -- [description]
         """
-        # Check if the COM of the top object is within the dimensions of the bottom
-        # object. We assume that the two objects are in static planar contact in z,
-        # and that the COM of the top object must lie within the object
 
-        top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
-        top_rel_com = top_rel_pos + top.com
-        return (np.abs(top_rel_com)*2 - bottom.dimensions <= 0)[:2].all()
+        if self.stability_mode == 'angle':
+            # position of the top block relative to the bottom COG
+            top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
+            # position of the top COM relative to the bottom COG
+            top_rel_com = top_rel_pos + np.array(top.com)
+            # calculate the four pivot edges
+            pivot_x_p = min(bottom.dimensions.x/2, top_rel_pos[0] + top.dimensions.x/2)
+            pivot_x_n = max(-bottom.dimensions.x/2, top_rel_pos[0] - top.dimensions.x/2)
+            pivot_y_p = min(bottom.dimensions.y/2, top_rel_pos[1] + top.dimensions.y/2)
+            pivot_y_n = max(-bottom.dimensions.y/2, top_rel_pos[1] - top.dimensions.y/2)
+            # get the height of the COM above the bottom block top surface
+            top_com_dist_z_to_bottom_surface = top_rel_com[2] - bottom.dimensions.z/2
+            # get the distance of the COM to the four pivot edges. these are positive
+            # if the COM is inside the pivot
+            top_com_dist_x_p = pivot_x_p - top_rel_com[0]
+            top_com_dist_x_n = top_rel_com[0] - pivot_x_n
+            top_com_dist_y_p = pivot_y_p - top_rel_com[1]
+            top_com_dist_y_n = top_rel_com[1] - pivot_y_n
+            # calculate the angles from the pivots to the COM
+            y = top_com_dist_z_to_bottom_surface
+            xs = np.array([top_com_dist_x_p,
+                           top_com_dist_x_n,
+                           top_com_dist_y_p,
+                           top_com_dist_y_n])
+            angles = np.degrees(np.arctan2(y, xs))
+            # and check stability
+            print(angles)
+            return (angles < 90 - self.angle_eps).all()
+        else:
+            # Check if the COM of the top object is within the dimensions of the bottom
+            # object. We assume that the two objects are in static planar contact in z,
+            # and that the COM of the top object must lie within the object
+            top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
+            top_rel_com = top_rel_pos + top.com
+            return (np.abs(top_rel_com)*2 - bottom.dimensions <= 0)[:2].all()
 
 
     def calc_expected_height(self, tower, num_samples=100):

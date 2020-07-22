@@ -32,7 +32,8 @@ class TeleportAgent:
         # and return the observed trajectory
         return observation
 
-    def simulate_tower(self, tower, vis=True, T=250, copy_blocks=True, save_tower=False):
+    @staticmethod
+    def simulate_tower(tower, vis=True, T=250, copy_blocks=True, save_tower=False):
         if copy_blocks:
             tower = [copy(block) for block in tower]
         world = World(tower)

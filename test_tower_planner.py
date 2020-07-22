@@ -7,10 +7,16 @@ import pytest
 
 from tower_planner import TowerPlanner
 from block_utils import *
+from agents.teleport_agent import TeleportAgent
 
 @pytest.fixture()
 def vis(pytestconfig):
     return pytestconfig.getoption("vis")
+
+def tower_is_stable_in_pybullet(tower, vis=False, T=200):
+    init_poses = {block.name: block.pose for block in tower}
+    final_poses = TeleportAgent.simulate_tower(tower, vis=vis, T=T)
+    return pos_unchanged(init_poses, final_poses, eps=1e-2)
 
 def test_stability_pair_is_stable():
     tp = TowerPlanner()
@@ -88,7 +94,7 @@ def test_stability_tower_is_constructible():
 
 def test_stability_tower_is_stable_with_sim(vis):
     tp = TowerPlanner()
-    for _ in range(5):
+    for _ in range(10):
         # sample three random blocks
         blocks = [Object.random(str(i)) for i in range(3)]
         # stack all the blocks on top of eachother (center of geometry, not COM)

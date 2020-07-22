@@ -312,15 +312,11 @@ def add_noise(pose, cov):
         orn = pose.orn
         return Pose(pos, orn)
 
-def tower_is_stable_in_pybullet(tower, vis=False, T=30):
-    init_poses = {block.name: block.pose for block in tower}
-    final_poses = simulate_tower(tower, vis=vis, T=T)
-    return pos_unchanged(init_poses, final_poses)
-
 # see if the two dicts of positions are roughly equivalent
 def pos_unchanged(init_poses, final_poses, eps=2e-3):
     dists = [np.linalg.norm(np.array(init_poses[obj].pos)
             - np.array(final_poses[obj])) for obj in init_poses]
+    print('Dists', dists)
     return max(dists) < eps
 
 def hand_urdf():
@@ -401,6 +397,7 @@ def group_blocks(bottom, top):
     total_mass = bottom.mass + top.mass
     # we'll use the pos from the bottom block as the center of geometry
     new_pos = bottom.pose.pos
+    new_dims = bottom.dimensions
     # take a weighted average of the COM vectors
     bottom_vec = np.array(bottom.com) + np.array(bottom.pose.pos)
     bottom_frac = bottom.mass / total_mass
@@ -408,10 +405,11 @@ def group_blocks(bottom, top):
     top_frac = top.mass / total_mass
     # bring the COM vector back into the coordinate frame of the group
     # by subtracting new_pos
-    new_com = bottom_vec*bottom_frac + top_vec*top_frac - new_pos
+    new_com = Position(*(bottom_vec*bottom_frac + top_vec*top_frac - new_pos))
     # construct a new block with the attributes of the group
-    new_block = Object('group', None, total_mass, Position(*new_com), None)
+    new_block = Object('group', None, total_mass, new_com, None)
     new_block.pose = Pose(new_pos, ZERO_ROT)
+    new_block.dimensions = new_dims
 
     return new_block
 
