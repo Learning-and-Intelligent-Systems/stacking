@@ -20,7 +20,7 @@ def main(args):
     if args.agent == 'teleport':
         agent = TeleportAgent(blocks, NOISE)
     elif args.agent == 'panda':
-        agent = PandaAgent(blocks, NOISE, teleport=True)
+        agent = PandaAgent(blocks, NOISE, teleport=False)
     else:
         raise NotImplementedError()
 
