@@ -10,27 +10,29 @@ class FCGAT(nn.Module):
     """ Implements graph attention networks as introduced in
     https://arxiv.org/abs/1710.10903
 
-    This implementation makes the following assumptions:
+    This implementation makes the following structural assumptions:
      * The graph is assumed to be fully connected, so no edge mask is applied
      * Single-headed attention
-     * The output feature dimension is equal to the input feature dimension
 
     Extends:
         nn.Module
     """
 
-    def __init__(self, D):
+    def __init__(self, D1, D2):
         """
         Arguments:
-            D {int} -- dimension of node features
+            D1 {int} -- input dimension of node features
+            D2 {int} -- output dimension of node features
         """
         super(FCGAT, self).__init__()
+        self.D1 = D1
+        self.D2 = D2
 
         # the node feature update weights
-        self.W = nn.Linear(D, D)
+        self.W = nn.Linear(D1, D2)
         # attention weights
         self.fc_attention = nn.Sequential(
-            nn.Linear(2*D, 1),
+            nn.Linear(2*D2, 1),
             nn.LeakyReLU()
         )
 
@@ -38,17 +40,17 @@ class FCGAT(nn.Module):
         """ Self attention layer. Outputs attention between pairs of nodes
 
         Arguments:
-            x {torch.Tensor} -- [N x K x D] tensor of nodes
+            x {torch.Tensor} -- [N x K x D2] tensor of nodes
 
         Returns:
-            torch.Tensor -- [N x K x K x A] tensor of attention weights
+            torch.Tensor -- [N x K x K] tensor of attention weights
         """
-        N, K, D = x.shape
-        # create an [N x K x K x 2D] vector of the pairs of node features
-        x = x[:, :, None, :].expand(N, K, K, D)
+        N, K, _ = x.shape
+        # create an [N x K x K x 2D2] vector of the pairs of node features
+        x = x[:, :, None, :].expand(N, K, K, self.D2)
         xx = torch.stack([x, x.transpose(1,2)], dim=3)
         # flatten, apply attention weights, and drop the extra dimension
-        aa = self.fc_attention(xx.view(-1, 2*D))[..., 0]
+        aa = self.fc_attention(xx.view(-1, 2*self.D2))[..., 0]
         # unflatten and normalize attention weights for each node
         return F.softmax(aa.view(N, K, K), dim=2)
 
@@ -60,14 +62,14 @@ class FCGAT(nn.Module):
         [N x K x D] tensor. N batches, K nodes, D dimension at each node.
 
         Arguments:
-            x {torch.Tensor} -- [N x K x D] tensor of node features
+            x {torch.Tensor} -- [N x K x D1] tensor of node features
 
         Returns:
-            torch.Tensor -- [N x K x D] tensor of node features
+            torch.Tensor -- [N x K x D2] tensor of node features
         """
-        N, K, D = x.shape
+        N, K, _ = x.shape
         # apply the weight matrix to the node features
-        x = self.W(x.view(-1, D)).view(N, K, D)
+        x = self.W(x.view(-1, self.D1)).view(N, K, self.D2)
         # get an attention mask for each node
         a = self.attention(x)
         # apply the attention mask to the nodes features
