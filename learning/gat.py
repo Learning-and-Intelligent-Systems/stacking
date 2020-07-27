@@ -10,14 +10,11 @@ class FCGAT(nn.Module):
     """ Implements graph attention networks as introduced in
     https://arxiv.org/abs/1710.10903
 
-    Takes in a set of nodes from a fully connected graph. Applies a
-    graph attention network layer. The set of nodes is passed in as a 
-    [N x K x D] tensor. N batches, K nodes, D dimension at each node.
+    This implementation makes the following assumptions:
+     * The graph is assumed to be fully connected, so no edge mask is applied
+     * Single-headed attention
+     * The output feature dimension is equal to the input feature dimension
 
-    The graph is assumed to be fully connected, so no edge mask is applied.
-    This implementation uses single-headed attention. Furthermore, we assume
-    that the output feature dimension is equal to the input dimension.
-    
     Extends:
         nn.Module
     """
@@ -29,8 +26,9 @@ class FCGAT(nn.Module):
         """
         super(FCGAT, self).__init__()
 
+        # the node feature update weights
         self.W = nn.Linear(D, D)
-
+        # attention weights
         self.fc_attention = nn.Sequential(
             nn.Linear(2*D, 1),
             nn.LeakyReLU()
@@ -41,7 +39,7 @@ class FCGAT(nn.Module):
 
         Arguments:
             x {torch.Tensor} -- [N x K x D] tensor of nodes
-        
+
         Returns:
             torch.Tensor -- [N x K x K x A] tensor of attention weights
         """
@@ -53,9 +51,20 @@ class FCGAT(nn.Module):
         aa = self.fc_attention(xx.view(-1, 2*D))[..., 0]
         # unflatten and normalize attention weights for each node
         return F.softmax(aa.view(N, K, K), dim=2)
-        
-    def forward(self, x):
 
+    def forward(self, x):
+        """ Apply the fully connected graph attention network layer
+
+        Takes in a set of nodes from a fully connected graph. Applies a
+        graph attention network layer. The set of nodes is passed in as a
+        [N x K x D] tensor. N batches, K nodes, D dimension at each node.
+
+        Arguments:
+            x {torch.Tensor} -- [N x K x D] tensor of node features
+
+        Returns:
+            torch.Tensor -- [N x K x D] tensor of node features
+        """
         N, K, D = x.shape
         # apply the weight matrix to the node features
         x = self.W(x.view(-1, D)).view(N, K, D)
@@ -65,4 +74,3 @@ class FCGAT(nn.Module):
         x = torch.einsum('nkj, nkd -> nkd', a, x)
         # and apply a nonlinearity
         return F.relu(x)
-
