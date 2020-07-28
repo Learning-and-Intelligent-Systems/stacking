@@ -13,6 +13,7 @@ class FCGAT(nn.Module):
     This implementation makes the following structural assumptions:
      * The graph is assumed to be fully connected, so no edge mask is applied
      * Single-headed attention
+     * D1 > D2
 
     Extends:
         nn.Module
@@ -68,11 +69,17 @@ class FCGAT(nn.Module):
             torch.Tensor -- [N x K x D2] tensor of node features
         """
         N, K, _ = x.shape
+        x_old = x[...,-self.D2:]
+
         # apply the weight matrix to the node features
         x = self.W(x.view(-1, self.D1)).view(N, K, self.D2)
         # get an attention mask for each node
         a = self.attention(x)
         # apply the attention mask to the nodes features
         x = torch.einsum('nkj, nkd -> nkd', a, x)
-        # and apply a nonlinearity
-        return F.relu(x)
+        # apply a nonlinearity
+        x = F.leaky_relu(x)
+        # and finally a skip connection to make it a resnet
+        x += x_old
+
+        return x
