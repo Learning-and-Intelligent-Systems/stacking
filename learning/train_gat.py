@@ -64,8 +64,8 @@ def run_model_on_towers(model, towers):
     # create M additional channels to be used in the processing of the tower
     x = 1e-2*torch.randn(N, K, M)
     # run the network as many times as there are blocks
-    for _ in range(K):
-    # for _ in range(7):
+    for _ in range(K+2):
+    # for _ in range(6):
         # append the tower information
         x = torch.cat([towers, x], axis=2)
         x = model(x)
@@ -81,7 +81,7 @@ def run_model_on_towers(model, towers):
 
 
 def train(model, datasets):
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
     batch_size = 10
     losses = []
 
@@ -91,7 +91,7 @@ def train(model, datasets):
             iter(DataLoader(d, batch_size=batch_size, shuffle=True))
             for d in datasets]
 
-        for batch_idx in range(10000 // batch_size):
+        for batch_idx in range(20000 // batch_size):
             # shuffle(iterable_dataloaders)
             # iterate through the tower sizes in the inner loop
             for iterable_dataloader in iterable_dataloaders:
