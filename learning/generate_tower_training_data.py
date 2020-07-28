@@ -13,7 +13,7 @@ from random import choices as sample_with_replacement
 def vectorize(tower):
     return [b.vectorize() for b in tower]
 
-def build_random_tower(blocks):
+def sample_random_tower(blocks):
     num_blocks = len(blocks)
     # pick random orientations for the blocks
     orns = sample_with_replacement(list(rotation_group()), k=num_blocks)
@@ -51,29 +51,33 @@ def build_random_tower(blocks):
 
     return blocks
 
-def main(args):
+def build_tower(blocks, stable=True):
     # init a tower planner for checking stability
     tp = TowerPlanner(stability_mode='angle')
+    while True:
+        # generate a random tower
+        tower = sample_random_tower(blocks)
+        # if the tower is stable, visualize it for debugging
+        rotated_tower = [get_rotated_block(b) for b in tower]
+        # save the tower if it's stable
+        if tp.tower_is_stable(rotated_tower) == stable:
+            return tower
 
+def main(args):
+    stable = True
     for num_blocks in range(2,6):
         vectorized_towers = []
         num_towers = 10000
-        count = 0
-
-        # generate random blocks
-        blocks = [Object.random(f'Obj_{i}') for i in range(num_blocks)]
-        while count < num_towers:
+        for count in range(num_towers):
+            # generate random blocks
+            blocks = [Object.random(f'Obj_{i}') for i in range(num_blocks)]
             # generate a random tower
-            tower = build_random_tower(blocks)
-            # if the tower is stable, visualize it for debugging
-            rotated_tower = [get_rotated_block(b) for b in tower]
-            # save the tower if it's stable
-            if tp.tower_is_stable(rotated_tower):
-                vectorized_towers.append(vectorize(tower))
-                count += 1
-                print(count)
+            tower = build_tower(blocks, stable)
+            # append the tower to the list
+            vectorized_towers.append(vectorize(tower))
+            print(count)
 
-        filename = f'learning/data/stable_{num_blocks}block_(x{num_towers}).npy'
+        filename = f'learning/data/{"stable" if stable else "unstable"}_{num_blocks}block_(x{num_towers}).npy'
         print('Saving to', filename)
         vectorized_towers = np.array(vectorized_towers)
         np.save(filename, vectorized_towers)
