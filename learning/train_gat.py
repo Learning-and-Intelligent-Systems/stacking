@@ -14,7 +14,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from learning.gat import FCGAT
 
 # the number of latent variables in the graph NN
-M = 10
+M = 20
 
 def load_datasets(num_towers):
     """ Load all the tower data into TensorDatasets. We need a different
@@ -61,32 +61,38 @@ def run_model_on_towers(model, towers):
     """
     N, K, _ = towers.shape
 
-    # introduce M additional channels to be used in the processing of the tower
-    x = torch.cat([towers, torch.zeros(N, K, M)], axis=2)
+    # create M additional channels to be used in the processing of the tower
+    x = 1e-2*torch.randn(N, K, M)
     # run the network as many times as there are blocks
     for _ in range(K):
-        x = model(x)
+    # for _ in range(7):
+        # append the tower information
         x = torch.cat([towers, x], axis=2)
+        x = model(x)
 
-    # pull out the logit for the predicted stability of each block
-    block_preds = torch.sigmoid(x[...,-1])
-    # the tower stability involves every block being stable
-    tower_preds = block_preds.prod(axis=1)
+
+    tower_preds = model.output(x)
+    # # pull out the logit for the predicted stability of each block
+    # block_preds = torch.sigmoid(x[...,-1])
+    # # the tower stability involves every block being stable
+    # tower_preds = block_preds.prod(axis=1)
     return tower_preds
 
 
 
 def train(model, datasets):
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    batch_size = 20
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    batch_size = 10
     losses = []
 
-    for epoch_idx in range(10):
+    for epoch_idx in range(5):
         # create a dataloader for each tower size
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=batch_size, shuffle=True))
             for d in datasets]
+
         for batch_idx in range(10000 // batch_size):
+            # shuffle(iterable_dataloaders)
             # iterate through the tower sizes in the inner loop
             for iterable_dataloader in iterable_dataloaders:
                 optimizer.zero_grad()
@@ -97,7 +103,8 @@ def train(model, datasets):
 
                 l.backward()
                 optimizer.step()
-                losses.append(l.item())
+                accuracy = ((preds>0.5) == labels).float().mean()
+                losses.append(accuracy.item())
 
             if batch_idx % 40 == 0:
                 print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {losses[-4:]}')
@@ -132,7 +139,7 @@ if __name__ == '__main__':
 
     test_datasets = load_datasets(1000)
     accuracies = test(model, test_datasets)
-    plt.scatter([2,3,4,5], accuracies)
+    plt.scatter(np.arange(2,6), accuracies)
     plt.xlabel('Num Blocks in Tower')
     plt.ylabel('Accuracy')
     plt.show()

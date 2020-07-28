@@ -30,12 +30,24 @@ class FCGAT(nn.Module):
         self.D2 = D2
 
         # the node feature update weights
-        self.W = nn.Linear(D1, D2)
+        self.W = nn.Sequential(
+            nn.Linear(D1, D1),
+            nn.LeakyReLU(),
+            nn.Linear(D1, D2),
+            nn.LeakyReLU()
+        )
+
         # attention weights
-        self.fc_attention = nn.Sequential(
+        self.A = nn.Sequential(
+
+            nn.Linear(2*D2, 2*D2),
+            nn.LeakyReLU(),
             nn.Linear(2*D2, 1),
             nn.LeakyReLU()
         )
+
+        # output layer
+        self.fc_output = nn.Linear(D2, 1)
 
     def attention(self, x):
         """ Self attention layer. Outputs attention between pairs of nodes
@@ -51,7 +63,7 @@ class FCGAT(nn.Module):
         x = x[:, :, None, :].expand(N, K, K, self.D2)
         xx = torch.stack([x, x.transpose(1,2)], dim=3)
         # flatten, apply attention weights, and drop the extra dimension
-        aa = self.fc_attention(xx.view(-1, 2*self.D2))[..., 0]
+        aa = self.A(xx.view(-1, 2*self.D2))[..., 0]
         # unflatten and normalize attention weights for each node
         return F.softmax(aa.view(N, K, K), dim=2)
 
@@ -77,9 +89,14 @@ class FCGAT(nn.Module):
         a = self.attention(x)
         # apply the attention mask to the nodes features
         x = torch.einsum('nkj, nkd -> nkd', a, x)
-        # apply a nonlinearity
-        x = F.leaky_relu(x)
         # and finally a skip connection to make it a resnet
         x += x_old
 
         return x
+
+    def output(self, x):
+        N, K, _ = x.shape
+        x = self.fc_output(x.view(-1, self.D2))
+        x = x.view(N,K,1)[...,0]
+        x = torch.sigmoid(x)
+        return x.prod(axis=1)
