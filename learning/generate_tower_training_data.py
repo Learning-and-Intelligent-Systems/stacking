@@ -2,13 +2,16 @@
 
 Izzy Brand, 2020
 """
-from agents.teleport_agent import TeleportAgent
+# from agents.teleport_agent import TeleportAgent
 from block_utils import Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block
 from tower_planner import TowerPlanner
 
 import argparse
 import numpy as np
 from random import choices as sample_with_replacement
+
+def vectorize(tower):
+    return [b.vectorize() for b in tower]
 
 def build_random_tower(blocks):
     num_blocks = len(blocks)
@@ -50,23 +53,35 @@ def build_random_tower(blocks):
 
 def main(args):
     # init a tower planner for checking stability
-    tp = TowerPlanner()
-    for _ in range(args.num_towers):
-        # pick a random number of blocks
-        # num_blocks = np.random.randint(2, 6)
-        num_blocks=2
+    tp = TowerPlanner(stability_mode='angle')
+
+    for num_blocks in range(2,6):
+        vectorized_towers = []
+        num_towers = 10000
+        count = 0
+
         # generate random blocks
         blocks = [Object.random(f'Obj_{i}') for i in range(num_blocks)]
-        # generate a random tower
-        tower = build_random_tower(blocks)
-        # if the tower is stable, visualize it for debugging
-        if tp.tower_is_stable(tower):
-            final_poses = TeleportAgent.simulate_tower(tower, vis=True, T=30)
+        while count < num_towers:
+            # generate a random tower
+            tower = build_random_tower(blocks)
+            # if the tower is stable, visualize it for debugging
+            rotated_tower = [get_rotated_block(b) for b in tower]
+            # save the tower if it's stable
+            if tp.tower_is_stable(rotated_tower):
+                vectorized_towers.append(vectorize(tower))
+                count += 1
+                print(count)
+
+        filename = f'learning/data/stable_{num_blocks}block_(x{num_towers}).npy'
+        print('Saving to', filename)
+        vectorized_towers = np.array(vectorized_towers)
+        np.save(filename, vectorized_towers)
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num-towers', type=int, default=100)
     # parser.add_argument('--output', type=str, required=True, help='where to save')
     args = parser.parse_args()
 

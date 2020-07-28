@@ -69,6 +69,26 @@ class Object:
     def get_id(self):
         return self.id
 
+    def vectorize(self):
+      """ Summarize a block in a vector
+
+      1 mass
+      3 com
+      3 dimensions
+      3 pos
+      4 quat
+      3 color
+      """
+      v = np.zeros(17)
+      v[0] = self.mass
+      v[1:4] = self.com
+      v[4:7] = self.dimensions
+      v[7:10] = self.pose.pos
+      v[10:14] = self.pose.orn
+      v[14:17] = self.color
+
+      return v
+
     @staticmethod
     def random(name=None):
         """ Construct a random object
@@ -112,7 +132,6 @@ class Object:
                                 orn=Quaternion(x=0, y=0, z=0, w=1)))
 
         return platform_block, platform_leg
-
 
 class Hand:
     def __init__(self):
