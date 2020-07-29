@@ -56,7 +56,7 @@ def load_dataset(name):
 
     return datasets
 
-def split(datasets, part_train=0.95):
+def split(datasets, part_train=0.9):
     train_datasets = []
     test_datasets = []
     for d in datasets:
@@ -147,24 +147,32 @@ def assess_generalization(model, datasets):
 
     train_datasets, test_datasets = split(datasets)
 
-    accuracies = train(model, train_datasets)
-    plt.plot(accuracies)
+    # get an initial measurement of the accuacy so we can see how much inference
+    # improves things
+    pre_inference_accuracies = test(model, test_datasets)
+
+    # perform inference
+    inference_accuracies = train(model, train_datasets)
+    plt.plot(inference_accuracies)
     plt.xlabel('Batch')
     plt.ylabel('Accuracy')
     plt.title('Accuracy throughout inference on test data')
     plt.show()
 
-    accuracies = test(model, test_datasets)
-    plt.scatter(np.arange(2, 6), accuracies)
+    # and then measure the accuracy again after inference
+    post_inference_accuracies = test(model, test_datasets)
+    plt.scatter(np.arange(2, 6), post_inference_accuracies, label='Post-inference')
+    plt.scatter(np.arange(2, 6), pre_inference_accuracies, label='Pre-inference')
+    plt.legend()
     plt.xlabel('Num Blocks in Tower')
     plt.ylabel('Accuracy')
-    plt.title('Final accuracy on test data')
+    plt.title('Accuracy on test data')
     plt.show()
 
 
 if __name__ == '__main__':
     # number of blocks in the training and test set
-    num_blocks = 10
+    num_blocks = 100
     #the dimensionality of the observed block attributes
     O = 11
     # the dimensionality of the latent space
@@ -194,5 +202,5 @@ if __name__ == '__main__':
     plt.title('Final accuracy on validation data')
     plt.show()
 
-    generalization_datasets = load_dataset(f'{num_blocks}block_set_(x1000).pkl')
+    generalization_datasets = load_dataset('10block_set_(x1000).pkl')
     assess_generalization(model, generalization_datasets)
