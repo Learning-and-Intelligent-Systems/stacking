@@ -84,7 +84,7 @@ def train(model, datasets):
     losses = []
     num_data_points = len(datasets[0])
 
-    for epoch_idx in range(5):
+    for epoch_idx in range(1):
         # create a dataloader for each tower size
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=batch_size, shuffle=True))
@@ -130,7 +130,7 @@ def test(model, datasets):
 if __name__ == '__main__':
     model = FCGAT(14+M, M)
 
-    train_datasets = load_dataset('10block_set_(x1000).pkl')
+    train_datasets = load_dataset('random_blocks_(x20000).pkl')
     losses = train(model, train_datasets)
     plt.plot(losses)
     plt.xlabel('Batch (x10)')

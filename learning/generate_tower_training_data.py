@@ -16,10 +16,6 @@ def vectorize(tower):
     return [b.vectorize() for b in tower]
 
 def sample_random_tower(blocks):
-    # since the blocks are sampled with replacement from a finite set, the
-    # object instances are sometimes identical. we need to deepcopy the blocks
-    # one at a time to make sure that they don't share the same instance
-    blocks = [deepcopy(block) for block in blocks]
     num_blocks = len(blocks)
     # pick random orientations for the blocks
     orns = sample_with_replacement(list(rotation_group()), k=num_blocks)
@@ -61,6 +57,11 @@ def build_tower(blocks, stable=True, vis=False):
     # init a tower planner for checking stability
     tp = TowerPlanner(stability_mode='angle')
 
+    # since the blocks are sampled with replacement from a finite set, the
+    # object instances are sometimes identical. we need to deepcopy the blocks
+    # one at a time to make sure that they don't share the same instance
+    blocks = [deepcopy(block) for block in blocks]
+
     while True:
         # generate a random tower
         tower = sample_random_tower(blocks)
@@ -81,7 +82,7 @@ def get_filename(num_towers, use_block_set, block_set_size):
 
 def main(args):
     # specify the number of towers to generate
-    num_towers = 1000
+    num_towers = 10000
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
     use_block_set = True
