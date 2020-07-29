@@ -100,3 +100,22 @@ class FCGAT(nn.Module):
         x = x.view(N,K,1)[...,0]
         x = torch.sigmoid(x)
         return x.prod(axis=1)
+
+    def iterate(self, towers, k=None, x=None):
+        N, K, _ = towers.shape
+
+        # create additional channels to be used in the processing of the tower
+        if x is None:
+            x = 1e-2*torch.randn(N, K, self.D2)
+
+        # run the network as many times as there are blocks in the tower
+        if k is None:
+            k = K
+
+        # run the network as many times as there are blocks
+        for _ in range(k):
+            # append the tower information
+            x = torch.cat([towers, x], axis=2)
+            x = self.forward(x)
+
+        return self.output(x)

@@ -14,9 +14,6 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from learning.gat import FCGAT
 
-# the number of latent variables in the graph NN
-M = 20
-
 def load_dataset(name):
     """ Load all the tower data into TensorDatasets. We need a different
     dataset for each tower size, because vectorized Graph Attention Network
@@ -47,40 +44,9 @@ def load_dataset(name):
 
     return datasets
 
-def run_model_on_towers(model, towers):
-    """ runs the given GAT model on the given set of vectorized towers.
-
-    Arguments:
-        model {GAT} -- the model
-        towers {torch.Tensor} -- [N x K x 14] tensor of towers
-
-    Returns:
-        torch.Tensor -- [N] tensor of stability predictions
-    """
-    N, K, _ = towers.shape
-
-    # create M additional channels to be used in the processing of the tower
-    x = 1e-2*torch.randn(N, K, M)
-    # run the network as many times as there are blocks
-    for _ in range(K+2):
-    # for _ in range(6):
-        # append the tower information
-        x = torch.cat([towers, x], axis=2)
-        x = model(x)
-
-
-    tower_preds = model.output(x)
-    # # pull out the logit for the predicted stability of each block
-    # block_preds = torch.sigmoid(x[...,-1])
-    # # the tower stability involves every block being stable
-    # tower_preds = block_preds.prod(axis=1)
-    return tower_preds
-
-
-
 def train(model, datasets):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    batch_size = 10
+    batch_size = 20
     losses = []
     num_data_points = len(datasets[0])
 
@@ -97,7 +63,7 @@ def train(model, datasets):
                 optimizer.zero_grad()
 
                 towers, labels = next(iterable_dataloader)
-                preds = run_model_on_towers(model, towers)
+                preds = model.iterate(towers, k=6)
                 l = F.binary_cross_entropy(preds, labels)
 
                 l.backward()
@@ -119,7 +85,7 @@ def test(model, datasets):
         towers = dataset[:][0]
         labels = dataset[:][1]
         # run the model on everything
-        preds = run_model_on_towers(model, towers)
+        preds = model.iterate(towers, k=6)
         # calculate the and save the accuracy
         accuracy = ((preds>0.5) == labels).float().mean()
         accuracies.append(accuracy.item())
@@ -128,6 +94,8 @@ def test(model, datasets):
 
 
 if __name__ == '__main__':
+    # the number of hidden variables in the graph NN
+    M = 20
     model = FCGAT(14+M, M)
 
     train_datasets = load_dataset('random_blocks_(x20000).pkl')
