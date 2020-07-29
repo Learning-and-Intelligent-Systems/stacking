@@ -77,7 +77,7 @@ def attach_latents_to_towers(model, towers, block_ids):
 def train(model, datasets):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     batch_size = 50
-    losses = []
+    accuracies = []
     num_data_points = len(datasets[0])
 
     for epoch_idx in range(10):
@@ -101,12 +101,12 @@ def train(model, datasets):
                 l.backward()
                 optimizer.step()
                 accuracy = ((preds>0.5) == labels).float().mean()
-                losses.append(accuracy.item())
+                accuracies.append(accuracy.item())
 
             if batch_idx % 40 == 0:
-                print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {losses[-4:]}')
+                print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {accuracies[-4:]}')
 
-    return losses
+    return accuracies
 
 def test(model, datasets):
     accuracies = []
@@ -127,6 +127,40 @@ def test(model, datasets):
 
     return accuracies
 
+def assess_generalization(model, datasets):
+    # we need to assess how well the model generalize to blocks other than
+    # the ones seen in training. This function freezes the weights of the
+    # dynamics function, and performs inference on the latents for previously
+    # unseen blocks. It then uses those inferred latents to make predictions
+    # for novel towers involving those blocks
+
+    # freeze all the weights in the model
+    for parameter in model.parameters():
+        parameter.requires_grad = False
+
+    L = model.latents.shape[1]
+    num_blocks = 10
+    model.latents = nn.Parameter(torch.randn(num_blocks, L))
+
+    # and unfreeze the latents
+    model.latents.requires_grad = True
+
+    train_datasets, test_datasets = split(datasets)
+
+    accuracies = train(model, train_datasets)
+    plt.plot(accuracies)
+    plt.xlabel('Batch')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy throughout inference on test data')
+    plt.show()
+
+    accuracies = test(model, test_datasets)
+    plt.scatter(np.arange(2, 6), accuracies)
+    plt.xlabel('Num Blocks in Tower')
+    plt.ylabel('Accuracy')
+    plt.title('Final accuracy on test data')
+    plt.show()
+
 
 if __name__ == '__main__':
     # number of blocks in the training and test set
@@ -144,15 +178,21 @@ if __name__ == '__main__':
 
     # load the data and split into train and test
     datasets = load_dataset(f'{num_blocks}block_set_(x10000).pkl')
-    train_datasets, test_datasets = split(datasets)
+    train_datasets, validation_datasets = split(datasets)
 
-    losses = train(model, train_datasets)
-    plt.plot(losses)
-    plt.xlabel('Batch (x10)')
+    accuracies = train(model, train_datasets)
+    plt.plot(accuracies)
+    plt.xlabel('Batch')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy throughout training')
     plt.show()
 
-    accuracies = test(model, test_datasets)
+    accuracies = test(model, validation_datasets)
     plt.scatter(np.arange(2, 6), accuracies)
     plt.xlabel('Num Blocks in Tower')
     plt.ylabel('Accuracy')
+    plt.title('Final accuracy on validation data')
     plt.show()
+
+    generalization_datasets = load_dataset(f'{num_blocks}block_set_(x1000).pkl')
+    assess_generalization(model, generalization_datasets)

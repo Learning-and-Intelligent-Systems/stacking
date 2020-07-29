@@ -87,7 +87,7 @@ def main(args):
     # for each tower
     use_block_set = True
     # the number of blocks in the finite set of blocks
-    block_set_size = 10
+    block_set_size = 100
     # generate the finite set of blocks
     if use_block_set:
         block_set = [Object.random(f'obj_{i}') for i in range(block_set_size)]
