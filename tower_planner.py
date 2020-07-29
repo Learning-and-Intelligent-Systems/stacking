@@ -112,7 +112,6 @@ class TowerPlanner(PlannerBase):
                            top_com_dist_y_n])
             angles = np.degrees(np.arctan2(y, xs))
             # and check stability
-            print(angles)
             return (angles < 90 - self.angle_thresh).all()
         else:
             # Check if the COM of the top object is within the dimensions of the bottom
