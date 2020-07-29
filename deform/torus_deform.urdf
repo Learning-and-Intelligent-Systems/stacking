@@ -8,7 +8,7 @@
     <collision_margin value="0.006"/>
     <repulsion_stiffness value="800.0"/>
     <friction value= "0.5"/>
-    <neohookean mu= "60" lambda= "200" damping= "0.01" />
+    <neohookean mu= "200" lambda= "200" damping= "0.01" />
     <visual filename="torus.vtk"/>
   </deformable>
 </robot>

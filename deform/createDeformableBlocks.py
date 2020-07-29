@@ -1,40 +1,53 @@
 import pybullet as p 
 from odio_urdf import *
+import os
 
 physicsClient = p.connect(p.GUI)
 p.resetSimulation(p.RESET_USE_DEFORMABLE_WORLD) #this is for FEM based simulation
 
+tmp_dir = 'tmp_urdfs'
+if not os.path.isdir(tmp_dir):
+    os.mkdir(tmp_dir)
 
+def out_of_bounds(l, index):
+    try:
+        return l[index]
+    except IndexError:
+        return 0
 
-def createBlock(name="dBlock1", origin=(0,0,0,0,0,0), mass=1.0, inertia=(0.001,0,0,0.001,0,0.001), collision_margin = 0.006,
- repulsion_stiffness=800.0, friction=0.5, neo=(60, 200, 0.01), size=(0.04,0.04,0.04), color=(0,1,1,1)):
-    robot=Robot("block")
-    deformable=Link(name)
-    origin=Origin(xyz="{} {} {}".format(origin[0], origin[1], origin[2]), rpy="{} {} {}".format(origin[3], origin[4], origin[5]))
-    inert=Inertial(origin,
-                    Mass(value= "{}".format(mass)),
-                    Inertia(ixx="{}".format(inertia[0]),
-                            ixy="{}".format(inertia[1]),
-                            ixz="{}".format(inertia[2]),
-                            iyy="{}".format(inertia[3]),
-                            iyz="{}".format(inertia[4]),
-                            izz="{}".format(inertia[5]))
+def createBlock(**kwargs):
+    #inertia takes a list with a specfic order but I can change it to a dicitonary if we desire
+    deformable_urdf=Deformable(kwargs['name'])
+    i=Inertial( Mass(value= kwargs['mass']),
+                    Inertia(ixx=out_of_bounds(kwargs['inertia'], 0),
+                            ixy=out_of_bounds(kwargs['inertia'], 1),
+                            ixz=out_of_bounds(kwargs['inertia'], 2),
+                            iyy=out_of_bounds(kwargs['inertia'], 3),
+                            iyz=out_of_bounds(kwargs['inertia'], 4),
+                            izz=out_of_bounds(kwargs['inertia'], 5))
                     )
-    collision = Collision(origin,
-                        Geometry(Box(size="{} {} {}".format(size[0],size[1], size[2])))
-                        )
-    visual=Visual(origin,
-                Geometry(Box(size="{} {} {}".format(size[0],size[1], size[2]))),
-                Material(Color(rgba="{} {} {} {}".format(color[0], color[1], color[2], color[3])))
-    )   
-    
-    print(robot(deformable(inert, collision, visual)))
+    c=Collision_margin(value = kwargs['collision_margin'])
+    r=Repulsion_Stiffness(value = kwargs['repulsion_stiffness'])
+    f=Friction(value = kwargs['friction']),
+    n=Neohookean(mu=kwargs['mu'], lam = kwargs['lamda'], damping=kwargs['damping']),
+    v=Visual(filename=kwargs['filename'])
 
-#other hacky method
+    return Robot(deformable_urdf(i,c,r,f,n,v))
 
-def createSpring():
-    #this might be just loading a premade urdf file that is a spring
-    pass
+if __name__ == "__main__":
+    myRobot = Robot(Deformable(
+            Inertial(
+                Mass(value=1),
+                Inertia(ixx=100, ixy=0),
+            ),
+            Collision_margin(value = 0.006),
+            Repulsion_Stiffness(value = 800.0),
+            Friction(value = 0.5),
+            Neohookean(mu=200.0, lam = 200.0, damping=0.01),
+            Visual2(filename="torus.vtk"),
+            name="practice"
+            ), name="block")
 
-def createSoftBody():
-    pass
+    print(myRobot)
+    with open(tmp_dir+'/practice_'+ str(0) + '.urdf', 'w') as handle:
+        handle.write(str(myRobot))
