@@ -2,18 +2,24 @@
 
 Izzy Brand, 2020
 """
-# from agents.teleport_agent import TeleportAgent
+from agents.teleport_agent import TeleportAgent
 from block_utils import Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block
 from tower_planner import TowerPlanner
 
 import argparse
+from copy import deepcopy
 import numpy as np
+import pickle
 from random import choices as sample_with_replacement
 
 def vectorize(tower):
     return [b.vectorize() for b in tower]
 
 def sample_random_tower(blocks):
+    # since the blocks are sampled with replacement from a finite set, the
+    # object instances are sometimes identical. we need to deepcopy the blocks
+    # one at a time to make sure that they don't share the same instance
+    blocks = [deepcopy(block) for block in blocks]
     num_blocks = len(blocks)
     # pick random orientations for the blocks
     orns = sample_with_replacement(list(rotation_group()), k=num_blocks)
@@ -51,37 +57,82 @@ def sample_random_tower(blocks):
 
     return blocks
 
-def build_tower(blocks, stable=True):
+def build_tower(blocks, stable=True, vis=False):
     # init a tower planner for checking stability
     tp = TowerPlanner(stability_mode='angle')
+
     while True:
         # generate a random tower
         tower = sample_random_tower(blocks)
+        # visualize the tower if desired
+        if vis: TeleportAgent.simulate_tower(tower, vis=True, T=20)
         # if the tower is stable, visualize it for debugging
         rotated_tower = [get_rotated_block(b) for b in tower]
         # save the tower if it's stable
         if tp.tower_is_stable(rotated_tower) == stable:
             return tower
 
+    return None
+
+def get_filename(num_towers, use_block_set, block_set_size):
+    # create a filename for the generated data based on the configuration
+    block_set_string = f"{block_set_size}block_set" if use_block_set else "random_blocks"
+    return f'learning/data/{block_set_string}_(x{num_towers}).pkl'
+
 def main(args):
-    stable = True
+    # specify the number of towers to generate
+    num_towers = 1000
+    # specify whether to use a finite set of blocks, or to generate new blocks
+    # for each tower
+    use_block_set = True
+    # the number of blocks in the finite set of blocks
+    block_set_size = 10
+    # generate the finite set of blocks
+    if use_block_set:
+        block_set = [Object.random(f'obj_{i}') for i in range(block_set_size)]
+    # create a vector of stability labels where half are unstable and half are stable
+    stability_labels = np.zeros(num_towers, dtype=int)
+    stability_labels[num_towers // 2:] = 1
+
+
+    dataset = {}
     for num_blocks in range(2,6):
         vectorized_towers = []
-        num_towers = 10000
-        for count in range(num_towers):
-            # generate random blocks
-            blocks = [Object.random(f'Obj_{i}') for i in range(num_blocks)]
+        block_names = []
+
+        for i, stable in enumerate(stability_labels):
+            # print the information about the tower we are about to generate
+            print(f'{i}/{num_towers}\t{"stable" if stable else "unstable"} {num_blocks}-block tower')
+
+            # generate random blocks. Use the block set if specified. otherwise
+            # generate new blocks from scratch. Save the block names if using blocks
+            # from the block set
+            if use_block_set:
+                blocks = sample_with_replacement(block_set, k=num_blocks)
+            else:
+                blocks = [Object.random(f'obj_{i}') for i in range(num_blocks)]
+
             # generate a random tower
             tower = build_tower(blocks, stable)
+
             # append the tower to the list
             vectorized_towers.append(vectorize(tower))
-            print(count)
+            block_names.append([b.name for b in blocks])
 
-        filename = f'learning/data/{"stable" if stable else "unstable"}_{num_blocks}block_(x{num_towers}).npy'
-        print('Saving to', filename)
-        vectorized_towers = np.array(vectorized_towers)
-        np.save(filename, vectorized_towers)
+        data = {
+            'towers': np.array(vectorized_towers),
+            'labels': stability_labels
+        }
+        if use_block_set:
+            data['block_names'] = block_names
 
+        dataset[f'{num_blocks}block'] = data
+
+    # save the generate data
+    filename = get_filename(num_towers, use_block_set, block_set_size)
+    print('Saving to', filename)
+    with open(filename, 'wb') as f:
+        pickle.dump(dataset, f)
 
 
 if __name__ == '__main__':
