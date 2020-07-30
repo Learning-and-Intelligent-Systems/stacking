@@ -94,9 +94,9 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
             new_y = transformation([0.0, length, 0.0], pos, quat)
             new_z = transformation([0.0, 0.0, length], pos, quat)
 
-            p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime)
-            p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime)
-            p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime)
+            p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime, physicsClientId=1)
+            p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
+            p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
 
         for _ in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)

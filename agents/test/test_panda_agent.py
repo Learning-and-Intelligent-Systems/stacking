@@ -67,7 +67,7 @@ def test_place_action(blocks, block_ix):
     Test method to try placing the given blocks on the platform.
     """
     agent = PandaAgent(blocks, NOISE, teleport=False)
-    for r in list(rotation_group())[5:]:
+    for r in list(rotation_group())[:]:
         
         action = PlaceAction(pos=None,
                              rot=r,
@@ -193,21 +193,28 @@ def visualize_grasps(agent, blocks):
     get_grasp = tamp.primitives.get_grasp_gen(agent.robot)
     get_ik = tamp.primitives.get_ik_fn(agent.robot, [agent.platform_leg, agent.platform_table, agent.table])
     
+    block_ix = 3
     for r in list(rotation_group())[5:]:
         table_pose = pb_robot.vobj.BodyPose(agent.table, 
                                             agent.table.get_base_link_pose())
-        pose = agent.pddl_blocks[3].get_base_link_pose()
-        pose = ((pose[0][0], pose[0][1], pose[0][2]), pose[1])
-        start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[3], 
+        pose = agent.pddl_blocks[block_ix].get_base_link_pose()
+        pose = ((pose[0][0] - 0.1, pose[0][1], pose[0][2]+0.2), pose[1])
+        start_pose = pb_robot.vobj.BodyPose(agent.pddl_blocks[block_ix], 
                                             pose)
-        agent.pddl_blocks[3].set_base_link_pose(pose)
+        agent.execute()
+        agent.pddl_blocks[block_ix].set_base_link_pose(pose)
+        agent.plan()
+        agent.pddl_blocks[block_ix].set_base_link_pose(pose)
         ix = 0
-        for grasp in list(get_grasp(agent.pddl_blocks[3])):
-            ik_start = get_ik(agent.pddl_blocks[3], start_pose, grasp[0])
+        for grasp in list(get_grasp(agent.pddl_blocks[block_ix])):
+            ik_start = get_ik(agent.pddl_blocks[block_ix], start_pose, grasp[0])
             import time
             if ik_start is not None:
                 print(ix, 'Y')
-                agent.robot.arm.SetJointValues(ik_start[0].configuration)
+                agent.execute()
+                agent.robot.arm.SetJointValues(ik_start[1][0].path[-1])
+                agent.plan()
+                agent.robot.arm.SetJointValues(ik_start[1][0].path[-1])
                 import time
                 time.sleep(2)
             else:
@@ -339,10 +346,10 @@ if __name__ == '__main__':
     #test_table_pose_ik(agent, blocks)
     # test_placement_ik(agent, blocks)
     # input('Continue?')
-    #test_place_action(blocks, 0)
+    test_place_action(blocks, 3)
     #test_observations(blocks, 1)
     #test_return_to_start(blocks, rot_ix=3)
     #test_placement_on_platform(agent)
-    test_tower_simulation(blocks)
+    #test_tower_simulation(blocks)
     time.sleep(5.0)
     pb_robot.utils.disconnect()
