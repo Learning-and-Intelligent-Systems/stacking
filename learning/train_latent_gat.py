@@ -56,7 +56,7 @@ def load_dataset(name):
 
     return datasets
 
-def split(datasets, part_train=0.9):
+def split(datasets, part_train=0.95):
     train_datasets = []
     test_datasets = []
     for d in datasets:
@@ -80,7 +80,7 @@ def train(model, datasets):
     accuracies = []
     num_data_points = len(datasets[0])
 
-    for epoch_idx in range(10):
+    for epoch_idx in range(15):
         # create a dataloader for each tower size
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=batch_size, shuffle=True))
@@ -134,18 +134,20 @@ def assess_generalization(model, datasets):
     # unseen blocks. It then uses those inferred latents to make predictions
     # for novel towers involving those blocks
 
+
+
+    L = model.latents.shape[1]
+    num_blocks = 100
+    model.latents = nn.Parameter(torch.randn(num_blocks, L))
+
+
     # freeze all the weights in the model
     for parameter in model.parameters():
         parameter.requires_grad = False
-
-    L = model.latents.shape[1]
-    num_blocks = 10
-    model.latents = nn.Parameter(torch.randn(num_blocks, L))
-
     # and unfreeze the latents
     model.latents.requires_grad = True
 
-    train_datasets, test_datasets = split(datasets)
+    train_datasets, test_datasets = split(datasets, part_train=0.8)
 
     # get an initial measurement of the accuacy so we can see how much inference
     # improves things
@@ -172,11 +174,11 @@ def assess_generalization(model, datasets):
 
 if __name__ == '__main__':
     # number of blocks in the training and test set
-    num_blocks = 100
+    num_blocks = 1000
     #the dimensionality of the observed block attributes
     O = 11
     # the dimensionality of the latent space
-    L = 3
+    L = 5
     # the number of hidden variables in the graph NN
     M = 20
     model = FCGAT(O+L+M, M)
@@ -185,7 +187,7 @@ if __name__ == '__main__':
     model.latents = nn.Parameter(torch.randn(num_blocks, L))
 
     # load the data and split into train and test
-    datasets = load_dataset(f'{num_blocks}block_set_(x10000).pkl')
+    datasets = load_dataset(f'{num_blocks}block_set_(x50000).pkl')
     train_datasets, validation_datasets = split(datasets)
 
     accuracies = train(model, train_datasets)
@@ -202,5 +204,5 @@ if __name__ == '__main__':
     plt.title('Final accuracy on validation data')
     plt.show()
 
-    generalization_datasets = load_dataset('10block_set_(x1000).pkl')
+    generalization_datasets = load_dataset('100block_set_(x10000).pkl')
     assess_generalization(model, generalization_datasets)
