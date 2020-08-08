@@ -82,12 +82,12 @@ def get_filename(num_towers, use_block_set, block_set_size):
 
 def main(args):
     # specify the number of towers to generate
-    num_towers = 10000
+    num_towers = 50000
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
     use_block_set = True
     # the number of blocks in the finite set of blocks
-    block_set_size = 10
+    block_set_size = 1000
     # generate the finite set of blocks
     if use_block_set:
         block_set = [Object.random(f'obj_{i}') for i in range(block_set_size)]
