@@ -1,0 +1,46 @@
+%if you are looking to edit LaTex files in VSC I highly reccomend checking out this tutorial https://github.com/James-Yu/LaTeX-Workshop/wiki/Install
+
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\title{Pybullet Documentation}
+\author{Jack Rivera}
+\date{August 2020}
+
+\begin{document}
+
+\section{Pybullet Documentation Extended}
+
+\vspace{0.4cm}
+\textbf{softBodyAnchor} (int body1, int link1, int body2, int link2, vec3 offset)
+\newline Pins vertex of a soft body to the vertex of a rigid/multi body or world. Returns constraint unique ID. See removeConstraint API to remove constraint
+\vspace{0.2cm}
+\newline @param
+\begin{itemize}
+    \item body1 - a non-negative integer denoting the body unique id of a deformable
+    \item link1 - an integer denoting the index of the link. Default is -1 for the base
+    \item body2 - a non-negative integer denoting the body unique id of a rigid/multibody. Default is -1 for the world
+    \item link2 - an integer denoting the index of the link. Default is -1 for the base
+    \item offset (optional) - unclear
+\end{itemize}
+@return - an integer denoting the constraint unique ID
+\vspace{0.4cm}
+\newline
+\textbf{getMeshData} (int bodyID)
+\newline Experimental API used to mesh information (indices, vertices)
+\vspace{0.2cm}
+\newline @param
+\begin{itemize}
+    \item bodyID - a non-negative integer denoting the body unique id of a mesh
+    \item note: other params outlined in pybullet doc do not appear to work
+\end{itemize}
+@return - a tuple (numVertices, (vertices)) where each vertex is a tuple (x,y,z) 
+
+\section{URDF Tags}
+\begin{itemize}
+    \item The 'neohookean' tag of a 'deformable' takes it's 'mu' and 'lambda' parameters (the lame parameters) in kPa (This is suspected given 60 mu and 200 lambda work and 60 Kpa =0.06 MPa which is close to the approximated 0.1 MPa for hyperelastic material elastin).
+    \item The 'virtual' tag of a 'deformable' is constrained to only a 'filename' attribute that loads a vtk/obj file. The deformable can only be relocated upon loading (loadURDF) and therefore cannot have a changed center of mass given you cannot specify an inertial reference frame relative to a nonexistent link reference frame
+    \item The 'inertial' tag is the only difference between loadSoftBody and developing a URDF with the 'deformable' tag and using loadURDF
+    \item Known supported URDF element tags for deformables: 'collision\_margin', 'repulsion\_stiffness', 'friction', 'neohookean'. The specifics of the tags can be found in the documentation for loadSoftBody in PyBullet Quickstart Guide and the other variables in said documentation are proposed to also be supported URDF element tags for deformables.
+\end{itemize}
+\end{document}
