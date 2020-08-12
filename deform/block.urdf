@@ -11,6 +11,7 @@
    <geometry >
     <box  size="1 1 1" />
    </geometry>
+   <!-- <contact_coefficients mu="0.2" kp="0.5" kd="0.5"/> -->
   </collision>
   <visual >
    <origin  xyz="0 0 0"  rpy="0 0 0" />
