@@ -47,18 +47,22 @@ def load_dataset(name):
         all_data = pickle.load(f)
 
     datasets = []
-    for num_blocks in range(2,4):
+    for num_blocks in range(2,6):
         data = all_data[f'{num_blocks}block']
         # load the tower data
         towers = torch.Tensor(data['towers'])
         labels = torch.Tensor(data['labels'])
 
+        # towers = torch.cat([towers[0:1250, :], towers[2500:3750,:],
+        #                     towers[6250:7500, :], towers[8750:, :]], dim=0)
+        # labels = torch.cat([labels[0:1250], labels[2500:3750],
+        #                     labels[6250:7500], labels[8750:]], dim=0)
         #towers, labels = get_subsets(data)
         # remove the three color channels at the end of each block encoding
         # (see block_utils.Object.vectorize for details)
         towers = towers[...,:14]
         # convert absolute xy positions to relative positions
-        towers[:,1:,7:9] -= towers[:,:-1,7:9]
+        #towers[:,1:,7:9] -= towers[:,:-1,7:9]
 
         # add the new dataset to the list of datasets
         datasets.append(TensorDataset(towers, labels))
@@ -113,7 +117,7 @@ def train(model, datasets):
     losses = []
     num_data_points = len(datasets[0])
 
-    for epoch_idx in range(100):
+    for epoch_idx in range(1000):
         # create a dataloader for each tower size
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=batch_size, shuffle=True))
@@ -128,13 +132,13 @@ def train(model, datasets):
 
                 towers, labels = next(iterable_dataloader)
                 #preds = model.iterate(towers, k=1)
-                preds = model.forward(towers, k=towers.shape[1]-1)
+                preds = model.forward(towers, k=1)#towers.shape[1]-1)
                 l = F.binary_cross_entropy(preds, labels)
                 l.backward()
                 optimizer.step()
                 accuracy = ((preds>0.5) == labels).float().mean()
                 accs[dx].append(accuracy)
-                losses.append(np.mean(accs[dx][-100:]))
+                losses.append(np.mean(accs[dx][-500:]))
             
                 #print(preds, labels)
                 
@@ -142,7 +146,7 @@ def train(model, datasets):
             if batch_idx % 40 == 0:
                 print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {losses[-4:]}')
 
-        print_split_accuracies(datasets[0], model)
+        #print_split_accuracies(datasets[0], model)
     return losses
 
 def test(model, datasets):
@@ -164,7 +168,7 @@ def test(model, datasets):
 
 if __name__ == '__main__':
     # the number of hidden variables in the graph NN
-    M = 512
+    M = 128
     #model = FCGAT(14+M, M)
     #model = MLP(2, 128)
     model = FCGN(14, 128)
