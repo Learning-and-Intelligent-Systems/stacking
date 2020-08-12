@@ -3,7 +3,7 @@
 Izzy Brand, 2020
 """
 from agents.teleport_agent import TeleportAgent
-from block_utils import Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block
+from block_utils import World, Environment, Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block
 from tower_planner import TowerPlanner
 
 import argparse
@@ -11,6 +11,7 @@ from copy import deepcopy
 import numpy as np
 import pickle
 from random import choices as sample_with_replacement
+import time
 
 def vectorize(tower):
     return [b.vectorize() for b in tower]
@@ -53,7 +54,13 @@ def sample_random_tower(blocks):
 
     return blocks
 
-def build_tower(blocks, stable=True, vis=False):
+def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=100):
+    """ Build a tower with the specified stability properties.
+    :param stable: Overall tower stability.
+    :param pairwise_stable: The stability between two consecutive blocks in the tower.
+    :param cog_stable: If the tower is stable just by looking at the CoG.
+    """
+   
     # init a tower planner for checking stability
     tp = TowerPlanner(stability_mode='angle')
 
@@ -62,7 +69,7 @@ def build_tower(blocks, stable=True, vis=False):
     # one at a time to make sure that they don't share the same instance
     blocks = [deepcopy(block) for block in blocks]
 
-    while True:
+    for _ in range(max_attempts):
         # generate a random tower
         tower = sample_random_tower(blocks)
         # visualize the tower if desired
@@ -70,22 +77,32 @@ def build_tower(blocks, stable=True, vis=False):
         # if the tower is stable, visualize it for debugging
         rotated_tower = [get_rotated_block(b) for b in tower]
         # save the tower if it's stable
-        if tp.tower_is_stable(rotated_tower) == stable:
-            return tower
+        if tp.tower_is_stable(rotated_tower) == stable and \
+           tp.tower_is_constructible(rotated_tower) == pairwise_stable and \
+           tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
+            return rotated_tower
 
     return None
 
-def get_filename(num_towers, use_block_set, block_set_size):
+def get_filename(num_towers, use_block_set, block_set_size, suffix):
     # create a filename for the generated data based on the configuration
     block_set_string = f"{block_set_size}block_set" if use_block_set else "random_blocks"
-    return f'learning/data/{block_set_string}_(x{num_towers}).pkl'
+    return f'learning/data/{block_set_string}_(x{num_towers})_{suffix}.pkl'
 
-def main(args):
+def main(args, vis_tower=False):
+    # This is a dictionary from stable/unstable label to what subsets of [COG_Stable, PW_Stable] to include.
+    difficulty_types = {
+        0: [[True, True], [False, True]],#[[True, True], [True, False], [False, True], [False, False]],
+        1: [[False, False], [True, False]]#[[True, True], [True, False], [False, True], [False, False]]
+    }
+
     # specify the number of towers to generate
-    num_towers = 50000
+    num_towers_per_cat = 2500
+    num_towers = num_towers_per_cat * 2 * 2
+
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
-    use_block_set = True
+    use_block_set = False
     # the number of blocks in the finite set of blocks
     block_set_size = 1000
     # generate the finite set of blocks
@@ -95,30 +112,55 @@ def main(args):
     stability_labels = np.zeros(num_towers, dtype=int)
     stability_labels[num_towers // 2:] = 1
 
-
     dataset = {}
-    for num_blocks in range(2,6):
+    for num_blocks in range(3, args.max_blocks+1):
         vectorized_towers = []
         block_names = []
 
-        for i, stable in enumerate(stability_labels):
-            # print the information about the tower we are about to generate
-            print(f'{i}/{num_towers}\t{"stable" if stable else "unstable"} {num_blocks}-block tower')
+        for stable in [0, 1]:
+            for cog_stable, pw_stable in difficulty_types[stable]:
+                # PW Stability is the same as global stability for two blocks.
+                if num_blocks == 2 and pw_stable != stable:
+                    continue
 
-            # generate random blocks. Use the block set if specified. otherwise
-            # generate new blocks from scratch. Save the block names if using blocks
-            # from the block set
-            if use_block_set:
-                blocks = sample_with_replacement(block_set, k=num_blocks)
-            else:
-                blocks = [Object.random(f'obj_{i}') for i in range(num_blocks)]
+                count = 0
+                while count < num_towers_per_cat:
+                    # print the information about the tower we are about to generate
+                    stability_type = "stable" if stable else "unstable"
+                    stability_type += "/cog_stable" if cog_stable else "/cog_unstable"
+                    stability_type += "/pw_stable" if pw_stable else "/pw_unstable"
+                    print(f'{count}/{num_towers_per_cat}\t{stability_type} {num_blocks}-block tower')
 
-            # generate a random tower
-            tower = build_tower(blocks, stable)
+                    # generate random blocks. Use the block set if specified. otherwise
+                    # generate new blocks from scratch. Save the block names if using blocks
+                    # from the block set
+                    if use_block_set:
+                        blocks = sample_with_replacement(block_set, k=num_blocks)
+                    else:
+                        blocks = [Object.random(f'obj_{ix}') for ix in range(num_blocks)]
 
-            # append the tower to the list
-            vectorized_towers.append(vectorize(tower))
-            block_names.append([b.name for b in blocks])
+                    # generate a random tower
+                    tower = build_tower(blocks, 
+                                        stable=stable, 
+                                        pairwise_stable=pw_stable, 
+                                        cog_stable=cog_stable)
+                    
+                    if tower is None:
+                        continue
+                    
+                    if vis_tower:
+                        w = World(tower)
+                        env = Environment([w], vis_sim=True, vis_frames=True)
+                        print(stability_type)
+                        input()
+                        for tx in range(240):
+                            env.step(vis_frames=False)
+                            time.sleep(1/240.)
+                        env.disconnect()
+                    count += 1
+                    # append the tower to the list
+                    vectorized_towers.append(vectorize(tower))
+                    block_names.append([b.name for b in blocks])
 
         data = {
             'towers': np.array(vectorized_towers),
@@ -130,7 +172,7 @@ def main(args):
         dataset[f'{num_blocks}block'] = data
 
     # save the generate data
-    filename = get_filename(num_towers, use_block_set, block_set_size)
+    filename = get_filename(num_towers, use_block_set, block_set_size, args.suffix)
     print('Saving to', filename)
     with open(filename, 'wb') as f:
         pickle.dump(dataset, f)
@@ -139,6 +181,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # parser.add_argument('--output', type=str, required=True, help='where to save')
+    parser.add_argument('--max-blocks', type=int, required=True)
+    parser.add_argument('--suffix', type=str, default='')
     args = parser.parse_args()
 
     main(args)
