@@ -17,7 +17,7 @@ from learning.gat import FCGAT
 from learning.gn import FCGN
 from learning.mlp import MLP
 from learning.lstm import TowerLSTM
-
+from learning.gated_gn import GatedGN
 
 def get_subsets(data):
     towers, labels = [], []
@@ -131,7 +131,7 @@ def train(model, datasets):
                 if torch.cuda.is_available():
                     towers = towers.cuda()
                     labels = labels.cuda()
-                preds = model.forward(towers, k=1)
+                preds = model.forward(towers, k=2)
                 l = F.binary_cross_entropy(preds, labels)
                 l.backward()
                 optimizer.step()
@@ -171,10 +171,11 @@ def test(model, datasets):
 if __name__ == '__main__':
     # the number of hidden variables in the graph NN
     M = 128
-    model = FCGAT(14+M, M)
+    #model = FCGAT(14+M, M)
     #model = MLP(2, 128)
     #model = FCGN(14, 128)
     #model = TowerLSTM(14, 128)
+    model = GatedGN(14, 64)
     if torch.cuda.is_available():
         model = model.cuda()
 
