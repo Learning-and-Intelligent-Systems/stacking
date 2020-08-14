@@ -16,6 +16,7 @@ from learning.analyze_data import is_geometrically_stable, is_com_stable, get_ge
 from learning.gat import FCGAT
 from learning.gn import FCGN
 from learning.mlp import MLP
+from learning.lstm import TowerLSTM
 
 
 def get_subsets(data):
@@ -53,10 +54,6 @@ def load_dataset(name):
         towers = torch.Tensor(data['towers'])
         labels = torch.Tensor(data['labels'])
 
-        # towers = torch.cat([towers[0:1250, :], towers[2500:3750,:],
-        #                     towers[6250:7500, :], towers[8750:, :]], dim=0)
-        # labels = torch.cat([labels[0:1250], labels[2500:3750],
-        #                     labels[6250:7500], labels[8750:]], dim=0)
         #towers, labels = get_subsets(data)
         # remove the three color channels at the end of each block encoding
         # (see block_utils.Object.vectorize for details)
@@ -131,8 +128,10 @@ def train(model, datasets):
                 
 
                 towers, labels = next(iterable_dataloader)
-                #preds = model.iterate(towers, k=1)
-                preds = model.forward(towers, k=1)#towers.shape[1]-1)
+                if torch.cuda.is_available():
+                    towers = towers.cuda()
+                    labels = labels.cuda()
+                preds = model.forward(towers, k=1)
                 l = F.binary_cross_entropy(preds, labels)
                 l.backward()
                 optimizer.step()
@@ -157,8 +156,11 @@ def test(model, datasets):
         # pull out the input and output tensors for the whole dataset
         towers = dataset[:][0]
         labels = dataset[:][1]
+        if torch.cuda.is_available():
+            towers = towers.cuda()
+            labels = labels.cuda()
         # run the model on everything
-        preds = model.forward(towers, k=towers.shape[1]-1)
+        preds = model.forward(towers, k=1)
         # calculate the and save the accuracy
         accuracy = ((preds>0.5) == labels).float().mean()
         accuracies.append(accuracy.item())
@@ -169,9 +171,12 @@ def test(model, datasets):
 if __name__ == '__main__':
     # the number of hidden variables in the graph NN
     M = 128
-    #model = FCGAT(14+M, M)
+    model = FCGAT(14+M, M)
     #model = MLP(2, 128)
-    model = FCGN(14, 128)
+    #model = FCGN(14, 128)
+    #model = TowerLSTM(14, 128)
+    if torch.cuda.is_available():
+        model = model.cuda()
 
     train_datasets = load_dataset('random_blocks_(x10000)_5blocks_all.pkl')
     losses = train(model, train_datasets)
