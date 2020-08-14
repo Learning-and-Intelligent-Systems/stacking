@@ -20,7 +20,8 @@ class FCGN(nn.Module):
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden),
                                nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden))
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU())
 
         # Update function that updates a node based on the sum of its messages.
         self.U = nn.Sequential(nn.Linear(n_in+n_hidden, n_hidden),            
@@ -29,11 +30,11 @@ class FCGN(nn.Module):
                                nn.ReLU())
 
         # Output function that predicts stability.
-        self.O = nn.Sequential(nn.Linear(n_hidden, 1))
-                               #nn.ReLU(),
+        self.O = nn.Sequential(nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
                                #nn.Linear(n_hidden, n_hidden),
                                #nn.ReLU(),
-                               #nn.Linear(n_hidden, 1))
+                               nn.Linear(n_hidden, 1))
         
         self.n_in, self.n_hidden = n_in, n_hidden
         self.init = nn.Parameter(torch.zeros(1, 1, n_hidden))
@@ -42,23 +43,26 @@ class FCGN(nn.Module):
         N, K, _ = towers.shape
 
         # Get features between all node. 
-        # xx.shape = (N, K, K, 2*n_in+2*n_hidden)
-        x = towers # self.E(towers.view(-1, self.n_in))#torch.cat([towers, h], dim=2)
-        #x = x.view(N, K, self.n_hidden) #+ h
-        x = x[:, :, None, :].expand(N, K, K, self.n_in)#+self.n_hidden)
+        # xx.shape = (N, K, K, 2*n_in)
+        x = towers 
+        x = x[:, :, None, :].expand(N, K, K, self.n_in)
         xx = torch.cat([x, x.transpose(1, 2)], dim=3)
-        xx = xx.view(-1, 2*self.n_in)#+self.n_hidden))
+        xx = xx.view(-1, 2*self.n_in)
 
         # Calculate the edge features for each node 
         # all_edges.shape = (N, K, K, n_hidden)
         all_edges = self.M(xx) 
         all_edges = all_edges.view(N, K, K, self.n_hidden)
 
-        # Sum the edge updates for each node.
+        # Only have edges from blocks above the current block.
         # edges.shape = (N, K, n_hidden)
         mask = torch.ones(N, K, K, 1)
-        for kx in range(K):
-            mask[:, kx, kx, :] = 0.
+        if torch.cuda.is_available():
+            mask = mask.cuda()
+        for kx1 in range(K):
+            for kx2 in range(K):
+                if kx1 >= kx2:
+                    mask[:, kx1, kx2, :] = 0.
         edges = torch.sum(all_edges*mask, dim=2)
         return edges
 
@@ -98,7 +102,8 @@ class FCGN(nn.Module):
             h = self.node_fn(towers, h, e)
             
         # Calculate output predictions.
-        x = self.O(h).view(N, K)
-        x = torch.sigmoid(x)
-        return x.prod(axis=1)
+        x = torch.mean(h, dim=1)
+        x = self.O(x).view(N)
+        return torch.sigmoid(x)
+        
         

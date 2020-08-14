@@ -31,9 +31,8 @@ class TowerLSTM(nn.Module):
         :param k: Number of times to iterate the graph update.
         """
         N, K, _ = towers.shape
-        # TODO: Reverse the sequence dimension.
         x = torch.flip(towers, dims=[1])
-        x, _ = self.lstm(towers)
+        x, _ = self.lstm(x)
 
         x = torch.mean(x, dim=1)
         x = self.O(x).view(N)

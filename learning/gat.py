@@ -67,7 +67,7 @@ class FCGAT(nn.Module):
         # unflatten and normalize attention weights for each node
         return F.softmax(aa.view(N, K, K), dim=2)
 
-    def forward(self, x):
+    def step(self, x):
         """ Apply the fully connected graph attention network layer
 
         Takes in a set of nodes from a fully connected graph. Applies a
@@ -101,7 +101,7 @@ class FCGAT(nn.Module):
         x = torch.sigmoid(x)
         return x.prod(axis=1)
 
-    def iterate(self, towers, k=None, x=None):
+    def forward(self, towers, k=None, x=None):
         N, K, _ = towers.shape
 
         # create additional channels to be used in the processing of the tower
@@ -116,6 +116,6 @@ class FCGAT(nn.Module):
         for _ in range(k):
             # append the tower information
             x = torch.cat([towers, x], axis=2)
-            x = self.forward(x)
+            x = self.step(x)
 
         return self.output(x)
