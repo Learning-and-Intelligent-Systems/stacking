@@ -2,6 +2,9 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+
+
+
 class GatedGN(nn.Module):
     def __init__(self, n_in, n_hidden):
         """ This network is given input of size (N, K, n_in) where N, K can vary per batch.
@@ -15,36 +18,85 @@ class GatedGN(nn.Module):
         self.E_g = nn.Linear(n_hidden, n_hidden)
 
         # Takes in features from nodes, node states, edge state, and global state.
-        self.M = nn.Sequential(nn.Linear(4*n_hidden+2*n_in, n_hidden),
-                               nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden))
-        self.M_update = nn.Sequential(nn.Linear(4*n_hidden+2*n_in, n_hidden),
-                                      nn.Sigmoid())   
-        self.M_reset = nn.Linear(4*n_hidden+2*n_in, n_hidden)
+        self.M_nodes = nn.Sequential(nn.Linear(2*n_hidden, n_hidden),
+                                     nn.ReLU(),
+                                     nn.Linear(n_hidden, n_hidden),
+                                     nn.ReLU(),
+                                     nn.Linear(n_hidden, n_hidden))
+        self.M_edges = nn.Sequential(nn.Linear(n_hidden, n_hidden),
+                                     nn.ReLU(),
+                                     nn.Linear(n_hidden, n_hidden),
+                                     nn.ReLU(),
+                                     nn.Linear(n_hidden, n_hidden))
+        self.M_global = nn.Sequential(nn.Linear(n_hidden, n_hidden),
+                                      nn.ReLU(),
+                                      nn.Linear(n_hidden, n_hidden),
+                                      nn.ReLU(),
+                                      nn.Linear(n_hidden, n_hidden))
+
+        self.M_update_nodes = nn.Linear(2*n_hidden, n_hidden)
+        self.M_update_edges = nn.Linear(n_hidden, n_hidden)
+        self.M_update_global = nn.Linear(n_hidden, n_hidden)
+        self.M_reset_nodes = nn.Linear(2*n_hidden, n_hidden)
+        self.M_reset_edges = nn.Linear(n_hidden, n_hidden)
+        self.M_reset_global = nn.Linear(n_hidden, n_hidden)
 
         # Update function that updates a node based on the sum of its messages.
-        self.U = nn.Sequential(nn.Linear(n_in+3*n_hidden, n_hidden),            
+        self.U_feats = nn.Sequential(nn.Linear(n_in, n_hidden),            
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden),
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
-        self.U_update = nn.Sequential(nn.Linear(n_in+3*n_hidden, n_hidden),
-                                      nn.Sigmoid())
-        self.U_reset = nn.Sequential(nn.Linear(n_in+3*n_hidden, n_hidden),
-                                     nn.Sigmoid())
+        self.U_node = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden))
+        self.U_edges = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden))
+        self.U_global = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden))
+
+        self.U_update_feats = nn.Linear(n_in, n_hidden)
+        self.U_update_node = nn.Linear(n_hidden, n_hidden)
+        self.U_update_edges = nn.Linear(n_hidden, n_hidden)
+        self.U_update_global = nn.Linear(n_hidden, n_hidden)
+
+        self.U_reset_feats = nn.Linear(n_in, n_hidden)
+        self.U_reset_node = nn.Linear(n_hidden, n_hidden)
+        self.U_reset_edges = nn.Linear(n_hidden, n_hidden)
+        self.U_reset_global = nn.Linear(n_hidden, n_hidden)
 
         # Recurrent function to update the global state.
-        self.G = nn.Sequential(nn.Linear(3*n_hidden, n_hidden),            
+        self.G_nodes = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden),
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
-        self.G_update = nn.Sequential(nn.Linear(3*n_hidden, n_hidden),
-                                      nn.Sigmoid())
-        self.G_reset = nn.Sequential(nn.Linear(3*n_hidden, n_hidden),
-                                     nn.Sigmoid())
+        self.G_edges = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden))
+        self.G_global = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden))
+
+        self.G_update_nodes = nn.Linear(n_hidden, n_hidden)
+        self.G_update_edges = nn.Linear(n_hidden, n_hidden)
+        self.G_update_global = nn.Linear(n_hidden, n_hidden)
+
+        self.G_reset_nodes = nn.Linear(n_hidden, n_hidden)
+        self.G_reset_edges = nn.Linear(n_hidden, n_hidden)
+        self.G_reset_global = nn.Linear(n_hidden, n_hidden)
 
         # Output function that predicts stability.
         self.O = nn.Sequential(nn.Linear(n_hidden, n_hidden),
@@ -56,28 +108,36 @@ class GatedGN(nn.Module):
         
         self.init_e = torch.zeros(1, 1, 1, n_hidden)
         self.init_g = torch.zeros(1, n_hidden)
+        
         self.n_in, self.n_hidden = n_in, n_hidden
 
     def edge_fn(self, towers, h, e, g):
         N, K, _ = towers.shape
 
         # Get features between all node. 
-        x = torch.cat([towers, h], dim=2)
-        x = x[:, :, None, :].expand(N, K, K, self.n_in+self.n_hidden)
+        x = h[:, :, None, :].expand(N, K, K, self.n_hidden)
         g = g[:, None, None, :].expand(N, K, K, self.n_hidden)
-        xx = torch.cat([x, x.transpose(1, 2), g, e], dim=3)
-        xx = xx.view(-1, 2*self.n_in + 4*self.n_hidden)
+        xx = torch.cat([x, x.transpose(1, 2)], dim=3)
+        xx = xx.view(-1, 2*self.n_hidden)
 
         # Calculate gate values.
-        resets = self.M_reset(xx).view(N, K, K, self.n_hidden)
-        update = self.M_update(xx).view(N, K, K, self.n_hidden)
+        r_g = self.M_reset_global(g.reshape(-1, self.n_hidden)).reshape(N, K, K, self.n_hidden)
+        r_e = self.M_reset_edges(e.view(-1, self.n_hidden)).view(N, K, K, self.n_hidden)
+        r_n = self.M_reset_nodes(xx).view(N, K, K, self.n_hidden)
+        reset = torch.sigmoid(r_g + r_e + r_n)
+
+        u_g = self.M_update_global(g.reshape(-1, self.n_hidden)).reshape(N, K, K, self.n_hidden)
+        u_e = self.M_update_edges(e.view(-1, self.n_hidden)).view(N, K, K, self.n_hidden)
+        u_n = self.M_update_nodes(xx).view(N, K, K, self.n_hidden)
+        update = torch.sigmoid(u_g + u_e + u_n)
 
         # Apply reset gate to inputs edge state.
-        xx = torch.cat([x, x.transpose(1, 2), g, resets*e], dim=3)
-        xx = xx.view(-1, 2*self.n_in + 4*self.n_hidden)
+        new_e_g = self.M_global(g.reshape(-1, self.n_hidden)).reshape(N, K, K, self.n_hidden)
+        new_e_h = self.M_nodes(xx).view(N, K, K, self.n_hidden)
+        new_e_e = self.M_edges((e*reset).view(-1, self.n_hidden)).view(N, K, K, self.n_hidden)
 
         # Calculate the updated hidden node values.
-        new_e = self.M(xx).view(N, K, K, self.n_hidden)
+        new_e = torch.tanh(new_e_g + new_e_h + new_e_h)
         new_e = (1 - update)*e + update*new_e
         return new_e
         
@@ -103,15 +163,24 @@ class GatedGN(nn.Module):
         x = x.view(-1, 3*self.n_hidden+self.n_in)
 
         # Calculate gate values.
-        resets = self.U_reset(x).view(N, K, self.n_hidden)
-        update = self.U_update(x).view(N, K, self.n_hidden)
+        r_g = self.U_reset_global(g.reshape(-1, self.n_hidden)).reshape(N, K, self.n_hidden)
+        r_e = self.U_reset_edges(edges.view(-1, self.n_hidden)).view(N, K, self.n_hidden)
+        r_n = self.U_reset_node(h.view(-1, self.n_hidden)).view(N, K, self.n_hidden)
+        r_f = self.U_reset_feats(towers.view(-1, self.n_in)).view(N, K, self.n_hidden)
+        reset = torch.sigmoid(r_g + r_e + r_n + r_f)
 
-        # Apply reset gate.
-        x = torch.cat([towers, edges, g, resets*h], dim=2)
-        x = x.view(-1, 3*self.n_hidden+self.n_in)
-
+        u_g = self.U_update_global(g.reshape(-1, self.n_hidden)).reshape(N, K, self.n_hidden)
+        u_e = self.U_update_edges(edges.view(-1, self.n_hidden)).view(N, K, self.n_hidden)
+        u_n = self.U_update_node(h.view(-1, self.n_hidden)).view(N, K, self.n_hidden)
+        u_f = self.U_update_feats(towers.view(-1, self.n_in)).view(N, K, self.n_hidden)
+        update = torch.sigmoid(u_g + u_e + u_n + u_f)
+        
         # Calculate the updated node features.
-        new_h = self.U(x).view(N, K, self.n_hidden)
+        new_h_f = self.U_feats(towers.view(-1, self.n_in)).view(N, K, self.n_hidden)
+        new_h_n = self.U_node((reset*h).view(-1, self.n_hidden)).view(N, K, self.n_hidden)
+        new_h_e = self.U_edges(edges.view(-1, self.n_hidden)).view(N, K, self.n_hidden)
+        new_h_g = self.U_global(g.reshape(-1, self.n_hidden)).reshape(N, K, self.n_hidden)
+        new_h = torch.tanh(new_h_f + new_h_n + new_h_e + new_h_g)
         new_h = (1 - update)*h + update*new_h
         return new_h
 
@@ -121,17 +190,23 @@ class GatedGN(nn.Module):
         # Concatenate all relevant inputs.
         h = h.sum(dim=1)
         e = e.sum(dim=[1,2])
-        x = torch.cat([h, e, g], dim=1)
 
         # Calculate gate values.
-        reset = self.G_reset(x)
-        update = self.G_update(x)
+        r_g = self.G_reset_global(g)
+        r_n = self.G_reset_nodes(h)
+        r_e = self.G_reset_edges(e)
+        reset = torch.sigmoid(r_g + r_n + r_e)
 
-        # Reset hidden states.
-        x = torch.cat([h, e, reset*g], dim=1)
+        u_g = self.G_update_global(g)
+        u_n = self.G_update_nodes(g)
+        u_e = self.G_update_edges(g)
+        update = torch.sigmoid(u_g + u_n + u_e)
 
         # Calculate updated global feature.
-        new_g = self.G(x)
+        new_g_g = self.G_global(reset*g)
+        new_g_e = self.G_edges(e)
+        new_g_v = self.G_nodes(h)
+        new_g = torch.tanh(new_g_g + new_g_e + new_g_v)
         new_g = (1 - update)*g + update*new_g
         return new_g
 
