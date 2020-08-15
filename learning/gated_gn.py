@@ -20,18 +20,18 @@ class GatedGN(nn.Module):
         # Takes in features from nodes, node states, edge state, and global state.
         self.M_nodes = nn.Sequential(nn.Linear(2*n_hidden, n_hidden),
                                      nn.ReLU(),
-                                     nn.Linear(n_hidden, n_hidden),
-                                     nn.ReLU(),
+        #                             nn.Linear(n_hidden, n_hidden),
+        #                             nn.ReLU(),
                                      nn.Linear(n_hidden, n_hidden))
         self.M_edges = nn.Sequential(nn.Linear(n_hidden, n_hidden),
                                      nn.ReLU(),
-                                     nn.Linear(n_hidden, n_hidden),
-                                     nn.ReLU(),
+        #                             nn.Linear(n_hidden, n_hidden),
+        #                             nn.ReLU(),
                                      nn.Linear(n_hidden, n_hidden))
         self.M_global = nn.Sequential(nn.Linear(n_hidden, n_hidden),
                                       nn.ReLU(),
-                                      nn.Linear(n_hidden, n_hidden),
-                                      nn.ReLU(),
+        #                              nn.Linear(n_hidden, n_hidden),
+        #                              nn.ReLU(),
                                       nn.Linear(n_hidden, n_hidden))
 
         self.M_update_nodes = nn.Linear(2*n_hidden, n_hidden)
@@ -44,23 +44,23 @@ class GatedGN(nn.Module):
         # Update function that updates a node based on the sum of its messages.
         self.U_feats = nn.Sequential(nn.Linear(n_in, n_hidden),            
                                nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
+        #                       nn.Linear(n_hidden, n_hidden),
+        #                       nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
         self.U_node = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
                                nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
+        #                       nn.Linear(n_hidden, n_hidden),
+        #                       nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
         self.U_edges = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
                                nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
+        #                       nn.Linear(n_hidden, n_hidden),
+        #                       nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
         self.U_global = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
                                nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
+        #                       nn.Linear(n_hidden, n_hidden),
+        #                       nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
 
         self.U_update_feats = nn.Linear(n_in, n_hidden)
@@ -76,18 +76,18 @@ class GatedGN(nn.Module):
         # Recurrent function to update the global state.
         self.G_nodes = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
                                nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
+        #                       nn.Linear(n_hidden, n_hidden),
+        #                       nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
         self.G_edges = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
                                nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
+        #                       nn.Linear(n_hidden, n_hidden),
+        #                       nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
         self.G_global = nn.Sequential(nn.Linear(n_hidden, n_hidden),            
                                nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
+        #                       nn.Linear(n_hidden, n_hidden),
+        #                       nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden))
 
         self.G_update_nodes = nn.Linear(n_hidden, n_hidden)
@@ -108,6 +108,9 @@ class GatedGN(nn.Module):
         
         self.init_e = torch.zeros(1, 1, 1, n_hidden)
         self.init_g = torch.zeros(1, n_hidden)
+        if torch.cuda.is_available():
+            self.init_e = self.init_e.cuda()
+            self.init_g = self.init_g.cuda()
         
         self.n_in, self.n_hidden = n_in, n_hidden
 
@@ -154,7 +157,9 @@ class GatedGN(nn.Module):
         if torch.cuda.is_available():
             mask = mask.cuda()
         for kx1 in range(K):
-            mask[:, kx1, kx1, :] = 0.
+            for kx2 in range(K):
+                if kx1 != kx2 - 1:
+                    mask[:, kx1, kx2, :] = 0.
         edges = torch.sum(e*mask, dim=2)
 
         # Concatenate all relevant inputs.
