@@ -107,7 +107,8 @@ class FCGAT(nn.Module):
         # create additional channels to be used in the processing of the tower
         if x is None:
             x = 1e-2*torch.randn(N, K, self.D2)
-
+            if torch.cuda.is_available():
+                x = x.cuda()
         # run the network as many times as there are blocks in the tower
         if k is None:
             k = K

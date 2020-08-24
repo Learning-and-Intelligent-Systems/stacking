@@ -10,7 +10,7 @@ class TowerLSTM(nn.Module):
         """
         super(TowerLSTM, self).__init__()
 
-        self.lstm = nn.LSTM(input_size=n_in,
+        self.lstm = nn.GRU(input_size=n_in,
                             hidden_size=n_hidden,
                             num_layers=2,
                             batch_first=True)
@@ -19,8 +19,8 @@ class TowerLSTM(nn.Module):
 
         self.O = nn.Sequential(nn.Linear(n_hidden, n_hidden),
                                nn.ReLU(),
-                               #nn.Linear(n_hidden, n_hidden),
-                               #nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
                                nn.Linear(n_hidden, 1))
         
         self.n_in, self.n_hidden = n_in, n_hidden
@@ -34,8 +34,8 @@ class TowerLSTM(nn.Module):
         x = torch.flip(towers, dims=[1])
         x, _ = self.lstm(x)
 
-        x = torch.mean(x, dim=1)
-        x = self.O(x).view(N)
-        return torch.sigmoid(x)
+        #x = torch.mean(x, dim=1)
+        x = torch.sigmoid(self.O(x.reshape(-1, self.n_hidden)).view(N, K))
+        return x.prod(dim=1)
 
         
