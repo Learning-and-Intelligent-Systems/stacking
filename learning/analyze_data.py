@@ -1,5 +1,8 @@
 import numpy as np
-
+import pickle
+import matplotlib.pyplot as plt
+from block_utils import Object, Pose, Position, Quaternion
+from tower_planner import TowerPlanner
 #rom learning.train_gat import load_dataset
 
 def is_com_stable(block0, block1):
@@ -83,9 +86,70 @@ def check_stability_type(dataset):
     print('Both:', n_gcstable)
     print('Valid:', label_com)
     
+def to_blocks(tower):
+    blocks = []
+    for ix in range(tower.shape[0]):
+        block = Object('block',
+                       dimensions=tower[ix, 4:7].numpy().tolist(),
+                       mass=tower[ix,0].item(),
+                       com=tower[ix, 1:4].numpy().tolist(),
+                       color=(1,0,0))
+        block.pose = Pose(Position(*tower[ix, 7:10].numpy().tolist()),
+                          Quaternion(*tower[ix, 10:14].numpy().tolist()))
+        blocks.append(block)
+    return blocks
+
+def evaluate_predictions(fname):
+    with open(fname, 'rb') as handle:
+        results = pickle.load(handle)
+
+    tp = TowerPlanner(stability_mode='contains')
+    
+    # Index this as [stable][cog_stable][pw_stable]
+    for ix, (towers, labels, preds) in enumerate(results):
+        correct = [[[0, 0],[0, 0]],[[0, 0],[0, 0]]]
+        total = [[[0, 0],[0, 0]],[[0, 0],[0, 0]]]
+
+        # Check the tower stability type.
+        for tower, label, pred in zip(towers, labels, preds):
+            blocks = to_blocks(tower)
+
+            cog_stable = tp.tower_is_cog_stable(blocks)
+            pw_stable = tp.tower_is_constructible(blocks)
+            stable = tp.tower_is_stable(blocks)
+            if stable != label:
+                print('WAT', stable, label)
+            #assert stable == label
+            total[stable][cog_stable][pw_stable] += 1
+            if (pred>0.5) == label:
+                correct[stable][cog_stable][pw_stable] += 1
+
+        print(total)
+        print('%d Towers' % (ix+2))
+        for stable in [0, 1]:
+            for cog_stable in [0, 1]:
+                for pw_stable in [0, 1]:
+                    if ix == 0 and pw_stable != stable:
+                        continue
+                    acc = correct[stable][cog_stable][pw_stable]/total[stable][cog_stable][pw_stable]
+                    print('Stable: %d\tCOG_Stable: %d\tPW_Stable: %d\tAcc: %f' % (stable, cog_stable, pw_stable, acc))
+
+
+def plot_data_distribution(fname):
+    with open(fname, 'rb') as handle:
+        data = pickle.load(handle)
+
+    towers = data['5block']['towers']
+    towers[:,1:,7:9] -= towers[:,:-1,7:9]
+
+    for tower in towers[::100]:
+        plt.scatter(tower[:,7], tower[:,8])
+
+    plt.show()
 
 if __name__ == '__main__':
-    FNAME = 'random_blocks_(x20000)_quat.pkl'
-    dataset = load_dataset(FNAME)
-
-    check_stability_type(dataset)
+    # FNAME = 'random_blocks_(x20000)_quat.pkl'
+    # dataset = load_dataset(FNAME)
+    # check_stability_type(dataset)
+    #evaluate_predictions('gat_preds.pkl')
+    plot_data_distribution('learning/data/random_blocks_(x10000)_5blocks_all.pkl')

@@ -54,7 +54,7 @@ def sample_random_tower(blocks):
 
     return blocks
 
-def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=100):
+def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
     """ Build a tower with the specified stability properties.
     :param stable: Overall tower stability.
     :param pairwise_stable: The stability between two consecutive blocks in the tower.
@@ -62,7 +62,7 @@ def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=
     """
    
     # init a tower planner for checking stability
-    tp = TowerPlanner(stability_mode='angle')
+    tp = TowerPlanner(stability_mode='contains')
 
     # since the blocks are sampled with replacement from a finite set, the
     # object instances are sometimes identical. we need to deepcopy the blocks
@@ -92,14 +92,13 @@ def get_filename(num_towers, use_block_set, block_set_size, suffix):
 def main(args, vis_tower=False):
     # This is a dictionary from stable/unstable label to what subsets of [COG_Stable, PW_Stable] to include.
     difficulty_types = {
-        0: [[True, True], [False, True]],#[[True, True], [True, False], [False, True], [False, False]],
-        1: [[False, False], [True, False]]#[[True, True], [True, False], [False, True], [False, False]]
+        0: [[True, True], [True, False], [False, True], [False, False]],
+        1: [[True, True], [True, False], [False, True], [False, False]]
     }
 
     # specify the number of towers to generate
-    num_towers_per_cat = 2500
-    num_towers = num_towers_per_cat * 2 * 2
-
+    num_towers_per_cat = 5000
+    num_towers = num_towers_per_cat * 4 * 2
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
     use_block_set = False
@@ -113,7 +112,7 @@ def main(args, vis_tower=False):
     stability_labels[num_towers // 2:] = 1
 
     dataset = {}
-    for num_blocks in range(3, args.max_blocks+1):
+    for num_blocks in range(2, args.max_blocks+1):
         vectorized_towers = []
         block_names = []
 
@@ -161,7 +160,12 @@ def main(args, vis_tower=False):
                     # append the tower to the list
                     vectorized_towers.append(vectorize(tower))
                     block_names.append([b.name for b in blocks])
-
+        if num_blocks == 2:
+            stability_labels = np.zeros(num_towers//2, dtype=int)
+            stability_labels[num_towers // 4:] = 1
+        else:
+            stability_labels = np.zeros(num_towers, dtype=int)
+            stability_labels[num_towers // 2:] = 1
         data = {
             'towers': np.array(vectorized_towers),
             'labels': stability_labels
@@ -185,4 +189,4 @@ if __name__ == '__main__':
     parser.add_argument('--suffix', type=str, default='')
     args = parser.parse_args()
 
-    main(args)
+    main(args, vis_tower=False)
