@@ -1,10 +1,9 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.21 (MiKTeX 20.6.29) (preloaded format=pdflatex 2020.8.8)  8 AUG 2020 15:13
+This is pdfTeX, Version 3.14159265-2.6-1.40.21 (MiKTeX 20.6.29) (preloaded format=pdflatex 2020.8.8)  8 AUG 2020 16:34
 entering extended mode
 **/home/jack/Curiosity/stacking/deform/Pybullet_doc_ext.tex
 (/home/jack/Curiosity/stacking/deform/Pybullet_doc_ext.tex
 LaTeX2e <2020-02-02> patch level 5
-L3 programming layer <2020-07-17>
-(/usr/local/share/miktex-texmf/tex/latex/base/article.cls
+L3 programming layer <2020-07-17> (/usr/local/share/miktex-texmf/tex/latex/base/article.cls
 Document Class: article 2019/12/20 v1.4l Standard LaTeX document class
 (/usr/local/share/miktex-texmf/tex/latex/base/size10.clo
 File: size10.clo 2019/12/20 v1.4l Standard LaTeX file (size option)
@@ -20,18 +19,15 @@ File: size10.clo 2019/12/20 v1.4l Standard LaTeX file (size option)
 \abovecaptionskip=\skip47
 \belowcaptionskip=\skip48
 \bibindent=\dimen134
-)
-(/usr/local/share/miktex-texmf/tex/latex/base/inputenc.sty
+) (/usr/local/share/miktex-texmf/tex/latex/base/inputenc.sty
 Package: inputenc 2018/08/11 v1.3c Input encoding file
 \inpenc@prehook=\toks15
 \inpenc@posthook=\toks16
-)
-(/usr/local/share/miktex-texmf/tex/latex/l3backend/l3backend-pdfmode.def
+) (/usr/local/share/miktex-texmf/tex/latex/l3backend/l3backend-pdfmode.def
 File: l3backend-pdfmode.def 2020-06-29 L3 backend support: PDF mode
 \l__kernel_color_stack_int=\count176
 \l__pdf_internal_box=\box45
-)
-(/home/jack/Curiosity/stacking/deform/Pybullet_doc_ext.aux)
+) (/home/jack/Curiosity/stacking/deform/Pybullet_doc_ext.aux)
 \openout1 = `Pybullet_doc_ext.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 10.
@@ -50,43 +46,41 @@ LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 10.
 LaTeX Font Info:    ... okay on input line 10.
 
 Overfull \hbox (23.38968pt too wide) in paragraph at lines 22--23
-[]\OT1/cmr/m/n/10 body2 - a non-negative integer denoting the body unique id of
- a rigid/multibody.
+[]\OT1/cmr/m/n/10 body2 - a non-negative integer denoting the body unique id of a rigid/multibody.
  []
 
 
 Overfull \hbox (15.80626pt too wide) in paragraph at lines 41--42
-[]\OT1/cmr/m/n/10 The 'neohookean' tag of a 'deformable' takes it's 'mu' and 'l
-ambda' parameters
+[]\OT1/cmr/m/n/10 The 'neohookean' tag of a 'deformable' takes it's 'mu' and 'lambda' parameters
  []
 
 
 Overfull \hbox (7.19511pt too wide) in paragraph at lines 43--44
-[]\OT1/cmr/m/n/10 The 'inertial' tag is the only difference between loadSoftBod
-y and developing
+[]\OT1/cmr/m/n/10 The 'inertial' tag is the only difference between loadSoftBody and developing
  []
 
 [1
 
-{/home/jack/.miktex/texmfs/data/pdftex/config/pdftex.map}] [2]
-(/home/jack/Curiosity/stacking/deform/Pybullet_doc_ext.aux) ) 
+{/home/jack/.miktex/texmfs/data/pdftex/config/pdftex.map}]
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <7> on input line 49.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <5> on input line 49.
+ [2] (/home/jack/Curiosity/stacking/deform/Pybullet_doc_ext.aux) ) 
 Here is how much of TeX's memory you used:
- 394 strings out of 483158
- 7074 string characters out of 2958028
+ 396 strings out of 483158
+ 7102 string characters out of 2958028
  241310 words of memory out of 3000000
- 15803 multiletter control sequences out of 15000+200000
+ 15805 multiletter control sequences out of 15000+200000
  536336 words of font info for 33 fonts, out of 3000000 for 9000
  0 hyphenation exceptions out of 8191
  25i,4n,25p,431b,162s stack positions out of 5000i,500n,10000p,200000b,50000s
- </home/jack/.mikt
-ex/texmfs/data/fonts/pk/ljfour/jknappen/ec/dpi600/tcrm1000.pk></usr/local/share
-/miktex-texmf/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/share/mikte
-x-texmf/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/share/miktex-texm
-f/fonts/type1/public/amsfonts/cm/cmr10.pfb>
-Output written on /home/jack/Curiosity/stacking/deform/Pybullet_doc_ext.pdf (2 
-pages, 51087 bytes).
+ </home/jack/.miktex/texmfs/data/fonts/pk/ljfour/jknappen/ec/dpi600/tcrm1000.pk></usr/local/share/miktex-texmf/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/share/miktex-texmf/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/share/miktex-texmf/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/share/miktex-texmf/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/share/miktex-texmf/fonts/type1/public/amsfonts/cm/cmsy10.pfb>
+Output written on /home/jack/Curiosity/stacking/deform/Pybullet_doc_ext.pdf (2 pages, 68860 bytes).
 PDF statistics:
- 26 PDF objects out of 1000 (max. 8388607)
+ 34 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
+
+0000000)
 
