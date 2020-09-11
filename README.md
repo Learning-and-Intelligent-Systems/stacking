@@ -4,11 +4,9 @@ This repo has code for using a simulation-based particle filter to estimate the 
 solving for the tallest stable tower (in expectation). Finally, the tower is constructed using a panda robot in simulation.
 The robot functionality comes from [rachelholladay/pb_robot](https://github.com/rachelholladay/pb_robot) repository.
 
-The particle filter and tower solver run in Python3 and the robot runs in Python2.
-
 ## Installation
 
-This should be run with Python3.7, NOT Python2
+Everything should be run with Python3.7.
 
 1. Install [pb_robot](https://github.com/mike-n-7/pb_robot) using the instructions below, not the ones in the repo's README
     1. Install pb_robot dependencies
@@ -17,7 +15,7 @@ This should be run with Python3.7, NOT Python2
     2. Clone pb_robot
     3. Compile the IKFast library for the panda
         1. ```cd pb_robot/src/pb_robot/ikfast/franka_panda```
-        2. ```python setup.py build``` (for errors, see **troubleshooting** below)
+        2. ```python3 setup.py build``` (for errors, see **troubleshooting** below)
 2. Install stacking
     1. Clone this repo
     1. Install dependencies
