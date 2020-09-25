@@ -170,6 +170,8 @@ def generate_training_images(world):
         image = get_object_training_image(object)
         images.append(image)
 
+    return images
+
 def main(args, vis_tower=False):
     # This is a dictionary from stable/unstable label to what subsets of [COG_Stable, PW_Stable] to include.
     difficulty_types = {
