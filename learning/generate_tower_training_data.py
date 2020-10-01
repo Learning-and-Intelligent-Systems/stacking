@@ -95,7 +95,7 @@ def get_filename(num_towers, use_block_set, block_set_size, suffix):
 
 def generate_training_images(world):
     # NOTE (caris): these images do not capture anything about the mass of the block
-    scale = .007                           # meters in a pixel
+    scale = .0035                           # meters in a pixel
     height, width = 150, 150              # dimensions of output images
     pixel_origin = (height/2, width/2)    # pixel corresponding to world frame origin
     com_marker_width = 5                  # in pixels
@@ -131,13 +131,15 @@ def generate_training_images(world):
         
     def get_object_training_image(object):
         image = np.zeros((width, height)) #(black)
-        image_xs = np.linspace(0, width, width+1).astype(np.uint32)
-        image_ys = np.linspace(0, height, height+1).astype(np.uint32)
+        image_xs = np.linspace(0, width-1, width).astype(np.uint32)
+        image_ys = np.linspace(0, height-1, height).astype(np.uint32)
         
         # draw object (white)
         found_obj = False
         for pixel_x in image_xs:
             for pixel_y in image_ys:
+                if pixel_x == width or pixel_y == height:
+                    raise Exception('Object is at the edge of the image! Increase scale and try again.')
                 world_xy = pixel_to_world([pixel_x, pixel_y])
                 if xy_in_obj(world_xy, object):
                     found_obj = True
