@@ -182,8 +182,7 @@ def main(args, vis_tower=False):
     }
 
     # specify the number of towers to generate
-    num_towers_per_cat = 5000
-    num_towers = num_towers_per_cat * 4 * 2
+    num_towers = args.towers_per_cat * 4 * 2
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
     use_block_set = False
@@ -209,12 +208,12 @@ def main(args, vis_tower=False):
                     continue
 
                 count = 0
-                while count < num_towers_per_cat:
+                while count < args.towers_per_cat:
                     # print the information about the tower we are about to generate
                     stability_type = "stable" if stable else "unstable"
                     stability_type += "/cog_stable" if cog_stable else "/cog_unstable"
                     stability_type += "/pw_stable" if pw_stable else "/pw_unstable"
-                    print(f'{count}/{num_towers_per_cat}\t{stability_type} {num_blocks}-block tower')
+                    print(f'{count}/{args.towers_per_cat}\t{stability_type} {num_blocks}-block tower')
 
                     # generate random blocks. Use the block set if specified. otherwise
                     # generate new blocks from scratch. Save the block names if using blocks
@@ -282,6 +281,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-blocks', type=int, required=True)
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--save-images', action='store_true')
+    parser.add_argument('--towers-per-cat', default=5000, type=int)
     args = parser.parse_args()
 
     main(args, vis_tower=False)
