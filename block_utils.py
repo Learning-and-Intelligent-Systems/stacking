@@ -99,10 +99,10 @@ class Object:
         Returns:
             Object -- a random object
         """
-        # blocks range in size from 0.1 to 1
+        # blocks range in size from [0.05, .15)
         dims = Dimensions(*(np.random.rand(3) * 0.1 + 0.05))
         # pick a density and multiply by the volume to get mass
-        density = np.random.rand() * 0.9 + 0.1
+        density = 0.5#np.random.rand() * 0.9 + 0.1
         mass = density * dims.x * dims.y * dims.z
         # center of mass lies within the middle 0.9 of the block along each axis
         com = Position(*((np.random.rand(3) - 0.5) * 0.9 * dims))
