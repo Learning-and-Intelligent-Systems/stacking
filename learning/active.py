@@ -29,7 +29,7 @@ def H(x, eps=1e-6):
     """
     return -(x+eps)*torch.log(x+eps)
 
-def score(model, x, k=100):
+def score(model, x, k=10):
     # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
 
     with torch.no_grad():
@@ -49,26 +49,38 @@ def active(model, train_datasets, pool_datasets, test_datasets):
     # score each of the datapoints in the pool
     # create a tensor to keep track of the scores
     num_tower_sizes = len(pool_datasets)
-    num_towers_per_size = len(pool_datasets[0])
-    scores = torch.zeros(num_tower_sizes, num_towers_per_size)
-    for tower_size_idx, pool_dataset in enumerate(pool_datasets):
-        pool_loader = DataLoader(pool_dataset,
-            batch_size=batch_size, shuffle=False)
-        for batch_idx, (towers, _) in enumerate(pool_loader):
-            start_idx = batch_idx * batch_size
-            end_idx = start_idx + towers.shape[0]
-            scores[tower_size_idx, start_idx:end_idx] = score(model, towers)
+    while (num_towers_per_size := len(pool_datasets[0])) > 0:
+        print(f'{num_towers_per_size} towers remaining in pool.')
+        model.training = True
+        num_towers_per_size = len(pool_datasets[0])
+        scores = torch.zeros(num_tower_sizes, num_towers_per_size)
+        for tower_size_idx, pool_dataset in enumerate(pool_datasets):
+            pool_loader = DataLoader(pool_dataset,
+                batch_size=batch_size, shuffle=False)
+            for batch_idx, (towers, _) in enumerate(pool_loader):
+                start_idx = batch_idx * batch_size
+                end_idx = start_idx + towers.shape[0]
+                scores[tower_size_idx, start_idx:end_idx] = score(model, towers)
 
-            print(f'Tower Size {tower_size_idx}\t batch {batch_idx}/{num_towers_per_size // batch_size}')
+        high_score_idxs = torch.argmax(scores, axis=1)
+        for i in range(num_tower_sizes):
+            # get the index of the tower in the dataset from which both pool
+            # and train are subsets
+            tower_idx_in_top_level = pool_datasets[i].indices[high_score_idxs[i]]
+            # add that tower idx to the train data
+            train_datasets[i].indices = np.concatenate([train_datasets[i].indices, [tower_idx_in_top_level]])
+            # and remove it from the pool data
+            pool_datasets[i].indices = np.delete(pool_datasets[i].indices, high_score_idxs[i], axis=0)
 
-    return scores
 
+
+        train(model, train_datasets, test_datasets, epochs=1)
 
 if __name__ == '__main__':
     model = DropoutFCGN(14, 64)
 
     num_train = 5000 # number of pretrain examples (for each tower size)
-    num_pool = 1000  # the size of the pool (for active learning)
+    num_pool = 300  # the size of the pool (for active learning)
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -90,7 +102,7 @@ if __name__ == '__main__':
 
     # and split each sub-dataset
     train_datasets = [torch.utils.data.Subset(d, train_indices) for d in train_and_pool_datasets]
-    pool_datasets = [torch.utils.data.Subset(d, train_indices) for d in train_and_pool_datasets]
+    pool_datasets = [torch.utils.data.Subset(d, pool_indices) for d in train_and_pool_datasets]
 
     # pretrain the model
     losses = train(model, train_datasets, test_datasets, epochs=5)

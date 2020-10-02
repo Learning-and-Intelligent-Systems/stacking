@@ -113,6 +113,7 @@ def train(model, datasets, test_datasets, epochs=100):
     batch_size = 32
     losses = []
     num_data_points = len(datasets[0])
+    model.training = True
 
     for epoch_idx in range(epochs):
         # create a dataloader for each tower size
@@ -152,6 +153,7 @@ def train(model, datasets, test_datasets, epochs=100):
     return losses
 
 def test(model, datasets, fname=''):
+    model.training = False
     accuracies = []
     
     results = []
