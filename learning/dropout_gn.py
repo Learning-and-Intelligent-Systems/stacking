@@ -103,12 +103,26 @@ class DropoutFCGN(nn.Module):
         x = x.view(N, K, self.n_hidden)
         return x
 
-    def forward(self, towers, k):
+    def reset_dropout(self):
+        """
+        Finds all the RepeatableDropout submodules and resets their masks
+        """
+        def recursive_reset(module):
+            for c in module.children():
+                if isinstance(c, RepeatableDropout):
+                    c.mask = None
+                else:
+                    recursive_reset(c)
+
+        recursive_reset(self)
+
+    def forward(self, towers, k=None):
         """
         :param towers: (N, K, n_in) tensor describing the tower.
         :param k: Number of times to iterate the graph update.
         """
         N, K, _ = towers.shape
+        if k is None: k = towers.shape[1]-1
         # Initialize hidden state for each node.
         #h = self.init.expand(N, K, self.n_hidden)
         h0 = self.E(towers.view(-1, self.n_in)).view(N, K, self.n_hidden)
@@ -123,6 +137,10 @@ class DropoutFCGN(nn.Module):
         # Calculate output predictions.
         x = torch.mean(h, dim=1)
         x = self.O(x).view(N)
+
+        # dropout should be different every forward pass
+        self.reset_dropout()
+
         return torch.sigmoid(x)
 
 
