@@ -10,3 +10,8 @@ pddlstream
 statistics
 temp
 tower-*
+
+# docker stuff
+Dockerfile
+.dockerignore
+train.sh
