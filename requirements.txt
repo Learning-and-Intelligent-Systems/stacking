@@ -1,3 +1,5 @@
+git+http://github.com/hauptmech/odio_urdf.git
+git+https://github.com/mike-n-7/tsr.git
 appnope==0.1.0
 attrs==19.3.0
 backcall==0.2.0
@@ -15,7 +17,7 @@ matplotlib==3.2.0
 more-itertools==8.2.0
 networkx==2.4
 numpy==1.18.1
--e git://github.com/hauptmech/odio_urdf.git@1f9ecb4e7833957c11cc707fa4c1b781ceb70ae8#egg=odio_urdf
+
 packaging==20.3
 parso==0.7.0
 pexpect==4.8.0
@@ -36,6 +38,6 @@ six==1.14.0
 torch==1.5.1
 torchvision==0.6.1
 traitlets==4.3.3
-tsr @ git+https://github.com/mike-n-7/tsr.git@aa92079b215fddf58075b71fc07a0ddb17e309af
+
 wcwidth==0.1.9
 zipp==3.1.0
