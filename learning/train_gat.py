@@ -214,29 +214,54 @@ if __name__ == '__main__':
     M = 64
     #model = FCGAT(14+M, M)
     #model = MLP(5, 256)
-    #model = FCGN(14, 64)
+    #model = FCGN(14, 64, visual=args.visual, image_dim=150)
     model = TowerLSTM(14, 32, visual=args.visual, image_dim=150)
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
 
-    #train_datasets = load_dataset('random_blocks_(x20000)_2blocks_all.pkl', args)
-    train_datasets, _ = load_dataset('random_blocks_(x16)_2blocks_all.pkl', args)
-    test_datasets, num_test_blocks = load_dataset('random_blocks_(x16)_2blocks_all.pkl', args)
+    train_dataset = 'random_blocks_(x24)_2blocks_uniform_density.pkl'
+    test_dataset = 'random_blocks_(x24)_2blocks_uniform_density.pkl'
+    train_datasets, _ = load_dataset(train_dataset, args)
+    test_datasets, num_test_blocks = load_dataset(test_dataset, args)
     
     train_losses, epoch_ids, test_accuracies = train(model, train_datasets, test_datasets, args)
     plt.plot(train_losses)
     plt.title('Training Loss')
     plt.xlabel('Batch (x10)')
-    plt.show()
-
+    fig.savefig('train_losses.png')
+    plt.close()
+    
     final_accuracies = test(model, test_datasets, args, fname='lstm_preds.pkl')
-    #print(accuracies)
     plt.plot(epoch_ids+[args.epochs], test_accuracies+[final_accuracies], label=num_test_blocks)
-    #plt.scatter(np.arange(2,3), accuracies)
-    #plt.xlabel('Num Blocks in Tower')
     plt.legend(title='number of blocks')
     plt.title('Test Accuracy')
     plt.xlabel('Epoch ID')
     plt.ylabel('Accuracy')
-    plt.show()
+    fig.savefig('test_accuracies.png')
+    
+    # write training params to a file
+    model_type = None
+    if isinstance(model, FCGAT):
+        model_type = 'FCGAT'
+    elif isninstance(model, MLP):
+        model_type = 'MLP'
+    elif isninstance(model, TowerLSTM):
+        model_type = 'TowerLSTM'
+    elif isninstance(model, FCGN):
+        model_type = 'FCGN'
+    elif isninstance(model, GatedGN):
+        model_type = 'GatedGN'
+    else:
+        print('Model type could not be determined.')
+    
+    file = open("params.txt","w")
+    file.write("model type : " + model_type + " \n") 
+    file.write("visual : " + args.visual + " \n") 
+    file.write("train dataset : " + train_dataset + " \n") 
+    file.write("test dataset : " + test_dataset + " \n") 
+    file.write("final test accuracy : " + final_accuracies + " \n") 
+    file.write(" \n") 
+    file.write("epochs : " + args.epochs + " \n") 
+    file.write("batch size: " + args.batch_size + " \n") 
+    file.close()
