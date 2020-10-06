@@ -226,42 +226,45 @@ if __name__ == '__main__':
     test_datasets, num_test_blocks = load_dataset(test_dataset, args)
     
     train_losses, epoch_ids, test_accuracies = train(model, train_datasets, test_datasets, args)
-    plt.plot(train_losses)
-    plt.title('Training Loss')
-    plt.xlabel('Batch (x10)')
+    fig, ax = plt.subplots()
+    ax.plot(train_losses)
+    ax.set_title('Training Loss')
+    ax.set_xlabel('Batch (x10)')
     fig.savefig('train_losses.png')
     plt.close()
     
     final_accuracies = test(model, test_datasets, args, fname='lstm_preds.pkl')
-    plt.plot(epoch_ids+[args.epochs], test_accuracies+[final_accuracies], label=num_test_blocks)
-    plt.legend(title='number of blocks')
-    plt.title('Test Accuracy')
-    plt.xlabel('Epoch ID')
-    plt.ylabel('Accuracy')
+    fig, ax = plt.subplots()
+    ax.plot(epoch_ids+[args.epochs], test_accuracies+[final_accuracies], label=num_test_blocks)
+    ax.legend(title='number of blocks')
+    ax.set_title('Test Accuracy')
+    ax.set_xlabel('Epoch ID')
+    ax.set_ylabel('Accuracy')
     fig.savefig('test_accuracies.png')
     
     # write training params to a file
     model_type = None
     if isinstance(model, FCGAT):
         model_type = 'FCGAT'
-    elif isninstance(model, MLP):
+    elif isinstance(model, MLP):
         model_type = 'MLP'
-    elif isninstance(model, TowerLSTM):
+    elif isinstance(model, TowerLSTM):
         model_type = 'TowerLSTM'
-    elif isninstance(model, FCGN):
+    elif isinstance(model, FCGN):
         model_type = 'FCGN'
-    elif isninstance(model, GatedGN):
+    elif isinstance(model, GatedGN):
         model_type = 'GatedGN'
     else:
         print('Model type could not be determined.')
     
     file = open("params.txt","w")
     file.write("model type : " + model_type + " \n") 
-    file.write("visual : " + args.visual + " \n") 
+    file.write("visual : " + str(args.visual) + " \n") 
     file.write("train dataset : " + train_dataset + " \n") 
     file.write("test dataset : " + test_dataset + " \n") 
-    file.write("final test accuracy : " + final_accuracies + " \n") 
+    s = ', '
+    file.write("final test accuracy : " + s.join([str(acc) for acc in final_accuracies])  + " \n") 
     file.write(" \n") 
-    file.write("epochs : " + args.epochs + " \n") 
-    file.write("batch size: " + args.batch_size + " \n") 
+    file.write("epochs : " + str(args.epochs) + " \n") 
+    file.write("batch size: " + str(args.batch_size) + " \n") 
     file.close()
