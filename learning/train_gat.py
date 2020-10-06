@@ -218,8 +218,9 @@ if __name__ == '__main__':
     model = TowerLSTM(14, 32, visual=args.visual, image_dim=150)
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
+        print('CUDA IS AVAILABLE')
         model = model.cuda()
-
+    print('should have set cuda')
     train_dataset = 'random_blocks_(x20000)_2blocks_uniform_density.pkl'
     test_dataset = 'random_blocks_(x2000)_2blocks_uniform_density.pkl'
     train_datasets, _ = load_dataset(train_dataset, args)
