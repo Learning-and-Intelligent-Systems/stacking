@@ -148,7 +148,7 @@ def train(model, datasets, test_datasets, args):
                 l = F.binary_cross_entropy(preds, labels)
                 l.backward()
                 optimizer.step()
-                accuracy = ((preds>0.5) == labels).float().mean()
+                accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
                 accs[dx].append(accuracy.item())
                 train_losses.append(np.mean(accs[dx][-500:]))
             
@@ -189,7 +189,7 @@ def test(model, datasets, args, fname=''):
         else:
             preds = model.forward(towers, k=towers.shape[1]-1)
         # calculate the and save the accuracy
-        accuracy = ((preds>0.5) == labels).float().mean()
+        accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
         accuracies.append(accuracy.item())
         results.append((towers.cpu(), labels.cpu(), preds.cpu()))
     if len(fname) > 0:
