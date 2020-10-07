@@ -224,8 +224,8 @@ if __name__ == '__main__':
         print('CUDA IS AVAILABLE')
         model = model.cuda()
     print('should have set cuda')
-    train_dataset = 'random_blocks_(x24)_2blocks_uniform_density.pkl'
-    test_dataset = 'random_blocks_(x24)_2blocks_uniform_density.pkl'
+    train_dataset = 'random_blocks_(x20000)_2blocks_uniform_density.pkl'
+    test_dataset = 'random_blocks_(x2000)_2blocks_uniform_density.pkl'
     train_datasets, _ = load_dataset(train_dataset, args)
     test_datasets, num_test_blocks = load_dataset(test_dataset, args)
     
