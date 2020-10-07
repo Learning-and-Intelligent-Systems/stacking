@@ -210,6 +210,9 @@ if __name__ == '__main__':
     if args.debug:
         import pdb; pdb.set_trace()
     
+    # needed to work with lis-cloud GPUs
+    torch.backends.cudnn.enabled = False
+    
     # the number of hidden variables in the graph NN
     M = 64
     #model = FCGAT(14+M, M)
