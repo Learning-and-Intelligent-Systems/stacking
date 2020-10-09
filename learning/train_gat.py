@@ -151,14 +151,10 @@ def train(model, datasets, test_datasets, args):
                 accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
                 accs[dx].append(accuracy.item())
                 train_losses.append(np.mean(accs[dx][-500:]))
-            
+    
                 #print(preds, labels)
                 
-            t = torch.cuda.get_device_properties(0).total_memory
-            c = torch.cuda.memory_cached(0)
-            a = torch.cuda.memory_allocated(0)
-            f = c-a  # free inside cache
-            print('Memory usage at end of Batch [GiB]: ', f/1073741824)
+
 
             #if batch_idx % 40 == 0:
             #    print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {train_losses[-4:]}')
@@ -173,7 +169,7 @@ def train(model, datasets, test_datasets, args):
         c = torch.cuda.memory_cached(0)
         a = torch.cuda.memory_allocated(0)
         f = c-a  # free inside cache
-        print('Memory usage at end of Epoch [GiB]: ', f/1073741824)
+        print('EPOCH: Total memory, cached, allocated [GiB]:', t/1073741824, c/1073741824, a/1073741824)
         
         #print_split_accuracies(datasets[0], model)
     return train_losses, epoch_ids, test_accuracies
