@@ -78,6 +78,11 @@ class TowerLSTM(nn.Module):
         
         if self.visual:
             x = self.encoder(towers.view(N*K, 1, self.image_dim, self.image_dim)).view(N, K, -1)
+            #t = torch.cuda.get_device_properties(0).total_memory
+            #c = torch.cuda.memory_cached(0)
+            #a = torch.cuda.memory_allocated(0)
+            #f = c-a  # free inside cache
+            #print('Total memory, cached, allocated [GiB]:', t/1073741824, c/1073741824, a/1073741824)
             lstm_input = x
         else:
             lstm_input = towers
