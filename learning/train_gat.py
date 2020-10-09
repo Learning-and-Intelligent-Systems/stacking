@@ -154,16 +154,27 @@ def train(model, datasets, test_datasets, args):
             
                 #print(preds, labels)
                 
+            t = torch.cuda.get_device_properties(0).total_memory
+            c = torch.cuda.memory_cached(0)
+            a = torch.cuda.memory_allocated(0)
+            f = c-a  # free inside cache
+            print('Memory usage at end of Batch [GiB]: ', f/1073741824)
 
-            if batch_idx % 40 == 0:
-                print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {train_losses[-4:]}')
-
+            #if batch_idx % 40 == 0:
+            #    print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {train_losses[-4:]}')
+                
         if epoch_idx % 5 == 0:
             epoch_ids += [epoch_idx]
             accuracies = test(model, test_datasets, args, fname='lstm_preds.pkl')
             test_accuracies.append(accuracies)
-            print('Val:', accuracies)
-
+            #print('Val:', accuracies)
+        
+        t = torch.cuda.get_device_properties(0).total_memory
+        c = torch.cuda.memory_cached(0)
+        a = torch.cuda.memory_allocated(0)
+        f = c-a  # free inside cache
+        print('Memory usage at end of Epoch [GiB]: ', f/1073741824)
+        
         #print_split_accuracies(datasets[0], model)
     return train_losses, epoch_ids, test_accuracies
 
@@ -205,6 +216,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--batch-size', default=32, type=int)
     parser.add_argument('--epochs', default=100, type=int)
+    parser.add_argument('--n-hidden', default=32, type=int)
     args = parser.parse_args()
     
     if args.debug:
@@ -218,12 +230,10 @@ if __name__ == '__main__':
     #model = FCGAT(14+M, M)
     #model = MLP(5, 256)
     #model = FCGN(14, 64, visual=args.visual, image_dim=150)
-    model = TowerLSTM(14, 32, visual=args.visual, image_dim=150)
+    model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
-        print('CUDA IS AVAILABLE')
         model = model.cuda()
-    print('should have set cuda')
     train_dataset = 'random_blocks_(x20000)_2blocks_uniform_density.pkl'
     test_dataset = 'random_blocks_(x2000)_2blocks_uniform_density.pkl'
     train_datasets, _ = load_dataset(train_dataset, args)
