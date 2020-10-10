@@ -3,7 +3,7 @@ import pickle
 import matplotlib.pyplot as plt
 from block_utils import Object, Pose, Position, Quaternion
 from tower_planner import TowerPlanner
-#rom learning.train_gat import load_dataset
+#rom learning.train_graph_net import load_dataset
 
 def is_com_stable(block0, block1):
     """

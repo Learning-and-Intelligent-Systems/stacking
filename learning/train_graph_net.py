@@ -109,13 +109,14 @@ def print_split_accuracies(dataset, model):
             print('Geom %d, CoM %d: %f' % (g, c, acc))
 
 
-def train(model, datasets, test_datasets):
+def train(model, datasets, test_datasets, epochs=100):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     batch_size = 32
     losses = []
     num_data_points = len(datasets[0])
+    model.training = True
 
-    for epoch_idx in range(500):
+    for epoch_idx in range(epochs):
         # create a dataloader for each tower size
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=batch_size, shuffle=True))
@@ -153,6 +154,7 @@ def train(model, datasets, test_datasets):
     return losses
 
 def test(model, datasets, fname=''):
+    model.training = False
     accuracies = []
     
     results = []
