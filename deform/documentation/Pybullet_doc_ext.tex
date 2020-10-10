@@ -19,7 +19,7 @@
 \begin{itemize}
     \item body1 - a non-negative integer denoting the body unique id of a deformable
     \item link1 - an integer denoting the index of the link. Default is -1 for the base
-    \item body2 - a non-negative integer denoting the body unique id of a rigid/multibody. Default is -1 for the world
+    \item body2 - a non-negative integer denoting the body unique id of a rigid/multibody with vertices defined (e.g. obj). Default is -1 for the world
     \item link2 - an integer denoting the index of the link. Default is -1 for the base
     \item offset (optional) - unclear
 \end{itemize}
@@ -34,13 +34,23 @@
     \item bodyID - a non-negative integer denoting the body unique id of a mesh
     \item note: other params outlined in pybullet doc do not appear to work
 \end{itemize}
-@return - a tuple (numVertices, (vertices)) where each vertex is a tuple (x,y,z) 
+@return - a tuple (numVertices, (vertices)) where each vertex in 'vertices' is a tuple (x,y,z) and their index in 'vertices' is their corresponding link index
 
 \section{URDF Tags}
 \begin{itemize}
     \item The 'neohookean' tag of a 'deformable' takes it's 'mu' and 'lambda' parameters (the lame parameters) in kPa (This is suspected given 60 mu and 200 lambda work and 60 Kpa =0.06 MPa which is close to the approximated 0.1 MPa for hyperelastic material elastin).
     \item The 'virtual' tag of a 'deformable' is constrained to only a 'filename' attribute that loads a vtk/obj file. The deformable can only be relocated upon loading (loadURDF) and therefore cannot have a changed center of mass given you cannot specify an inertial reference frame relative to a nonexistent link reference frame
-    \item The 'inertial' tag is the only difference between loadSoftBody and developing a URDF with the 'deformable' tag and using loadURDF
-    \item Known supported URDF element tags for deformables: 'collision\_margin', 'repulsion\_stiffness', 'friction', 'neohookean'. The specifics of the tags can be found in the documentation for loadSoftBody in PyBullet Quickstart Guide and the other variables in said documentation are proposed to also be supported URDF element tags for deformables.
+    \item loadSoftBody can support a spring model and neohookean model while URDF only supports neohookean (URDF also allows setting inertial properties)
+    \item The only known supported URDF element tags for deformables: 'collision\_margin', 'repulsion\_stiffness', 'friction', 'neohookean'.
+\end{itemize}
+
+\section{Lame Parameter Notes}
+\begin{itemize}
+    \item The General Rule: $\mu \leq \lambda$
+    \item The difference between $\mu$ and $\lambda$ cannot be too large (e.g. $<$ 400) but to be honest you should use your reference of phsyical properties to guide yourself. For example,
+    elastic moduli ($\mu$) should be at least be 60 MPa because anything lower becomes too hyperelastic for the simulation to handle.
+    \item My general rule is to start out at a decent Young's Modulus, increase $\lambda$ from the $\mu$ value until the simulation breaks and then everything
+    is fair game. In other words, from the value of a decent Young's Modulus until the breaking lambda, any combination of two values in that range as long as the general rule is true should not break the simulation
+    \item too many hyperelastic pieces will cause the sim to crash so as the number of nehookean pieces grow, the stiffer each one should become
 \end{itemize}
 \end{document}
