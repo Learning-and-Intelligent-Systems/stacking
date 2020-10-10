@@ -19,6 +19,8 @@ class MLP(nn.Module):
             nn.ReLU(),
             nn.Linear(n_hidden, n_hidden),
             nn.ReLU(),
+            nn.Linear(n_hidden, n_hidden),
+            nn.ReLU(),
             nn.Linear(n_hidden, 1),
         )
 
