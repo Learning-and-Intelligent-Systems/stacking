@@ -19,6 +19,7 @@ from learning.gn import FCGN
 from learning.mlp import MLP
 from learning.lstm import TowerLSTM
 from learning.gated_gn import GatedGN
+from learning.cnn import TowerCNN
 
 def get_subsets(data):
     towers, labels = [], []

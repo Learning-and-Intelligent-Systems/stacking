@@ -5,7 +5,7 @@ from torch.nn import functional as F
 from learning.utils import View
 
 class TowerCNN(nn.Module):
-    def __init__(self, image_dim):
+    def __init__(self, image_dim, n_hidden=32):
         """ This network is given input of size (N, K, n_in) where N, K can vary per batch.
         :param image_dim: width/height (square images) number of pixels (only used 
                             if visual==True)
@@ -49,11 +49,11 @@ class TowerCNN(nn.Module):
                         nn.Linear(n_hidden, 1),
                         nn.Sigmoid())
 
-    def forward(self, images):
+    def forward(self, images, k=None):
         """
         :param images: (N, K, image_dim, image_dim) tensor describing the tower in images.
         """
-        x = self.encoder(towers)
+        x = self.encoder(images)
         return x
 
         
