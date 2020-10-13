@@ -129,15 +129,15 @@ def train(model, datasets, test_datasets, args):
 
     for epoch_idx in range(args.epochs):
         print('epoch', epoch_idx)
-        print_memory()
+        #print_memory()
         # create a dataloader for each tower size
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=args.batch_size, shuffle=True))
             for d in datasets]
         accs = [[],[],[],[]]
         for batch_idx in range(num_data_points // args.batch_size):
-            print('batch', batch_idx)
-            print_memory()
+            #print('batch', batch_idx)
+            #print_memory()
             # shuffle(iterable_dataloaders)
             # iterate through the tower sizes in the inner loop
             for dx, iterable_dataloader in enumerate(iterable_dataloaders):
@@ -162,10 +162,11 @@ def train(model, datasets, test_datasets, args):
                 accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
                 accs[dx].append(accuracy.item())
                 train_losses.append(np.mean(accs[dx][-500:])) # just average last 500 accuracies
-                # train_losses is a vector of running average accuracies for each tower size
-    
-                #print(preds, labels)
-                
+        print('acc: ', accuracy)
+        # train_losses is a vector of running average accuracies for each tower size
+
+        #print(preds, labels)
+            
 
 
             #if batch_idx % 40 == 0:
@@ -197,8 +198,8 @@ def test(model, datasets, args, fname=''):
             dataloader = iter(DataLoader(dataset, batch_size=batch_size))
             accs = []
             for batch_idx in range(num_data_points // batch_size):
-                print('testing batch: ', batch_idx)
-                print_memory()
+                #print('testing batch: ', batch_idx)
+                #print_memory()
                 towers, labels, images = next(dataloader)
                 if torch.cuda.is_available():
                     towers = towers.cuda()
@@ -209,7 +210,7 @@ def test(model, datasets, args, fname=''):
                 accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
                 accs.append(accuracy.item())
                 #results.append((towers.cpu(), labels.cpu(), preds.cpu().detach().numpy()))
-            accuracies.append(accs.float().mean())
+            accuracies.append(np.mean(accs))
         else:
             # pull out the input and output tensors for the whole dataset
             towers = dataset[:][0]
@@ -251,7 +252,8 @@ if __name__ == '__main__':
     #model = FCGAT(14+M, M)
     #model = MLP(5, 256)
     #model = FCGN(14, 64, visual=args.visual, image_dim=150)
-    model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
+    #model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
+    model = TowerCNN(150)
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
@@ -289,6 +291,8 @@ if __name__ == '__main__':
         model_type = 'FCGN'
     elif isinstance(model, GatedGN):
         model_type = 'GatedGN'
+    elif isinstance(model, TowerCNN):
+        model_type = 'TowerCNN'
     else:
         print('Model type could not be determined.')
     
