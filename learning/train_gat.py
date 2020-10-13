@@ -72,6 +72,13 @@ def load_dataset(name, args):
 
     return datasets, all_num_blocks
 
+def print_memory():
+    t = torch.cuda.get_device_properties(0).total_memory
+    c = torch.cuda.memory_cached(0)
+    a = torch.cuda.memory_allocated(0)
+    f = c-a  # free inside cache
+    print('allocated:', a, 'cached:', c)
+
 def print_split_accuracies(dataset, model):
     """
     Subdivide the accuracies into multiple groups.
@@ -121,12 +128,16 @@ def train(model, datasets, test_datasets, args):
     epoch_ids, test_accuracies = [], []
 
     for epoch_idx in range(args.epochs):
+        print('epoch', epoch_idx)
+        print_memory()
         # create a dataloader for each tower size
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=args.batch_size, shuffle=True))
             for d in datasets]
         accs = [[],[],[],[]]
         for batch_idx in range(num_data_points // args.batch_size):
+            print('batch', batch_idx)
+            print_memory()
             # shuffle(iterable_dataloaders)
             # iterate through the tower sizes in the inner loop
             for dx, iterable_dataloader in enumerate(iterable_dataloaders):
@@ -150,7 +161,8 @@ def train(model, datasets, test_datasets, args):
                 optimizer.step()
                 accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
                 accs[dx].append(accuracy.item())
-                train_losses.append(np.mean(accs[dx][-500:]))
+                train_losses.append(np.mean(accs[dx][-500:])) # just average last 500 accuracies
+                # train_losses is a vector of running average accuracies for each tower size
     
                 #print(preds, labels)
                 
@@ -161,15 +173,13 @@ def train(model, datasets, test_datasets, args):
                 
         if epoch_idx % 5 == 0:
             epoch_ids += [epoch_idx]
+
             accuracies = test(model, test_datasets, args, fname='lstm_preds.pkl')
             test_accuracies.append(accuracies)
             #print('Val:', accuracies)
         
-        t = torch.cuda.get_device_properties(0).total_memory
-        c = torch.cuda.memory_cached(0)
-        a = torch.cuda.memory_allocated(0)
-        f = c-a  # free inside cache
-        print('EPOCH: Total memory, cached, allocated [GiB]:', t/1073741824, c/1073741824, a/1073741824)
+        
+        #print('EPOCH: Total memory, cached, allocated [GiB]:', t/1073741824, c/1073741824, a/1073741824)
         
         #print_split_accuracies(datasets[0], model)
     return train_losses, epoch_ids, test_accuracies
@@ -177,31 +187,46 @@ def train(model, datasets, test_datasets, args):
 def test(model, datasets, args, fname=''):
     accuracies = []
     
-    results = []
+    #results = []
     # iterate through the tower sizes
     for dataset in datasets:
-        # pull out the input and output tensors for the whole dataset
-        towers = dataset[:][0]
-        labels = dataset[:][1]
         if args.visual:
-            images = dataset[:][2]
-        if torch.cuda.is_available():
-            towers = towers.cuda()
-            labels = labels.cuda()
-            if args.visual:
-                images = images.cuda()
-        # run the model on everything
-        if args.visual:
-            preds = model.forward(images, k=towers.shape[1]-1)
+            # have to run test set through network in batches due to memory issues
+            num_data_points = len(dataset)
+            batch_size = 100
+            dataloader = iter(DataLoader(dataset, batch_size=batch_size))
+            accs = []
+            for batch_idx in range(num_data_points // batch_size):
+                print('testing batch: ', batch_idx)
+                print_memory()
+                towers, labels, images = next(dataloader)
+                if torch.cuda.is_available():
+                    towers = towers.cuda()
+                    labels = labels.cuda()
+                    images = images.cuda()
+                    
+                preds = model.forward(images, k=towers.shape[1]-1)
+                accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
+                accs.append(accuracy.item())
+                #results.append((towers.cpu(), labels.cpu(), preds.cpu().detach().numpy()))
+            accuracies.append(accs.float().mean())
         else:
+            # pull out the input and output tensors for the whole dataset
+            towers = dataset[:][0]
+            labels = dataset[:][1]
+            if torch.cuda.is_available():
+                towers = towers.cuda()
+                labels = labels.cuda()
+                    
+            # run the model on everything
             preds = model.forward(towers, k=towers.shape[1]-1)
-        # calculate the and save the accuracy
-        accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
-        accuracies.append(accuracy.item())
-        results.append((towers.cpu(), labels.cpu(), preds.cpu()))
-    if len(fname) > 0:
-        with open(fname, 'wb') as handle:
-            pickle.dump(results, handle)
+            # calculate and save the accuracy
+            accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
+            accuracies.append(accuracy.item())
+            #results.append((towers.cpu(), labels.cpu(), preds.cpu().detach().numpy()))
+    #if len(fname) > 0:
+    #    with open(fname, 'wb') as handle:
+    #        pickle.dump(results, handle)
     return accuracies
 
 
