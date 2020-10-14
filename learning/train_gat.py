@@ -184,6 +184,10 @@ def train(model, datasets, test_datasets, args):
         #print('EPOCH: Total memory, cached, allocated [GiB]:', t/1073741824, c/1073741824, a/1073741824)
         
         #print_split_accuracies(datasets[0], model)
+        
+    # save model
+    torch.save(model.state_dict(), 'model.pt')
+    
     return train_losses, epoch_ids, test_accuracies
 
 def test(model, datasets, args, fname=''):
