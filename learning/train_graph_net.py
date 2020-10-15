@@ -61,7 +61,12 @@ def load_dataset(name, K=1):
         towers = towers[...,:14]
         #towers = towers[...,[0, 1, 2, 4, 5, 7, 8]]
         # convert absolute xy positions to relative positions
-        # towers[:,1:,7:9] -= towers[:,:-1,7:9]
+        #towers[:,1:,7:9] -= towers[:,:-1,7:9]
+        #towers[:,:,1:3] += towers[:,:,7:9]
+        towers[:,:,1:4] /= 0.01 #towers[:,:,4:7]
+        towers[:,:,7:9] /= 0.01 #towers[:,:,4:6]
+        towers[:,:,4:7] = (towers[:,:,4:7] - 0.1) / 0.01
+        towers[:,:,0] = (towers[:,:,0] - 0.55)
         # add the new dataset to the list of datasets
         datasets.append(TensorDataset(towers[::K,:], labels[::K]))
 
@@ -185,22 +190,22 @@ if __name__ == '__main__':
     M = 64
     #model = FCGAT(14+M, M)
     #model = MLP(3, 256)
-    #model = FCGN(14, 64)
-    #model = TowerLSTM(14, 16)
-    model = GatedGN(14, 32, n_layers=3)
-    #model = TopDownNet(14, 64)
+    model = FCGN(14, 64)
+    #model = TowerLSTM(14, 32)
+    #model = GatedGN(14, 64, n_layers=2)
+    #model = TopDownNet(14, 32)
     if torch.cuda.is_available():
         model = model.cuda()
 
     #train_datasets = load_dataset('random_blocks_(x40000)_5blocks_all.pkl')
-    train_datasets = load_dataset('random_blocks_(x40000)_5blocks_same_mass.pkl', K=4)
+    train_datasets = load_dataset('random_blocks_(x40000)_5blocks_uniform_mass_aug_4.pkl', K=1)
     print('Number of Training Towers') 
     for d in train_datasets:
         print(len(d))
     #test_datasets = load_dataset('random_blocks_(x2000)_5blocks_all.pkl')
-    test_datasets = load_dataset('random_blocks_(x2000)_5blocks_same_mass.pkl', K=1)
+    test_datasets = load_dataset('random_blocks_(x2000)_5blocks_uniform_mass.pkl', K=1)
     #train_datasets = load_dataset('random_blocks_(x5000)_5blocks_pwu.pkl')
-    losses = train(model, train_datasets, test_datasets)
+    losses = train(model, train_datasets, test_datasets, epochs=500)
     plt.plot(losses)
     plt.xlabel('Batch (x10)')
     plt.show()

@@ -47,5 +47,5 @@ class TopDownNet(nn.Module):
         preds = torch.cat(preds, dim=1)
         return preds.prod(dim=1)
 
-        
+            
         
