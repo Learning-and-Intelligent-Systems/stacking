@@ -14,6 +14,7 @@ tower-*
 # large datasets
 learning/data/random_blocks_(x2000)_2blocks_uniform_density.pkl
 learning/data/random_blocks_(x20000)_2blocks_uniform_density.pkl
+learning/data/random_blocks_(x800)_2blocks_uniform_density.pkl
 
 # docker stuff
 Dockerfile

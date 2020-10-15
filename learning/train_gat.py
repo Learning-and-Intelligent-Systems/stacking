@@ -135,7 +135,6 @@ def train(model, datasets, test_datasets, args):
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=args.batch_size, shuffle=True))
             for d in datasets]
-        accs = [[],[],[],[]]
         for batch_idx in range(num_data_points // args.batch_size):
             #print('batch', batch_idx)
             #print_memory()
@@ -160,10 +159,9 @@ def train(model, datasets, test_datasets, args):
                 l = F.binary_cross_entropy(preds, labels)
                 l.backward()
                 optimizer.step()
-                accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
-                accs[dx].append(accuracy.item())
-                train_losses.append(np.mean(accs[dx][-500:])) # just average last 500 accuracies
-        print('acc: ', accuracy)
+                accuracy = ((preds.cpu().detach().numpy().squeeze()>0.5) == labels.cpu().detach().numpy()).mean()
+                train_losses.append(accuracy.item())
+        print('acc: ', np.mean(train_losses[-(num_data_points // args.batch_size):]))
         # train_losses is a vector of running average accuracies for each tower size
 
         #print(preds, labels)
@@ -212,7 +210,7 @@ def test(model, datasets, args, fname=''):
                     images = images.cuda()
                     
                 preds = model.forward(images, k=towers.shape[1]-1)
-                accuracy = ((preds.cpu().detach().numpy()>0.5) == labels.cpu().detach().numpy()).mean()
+                accuracy = ((preds.cpu().detach().numpy().squeeze()>0.5) == labels.cpu().detach().numpy()).mean()
                 accs.append(accuracy.item())
                 #results.append((towers.cpu(), labels.cpu(), preds.cpu().detach().numpy()))
             accuracies.append(np.mean(accs))
