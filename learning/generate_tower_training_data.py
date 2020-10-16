@@ -5,13 +5,14 @@ Izzy Brand, 2020
 from agents.teleport_agent import TeleportAgent
 from block_utils import World, Environment, Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block
 from tower_planner import TowerPlanner
-
+from pybullet_utils import transformation
 import argparse
 from copy import deepcopy
 import numpy as np
 import pickle
 from random import choices as sample_with_replacement
 import time
+import matplotlib.pyplot as plt
 
 def vectorize(tower):
     return [b.vectorize() for b in tower]
@@ -78,16 +79,98 @@ def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=
         rotated_tower = [get_rotated_block(b) for b in tower]
         # save the tower if it's stable
         if tp.tower_is_stable(rotated_tower) == stable and \
-           tp.tower_is_constructible(rotated_tower) == pairwise_stable and \
-           tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
+           tp.tower_is_constructible(rotated_tower) == pairwise_stable: #and \
+           #tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
             return rotated_tower
 
     return None
 
+# NOTE(caris): I think we should use the size of the dataset in the filename, not
+# num_towers as sometimes 
+# sum([len(dataset[num_blocks]['towers']) for num_blocks in dataset.keys()]) < num_towers
 def get_filename(num_towers, use_block_set, block_set_size, suffix):
     # create a filename for the generated data based on the configuration
     block_set_string = f"{block_set_size}block_set" if use_block_set else "random_blocks"
     return f'learning/data/{block_set_string}_(x{num_towers})_{suffix}.pkl'
+
+def generate_training_images(world):
+    # NOTE (caris): these images do not capture anything about the mass of the block
+    scale = .007                           # meters in a pixel
+    height, width = 150, 150              # dimensions of output images
+    pixel_origin = (height/2, width/2)    # pixel corresponding to world frame origin
+    com_marker_width = 5                  # in pixels
+
+    def pixel_to_world(pixel):
+        x = scale*(pixel[0]-pixel_origin[0])
+        y = scale*(pixel_origin[1]-pixel[1])
+        return np.array([x, y])
+        
+        # TODD, test xy_in_obj()
+    def world_to_pixel(point):
+        x = pixel_origin[0] + point[0]/scale
+        y = pixel_origin[1] - point[1]/scale
+        return np.array([x, y])
+        
+    def xy_in_obj(xy, object):
+        endpoints_obj = [[-object.dimensions.x/2, -object.dimensions.y/2],
+                        [-object.dimensions.x/2, +object.dimensions.y/2],
+                        [object.dimensions.x/2, +object.dimensions.y/2],
+                        [object.dimensions.x/2, -object.dimensions.y/2]]
+        endpoints_world = [transformation([epo[0], epo[1], 0.], object.pose.pos, object.pose.orn)[:2] for epo in endpoints_obj]
+        line_segment_indices = [(0,1),(1,2),(2,3),(3,0)]
+        inside = True
+        for line_indices in line_segment_indices:
+            line = [endpoints_world[index] for index in line_indices]
+            line_vec = np.subtract(line[1], line[0])
+            line_query = np.subtract(xy, line[0])
+            if np.cross(line_vec, line_query) < 0:
+                inside = inside and True
+            else:
+                inside = inside and False
+        return inside
+        
+    def get_object_training_image(object):
+        image = np.zeros((width, height)) #(black)
+        image_xs = np.linspace(0, width, width+1).astype(np.uint32)
+        image_ys = np.linspace(0, height, height+1).astype(np.uint32)
+        
+        # draw object (white)
+        found_obj = False
+        for pixel_x in image_xs:
+            for pixel_y in image_ys:
+                world_xy = pixel_to_world([pixel_x, pixel_y])
+                if xy_in_obj(world_xy, object):
+                    found_obj = True
+                    image[pixel_y, pixel_x] = 1.0
+
+        # draw COM in object (gray)
+        com_world = transformation(object.com, object.pose.pos, object.pose.orn)
+        com_pixel = world_to_pixel(com_world[:2])
+        com_xs = np.linspace(com_pixel[0]-(com_marker_width-1)/2,
+                                com_pixel[0]+(com_marker_width-1)/2,
+                                com_marker_width).astype(np.uint32)
+        com_ys = np.linspace(com_pixel[1]-(com_marker_width-1)/2,
+                                com_pixel[1]+(com_marker_width-1)/2,
+                                com_marker_width).astype(np.uint32)
+        for com_x in com_xs:
+            for com_y in com_ys:
+                image[com_y, com_x] = 0.5
+
+        '''
+        plt.imshow(image, cmap='gray')
+        plt.axis('off')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.show()
+        '''
+        return image
+
+    images = []
+    for object in world.objects:
+        image = get_object_training_image(object)
+        images.append(image)
+
+    return images
 
 def main(args, vis_tower=False):
     # This is a dictionary from stable/unstable label to what subsets of [COG_Stable, PW_Stable] to include.
@@ -115,6 +198,7 @@ def main(args, vis_tower=False):
     for num_blocks in range(2, args.max_blocks+1):
         vectorized_towers = []
         block_names = []
+        images = []
 
         for stable in [0, 1]:
             for cog_stable, pw_stable in difficulty_types[stable]:
@@ -147,6 +231,13 @@ def main(args, vis_tower=False):
                     if tower is None:
                         continue
                     
+                    # NOTE: this has to be done before the sim is run or else
+                    # the images will be of the object final positions
+                    if args.save_images:
+                        w = World(tower)
+                        training_images = generate_training_images(w)
+                        images.append(training_images)
+
                     if vis_tower:
                         w = World(tower)
                         env = Environment([w], vis_sim=True, vis_frames=True)
@@ -168,7 +259,8 @@ def main(args, vis_tower=False):
             stability_labels[num_towers // 2:] = 1
         data = {
             'towers': np.array(vectorized_towers),
-            'labels': stability_labels
+            'labels': stability_labels,
+            'images': images
         }
         if use_block_set:
             data['block_names'] = block_names
@@ -187,6 +279,7 @@ if __name__ == '__main__':
     # parser.add_argument('--output', type=str, required=True, help='where to save')
     parser.add_argument('--max-blocks', type=int, required=True)
     parser.add_argument('--suffix', type=str, default='')
+    parser.add_argument('--save-images', action='store_true')
     args = parser.parse_args()
 
     main(args, vis_tower=False)
