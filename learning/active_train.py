@@ -45,9 +45,12 @@ def bald(Y):
     # 1. compute the entropy of the sample AND class distribution
     # 2. and sum over the class dimension
     # 3. and average over the sample dimension
-    H2 = H(Y).sum(axis=(1,2))/k
+    H2 = H(Y).sum(axis=(1,2))/Y.shape[1]
     # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
     return H1 - H2
+
+def bernoulli_bald(p):
+    return bald(torch.stack([p, 1-p], axis=2))
 
 def mc_dropout_score(model, x, k=100):
     # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
@@ -57,9 +60,7 @@ def mc_dropout_score(model, x, k=100):
         p = torch.stack([model(x) for i in range(k)], dim=1)
         # computing the mutual information requires a label distribution. the
         # model predicts probility of stable p, so the distribution is p, 1-p
-        Y = torch.stack([p, 1-p], axis=2) # [n x k x 2]
-
-        return bald(Y)
+        return bernoulli_bald(p)
 
 def active(model, train_datasets, pool_datasets, test_datasets):
     batch_size = 128
