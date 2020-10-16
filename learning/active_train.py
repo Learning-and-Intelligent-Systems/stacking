@@ -39,10 +39,14 @@ def bald(Y):
     Returns:
         torch.Tensor -- bald scores for each element in the batch [batch_size]
     """
-    # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
+    # 1. average over the sample dimensions to get the mean class distribution
+    # 2. compute the entropy of the class distribution
     H1 = H(Y.mean(axis=1)).sum(axis=1)
+    # 1. compute the entropy of the sample AND class distribution
+    # 2. and sum over the class dimension
+    # 3. and average over the sample dimension
     H2 = H(Y).sum(axis=(1,2))/k
-
+    # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
     return H1 - H2
 
 def mc_dropout_score(model, x, k=100):

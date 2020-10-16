@@ -114,7 +114,7 @@ def print_split_accuracies(dataset, model):
             print('Geom %d, CoM %d: %f' % (g, c, acc))
 
 
-def train(model, datasets, test_datasets, epochs=100):
+def train(model, datasets, test_datasets, epochs=100, is_ensemble=False):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     batch_size = 32
     losses = []
@@ -131,34 +131,46 @@ def train(model, datasets, test_datasets, epochs=100):
             # shuffle(iterable_dataloaders)
             # iterate through the tower sizes in the inner loop
             for dx, iterable_dataloader in enumerate(iterable_dataloaders):
-                
+                model.train(True)
                 optimizer.zero_grad()
                 towers, labels = next(iterable_dataloader)
                 if torch.cuda.is_available():
                     towers = towers.cuda()
                     labels = labels.cuda()
                 preds = model.forward(towers, k=towers.shape[1]-1)
-                l = F.binary_cross_entropy(preds, labels)
+
+                if is_ensemble:
+                    # NOTE(izzy): do I run into any weird gradient magnitude issues if
+                    # i combine the losses for every model in the ensemble? Pretty
+                    # sure I shuold use sum, because mean would reduce the magnitude
+                    # of the gradient for each model
+                    labels = labels[:, None, ...].expand(-1, model.ensemble_size)
+                    scale = model.ensemble_size
+                else:
+                    scale = 1
+
+                l = F.binary_cross_entropy(preds, labels) * scale
                 l.backward()
                 optimizer.step()
+
+                model.train(False) # turn off dropout before computing accuracy
                 accuracy = ((preds>0.5) == labels).float().mean()
                 accs[dx].append(accuracy.item())
                 losses.append(np.mean(accs[dx][-500:]))
-            
-                #print(preds, labels)
                 
 
             if batch_idx % 40 == 0:
                 print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {losses[-4:]}')
 
         if epoch_idx % 5 == 0:
-            accuracies = test(model, test_datasets, fname='lstm_preds.pkl')
+            model.train(False) # turn off dropout before computing accuracy
+            accuracies = test(model, test_datasets, fname='lstm_preds.pkl', is_ensemble=is_ensemble)
             print('Val:', accuracies)
 
         #print_split_accuracies(datasets[0], model)
     return losses
 
-def test(model, datasets, fname=''):
+def test(model, datasets, fname='', is_ensemble=False):
     model.training = False
     accuracies = []
     
@@ -174,6 +186,9 @@ def test(model, datasets, fname=''):
         # run the model on everything
         with torch.no_grad():
             preds = model.forward(towers, k=towers.shape[1]-1)
+
+        if is_ensemble:
+            labels = labels[:, None, ...].expand(-1, model.ensemble_size)
 
         # calculate the and save the accuracy
         accuracy = ((preds>0.5) == labels).float().mean()
