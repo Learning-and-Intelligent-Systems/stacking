@@ -29,15 +29,16 @@ def H(x, eps=1e-6):
     """
     return -(x+eps)*torch.log(x+eps)
 
-def score(model, x, k=10):
+def score(model, x, k=100):
     # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
 
     with torch.no_grad():
         # take k monte-carlo samples of forward pass w/ dropout
         p = torch.stack([model(x) for i in range(k)], dim=1)
+        print(p.shape)
         # computing the mutual information requires a label distribution. the
         # model predicts probility of stable p, so the distribution is p, 1-p
-        Y = torch.stack([p, 1-p], axis=2)
+        Y = torch.stack([p, 1-p], axis=2) # [n x k x 2]
         H1 = H(Y.mean(axis=1)).sum(axis=1)
         H2 = H(Y).sum(axis=(1,2))/k
 
@@ -63,6 +64,7 @@ def active(model, train_datasets, pool_datasets, test_datasets):
                 scores[tower_size_idx, start_idx:end_idx] = score(model, towers)
 
         high_score_idxs = torch.argmax(scores, axis=1)
+        print(f'Information:\t{torch.mean(scores, axis=1)}')
         for i in range(num_tower_sizes):
             # get the index of the tower in the dataset from which both pool
             # and train are subsets
@@ -80,7 +82,7 @@ if __name__ == '__main__':
     model = DropoutFCGN(14, 64)
 
     num_train = 5000 # number of pretrain examples (for each tower size)
-    num_pool = 300  # the size of the pool (for active learning)
+    num_pool = 1000  # the size of the pool (for active learning)
 
     if torch.cuda.is_available():
         model = model.cuda()

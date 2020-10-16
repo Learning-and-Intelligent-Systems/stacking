@@ -73,7 +73,6 @@ def display_bald_objective(all_preds, resolution):
     :param all_preds: A list of predictions for each model.
     :return: A tensor of the BALD value for each predicted point.
     """
-    print(all_preds[0].shape)
     eps = 1e-5
     all_preds = torch.stack(all_preds)
 
