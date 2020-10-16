@@ -305,7 +305,7 @@ class Environment:
         if action and action.__class__.__name__ == 'PushAction':
             hand_pos = action.step()
             for world in self.worlds:
-                world.set_hand_pos(hand_pos)
+                world.set_hand_pos(hand_pos, self.pybullet_server.client)
 
         # forward step the sim
         self.pybullet_server.step()

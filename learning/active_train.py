@@ -29,7 +29,30 @@ def H(x, eps=1e-6):
     """
     return -(x+eps)*torch.log(x+eps)
 
-def score(model, x, k=10):
+
+def bald(Y):
+    """ compute the bald score for the given distribution
+
+    Arguments:
+        Y {torch.Tensor} -- [batch_size x num_samples x num_classes]
+
+    Returns:
+        torch.Tensor -- bald scores for each element in the batch [batch_size]
+    """
+    # 1. average over the sample dimensions to get the mean class distribution
+    # 2. compute the entropy of the class distribution
+    H1 = H(Y.mean(axis=1)).sum(axis=1)
+    # 1. compute the entropy of the sample AND class distribution
+    # 2. and sum over the class dimension
+    # 3. and average over the sample dimension
+    H2 = H(Y).sum(axis=(1,2))/Y.shape[1]
+    # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
+    return H1 - H2
+
+def bernoulli_bald(p):
+    return bald(torch.stack([p, 1-p], axis=2))
+
+def mc_dropout_score(model, x, k=100):
     # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
 
     with torch.no_grad():
@@ -37,11 +60,7 @@ def score(model, x, k=10):
         p = torch.stack([model(x) for i in range(k)], dim=1)
         # computing the mutual information requires a label distribution. the
         # model predicts probility of stable p, so the distribution is p, 1-p
-        Y = torch.stack([p, 1-p], axis=2)
-        H1 = H(Y.mean(axis=1)).sum(axis=1)
-        H2 = H(Y).sum(axis=(1,2))/k
-
-        return H1 - H2
+        return bernoulli_bald(p)
 
 def active(model, train_datasets, pool_datasets, test_datasets):
     batch_size = 128
@@ -60,9 +79,10 @@ def active(model, train_datasets, pool_datasets, test_datasets):
             for batch_idx, (towers, _) in enumerate(pool_loader):
                 start_idx = batch_idx * batch_size
                 end_idx = start_idx + towers.shape[0]
-                scores[tower_size_idx, start_idx:end_idx] = score(model, towers)
+                scores[tower_size_idx, start_idx:end_idx] = mc_dropout_score(model, towers)
 
         high_score_idxs = torch.argmax(scores, axis=1)
+        print(f'Information:\t{torch.mean(scores, axis=1)}')
         for i in range(num_tower_sizes):
             # get the index of the tower in the dataset from which both pool
             # and train are subsets
@@ -80,7 +100,7 @@ if __name__ == '__main__':
     model = DropoutFCGN(14, 64)
 
     num_train = 5000 # number of pretrain examples (for each tower size)
-    num_pool = 300  # the size of the pool (for active learning)
+    num_pool = 1000  # the size of the pool (for active learning)
 
     if torch.cuda.is_available():
         model = model.cuda()

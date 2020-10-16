@@ -55,7 +55,6 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
         print(np.mean(acc))
     return model
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
