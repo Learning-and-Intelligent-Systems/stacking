@@ -88,6 +88,18 @@ class Object:
       v[14:17] = self.color
 
       return v
+    
+    @staticmethod
+    def from_vector(vblock):
+        block = Object('from_vec', 
+                       dimensions=Dimensions(*vblock[4:7].tolist()), 
+                       mass=vblock[0], 
+                       com=Position(*vblock[1:4].tolist()), 
+                       color=Color(*vblock[14:17].tolist()))
+        pose = Pose(Position(*vblock[7:10].tolist()),
+                    Quaternion(*vblock[10:14].tolist()))
+        block.set_pose(pose)
+        return block
 
     @staticmethod
     def random(name=None):
@@ -450,10 +462,12 @@ def get_rotated_block(block):
     new_block.set_pose(new_pose)
     # get the original block's rotation
     r = R.from_quat(block.pose.orn)
+    vs = np.array([block.com, block.dimensions])
+    vs_rot = r.apply(vs)
     # rotate the old center of mass
-    new_block.com = Position(*r.apply(block.com))
+    new_block.com = Position(*vs_rot[0,:])
     # rotate the old dimensions
-    new_block.dimensions = Dimensions(*np.abs(r.apply(block.dimensions)))
+    new_block.dimensions = Dimensions(*np.abs(vs_rot[1,:]))
     # rotate the particle filter for the com if there is one
     if block.com_filter is not None:
         new_block.com_filter = ParticleDistribution(

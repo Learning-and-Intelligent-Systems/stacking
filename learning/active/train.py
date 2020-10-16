@@ -1,3 +1,4 @@
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -6,8 +7,9 @@ from torch.nn import functional as F
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from learning.active.toy_data import ToyDataset, ToyDataGenerator
 from learning.active.mlp import MLP
+from learning.active.toy_data import ToyDataset, ToyDataGenerator
+from learning.active.utils import ExperimentLogger
 
 
 def evaluate(loader, model):
@@ -53,76 +55,40 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
         print(np.mean(acc))
     return model
 
-def display_marginal_predictions(all_preds, resolution):
-    eps = 1e-5
-    all_preds = torch.stack(all_preds)
-
-    p = torch.mean(all_preds, dim=0)
-
-    x1 = torch.arange(-1, 1, resolution)
-    x2 = torch.arange(-1, 1, resolution)
-    x1s, x2s = torch.meshgrid(x1, x2)
-    K = x1s.shape[0]
-    p = p.view(K, K)
-    plt.close()
-    plt.pcolormesh(x1s.numpy(), x2s.numpy(), p.numpy())
-    plt.savefig('learning/active/figures/preds_ensemble_val_1000_test.png')
-
-def display_bald_objective(all_preds, resolution):
-    """
-    :param all_preds: A list of predictions for each model.
-    :return: A tensor of the BALD value for each predicted point.
-    """
-    eps = 1e-5
-    all_preds = torch.stack(all_preds)
-
-    mp_c1 = torch.mean(all_preds, dim=0)
-    mp_c0 = torch.mean(1 - all_preds, dim=0)
-
-    m_ent = -(mp_c1 * torch.log(mp_c1+eps) + mp_c0 * torch.log(mp_c0+eps))
-
-    p_c1 = all_preds
-    p_c0 = 1 - all_preds
-    ent_per_model = p_c1 * torch.log(p_c1+eps) + p_c0 * torch.log(p_c0+eps)
-    ent = torch.mean(ent_per_model, dim=0)
-
-    bald = m_ent + ent
-
-    x1 = torch.arange(-1, 1, resolution)
-    x2 = torch.arange(-1, 1, resolution)
-    x1s, x2s = torch.meshgrid(x1, x2)
-    K = x1s.shape[0]
-    bald = bald.view(K, K)
-    plt.close()
-    plt.pcolormesh(x1s.numpy(), x2s.numpy(), bald.numpy())
-    plt.savefig('learning/active/figures/bald_ensemble_val_1000_test.png')
-
-res=0.005
-exp_name = 'ensemble'
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
+    parser.add_argument('--n-train', type=int, default=1000)
+    parser.add_argument('--n-val', type=int, default=1000)
+    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--n-models', type=int, default=5, help='Number of models in the ensemble.')
+    parser.add_argument('--n-hidden', type=int, default=128)
+    parser.add_argument('--dropout', type=float, default=0.)
+    parser.add_argument('--n-epochs', type=int, default=300)
+    args = parser.parse_args()
+
+    logger = ExperimentLogger.setup_experiment_directory(args)
+
     gen = ToyDataGenerator()
-    xs, ys = gen.generate_uniform_dataset(N=1000)
-    gen.plot_dataset(xs, ys, 'learning/active/figures/dataset_1000.png')
+    xs, ys = gen.generate_uniform_dataset(N=args.n_train)
+    gen.plot_dataset(xs, ys, logger.get_figure_path('dataset_train.png'))
     dataset = ToyDataset(xs, ys)
+    logger.save_dataset(dataset, 'train.pkl')
+
     loader = DataLoader(dataset,
-                        batch_size=16,
+                        batch_size=args.batch_size,
                         shuffle=True)
 
-    val_xs, val_ys = gen.generate_uniform_dataset(N=500)
+    val_xs, val_ys = gen.generate_uniform_dataset(N=args.n_val)
     val_dataset = ToyDataset(val_xs, val_ys)
+    gen.plot_dataset(val_xs, val_ys, logger.get_figure_path('dataset_val.png'))
+    logger.save_dataset(val_dataset, 'val.pkl')
     val_loader = DataLoader(val_dataset,
-                            batch_size=32,
+                            batch_size=args.batch_size,
                             shuffle=False)
 
-    all_preds = []
-    for mx in range(50):
-        net = MLP(n_hidden=128, dropout=0.)
+    for mx in range(args.n_models):
+        net = MLP(n_hidden=args.n_hidden, dropout=args.dropout)
+        best_net = train(loader, val_loader, net, n_epochs=args.n_epochs)
 
-        best_net = train(loader, val_loader, net, n_epochs=300)
-
-        # Returns a list of the predictions for each of the dropout models.
-        all_preds += best_net.plot_decision_boundary(resolution=res, fname='tmp%d' % mx, k=1)
-
-    # TODO: Plot the BALD objective values for each of the contour points.
-    display_bald_objective(all_preds, resolution=res)
-    display_marginal_predictions(all_preds, resolution=res)
+        logger.save_model(best_net, 'net_%d.pt' % mx)
