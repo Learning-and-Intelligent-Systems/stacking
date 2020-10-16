@@ -103,7 +103,7 @@ class Object:
         dims = Dimensions(*(np.random.rand(3) * 0.1 + 0.05))
         # pick a density and multiply by the volume to get mass
         density = np.random.rand() * 0.9 + 0.1
-        mass = density * dims.x * dims.y * dims.z
+        mass = np.random.uniform(0.1, 1.0)
         # center of mass lies within the middle 0.9 of the block along each axis
         com = Position(*((np.random.rand(3) - 0.5) * 0.9 * dims))
         # pick a random color

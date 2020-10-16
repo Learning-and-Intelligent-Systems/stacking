@@ -2,31 +2,50 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-class FCGN(nn.Module):
+class RepeatableDropout(nn.Module):
+    def __init__(self, p=0.1):
+        super(RepeatableDropout, self).__init__()
+        self.p = p
+        self.mask = None
+
+    def forward(self, x):
+        if not self.training:
+            return x
+
+        if self.mask == None:
+            self.mask = torch.empty(x.shape, dtype=torch.uint8,
+                device=x.device).bernoulli_(1-self.p)
+        
+        return x * self.mask / (1-self.p)
+
+
+class DropoutFCGN(nn.Module):
     def __init__(self, n_in, n_hidden):
         """ This network is given input of size (N, K, n_in) where N, K can vary per batch.
         :param n_in: Number of block-specific parameters.
         :param n_hidden: Number of hidden units unsed throughout the network.
         """
-        super(FCGN, self).__init__()
+        super(DropoutFCGN, self).__init__()
 
         # Note (Mike): When tuning, keep this shallow as it helps to compare 
         # the untransformed features for the edges.
         self.E = nn.Sequential(nn.Linear(n_in, n_hidden))
-                               #nn.ReLU())
 
         # Message function that compute relation between two nodes and outputs a message vector.
         self.M = nn.Sequential(nn.Linear(2*n_in, n_hidden),
+                               RepeatableDropout(0.5),
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden),
+                               RepeatableDropout(0.5),
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden),
                                nn.ReLU())
 
         # Update function that updates a node based on the sum of its messages.
-        self.U = nn.Sequential(nn.Linear(n_in+n_hidden, n_hidden),            
-                               #nn.ReLU(),
-                               #nn.Linear(n_hidden, n_hidden),
+        self.U = nn.Sequential(nn.Linear(n_in+n_hidden, n_hidden),      
+                               RepeatableDropout(0.5),      
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
                                nn.ReLU())
 
         # Output function that predicts stability.
@@ -84,12 +103,26 @@ class FCGN(nn.Module):
         x = x.view(N, K, self.n_hidden)
         return x
 
-    def forward(self, towers, k):
+    def reset_dropout(self):
+        """
+        Finds all the RepeatableDropout submodules and resets their masks
+        """
+        def recursive_reset(module):
+            for c in module.children():
+                if isinstance(c, RepeatableDropout):
+                    c.mask = None
+                else:
+                    recursive_reset(c)
+
+        recursive_reset(self)
+
+    def forward(self, towers, k=None):
         """
         :param towers: (N, K, n_in) tensor describing the tower.
         :param k: Number of times to iterate the graph update.
         """
         N, K, _ = towers.shape
+        if k is None: k = towers.shape[1]-1
         # Initialize hidden state for each node.
         #h = self.init.expand(N, K, self.n_hidden)
         h0 = self.E(towers.view(-1, self.n_in)).view(N, K, self.n_hidden)
@@ -104,6 +137,48 @@ class FCGN(nn.Module):
         # Calculate output predictions.
         x = torch.mean(h, dim=1)
         x = self.O(x).view(N)
+
+        # dropout should be different every forward pass
+        self.reset_dropout()
+
         return torch.sigmoid(x)
-        
+
+
+""" Just a simple class that uses RepeatableDropout.
+Demonstrates that the drouput can be reset by setting the mask
+parameter to None.
+"""
+class TestRepeatableDropout(nn.Module):
+    def __init__(self):
+        super(TestRepeatableDropout, self).__init__()
+
+        self.layers = nn.Sequential(
+            nn.Linear(10,20),
+            RepeatableDropout(),
+            nn.ReLU(),
+            nn.Linear(20,1)
+        )
+
+    def reset_dropout(self):
+        def recursive_reset(module):
+            for c in module.children():
+                if isinstance(c, RepeatableDropout):
+                    c.mask = None
+                else:
+                    recursive_reset(c)
+
+        recursive_reset(self)
+
+    def forward(self, x):
+        o1 = self.layers(x)
+        o2 = self.layers(x)
+        self.reset_dropout()
+        o3 = self.layers(x)
+        return o1, o2, o3
+
+
+if __name__ == '__main__':
+    d = TestRepeatableDropout()
+    a = torch.ones(10)
+    print(d(a))
         
