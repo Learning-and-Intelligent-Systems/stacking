@@ -51,7 +51,6 @@ class MLP(nn.Module):
         x2 = torch.arange(-1, 1, resolution)
 
         x1s, x2s = torch.meshgrid(x1, x2)
-        print(x1s.shape)
         K = x1s.shape[0]
         x = torch.cat([x1s.reshape(K*K, 1), x2s.reshape(K*K, 1)], dim=1)
         
@@ -71,6 +70,6 @@ class MLP(nn.Module):
             preds = (preds > 0.5).reshape(K, K)
             plt.close()
             plt.pcolormesh(x1s.numpy(), x2s.numpy(), preds.numpy())
-            plt.savefig('learning/active/figures/%s_%d.png' % (fname, kx))
+            plt.savefig(fname)
 
         return model_predictions
