@@ -29,20 +29,33 @@ def H(x, eps=1e-6):
     """
     return -(x+eps)*torch.log(x+eps)
 
-def score(model, x, k=100):
+
+def bald(Y):
+    """ compute the bald score for the given distribution
+
+    Arguments:
+        Y {torch.Tensor} -- [batch_size x num_samples x num_classes]
+
+    Returns:
+        torch.Tensor -- bald scores for each element in the batch [batch_size]
+    """
+    # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
+    H1 = H(Y.mean(axis=1)).sum(axis=1)
+    H2 = H(Y).sum(axis=(1,2))/k
+
+    return H1 - H2
+
+def mc_dropout_score(model, x, k=100):
     # I(y;W | x) = H1 - H2 = H(y|x) - E_w[H(y|x,W)]
 
     with torch.no_grad():
         # take k monte-carlo samples of forward pass w/ dropout
         p = torch.stack([model(x) for i in range(k)], dim=1)
-        print(p.shape)
         # computing the mutual information requires a label distribution. the
         # model predicts probility of stable p, so the distribution is p, 1-p
         Y = torch.stack([p, 1-p], axis=2) # [n x k x 2]
-        H1 = H(Y.mean(axis=1)).sum(axis=1)
-        H2 = H(Y).sum(axis=(1,2))/k
 
-        return H1 - H2
+        return bald(Y)
 
 def active(model, train_datasets, pool_datasets, test_datasets):
     batch_size = 128
@@ -61,7 +74,7 @@ def active(model, train_datasets, pool_datasets, test_datasets):
             for batch_idx, (towers, _) in enumerate(pool_loader):
                 start_idx = batch_idx * batch_size
                 end_idx = start_idx + towers.shape[0]
-                scores[tower_size_idx, start_idx:end_idx] = score(model, towers)
+                scores[tower_size_idx, start_idx:end_idx] = mc_dropout_score(model, towers)
 
         high_score_idxs = torch.argmax(scores, axis=1)
         print(f'Information:\t{torch.mean(scores, axis=1)}')
