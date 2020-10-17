@@ -67,7 +67,6 @@ def mc_dropout_score(model, x, k=100):
 def active(model, train_datasets, test_datasets):
     batch_size = 32
     num_to_acquire_per_batch = 4
-
     while True:
         model.train(True)
 
@@ -92,11 +91,13 @@ def active(model, train_datasets, test_datasets):
                 torch.cat([train_datasets[i][:][0], best_towers]),
                 torch.cat([train_datasets[i][:][1], best_labels]))
 
+        # model.reset()
         print('Dataset sizes:', [len(d) for d in train_datasets])
         train(model, train_datasets, test_datasets, epochs=1)
 
 if __name__ == '__main__':
     model = DropoutFCGN(14, 64)
+    model.backup()
     num_train = 1000
 
     if torch.cuda.is_available():
@@ -108,7 +109,8 @@ if __name__ == '__main__':
     train_datasets = load_dataset('random_blocks_(x40000)_5blocks_all.pkl')
     test_datasets = load_dataset('random_blocks_(x2000)_5blocks_all.pkl')
     subset_idxs = np.random.choice(len(train_datasets), num_train)
-    train_datasets = [TensorDataset(t.tensors[0][subset_idxs], t.tensors[1][subset_idxs]) for t in train_datasets]
+    train_datasets = [TensorDataset(t.tensors[0][subset_idxs], t.tensors[1][subset_idxs])\
+        for t in train_datasets]
 
 
     # pretrain the model

@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from learning.util import Resetable
+
 class RepeatableDropout(nn.Module):
     def __init__(self, p=0.1):
         super(RepeatableDropout, self).__init__()
@@ -19,7 +21,7 @@ class RepeatableDropout(nn.Module):
         return x * self.mask / (1-self.p)
 
 
-class DropoutFCGN(nn.Module):
+class DropoutFCGN(Resetable):
     def __init__(self, n_in, n_hidden):
         """ This network is given input of size (N, K, n_in) where N, K can vary per batch.
         :param n_in: Number of block-specific parameters.

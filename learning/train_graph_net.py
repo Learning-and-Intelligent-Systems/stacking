@@ -171,7 +171,7 @@ def train(model, datasets, test_datasets, epochs=100, is_ensemble=False):
 
         if epoch_idx % 5 == 0:
             model.train(False) # turn off dropout before computing accuracy
-            accuracies = test(model, test_datasets, fname='lstm_preds.pkl', is_ensemble=is_ensemble)
+            accuracies = test(model, test_datasets, is_ensemble=is_ensemble)
             print('Val:', accuracies)
 
         #print_split_accuracies(datasets[0], model)
@@ -197,6 +197,7 @@ def test(model, datasets, fname='', is_ensemble=False):
         if is_ensemble:
             labels = labels[:, None, ...].expand(-1, model.ensemble_size)
 
+        print(preds)
         # calculate the and save the accuracy
         accuracy = ((preds>0.5) == labels).float().mean()
         accuracies.append(accuracy.item())
