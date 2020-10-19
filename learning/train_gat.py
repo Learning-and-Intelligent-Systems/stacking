@@ -197,7 +197,7 @@ def test(model, datasets, args, fname=''):
         if args.visual:
             # have to run test set through network in batches due to memory issues
             num_data_points = len(dataset)
-            batch_size = 5
+            batch_size = 100
             dataloader = iter(DataLoader(dataset, batch_size=batch_size))
             accs = []
             for batch_idx in range(num_data_points // batch_size):
