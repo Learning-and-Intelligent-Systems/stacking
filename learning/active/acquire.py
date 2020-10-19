@@ -45,7 +45,7 @@ def choose_acquisition_data(samples, ensemble, n_acquire):
     preds = get_predictions(dataset, ensemble)
 
     # Get the BALD score for each.
-    scores = bald(preds).numpy()
+    scores = bald(preds).cpu().numpy()
 
     # Return the n_acquire points with the highest score.
     acquire_indices = np.argsort(scores)[::-1][:n_acquire]

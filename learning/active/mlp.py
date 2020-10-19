@@ -33,6 +33,10 @@ class MLP(nn.Module):
         self.mask1 = torch.bernoulli(dropout_probs)
         self.mask2 = torch.bernoulli(dropout_probs)
         self.mask3 = torch.bernoulli(dropout_probs)
+        if torch.cuda.is_available():
+            self.mask1 = self.mask1.cuda()
+            self.mask2 = self.mask2.cuda()
+            self.mask3 = self.mask3.cuda()
 
     def forward(self, x):
         x = self.relu(self.lin1(x))
