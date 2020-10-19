@@ -32,7 +32,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     for ex in range(n_epochs):
         print('Epoch', ex)
         acc = []
-        for x, y in loader:
+        for x, y in dataloader:
             optimizer.zero_grad()
 
             model.sample_dropout_masks()
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--n-train', type=int, default=1000)
-    parser.add_argument('--n-val', type=int, default=1000)
+    parser.add_argument('--n-val', type=int, default=5000)
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--n-models', type=int, default=5, help='Number of models in the ensemble.')
     parser.add_argument('--n-hidden', type=int, default=128)
