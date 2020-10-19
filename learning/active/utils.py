@@ -3,6 +3,8 @@ import pickle
 import time
 import torch
 
+from torch.utils.data import DataLoader
+
 from learning.active.mlp import MLP
 
 
@@ -61,4 +63,23 @@ class ExperimentLogger:
         for mx in range(0, self.args.n_models):
             ensemble.append(self.load_model('net_%d.pt' % mx))
         return ensemble
-        
+
+def get_predictions(dataset, models):
+    """
+    :param dataset: A ToyDataset object with N examples.
+    :param models: A list of K models on which to get predictions.
+    :return: A (NxK) array with classification probabilities for each model.
+    """
+    loader = DataLoader(dataset, shuffle=False, batch_size=32)
+
+    model_predictions = []
+    for model in models:
+        preds = []
+        for tensor, _ in loader:
+            with torch.no_grad():
+                preds.append(model.forward(tensor))
+            
+        preds = torch.cat(preds, dim=0)
+        model_predictions.append(preds)
+
+    return torch.cat(model_predictions, dim=1)
