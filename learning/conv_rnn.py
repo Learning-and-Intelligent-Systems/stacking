@@ -18,8 +18,6 @@ class TowerConvRNN(nn.Module):
             W = (image_dim-kernel_size)+1
             W = ((W-kernel_size)/stride)+1
             W = (W-kernel_size)+1
-            W = (W-kernel_size)+1
-            W = ((W-kernel_size)/stride)+1
             return int(W)
         self.hidden_dim = calc_fc_size()
         self.encoder = nn.Sequential(
@@ -30,8 +28,9 @@ class TowerConvRNN(nn.Module):
                         nn.MaxPool2d(kernel_size=kernel_size, 
                                         stride=stride),
                         nn.Conv2d(in_channels=n_hidden,
-                                        out_channels=n_hidden,
+                                        out_channels=1,
                                         kernel_size=kernel_size),
+                        nn.ReLU())
         
         self.insert_h = int(image_dim/2-self.hidden_dim/2)
                                        
@@ -49,12 +48,15 @@ class TowerConvRNN(nn.Module):
         """
         N, K, image_dim, image_dim = images.shape
         h_0 = torch.zeros(N, 1, image_dim, image_dim)
-            
+        if torch.cuda.is_available():
+            h_0 = h_0.cuda()
         h = h_0
         for k in range(K): 
             input = torch.cat([images[:,k,:,:].view(N,1,image_dim, image_dim), h], dim=1)
             h_small = self.encoder(input)
             h = torch.zeros(N, 1, image_dim, image_dim)
+            if torch.cuda.is_available():
+                h = h.cuda()
             h[:,:,self.insert_h:self.insert_h+self.hidden_dim, self.insert_h:self.insert_h+self.hidden_dim] = h_small
 
         # TODO: try later to map all hidden states to a stability prediction and take the .prod()
