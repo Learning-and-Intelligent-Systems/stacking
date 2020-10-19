@@ -119,7 +119,7 @@ def print_split_accuracies(dataset, model):
             print('Geom %d, CoM %d: %f' % (g, c, acc))
 
 
-def train(model, datasets, test_datasets, epochs=100, is_ensemble=False):
+def train(model, datasets, test_datasets=None, epochs=100, is_ensemble=False):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     batch_size = 32
     losses = []
@@ -154,33 +154,32 @@ def train(model, datasets, test_datasets, epochs=100, is_ensemble=False):
                     labels = labels[:, None, ...].expand(-1, model.ensemble_size)
                     scale = model.ensemble_size
                 else:
-                    scale = 1
+                    scale = 1.
 
                 l = F.binary_cross_entropy(preds, labels) * scale
                 l.backward()
                 optimizer.step()
 
-                model.train(False) # turn off dropout before computing accuracy
                 accuracy = ((preds>0.5) == labels).float().mean()
                 accs[idx].append(accuracy.item())
                 losses.append(np.mean(accs[idx][-500:]))
-                
+
 
             if batch_idx % 40 == 0:
                 print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {losses[-4:]}')
 
-        if epoch_idx % 5 == 0:
-            model.train(False) # turn off dropout before computing accuracy
-            accuracies = test(model, test_datasets, fname='lstm_preds.pkl', is_ensemble=is_ensemble)
+        if test_datasets is not None and epoch_idx % 5 == 0:
+            model.train(False)
+            accuracies = test(model, test_datasets, is_ensemble=is_ensemble)
             print('Val:', accuracies)
 
         #print_split_accuracies(datasets[0], model)
     return losses
 
 def test(model, datasets, fname='', is_ensemble=False):
-    model.training = False
+    model.train(False) # turn off dropout before computing accuracy
     accuracies = []
-    
+
     results = []
     # iterate through the tower sizes
     for dataset in datasets:
@@ -219,13 +218,13 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         model = model.cuda()
 
-    #train_datasets = load_dataset('random_blocks_(x40000)_5blocks_all.pkl')
-    train_datasets = load_dataset('random_blocks_(x40000)_5blocks_uniform_mass_aug_4.pkl', K=1)
-    print('Number of Training Towers') 
+    train_datasets = load_dataset('random_blocks_(x40000)_5blocks_all.pkl')
+    # train_datasets = load_dataset('random_blocks_(x40000)_5blocks_uniform_mass_aug_4.pkl', K=1)
+    print('Number of Training Towers')
     for d in train_datasets:
         print(len(d))
-    #test_datasets = load_dataset('random_blocks_(x2000)_5blocks_all.pkl')
-    test_datasets = load_dataset('random_blocks_(x2000)_5blocks_uniform_mass.pkl', K=1)
+    test_datasets = load_dataset('random_blocks_(x2000)_5blocks_all.pkl')
+    # test_datasets = load_dataset('random_blocks_(x2000)_5blocks_uniform_mass.pkl', K=1)
     #train_datasets = load_dataset('random_blocks_(x5000)_5blocks_pwu.pkl')
     losses = train(model, train_datasets, test_datasets, epochs=500)
     plt.plot(losses)
