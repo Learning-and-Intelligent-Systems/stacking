@@ -125,7 +125,7 @@ class ActiveExperimentLogger:
         os.mkdir(os.path.join(self.exp_path, 'models', str(tx)))
         for mx, model in enumerate(ensemble):
             path = os.path.join(self.exp_path, 'models', str(tx), 'net_%d.pt' % mx)
-            torch.save(model.state_dict(), os.path.join(path))
+            torch.save(model.cpu().state_dict(), os.path.join(path))
 
     def save_acquisition_data(self, new_xs, new_ys, samples, tx):
         data = {

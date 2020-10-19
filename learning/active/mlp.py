@@ -44,8 +44,6 @@ class MLP(nn.Module):
 
         return self.sigmoid(self.lin4(x))
 
-
-
     def plot_decision_boundary(self, resolution, fname, k):
         x1 = torch.arange(-1, 1, resolution)
         x2 = torch.arange(-1, 1, resolution)

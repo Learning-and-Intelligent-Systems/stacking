@@ -29,10 +29,17 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     optimizer = Adam(model.parameters(), lr=1e-3)
     best_acc = 0.
     best_model = None
+
+    if torch.cuda.is_available():
+        model.cuda()
+
     for ex in range(n_epochs):
         print('Epoch', ex)
         acc = []
         for x, y in dataloader:
+            if torch.cuda.is_available():
+                x = x.cuda()
+                y = y.cuda()
             optimizer.zero_grad()
 
             model.sample_dropout_masks()
