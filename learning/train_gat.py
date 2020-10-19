@@ -161,7 +161,7 @@ def train(model, datasets, test_datasets, args):
                 optimizer.step()
                 accuracy = ((preds.cpu().detach().numpy().squeeze()>0.5) == labels.cpu().detach().numpy()).mean()
                 train_losses.append(accuracy.item())
-        print('acc: ', np.mean(train_losses[-(num_data_points // args.batch_size):]))
+        print('training acc: ', np.mean(train_losses[-(num_data_points // args.batch_size):]))
         # train_losses is a vector of running average accuracies for each tower size
 
         #print(preds, labels)
@@ -176,6 +176,7 @@ def train(model, datasets, test_datasets, args):
 
             accuracies = test(model, test_datasets, args, fname='lstm_preds.pkl')
             test_accuracies.append(accuracies)
+            print('test acc: ', accuracies)
             #print('Val:', accuracies)
         
         
@@ -273,9 +274,8 @@ if __name__ == '__main__':
     fig.savefig('train_losses.png')
     plt.close()
     
-    final_accuracies = test(model, test_datasets, args, fname='lstm_preds.pkl')
     fig, ax = plt.subplots()
-    ax.plot(epoch_ids+[args.epochs], test_accuracies+[final_accuracies], label=num_test_blocks)
+    ax.plot(epoch_ids, test_accuracies, label=num_test_blocks)
     ax.legend(title='number of blocks')
     ax.set_title('Test Accuracy')
     ax.set_xlabel('Epoch ID')
@@ -305,7 +305,7 @@ if __name__ == '__main__':
     file.write("train dataset : " + train_dataset + " \n") 
     file.write("test dataset : " + test_dataset + " \n") 
     s = ', '
-    file.write("final test accuracy : " + s.join([str(acc) for acc in final_accuracies])  + " \n") 
+    file.write("final test accuracy : " + test_accuracies[-1]  + " \n") 
     file.write(" \n") 
     file.write("epochs : " + str(args.epochs) + " \n") 
     file.write("batch size: " + str(args.batch_size) + " \n") 
