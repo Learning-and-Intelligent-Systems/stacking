@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 
 from block_utils import Object
 from learning.generate_tower_training_data import build_tower, vectorize
+from learning.gn import FCGN
 from learning.dropout_gn import DropoutFCGN
 from learning.train_graph_net import load_dataset, preprocess, train, test
 
@@ -66,10 +67,16 @@ def mc_dropout_score(model, x, k=100):
 
 def active(model, train_datasets, test_datasets, score_func=mc_dropout_score):
     batch_size = 32
-    num_to_acquire_per_batch = 4
+    num_to_acquire_per_batch = 8
     num_to_acquire_in_total = 40
-    for _ in range(num_to_acquire_per_batch // num_to_acquire_in_total1)
-        model.train(True)
+    accuracies = []
+
+    # pretrain the model so the first BALD score makes sense
+    model.train(True)
+    train(model, train_datasets, epochs=3)
+
+    for _ in range(num_to_acquire_in_total // num_to_acquire_per_batch):
+
 
         for i in range(4):
             # generate new towers
@@ -92,34 +99,21 @@ def active(model, train_datasets, test_datasets, score_func=mc_dropout_score):
                 torch.cat([train_datasets[i][:][0], best_towers]),
                 torch.cat([train_datasets[i][:][1], best_labels]))
 
-        # model.reset()
+
         print('Dataset sizes:', [len(d) for d in train_datasets])
-        train(model, train_datasets, test_datasets, epochs=1)
 
+        # reset the model and train from scratch on the new datasets
+        model.reset()
+        model.train(True)
+        train(model, train_datasets, epochs=3)
+        accuracies.append(test(model, test_datasets))
 
-def evaluate_active_learning_performance(model, score_func, train_datasets, test_datasets):
+    return np.array(accuracies)
 
-    # pretrain the model
-    losses = train(model, train_datasets, test_datasets, epochs=1)
-    # plt.plot(losses)
-    # plt.xlabel('Batch (x10)')
-    # plt.show()
-
-    # do active learning until the pool is empty
-    scores = active(model, train_datasets, test_datasets, score_func=score_func)
-    # import sys; sys.exit(0)
-
-    # and do a final test of the model
-    accuracies = test(model, test_datasets, fname='lstm_preds.pkl')
-    print(accuracies)
-    plt.scatter(np.arange(2,6), accuracies)
-    plt.xlabel('Num Blocks in Tower')
-    plt.ylabel('Accuracy')
-    plt.show()
 
 if __name__ == '__main__':
     model = DropoutFCGN(14, 64)
-    
+
     num_train = 1000
 
     if torch.cuda.is_available():
@@ -130,12 +124,22 @@ if __name__ == '__main__':
     # differing tower sizes requires tensors of differing dimensions
     train_datasets = load_dataset('random_blocks_(x40000)_5blocks_all.pkl')
     test_datasets = load_dataset('random_blocks_(x2000)_5blocks_all.pkl')
-    subset_idxs = np.random.choice(len(train_datasets), num_train)
+    subset_idxs = np.random.choice(len(train_datasets[0]), num_train, replace=False)
     train_datasets = [TensorDataset(t.tensors[0][subset_idxs], t.tensors[1][subset_idxs])\
         for t in train_datasets]
 
-    for model_class, score_func in [(DropoutFCGN(14, 64), mc_dropout_score),
-                                    (DropoutFCGN(14, 64), torch.rand_like)]:
+    for model_class, score_func, label in [(DropoutFCGN(14, 64), mc_dropout_score, 'DropoutFCGN with BALD'),
+                                           (DropoutFCGN(14, 64), torch.rand_like, 'DropoutFCGN with Random')]:
 
         model.backup()
-        evaluate_active_learning_performance(model, score_func, deepcopy(train_datasets), deepcopy(test_datasets))
+        print(f'-------------------{label}-------------------')
+        accuracies = active(model, deepcopy(train_datasets),
+            deepcopy(test_datasets), score_func)
+
+        plt.plot(accuracies.ravel(), label=label)
+
+    plt.title('Validation Accuracy throughout active Learning')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Number of datapoints acquired')
+    plt.legend()
+    plt.show()
