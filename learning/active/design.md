@@ -25,8 +25,7 @@ The experiments directory will be used for this and each active learning experim
 ```
 experiments/
 --<exp-name>-<timestamp>/
-----acquisition-data/ 
-------<active-loop-ix>/ (Each folder will contain the set of all points considered in the sampler. A second file will contain a list of the points that were actually chosen.)
+----acquisition-data/ (Each folder will contain the set of all points considered in the sampler. A second file will contain a list of the points that were actually chosen.)
 ----datasets/ (There will be a dataset for each set of ensembles in this folder. The ids will correspond with the models.)
 ----models/
 ------<active-loop-ix>/ (There will be a folder with all the trained models after each acquisition. 0 corresponds to the model with the initial data)

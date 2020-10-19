@@ -46,7 +46,6 @@ def choose_acquisition_data(samples, ensemble, n_acquire):
 
     # Get the BALD score for each.
     scores = bald(preds).numpy()
-    print(scores.shape)
 
     # Return the n_acquire points with the highest score.
     acquire_indices = np.argsort(scores)[::-1][:n_acquire]
@@ -70,4 +69,4 @@ def acquire_datapoints(ensemble, n_samples, n_acquire):
     unlabeled_pool = sample_unlabeled_data(n_samples)
     xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire)
     ys = get_labels(xs)
-    return xs, ys
+    return xs, ys, unlabeled_pool
