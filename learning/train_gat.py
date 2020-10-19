@@ -20,6 +20,7 @@ from learning.mlp import MLP
 from learning.lstm import TowerLSTM
 from learning.gated_gn import GatedGN
 from learning.cnn import TowerCNN
+from learning.conv_rnn import TowerConvRNN
 
 def get_subsets(data):
     towers, labels = [], []
@@ -257,7 +258,8 @@ if __name__ == '__main__':
     #model = MLP(5, 256)
     #model = FCGN(14, 64, visual=args.visual, image_dim=150)
     #model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
-    model = TowerCNN(150)
+    #model = TowerCNN(150)
+    model = TowerConvRNN(150)
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
@@ -296,6 +298,8 @@ if __name__ == '__main__':
         model_type = 'GatedGN'
     elif isinstance(model, TowerCNN):
         model_type = 'TowerCNN'
+    elif isinstance(model, TowerConvRNN):
+        model_type = 'TowerConvRNN'
     else:
         print('Model type could not be determined.')
     
@@ -305,7 +309,7 @@ if __name__ == '__main__':
     file.write("train dataset : " + train_dataset + " \n") 
     file.write("test dataset : " + test_dataset + " \n") 
     s = ', '
-    file.write("final test accuracy : " + test_accuracies[-1]  + " \n") 
+    file.write("final test accuracy : " + str(test_accuracies[-1])  + " \n") 
     file.write(" \n") 
     file.write("epochs : " + str(args.epochs) + " \n") 
     file.write("batch size: " + str(args.batch_size) + " \n") 
