@@ -57,6 +57,7 @@ def sample_random_tower(blocks):
 
 def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
     """ Build a tower with the specified stability properties.
+    :param blocks: if this is a list of blocks, use those blocks. if int, generate that many new blocks
     :param stable: Overall tower stability.
     :param pairwise_stable: The stability between two consecutive blocks in the tower.
     :param cog_stable: If the tower is stable just by looking at the CoG.
@@ -64,6 +65,9 @@ def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=
    
     # init a tower planner for checking stability
     tp = TowerPlanner(stability_mode='contains')
+
+    if isinstance(blocks, int):
+        blocks = [Object.random(f'obj_{ix}') for ix in range(blocks)]
 
     # since the blocks are sampled with replacement from a finite set, the
     # object instances are sometimes identical. we need to deepcopy the blocks
@@ -171,6 +175,7 @@ def generate_training_images(world):
         images.append(image)
 
     return images
+
 
 def main(args, vis_tower=False):
     # This is a dictionary from stable/unstable label to what subsets of [COG_Stable, PW_Stable] to include.

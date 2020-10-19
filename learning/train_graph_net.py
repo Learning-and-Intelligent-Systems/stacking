@@ -34,6 +34,21 @@ def get_subsets(data):
             labels.append(label)
     return torch.Tensor(towers), torch.Tensor(labels)
 
+def preprocess(towers):
+    # remove the three color channels at the end of each block encoding
+    # (see block_utils.Object.vectorize for details)
+    towers = towers[...,:14]
+    #towers = towers[...,[0, 1, 2, 4, 5, 7, 8]]
+    # convert absolute xy positions to relative positions
+    #towers[:,1:,7:9] -= towers[:,:-1,7:9]
+    #towers[:,:,1:3] += towers[:,:,7:9]
+    towers[:,:,1:4] /= 0.01 #towers[:,:,4:7]
+    towers[:,:,7:9] /= 0.01 #towers[:,:,4:6]
+    towers[:,:,4:7] = (towers[:,:,4:7] - 0.1) / 0.01
+    towers[:,:,0] = (towers[:,:,0] - 0.55)
+
+    return towers.float()
+
 def load_dataset(name, K=1):
     """ Load all the tower data into TensorDatasets. We need a different
     dataset for each tower size, because vectorized Graph Attention Network
@@ -56,17 +71,7 @@ def load_dataset(name, K=1):
         labels = torch.Tensor(data['labels'])
 
         #towers, labels = get_subsets(data)
-        # remove the three color channels at the end of each block encoding
-        # (see block_utils.Object.vectorize for details)
-        towers = towers[...,:14]
-        #towers = towers[...,[0, 1, 2, 4, 5, 7, 8]]
-        # convert absolute xy positions to relative positions
-        #towers[:,1:,7:9] -= towers[:,:-1,7:9]
-        #towers[:,:,1:3] += towers[:,:,7:9]
-        towers[:,:,1:4] /= 0.01 #towers[:,:,4:7]
-        towers[:,:,7:9] /= 0.01 #towers[:,:,4:6]
-        towers[:,:,4:7] = (towers[:,:,4:7] - 0.1) / 0.01
-        towers[:,:,0] = (towers[:,:,0] - 0.55)
+        towers = preprocess(towers)
         # add the new dataset to the list of datasets
         datasets.append(TensorDataset(towers[::K,:], labels[::K]))
 
@@ -130,10 +135,12 @@ def train(model, datasets, test_datasets, epochs=100, is_ensemble=False):
         for batch_idx in range(num_data_points // batch_size):
             # shuffle(iterable_dataloaders)
             # iterate through the tower sizes in the inner loop
-            for dx, iterable_dataloader in enumerate(iterable_dataloaders):
+            for idx, iterable_dataloader in enumerate(iterable_dataloaders):
                 model.train(True)
                 optimizer.zero_grad()
-                towers, labels = next(iterable_dataloader)
+                catch = next(iterable_dataloader)
+                # print(catch)
+                towers, labels =catch
                 if torch.cuda.is_available():
                     towers = towers.cuda()
                     labels = labels.cuda()
@@ -155,8 +162,8 @@ def train(model, datasets, test_datasets, epochs=100, is_ensemble=False):
 
                 model.train(False) # turn off dropout before computing accuracy
                 accuracy = ((preds>0.5) == labels).float().mean()
-                accs[dx].append(accuracy.item())
-                losses.append(np.mean(accs[dx][-500:]))
+                accs[idx].append(accuracy.item())
+                losses.append(np.mean(accs[idx][-500:]))
                 
 
             if batch_idx % 40 == 0:
