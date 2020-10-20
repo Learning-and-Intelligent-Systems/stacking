@@ -15,12 +15,15 @@ from learning.active.utils import ExperimentLogger
 def evaluate(loader, model):
     acc = []
     for x, y in loader:
+        if torch.cuda.is_available():
+            x = x.cuda()
+            y = y.cuda()
         # TODO: When doing validation on dropout, average models.
         model.sample_dropout_masks()
         pred = model.forward(x).squeeze()
 
         accuracy = ((pred>0.5) == y).float().mean()
-        acc.append(accuracy)
+        acc.append(accuracy.item())
 
     return np.mean(acc)
 
@@ -29,10 +32,17 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     optimizer = Adam(model.parameters(), lr=1e-3)
     best_acc = 0.
     best_model = None
+
+    if torch.cuda.is_available():
+        model.cuda()
+
     for ex in range(n_epochs):
         print('Epoch', ex)
         acc = []
         for x, y in dataloader:
+            if torch.cuda.is_available():
+                x = x.cuda()
+                y = y.cuda()
             optimizer.zero_grad()
 
             model.sample_dropout_masks()
@@ -43,7 +53,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             optimizer.step()
 
             accuracy = ((pred>0.5) == y).float().mean()
-            acc.append(accuracy)
+            acc.append(accuracy.item())
 
         val_acc = evaluate(val_dataloader, model)
         if val_acc > best_acc:

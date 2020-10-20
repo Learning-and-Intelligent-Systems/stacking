@@ -33,6 +33,10 @@ class MLP(nn.Module):
         self.mask1 = torch.bernoulli(dropout_probs)
         self.mask2 = torch.bernoulli(dropout_probs)
         self.mask3 = torch.bernoulli(dropout_probs)
+        if torch.cuda.is_available():
+            self.mask1 = self.mask1.cuda()
+            self.mask2 = self.mask2.cuda()
+            self.mask3 = self.mask3.cuda()
 
     def forward(self, x):
         x = self.relu(self.lin1(x))
@@ -43,8 +47,6 @@ class MLP(nn.Module):
         x = x*self.mask3
 
         return self.sigmoid(self.lin4(x))
-
-
 
     def plot_decision_boundary(self, resolution, fname, k):
         x1 = torch.arange(-1, 1, resolution)
