@@ -32,11 +32,12 @@ def sample_unlabeled_data(n_samples):
     xs, _ = gen.generate_uniform_dataset(n_samples)
     return xs
 
-def choose_acquisition_data(samples, ensemble, n_acquire):
+def choose_acquisition_data(samples, ensemble, n_acquire, strategy):
     """ Choose data points with the highest acquisition score
     :param samples: (N,2) An array of unlabelled datapoints which to evaluate.
     :param ensemble: A list of models. 
     :param n_acquire: The number of data points to acquire.
+    :param strategy: ['random', 'bald'] The objective to use to choose new datapoints.
     :return: (n_acquire, 2) - the samples which to label.
     """
     # Get predictions for each model of the ensemble. Note these ys won't be used.
@@ -44,9 +45,12 @@ def choose_acquisition_data(samples, ensemble, n_acquire):
     dataset = ToyDataset(samples, placeholder_ys)
     preds = get_predictions(dataset, ensemble)
 
-    # Get the BALD score for each.
-    scores = bald(preds).cpu().numpy()
-
+    # Get the acquisition score for each.
+    if strategy == 'bald':
+        scores = bald(preds).cpu().numpy()
+    elif strategy == 'random':
+        scores = np.ones((preds.shape[0],), dtype='float32')
+        
     # Return the n_acquire points with the highest score.
     acquire_indices = np.argsort(scores)[::-1][:n_acquire]
     return samples[acquire_indices, :]
@@ -60,13 +64,13 @@ def get_labels(samples):
     ys = gen.get_labels(samples)
     return ys
 
-def acquire_datapoints(ensemble, n_samples, n_acquire):
+def acquire_datapoints(ensemble, n_samples, n_acquire, strategy):
     """ Get new datapoints given the current set of models.
     Calls the next three methods in turn with their respective 
     parameters.
     :return: (n_acquire, 2), (n_acquire,) - x,y tuples of the new datapoints.
     """
     unlabeled_pool = sample_unlabeled_data(n_samples)
-    xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire)
+    xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy)
     ys = get_labels(xs)
     return xs, ys, unlabeled_pool

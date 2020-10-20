@@ -48,7 +48,7 @@ def active_train(args):
         logger.save_ensemble(ensemble, tx)
 
         # Collect new samples.
-        new_xs, new_ys, all_samples = acquire_datapoints(ensemble, args.n_samples, args.n_acquire)
+        new_xs, new_ys, all_samples = acquire_datapoints(ensemble, args.n_samples, args.n_acquire, args.strategy)
         logger.save_acquisition_data(new_xs, new_ys, all_samples, tx)
 
         # Add to dataset.
@@ -65,13 +65,12 @@ if __name__ == '__main__':
     parser.add_argument('--n-models', type=int, default=5, help='Number of models in the ensemble.')
     parser.add_argument('--n-hidden', type=int, default=128)
     parser.add_argument('--dropout', type=float, default=0.)
-    parser.add_argument('--n-epochs', type=int, default=300)
+    parser.add_argument('--n-epochs', type=int, default=500)
     parser.add_argument('--n-train-init', type=int, default=100)
     parser.add_argument('--n-samples', type=int, default=500)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
-
-    
+    parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')    
     args = parser.parse_args()
 
     active_train(args)

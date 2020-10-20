@@ -111,7 +111,7 @@ class ActiveExperimentLogger:
 
     def load_model(self, path):
         model = MLP(n_hidden=self.args.n_hidden, dropout=self.args.dropout)
-        model.load_state_dict(torch.load(path))
+        model.load_state_dict(torch.load(path, map_location='cpu'))
         return model
 
     def get_ensemble(self, tx):
