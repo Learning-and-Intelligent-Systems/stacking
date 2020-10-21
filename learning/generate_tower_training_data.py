@@ -95,10 +95,10 @@ def get_filename(num_towers, use_block_set, block_set_size, suffix):
 
 def generate_training_images(world):
     # NOTE (caris): these images do not capture anything about the mass of the block
-    scale = .0035                           # meters in a pixel
+    scale = .009                           # meters in a pixel
     height, width = 150, 150              # dimensions of output images
     pixel_origin = (height/2, width/2)    # pixel corresponding to world frame origin
-    com_marker_width = 5                  # in pixels
+    com_marker_width = 3                  # in pixels
 
     def pixel_to_world(pixel):
         x = scale*(pixel[0]-pixel_origin[0])
@@ -129,22 +129,43 @@ def generate_training_images(world):
                 inside = inside and False
         return inside
         
-    def get_object_training_image(object):
-        image = np.zeros((width, height)) #(black)
+    def add_object(image):
+        endpoints_obj = [[-object.dimensions.x/2, -object.dimensions.y/2],
+                        [-object.dimensions.x/2, +object.dimensions.y/2],
+                        [object.dimensions.x/2, +object.dimensions.y/2],
+                        [object.dimensions.x/2, -object.dimensions.y/2]]
+        endpoints_world = [transformation([epo[0], epo[1], 0.], object.pose.pos, object.pose.orn)[:2] for epo in endpoints_obj]
+        pixel_endpoints = [world_to_pixel(endpoint) for endpoint in endpoints_world]
+        min_x_pixel = int(min([x for (x,y) in pixel_endpoints]))
+        max_x_pixel = int(max([x for (x,y) in pixel_endpoints]))
+        min_y_pixel = int(min([y for (x,y) in pixel_endpoints]))
+        max_y_pixel = int(max([y for (x,y) in pixel_endpoints]))
+        if min_x_pixel < 0 or max_x_pixel > width or min_y_pixel < 0 or max_y_pixel > height:
+            raise Exception('Object is at the edge of the image! Increase scale and try again.')
+        else:
+            image[min_y_pixel:max_y_pixel, min_x_pixel:max_x_pixel] = 1.0
+
+    def add_object_rot(image):
         image_xs = np.linspace(0, width-1, width).astype(np.uint32)
         image_ys = np.linspace(0, height-1, height).astype(np.uint32)
-        
-        # draw object (white)
         found_obj = False
         for pixel_x in image_xs:
             for pixel_y in image_ys:
-                if pixel_x == width or pixel_y == height:
-                    raise Exception('Object is at the edge of the image! Increase scale and try again.')
                 world_xy = pixel_to_world([pixel_x, pixel_y])
                 if xy_in_obj(world_xy, object):
                     found_obj = True
                     image[pixel_y, pixel_x] = 1.0
-
+    
+    def get_object_training_image(object):
+        image = np.zeros((width, height)) #(black)
+        
+        # draw object (white)
+        all_zero_rot = True # all block orn = (0,0,0,1)
+        if all_zero_rot:
+            add_object(image)
+        else: # TODO: need way to detect if it's at the edge
+            add_object_rot(image, width, height)
+        
         # draw COM in object (gray)
         com_world = transformation(object.com, object.pose.pos, object.pose.orn)
         com_pixel = world_to_pixel(com_world[:2])
@@ -156,20 +177,24 @@ def generate_training_images(world):
                                 com_marker_width).astype(np.uint32)
         for com_x in com_xs:
             for com_y in com_ys:
-                image[com_y, com_x] = 0.5
+                try:
+                    image[com_y, com_x] = 0.5
+                except:
+                    raise Exception('Object is at the edge of the image! Increase scale and try again.')
+        return image
 
-        '''
+    def plot_image(image):
         plt.imshow(image, cmap='gray')
         plt.axis('off')
         plt.xlabel('x')
         plt.ylabel('y')
         plt.show()
-        '''
-        return image
+
 
     images = []
     for object in world.objects:
         image = get_object_training_image(object)
+        #plot_image(image)
         images.append(image)
 
     return images
