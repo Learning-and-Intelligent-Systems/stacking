@@ -2,11 +2,13 @@ import argparse
 import numpy as np
 import pickle
 import os
+import time
 
 from block_utils import World, Environment, Dimensions, Object, Quaternion, Pose, Position, ZERO_POS, rotation_group, get_rotated_block
 from scipy.spatial.transform import Rotation as R
 
-def augment_by_rotating(all_data, K_skip, vis_tower=False):
+
+def augment(all_data, K_skip, translate, vis_tower=False):
     datasets = {}
     for num_blocks in range(2, 6):
         print('Augmenting %d block towers...' % num_blocks)
@@ -15,9 +17,13 @@ def augment_by_rotating(all_data, K_skip, vis_tower=False):
         towers = data['towers'][::K_skip, :]
         labels = data['labels'][::K_skip]
         N, K, D = towers.shape
-        augmented_towers = np.zeros((N*4, K, D))
-        augmented_labels = np.zeros((N*4))
         
+        if translate:
+            N_shift = 4
+        else:
+            N_shift = 0
+        augmented_towers = np.zeros((N*(4+N_shift), K, D))
+        augmented_labels = np.zeros((N*(4+N_shift)))
         for ix in range(N):
             if ix % 1000 == 0:
                 print(ix)
@@ -37,8 +43,19 @@ def augment_by_rotating(all_data, K_skip, vis_tower=False):
                     #                 Quaternion(*rot.as_quat().tolist()))
                     block.set_pose(new_pose)
                     rot_tower[bx] = get_rotated_block(block)
-                    augmented_towers[4*ix + kx, bx, :] = rot_tower[bx].vectorize()                    
-                augmented_labels[4*ix + kx] =   labels[ix]                   
+                    augmented_towers[(4+N_shift)*ix + kx, bx, :] = rot_tower[bx].vectorize()                    
+                augmented_labels[(4+N_shift)*ix + kx] = labels[ix]                   
+                
+                if translate:
+                    dx, dy = np.random.uniform(-0.2, 0.2, 2)
+                    shifted_tower = augmented_towers[(4+N_shift)*ix + kx, :].copy()
+                    # Indices 7,8 correspond to the pose.
+                    # The CoM doesn't need to be shifted because it is relative.
+                    shifted_tower[:, 7] += dx
+                    shifted_tower[:, 8] += dy
+                    
+                    augmented_towers[(4+N_shift)*ix + 4 + kx, :, :] = shifted_tower
+                    augmented_labels[(4+N_shift)*ix + 4 + kx] = labels[ix]  
                 
                 if vis_tower:
                     w = World(rot_tower)
@@ -47,7 +64,7 @@ def augment_by_rotating(all_data, K_skip, vis_tower=False):
                         env.step(vis_frames=False)
                         time.sleep(1/240.)
                     env.disconnect()
-        
+
         datasets[f'{num_blocks}block'] = {'towers': augmented_towers,
                                           'labels': augmented_labels}
     
@@ -57,17 +74,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--fname', type=str, required=True)
     parser.add_argument('--K', type=int, required=True)
+    parser.add_argument('--translate', action='store_true', default=False)
     args = parser.parse_args()
+    print(args)
     # 'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl'
    
     with open(args.fname, 'rb') as handle:
         data = pickle.load(handle)
     
-    aug_data = augment_by_rotating(data, args.K, vis_tower=False)
+    aug_data = augment(data, args.K, args.translate, vis_tower=False)
 
     # Save the new dataset.
     root, ext = os.path.splitext(args.fname)
-    fname = '%s_aug_%d%s' % (root, args.K, ext)
+    fname = '%s_%daug_%dshift%s' % (root, args.K, args.translate, ext)
     print('Saving to: %s' % fname)
     with open(fname, 'wb') as handle:
         pickle.dump(aug_data, handle)
