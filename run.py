@@ -28,17 +28,20 @@ def main(args):
     beliefs = [ParticleBelief(block, 
                               N=200, 
                               plot=True, 
-                              vis_sim=args.vis,
+                              vis_sim=False,
                               noise=NOISE) for block in blocks]
-    # agent._add_text('Ready?')
+    agent._add_text('Ready?')
     input('Start?')
+
+    # Gain information about the CoM of each block.
     for b_ix, (block, belief) in enumerate(zip(blocks, beliefs)):
         print('Running filter for', block.name)
         for interaction_num in range(5):
             print("Interaction number: ", interaction_num)
+            agent._add_text('Planning action.')
             action = plan_action(belief, exp_type='reduce_var', action_type='place')
             observation = agent.simulate_action(action, b_ix, T=50)
-            # agent._add_text('Updating particle belief')
+            agent._add_text('Updating particle belief.')
             belief.update(observation)
             block.com_filter = belief.particles
 
@@ -46,19 +49,18 @@ def main(args):
 
         
 
-    # find the tallest tower
+    # Find the tallest tower
     print('Finding tallest tower.')
     # agent._add_text('Planning tallest tower')
-    tp = TowerPlanner()
+    tp = TowerPlanner(plan_mode='expectation')
     tallest_tower = tp.plan(blocks)
 
-    # and visualize the result
+    # and execute the resulting plan.
     agent.simulate_tower(tallest_tower, vis=True, T=2500, save_tower=args.save_tower)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--vis', action='store_true')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--num-blocks', type=int, default=3)
