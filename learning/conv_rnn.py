@@ -18,6 +18,8 @@ class TowerConvRNN(nn.Module):
             W = (image_dim-kernel_size)+1
             W = ((W-kernel_size)/stride)+1
             W = (W-kernel_size)+1
+            W = (W-kernel_size)+1
+            W = ((W-kernel_size)/stride)+1
             return int(W)
         self.hidden_dim = calc_fc_size()
         self.encoder = nn.Sequential(
@@ -30,8 +32,15 @@ class TowerConvRNN(nn.Module):
                         nn.Conv2d(in_channels=n_hidden,
                                         out_channels=1,
                                         kernel_size=kernel_size),
+                        nn.ReLU(),
+                        nn.Conv2d(in_channels=n_hidden,
+                                        out_channels=n_hidden,
+                                        kernel_size=kernel_size),
+                        nn.ReLU(),
+                        nn.MaxPool2d(kernel_size=kernel_size, 
+                                        stride=stride),
                         nn.ReLU())
-        
+
         self.insert_h = int(image_dim/2-self.hidden_dim/2)
                                        
         self.output = nn.Sequential(
