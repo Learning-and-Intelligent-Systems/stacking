@@ -257,9 +257,9 @@ if __name__ == '__main__':
     #model = FCGAT(14+M, M)
     #model = MLP(5, 256)
     #model = FCGN(14, 64, visual=args.visual, image_dim=150)
-    #model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
+    model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
     #model = TowerCNN(150)
-    model = TowerConvRNN(150)
+    #model = TowerConvRNN(150)
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
