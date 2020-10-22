@@ -263,7 +263,7 @@ if __name__ == '__main__':
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
-    train_dataset = 'random_blocks_(x20000)_2blocks_uniform_density.pkl'
+    train_dataset = 'random_blocks_(x2000)_2blocks_uniform_density.pkl'
     test_dataset = 'random_blocks_(x800)_2blocks_uniform_density.pkl'
     train_datasets, _ = load_dataset(train_dataset, args)
     test_datasets, num_test_blocks = load_dataset(test_dataset, args)
