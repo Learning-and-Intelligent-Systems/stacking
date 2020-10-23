@@ -60,8 +60,7 @@ class TowerConvRNN(nn.Module):
         if torch.cuda.is_available():
             h_0 = h_0.cuda()
         h = h_0
-        for k in range(K): 
-            # TODO: might need to flip this!
+        for k in range(K-1, -1, -1): # start with the top block
             input = torch.cat([images[:,k,:,:].view(N,1,image_dim, image_dim), h], dim=1)
             h_small = self.encoder(input)
             h = torch.zeros(N, 1, image_dim, image_dim)
