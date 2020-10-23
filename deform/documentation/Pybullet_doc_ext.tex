@@ -36,7 +36,21 @@
 \end{itemize}
 @return - a tuple (numVertices, (vertices)) where each vertex in 'vertices' is a tuple (x,y,z) and their index in 'vertices' is their corresponding link index
 
-\section{URDF Tags}
+\section{General Simulation Notes}
+\begin{itemize}
+    \item For the simulation not to crash, a hole is needed in the new deformable architecture (inner rigid inside of a deformable cover)
+          This is most likely due to a watertight requirement by the simulation. The current hole size we have been using has 0.1 m radius because
+          anything too small (e.g 0.01 m) causes the mesh geometry to greatly increase in complexity around the hole causing the simulation to crash.
+    \item numerical stability/stability of simulation is dependent on lame parameters and collision margin
+    \item speed of simulation is dependent on density of mesh (empirically proven to be dominant factor in comparison to
+          disabling collisions between internal rigid and outer deformable)
+    \item To enable collisions between deformables, a collision margin must be set. WARNING: collision margin is very volatile. If the collision marign is set too high in comparison to width of deformable,
+          the deforamble can collapse upon itself until it disappears or cause unphysical interactions (ejecting colliding objects)
+    \item Currently, a resolution of 2 (gmsh element size factor), 60\% of outer dimensions for inner rigid body, and a 0.01
+          has proven to be a stable and fast set of parameters for deformable cubes
+\end{itemize}
+
+\section{URDF Deformable Support}
 \begin{itemize}
     \item The 'neohookean' tag of a 'deformable' takes it's 'mu' and 'lambda' parameters (the lame parameters) in kPa (This is suspected given 60 mu and 200 lambda work and 60 Kpa =0.06 MPa which is close to the approximated 0.1 MPa for hyperelastic material elastin).
     \item The 'virtual' tag of a 'deformable' is constrained to only a 'filename' attribute that loads a vtk/obj file. The deformable can only be relocated upon loading (loadURDF) and therefore cannot have a changed center of mass given you cannot specify an inertial reference frame relative to a nonexistent link reference frame
@@ -52,5 +66,7 @@
     \item My general rule is to start out at a decent Young's Modulus, increase $\lambda$ from the $\mu$ value until the simulation breaks and then everything
     is fair game. In other words, from the value of a decent Young's Modulus until the breaking lambda, any combination of two values in that range as long as the general rule is true should not break the simulation
     \item too many hyperelastic pieces will cause the sim to crash so as the number of nehookean pieces grow, the stiffer each one should become
+    \item Generally, one could make the deformable stiffer by increasing the value of the Young's Modulus
+          and in effect increasing lambda or by decreasing the difference between the two values.
 \end{itemize}
 \end{document}

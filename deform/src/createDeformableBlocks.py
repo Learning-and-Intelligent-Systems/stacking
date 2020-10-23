@@ -15,7 +15,7 @@ def out_of_bounds(l, index):
     except IndexError:
         return 0
 
-def createBlock(**kwargs):
+def createDeformableHollowBlock(file="res_2_cover_8_in.vtk", **kwargs):
     #inertia takes a list with a specfic order but I can change it to a dicitonary if we desire
     deformable_urdf=Deformable(kwargs['name'])
     i=Inertial( Mass(value= kwargs['mass']),
@@ -26,11 +26,11 @@ def createBlock(**kwargs):
                             iyz=out_of_bounds(kwargs['inertia'], 4),
                             izz=out_of_bounds(kwargs['inertia'], 5))
                     )
-    c=Collision_margin(value = kwargs['collision_margin'])
+    c=Collision_margin(value = kwargs['collision_margin']) #should be 0
     r=Repulsion_Stiffness(value = kwargs['repulsion_stiffness'])
     f=Friction(value = kwargs['friction']),
     n=Neohookean(mu=kwargs['mu'], lam = kwargs['lamda'], damping=kwargs['damping']),
-    v=Visual(filename=kwargs['filename'])
+    v=Visual(filename=file)
 
     return Robot(deformable_urdf(i,c,r,f,n,v))
 

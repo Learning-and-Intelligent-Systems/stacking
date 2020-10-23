@@ -9,14 +9,14 @@
   <collision >
    <origin  xyz="0 0 0"  rpy="0 0 0" />
    <geometry >
-    <box  size="0.8 0.8 0.8" />
+    <box  size="0.6 0.6 0.6" />
    </geometry>
    <!-- <contact_coefficients mu="0.2" kp="0.5" kd="0.5"/> -->
   </collision>
   <visual >
    <origin  xyz="0 0 0"  rpy="0 0 0" />
    <geometry >
-    <box  size="0.8 0.8 0.8" />
+    <box  size="0.6 0.6 0.6" />
    </geometry>
    <material  name="color" >
     <color  rgba="0 1 1 1.0" />
