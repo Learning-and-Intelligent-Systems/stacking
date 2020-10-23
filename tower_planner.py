@@ -7,7 +7,7 @@ from block_utils import *
 from filter_utils import *
 from base_class import PlannerBase
 import numpy as np
-from copy import copy
+from copy import copy, deepcopy
 from itertools import permutations, combinations_with_replacement
 
 
@@ -121,6 +121,34 @@ class TowerPlanner(PlannerBase):
             top_rel_com = top_rel_pos + top.com
             return (np.abs(top_rel_com)*2 - bottom.dimensions <= 0)[:2].all()
 
+    def tower_is_containment_stable(self, tower):
+        """ A distractor stability function. Returns true if each block is completely 
+            within the block below it. 
+        """
+        for i in range(len(tower) - 1):
+            # check that each pair of blocks is stably individually
+            top = tower[i+1]
+            bottom = tower[i]
+            
+            if (top.pose.pos[0] + top.dimensions.x/2.) > (bottom.pose.pos[0] + bottom.dimensions.x/2.):
+                return False
+            if (top.pose.pos[0] - top.dimensions.x/2.) < (bottom.pose.pos[0] - bottom.dimensions.x/2.):
+                return False
+            if (top.pose.pos[1] + top.dimensions.y/2.) > (bottom.pose.pos[1] + bottom.dimensions.y/2.):
+                return False
+            if (top.pose.pos[1] - top.dimensions.y/2.) < (bottom.pose.pos[1] - bottom.dimensions.y/2.):
+                return False
+
+        return True
+
+
+    def tower_is_cog_stable(self, tower):
+        """ Return True is the tower would be stable if the CoM==COG
+        """
+        cog_tower = [deepcopy(block) for block in tower]
+        for block in cog_tower:
+            block.com = Position(0., 0., 0.)
+        return self.tower_is_stable(cog_tower)
 
     def calc_expected_height(self, tower, num_samples=100):
         """ Finds the expected height of a tower

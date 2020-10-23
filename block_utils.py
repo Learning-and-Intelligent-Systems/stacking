@@ -88,6 +88,18 @@ class Object:
       v[14:17] = self.color
 
       return v
+    
+    @staticmethod
+    def from_vector(vblock):
+        block = Object('from_vec', 
+                       dimensions=Dimensions(*vblock[4:7].tolist()), 
+                       mass=vblock[0], 
+                       com=Position(*vblock[1:4].tolist()), 
+                       color=Color(*vblock[14:17].tolist()))
+        pose = Pose(Position(*vblock[7:10].tolist()),
+                    Quaternion(*vblock[10:14].tolist()))
+        block.set_pose(pose)
+        return block
 
     @staticmethod
     def random(name=None):
@@ -103,7 +115,7 @@ class Object:
         dims = Dimensions(*(np.random.rand(3) * 0.1 + 0.05))
         # pick a density and multiply by the volume to get mass
         density = np.random.rand() * 0.9 + 0.1
-        mass = density * dims.x * dims.y * dims.z
+        mass = np.random.uniform(0.1, 1.0)
         # center of mass lies within the middle 0.9 of the block along each axis
         com = Position(*((np.random.rand(3) - 0.5) * 0.9 * dims))
         # pick a random color
@@ -261,7 +273,7 @@ class Environment:
                             pos, quat = self.pybullet_server.get_pose(obj_id)
                             self.pybullet_server.vis_frame(pos, quat)
                             # NOTE(izzy): I haven't tested this yet!
-                            self.pybullet_server.vis_particles(obj)
+                            #self.pybullet_server.vis_particles(obj)
                     world_i += 1
 
         if save_tower:
@@ -293,7 +305,7 @@ class Environment:
         if action and action.__class__.__name__ == 'PushAction':
             hand_pos = action.step()
             for world in self.worlds:
-                world.set_hand_pos(hand_pos)
+                world.set_hand_pos(hand_pos, self.pybullet_server.client)
 
         # forward step the sim
         self.pybullet_server.step()
@@ -450,10 +462,12 @@ def get_rotated_block(block):
     new_block.set_pose(new_pose)
     # get the original block's rotation
     r = R.from_quat(block.pose.orn)
+    vs = np.array([block.com, block.dimensions])
+    vs_rot = r.apply(vs)
     # rotate the old center of mass
-    new_block.com = Position(*r.apply(block.com))
+    new_block.com = Position(*vs_rot[0,:])
     # rotate the old dimensions
-    new_block.dimensions = Dimensions(*np.abs(r.apply(block.dimensions)))
+    new_block.dimensions = Dimensions(*np.abs(vs_rot[1,:]))
     # rotate the particle filter for the com if there is one
     if block.com_filter is not None:
         new_block.com_filter = ParticleDistribution(

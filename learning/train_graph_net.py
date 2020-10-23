@@ -18,6 +18,7 @@ from learning.gn import FCGN
 from learning.mlp import MLP
 from learning.lstm import TowerLSTM
 from learning.gated_gn import GatedGN
+from learning.topdown_net import TopDownNet
 
 def get_subsets(data):
     towers, labels = [], []
@@ -33,7 +34,22 @@ def get_subsets(data):
             labels.append(label)
     return torch.Tensor(towers), torch.Tensor(labels)
 
-def load_dataset(name):
+def preprocess(towers):
+    # remove the three color channels at the end of each block encoding
+    # (see block_utils.Object.vectorize for details)
+    towers = towers[...,:14]
+    #towers = towers[...,[0, 1, 2, 4, 5, 7, 8]]
+    # convert absolute xy positions to relative positions
+    #towers[:,1:,7:9] -= towers[:,:-1,7:9]
+    #towers[:,:,1:3] += towers[:,:,7:9]
+    towers[:,:,1:4] /= 0.01 #towers[:,:,4:7]
+    towers[:,:,7:9] /= 0.01 #towers[:,:,4:6]
+    towers[:,:,4:7] = (towers[:,:,4:7] - 0.1) / 0.01
+    towers[:,:,0] = (towers[:,:,0] - 0.55)
+
+    return towers.float()
+
+def load_dataset(name, K=1):
     """ Load all the tower data into TensorDatasets. We need a different
     dataset for each tower size, because vectorized Graph Attention Network
     can only ingest batches of graphs with equal numbers of nodes.
@@ -55,14 +71,9 @@ def load_dataset(name):
         labels = torch.Tensor(data['labels'])
 
         #towers, labels = get_subsets(data)
-        # remove the three color channels at the end of each block encoding
-        # (see block_utils.Object.vectorize for details)
-        towers = towers[...,:14]
-        #towers = towers[...,[0, 1, 2, 4, 5, 7, 8]]
-        # convert absolute xy positions to relative positions
-        #towers[:,1:,7:9] -= towers[:,:-1,7:9]
+        towers = preprocess(towers)
         # add the new dataset to the list of datasets
-        datasets.append(TensorDataset(towers, labels))
+        datasets.append(TensorDataset(towers[::K,:], labels[::K]))
 
     return datasets
 
@@ -108,13 +119,14 @@ def print_split_accuracies(dataset, model):
             print('Geom %d, CoM %d: %f' % (g, c, acc))
 
 
-def train(model, datasets, test_datasets):
+def train(model, datasets, test_datasets=None, epochs=100, is_ensemble=False):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     batch_size = 32
     losses = []
     num_data_points = len(datasets[0])
+    model.training = True
 
-    for epoch_idx in range(100):
+    for epoch_idx in range(epochs):
         # create a dataloader for each tower size
         iterable_dataloaders = [
             iter(DataLoader(d, batch_size=batch_size, shuffle=True))
@@ -123,37 +135,51 @@ def train(model, datasets, test_datasets):
         for batch_idx in range(num_data_points // batch_size):
             # shuffle(iterable_dataloaders)
             # iterate through the tower sizes in the inner loop
-            for dx, iterable_dataloader in enumerate(iterable_dataloaders):
-                
+            for idx, iterable_dataloader in enumerate(iterable_dataloaders):
+                model.train(True)
                 optimizer.zero_grad()
-                towers, labels = next(iterable_dataloader)
+                catch = next(iterable_dataloader)
+                # print(catch)
+                towers, labels =catch
                 if torch.cuda.is_available():
                     towers = towers.cuda()
                     labels = labels.cuda()
                 preds = model.forward(towers, k=towers.shape[1]-1)
-                l = F.binary_cross_entropy(preds, labels)
+
+                if is_ensemble:
+                    # NOTE(izzy): do I run into any weird gradient magnitude issues if
+                    # i combine the losses for every model in the ensemble? Pretty
+                    # sure I shuold use sum, because mean would reduce the magnitude
+                    # of the gradient for each model
+                    labels = labels[:, None, ...].expand(-1, model.ensemble_size)
+                    scale = model.ensemble_size
+                else:
+                    scale = 1.
+
+                l = F.binary_cross_entropy(preds, labels) * scale
                 l.backward()
                 optimizer.step()
+
                 accuracy = ((preds>0.5) == labels).float().mean()
-                accs[dx].append(accuracy.item())
-                losses.append(np.mean(accs[dx][-500:]))
-            
-                #print(preds, labels)
-                
+                accs[idx].append(accuracy.item())
+                losses.append(np.mean(accs[idx][-500:]))
+
 
             if batch_idx % 40 == 0:
                 print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {losses[-4:]}')
 
-        if epoch_idx % 5 == 0:
-            accuracies = test(model, test_datasets, fname='lstm_preds.pkl')
+        if test_datasets is not None and epoch_idx % 5 == 0:
+            model.train(False)
+            accuracies = test(model, test_datasets, is_ensemble=is_ensemble)
             print('Val:', accuracies)
 
         #print_split_accuracies(datasets[0], model)
     return losses
 
-def test(model, datasets, fname=''):
+def test(model, datasets, fname='', is_ensemble=False):
+    model.train(False) # turn off dropout before computing accuracy
     accuracies = []
-    
+
     results = []
     # iterate through the tower sizes
     for dataset in datasets:
@@ -164,7 +190,12 @@ def test(model, datasets, fname=''):
             towers = towers.cuda()
             labels = labels.cuda()
         # run the model on everything
-        preds = model.forward(towers, k=towers.shape[1]-1)
+        with torch.no_grad():
+            preds = model.forward(towers, k=towers.shape[1]-1)
+
+        if is_ensemble:
+            labels = labels[:, None, ...].expand(-1, model.ensemble_size)
+
         # calculate the and save the accuracy
         accuracy = ((preds>0.5) == labels).float().mean()
         accuracies.append(accuracy.item())
@@ -179,17 +210,23 @@ if __name__ == '__main__':
     # the number of hidden variables in the graph NN
     M = 64
     #model = FCGAT(14+M, M)
-    #model = MLP(5, 256)
+    #model = MLP(3, 256)
     model = FCGN(14, 64)
     #model = TowerLSTM(14, 32)
-    #model = GatedGN(14, 32)
+    #model = GatedGN(14, 64, n_layers=2)
+    #model = TopDownNet(14, 32)
     if torch.cuda.is_available():
         model = model.cuda()
 
     train_datasets = load_dataset('random_blocks_(x40000)_5blocks_all.pkl')
+    # train_datasets = load_dataset('random_blocks_(x40000)_5blocks_uniform_mass_aug_4.pkl', K=1)
+    print('Number of Training Towers')
+    for d in train_datasets:
+        print(len(d))
     test_datasets = load_dataset('random_blocks_(x2000)_5blocks_all.pkl')
+    # test_datasets = load_dataset('random_blocks_(x2000)_5blocks_uniform_mass.pkl', K=1)
     #train_datasets = load_dataset('random_blocks_(x5000)_5blocks_pwu.pkl')
-    losses = train(model, train_datasets, test_datasets)
+    losses = train(model, train_datasets, test_datasets, epochs=500)
     plt.plot(losses)
     plt.xlabel('Batch (x10)')
     plt.show()

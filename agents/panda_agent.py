@@ -199,7 +199,7 @@ class PandaAgent:
         print('Goal:', goal)
 
         if not self.teleport:
-            success = self._solve_and_execute_pddl(init, goal, max_time=60., search_sample_ratio=1000)
+            success = self._solve_and_execute_pddl(init, goal, max_time=100., search_sample_ratio=1000)
             if not success:
                 print('Plan failed: Teleporting block to intial position.')
                 self.teleport_block(pddl_block, original_pose)
@@ -294,7 +294,7 @@ class PandaAgent:
             goal = tuple(['and'] + goal_terms)
             self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
 
-        self.step_simulation(T)
+        self.step_simulation(T, vis_frames=True)
 
 
         # TODO: Reset Environment. Need to handle conditions where the blocks are still a stable tower.
@@ -312,13 +312,25 @@ class PandaAgent:
             goal = tuple(['and'] + goal_terms)
             self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
 
-    def step_simulation(self, T):
+    def step_simulation(self, T, vis_frames=False):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
         p.setGravity(0, 0, -10, physicsClientId=self._planning_client_id)
         for _ in range(T):
             p.stepSimulation(physicsClientId=self._execution_client_id)
             p.stepSimulation(physicsClientId=self._planning_client_id)
             time.sleep(1/240.)
+
+            if vis_frames:
+                length, lifeTime = 0.1, 0
+                for pddl_block in self.pddl_blocks:
+                    pos, quat = pddl_block.get_pose()
+                    new_x = transformation([length, 0.0, 0.0], pos, quat)
+                    new_y = transformation([0.0, length, 0.0], pos, quat)
+                    new_z = transformation([0.0, 0.0, length], pos, quat)
+
+                    p.addUserDebugLine(pos, new_x, [1,0,0], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
+                    p.addUserDebugLine(pos, new_y, [0,1,0], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
+                    p.addUserDebugLine(pos, new_z, [0,0,1], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
 
     def _get_observed_pose(self, pddl_block, action):
         """

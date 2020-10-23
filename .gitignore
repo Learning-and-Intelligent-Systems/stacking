@@ -10,3 +10,13 @@ pddlstream
 statistics
 temp
 tower-*
+*.pkl
+*.backup
+*.png
+*.swo
+*.swp
+.venv/
+.vscode/
+*.mp4
+*.npy
+scratch/
