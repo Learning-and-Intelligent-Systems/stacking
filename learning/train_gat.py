@@ -50,7 +50,8 @@ def load_dataset(name, args):
     """
     with open(f'learning/data/{name}', 'rb') as f:
         all_data = pickle.load(f)
-    all_num_blocks = [int(num_blocks[0]) for num_blocks in all_data.keys()]
+    #all_num_blocks = [int(num_blocks[0]) for num_blocks in all_data.keys()]
+    all_num_blocks = [2, 3]
     datasets = []
     for num_blocks in all_num_blocks:
         data = all_data[f'{num_blocks}block']
@@ -265,8 +266,8 @@ if __name__ == '__main__':
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
-    train_dataset = 'random_blocks_(x20000)_2blocks_uniform_density.pkl'
-    test_dataset = 'random_blocks_(x800)_2blocks_uniform_density.pkl'
+    train_dataset = 'random_blocks_(x10000)_2to5blocks_uniform_density.pkl'
+    test_dataset = 'random_blocks_(x2000)_2to5blocks_uniform_density.pkl'
     train_datasets, _ = load_dataset(train_dataset, args)
     test_datasets, num_test_blocks = load_dataset(test_dataset, args)
     
