@@ -28,7 +28,7 @@ def run_active_toy2d(args):
                             batch_size=args.batch_size,
                             shuffle=True) 
 
-    active_train(ensemble, dataloader, None, None, logger, args)
+    active_train(ensemble, dataset, dataloader, None, None, logger, args)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

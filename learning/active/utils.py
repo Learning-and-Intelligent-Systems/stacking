@@ -111,6 +111,10 @@ class ActiveExperimentLogger:
         return os.path.join(self.exp_path, 'figures', fname)
 
     def get_ensemble(self, tx):
+        """ Load an ensemble from the logging structure.
+        :param tx: The active learning iteration of which ensemble to load.
+        :return: learning.models.Ensemble object.
+        """
         # Load metadata and initialize ensemble.
         path = os.path.join(self.exp_path, 'models', 'metadata.pkl')
         with open(path, 'rb') as handle:
@@ -125,6 +129,14 @@ class ActiveExperimentLogger:
         return ensemble
 
     def save_ensemble(self, ensemble, tx):
+        """ Save an ensemble within the logging directory. The weights
+        will be saved to <exp_name>/models/ensemble_<tx>.pt. Model metadata that
+        is needed to initialize the Ensemble class while loading is 
+        save to <exp_name>/models/metadata.pkl.
+
+        :ensemble: A learning.model.Ensemble object.
+        :tx: The active learning timestep these models represent.
+        """
         # Save ensemble metadata.
         metadata = {'base_model': ensemble.base_model,
                     'base_args': ensemble.base_args,
