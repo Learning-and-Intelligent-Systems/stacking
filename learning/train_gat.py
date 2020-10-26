@@ -51,7 +51,7 @@ def load_dataset(name, args):
     with open(f'learning/data/{name}', 'rb') as f:
         all_data = pickle.load(f)
     #all_num_blocks = [int(num_blocks[0]) for num_blocks in all_data.keys()]
-    all_num_blocks = [2, 3]
+    all_num_blocks = [2,]
     datasets = []
     for num_blocks in all_num_blocks:
         data = all_data[f'{num_blocks}block']
