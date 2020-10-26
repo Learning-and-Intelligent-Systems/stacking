@@ -80,7 +80,6 @@ class ToyDataset(Dataset):
         self.xs = xs
         self.ys = ys
 
-
     def __len__(self):
         return self.xs.shape[0]
 

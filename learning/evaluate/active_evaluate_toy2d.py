@@ -7,8 +7,9 @@ import torch
 from matplotlib.animation import FuncAnimation, writers
 from torch.utils.data import DataLoader
 
-from learning.active.toy_data import ToyDataset
-from learning.active.utils import ActiveExperimentLogger, get_predictions
+from learning.domains.toy2d.active_utils import get_predictions
+from learning.domains.toy2d.toy_data import ToyDataset
+from learning.active.utils import ActiveExperimentLogger
 
 
 def get_ensemble_predictions(logger, resolution=0.02, eps=1e-5):
@@ -147,9 +148,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 200
-    make_validation_curves()
-    #get_validation_accuracy(logger, 'learning/active/val_dataset.pkl')
+    logger.args.max_acquisitions = 10
+    #make_validation_curves()
+    get_validation_accuracy(logger, 'learning/evaluate/val_dataset.pkl')
 
     data, acquired_points = get_datasets_and_acquisitions(logger)
     pred_info = get_ensemble_predictions(logger)

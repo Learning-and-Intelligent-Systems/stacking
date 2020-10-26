@@ -2,7 +2,6 @@ import argparse
 import numpy as np
 
 from learning.active.acquire import acquire_datapoints
-from learning.active.mlp import MLP
 from learning.active.train import train
 from learning.active.utils import ActiveExperimentLogger
 

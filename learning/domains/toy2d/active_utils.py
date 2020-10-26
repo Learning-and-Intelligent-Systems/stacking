@@ -16,14 +16,15 @@ def sample_unlabeled_data(n_samples):
     return xs
 
 
-def get_predictions(samples, ensemble):
+def get_predictions(dataset, ensemble):
     """
-    :param samples: Data returned from sample_unlabeled_data.
+    :param dataset: Data returned from sample_unlabeled_data.
     :param ensemble: An ensemble of K models on which to get predictions.
     :return: A (NxK) array with classification probabilities for each model.
     """
-    placeholder_ys = np.zeros((samples.shape[0],), dtype='float32')
-    dataset = ToyDataset(samples, placeholder_ys)
+    if type(dataset) != ToyDataset:
+        placeholder_ys = np.zeros((dataset.shape[0],), dtype='float32')
+        dataset = ToyDataset(dataset, placeholder_ys)
     loader = DataLoader(dataset, shuffle=False, batch_size=32)
 
     preds = []
