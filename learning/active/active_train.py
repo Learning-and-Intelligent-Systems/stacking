@@ -30,16 +30,16 @@ def active_train(ensemble, dataloader, data_gen_fn, data_label_fn, logger, args)
     
 
     for tx in range(args.max_acquisitions):
-        logger.save_dataset(dataset, tx)
+        # logger.save_dataset(dataset, tx)
 
         # Initialize and train models.
-        loader = DataLoader(dataset,
-                            batch_size=args.batch_size,
-                            shuffle=True) 
+        # loader = DataLoader(dataset,
+        #                     batch_size=args.batch_size,
+        #                     shuffle=True) 
         
         # TODO: Need to somehow reinitialize the ensemble.
-        for model in ensemble:
-            train(loader, loader, model, args.n_epochs)
+        for model in ensemble.models:
+            train(dataloader, dataloader, model, args.n_epochs)
         
         logger.save_ensemble(ensemble, tx)
 

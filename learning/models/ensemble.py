@@ -5,8 +5,22 @@ from learning.models.mlp_dropout import MLP
 
 
 class Ensemble(nn.Module):
+    """ A helper class to represent a collection of models.
+
+    Intended usage:
+    This class is designed to be used for active learning. It only needs
+    to be initialized once outside of the active loop. Every time we want 
+    new models, we only need to call reset().
+    
+    To save an ensemble, save it as a regular PyTorch model. Only a single 
+    file is needed for the whole ensemble.
+
+    When loading, an ensemble with the same base parameters will need to
+    be used. After that the forward function can be used to get predictions
+    from all models.
+    """
     def __init__(self, base_model, base_args, n_models):
-        """ A helper class to represent a collection of models.
+        """ Save relevant information to reinitialize the ensemble later on.
         :param base_model: The class of a single ensemble member.
         :param base_args: The arguments used to initialize the base member.
         :param n_models: The number of models in the ensemble.
@@ -65,6 +79,7 @@ if __name__ == '__main__':
     print('Loaded 2nd ensemble.')
     print(ensemble2_load.models[0].lin1.weight)
 
+    ensemble1_load.reset()
     x = torch.ones(10, 2)
     p = ensemble.forward(x)
     print(p.shape)

@@ -5,6 +5,7 @@ import torch
 
 from torch.utils.data import DataLoader
 
+from learning.models.ensemble import Ensemble
 from learning.models.mlp_dropout import MLP
 
 
@@ -109,23 +110,32 @@ class ActiveExperimentLogger:
     def get_figure_path(self, fname):
         return os.path.join(self.exp_path, 'figures', fname)
 
-    def load_model(self, path):
-        model = MLP(n_hidden=self.args.n_hidden, dropout=self.args.dropout)
-        model.load_state_dict(torch.load(path, map_location='cpu'))
-        return model
-
     def get_ensemble(self, tx):
-        ensemble = []
-        for mx in range(0, self.args.n_models):
-            path = os.path.join(self.exp_path, 'models', str(tx), 'net_%d.pt' % mx)
-            ensemble.append(self.load_model(path))
+        # Load metadata and initialize ensemble.
+        path = os.path.join(self.exp_path, 'models', 'metadata.pkl')
+        with open(path, 'rb') as handle:
+            metadata = pickle.load(handle)
+        ensemble = Ensemble(base_model=metadata['base_model'],
+                            base_args=metadata['base_args'],
+                            n_models=metadata['n_models'])
+
+        # Load ensemble weights.
+        path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
+        ensemble.load_state_dict(torch.load(path, map_location='cpu'))
         return ensemble
 
     def save_ensemble(self, ensemble, tx):
-        os.mkdir(os.path.join(self.exp_path, 'models', str(tx)))
-        for mx, model in enumerate(ensemble):
-            path = os.path.join(self.exp_path, 'models', str(tx), 'net_%d.pt' % mx)
-            torch.save(model.state_dict(), os.path.join(path))
+        # Save ensemble metadata.
+        metadata = {'base_model': ensemble.base_model,
+                    'base_args': ensemble.base_args,
+                    'n_models': ensemble.n_models}
+        path = os.path.join(self.exp_path, 'models', 'metadata.pkl')
+        with open(path, 'wb') as handle:
+            pickle.dump(metadata, handle)
+
+        # Save ensemble weights.
+        path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
+        torch.save(ensemble.state_dict(), os.path.join(path))
 
     def save_acquisition_data(self, new_xs, new_ys, samples, tx):
         data = {
