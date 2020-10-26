@@ -7,13 +7,14 @@ from learning.active.train import train
 from learning.active.utils import ActiveExperimentLogger
 
 
-def active_train(ensemble, dataset, dataloader, data_gen_fn, data_label_fn, logger, args):
+def active_train(ensemble, dataset, dataloader, data_sampler_fn, data_label_fn, data_pred_fn, logger, args):
     """ Main training function 
     :param ensemble: learning.models.Ensemble object to be trained.
     :param dataset: Object containing the data to iterate over. Can be added to.
     :param dataloader: The dataloader linked to the given dataset.
-    :param data_gen_fn:
+    :param data_sampler_fn:
     :param data_label_fn:
+    :param data_pred_fn:
     :param logger: Object used to keep track of training artifacts.
     :param args: Commandline arguments such as the number of acquisition points.
     :return: The fully trained ensemble.

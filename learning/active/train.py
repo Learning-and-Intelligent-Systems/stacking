@@ -30,9 +30,6 @@ def evaluate(loader, model):
 
 def train(dataloader, val_dataloader, model, n_epochs=20):
     optimizer = Adam(model.parameters(), lr=1e-3)
-    best_acc = 0.
-    best_model = None
-
     if torch.cuda.is_available():
         model.cuda()
 
@@ -54,13 +51,6 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
 
             accuracy = ((pred>0.5) == y).float().mean()
             acc.append(accuracy.item())
-
-        val_acc = evaluate(val_dataloader, model)
-        if val_acc > best_acc:
-            print('Saved')
-            best_model = MLP(model.n_hidden, model.dropout)
-            best_model.load_state_dict(model.state_dict())
-            best_acc = val_acc
 
         print(np.mean(acc))
     return model

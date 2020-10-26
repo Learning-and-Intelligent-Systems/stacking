@@ -164,27 +164,3 @@ class ActiveExperimentLogger:
         with open(path, 'rb') as handle:
             data = pickle.load(handle)
         return data['acquired_xs'], data['acquired_ys'], data['samples']
-
-
-
-def get_predictions(dataset, models):
-    """
-    :param dataset: A ToyDataset object with N examples.
-    :param models: A list of K models on which to get predictions.
-    :return: A (NxK) array with classification probabilities for each model.
-    """
-    loader = DataLoader(dataset, shuffle=False, batch_size=32)
-
-    model_predictions = []
-    for model in models:
-        preds = []
-        for tensor, _ in loader:
-            if torch.cuda.is_available():
-                tensor = tensor.cuda()
-            with torch.no_grad():
-                preds.append(model.forward(tensor))
-            
-        preds = torch.cat(preds, dim=0)
-        model_predictions.append(preds)
-
-    return torch.cat(model_predictions, dim=1)

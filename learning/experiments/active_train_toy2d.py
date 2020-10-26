@@ -3,6 +3,7 @@ import argparse
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
+from learning.domains.toy2d.active_utils import get_labels, get_predictions, sample_unlabeled_data
 from learning.domains.toy2d.toy_data import ToyDataset, ToyDataGenerator
 from learning.models.ensemble import Ensemble
 from learning.models.mlp_dropout import MLP
@@ -12,23 +13,28 @@ from learning.active.utils import ActiveExperimentLogger
 def run_active_toy2d(args):
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
     
+    # Initialize ensemble.
     ensemble = Ensemble(base_model=MLP,
                         base_args={'n_hidden': args.n_hidden, 'dropout': args.dropout},
                         n_models=args.n_models)
 
-    # TODO: Get data_sampler and labeler functions.
-
-    # TODO: Sample initial dataset.
+    # Sample initial dataset.
     gen = ToyDataGenerator()
     xs, ys = gen.generate_uniform_dataset(N=args.n_train_init)
     dataset = ToyDataset(xs, ys)
-
-    # Initialize and train models.
     dataloader = DataLoader(dataset,
                             batch_size=args.batch_size,
                             shuffle=True) 
 
-    active_train(ensemble, dataset, dataloader, None, None, logger, args)
+    active_train(ensemble=ensemble, 
+                 dataset=dataset, 
+                 dataloader=dataloader, 
+                 data_sampler_fn=sample_unlabeled_data, 
+                 data_label_fn=get_labels, 
+                 data_pred_fn=get_predictions,
+                 logger=logger, 
+                 args=args)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
