@@ -5,7 +5,7 @@ import torch
 
 from torch.utils.data import DataLoader
 
-from learning.active.mlp import MLP
+from learning.models.mlp_dropout import MLP
 
 
 class ExperimentLogger:
@@ -78,7 +78,7 @@ class ActiveExperimentLogger:
         Setup the directory structure to store models, figures, datasets
         and parameters relating to an experiment.
         """
-        root = 'learning/active/experiments'
+        root = 'learning/experiments/logs'
         exp_name = args.exp_name if len(args.exp_name) > 0 else 'exp'
         ts = time.strftime('%Y%m%d-%H%M%S')
         exp_dir = '%s-%s' % (exp_name, ts)

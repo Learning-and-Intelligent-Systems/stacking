@@ -21,17 +21,13 @@ def add_to_dataset(dataset, new_xs, new_ys):
     ys = np.concatenate([dataset.ys, new_ys], axis=0)
     return ToyDataset(xs, ys)
 
-def active_train(args):
+def active_train(ensemble, dataloader, data_gen_fn, data_label_fn, logger, args):
     """ Main training function 
     :param args: Commandline arguments such as the number of acquisition points.
     :return: Ensembles. The fully trained ensembles.
     """
-    logger = ActiveExperimentLogger.setup_experiment_directory(args)
-
     # Initilize dataset.
-    gen = ToyDataGenerator()
-    xs, ys = gen.generate_uniform_dataset(N=args.n_train_init)
-    dataset = ToyDataset(xs, ys)
+    
 
     for tx in range(args.max_acquisitions):
         logger.save_dataset(dataset, tx)
@@ -41,7 +37,7 @@ def active_train(args):
                             batch_size=args.batch_size,
                             shuffle=True) 
         
-        ensemble = [MLP(args.n_hidden, args.dropout) for _ in range(args.n_models)]
+        # TODO: Need to somehow reinitialize the ensemble.
         for model in ensemble:
             train(loader, loader, model, args.n_epochs)
         
@@ -53,24 +49,3 @@ def active_train(args):
 
         # Add to dataset.
         dataset = add_to_dataset(dataset, new_xs, new_ys)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--max-acquisitions', 
-                        type=int, 
-                        default=200,
-                        help='Number of iterations to run the main active learning loop for.')
-    parser.add_argument('--batch-size', type=int, default=16)
-    parser.add_argument('--n-models', type=int, default=5, help='Number of models in the ensemble.')
-    parser.add_argument('--n-hidden', type=int, default=128)
-    parser.add_argument('--dropout', type=float, default=0.)
-    parser.add_argument('--n-epochs', type=int, default=500)
-    parser.add_argument('--n-train-init', type=int, default=100)
-    parser.add_argument('--n-samples', type=int, default=500)
-    parser.add_argument('--n-acquire', type=int, default=10)
-    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
-    parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')    
-    args = parser.parse_args()
-
-    active_train(args)
