@@ -148,7 +148,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 10
+    logger.args.max_acquisitions = 75
     #make_validation_curves()
     get_validation_accuracy(logger, 'learning/evaluate/val_dataset.pkl')
 
