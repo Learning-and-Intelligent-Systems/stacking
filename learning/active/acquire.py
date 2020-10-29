@@ -20,13 +20,14 @@ def bald(predictions, eps=1e-5):
     bald = m_ent + ent
     return bald
 
-def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn):
+def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn):
     """ Choose data points with the highest acquisition score
     :param samples: (N,2) An array of unlabelled datapoints which to evaluate.
     :param ensemble: A list of models. 
     :param n_acquire: The number of data points to acquire.
     :param strategy: ['random', 'bald'] The objective to use to choose new datapoints.
     :param data_pred_fn: A handler to get predictions specific on the dataset type.
+    :prarm data_subset_fn: A handler to select fewer datapoints.
     :return: (n_acquire, 2) - the samples which to label.
     """
     # Get predictions for each model of the ensemble. 
@@ -40,20 +41,21 @@ def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn
         
     # Return the n_acquire points with the highest score.
     acquire_indices = np.argsort(scores)[::-1][:n_acquire]
-    return samples[acquire_indices, :]
+    return data_subset_fn(samples, acquire_indices)
 
-def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn, data_label_fn, data_pred_fn):
+def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn):
     """ Get new datapoints given the current ensemble.
     Uses function handlers for domain specific components (e.g., sampling unlabeled data).
-    :n_samples: How many unlabeled samples to generate.
-    :n_acquire: How many samples to acquire labels for.
-    :strategy: Which acquisition function to use.
-    :data_sampler_fn: Function handler: n_samples -> Dataset
-    :data_label_fn:
-    :data_pred_fn:
+    :param n_samples: How many unlabeled samples to generate.
+    :param n_acquire: How many samples to acquire labels for.
+    :param strategy: Which acquisition function to use.
+    :param data_sampler_fn: Function handler: n_samples -> Dataset
+    :param data_label_fn:
+    :param data_pred_fn:
+    :param data_subset_fn:
     :return: (n_acquire, 2), (n_acquire,) - x,y tuples of the new datapoints.
     """
     unlabeled_pool = data_sampler_fn(n_samples)
-    xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn)
+    xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
     ys = data_label_fn(xs)
     return xs, ys, unlabeled_pool

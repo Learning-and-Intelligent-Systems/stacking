@@ -6,7 +6,7 @@ from learning.active.train import train
 from learning.active.utils import ActiveExperimentLogger
 
 
-def active_train(ensemble, dataset, dataloader, data_sampler_fn, data_label_fn, data_pred_fn, logger, args):
+def active_train(ensemble, dataset, dataloader, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn, logger, args):
     """ Main training function 
     :param ensemble: learning.models.Ensemble object to be trained.
     :param dataset: Object containing the data to iterate over. Can be added to.
@@ -14,6 +14,7 @@ def active_train(ensemble, dataset, dataloader, data_sampler_fn, data_label_fn, 
     :param data_sampler_fn:
     :param data_label_fn:
     :param data_pred_fn:
+    :param data_subset_fn:
     :param logger: Object used to keep track of training artifacts.
     :param args: Commandline arguments such as the number of acquisition points.
     :return: The fully trained ensemble.
@@ -34,6 +35,7 @@ def active_train(ensemble, dataset, dataloader, data_sampler_fn, data_label_fn, 
                                                          n_acquire=args.n_acquire, 
                                                          strategy=args.strategy,
                                                          data_sampler_fn=data_sampler_fn,
+                                                         data_subset_fn=data_subset_fn,
                                                          data_label_fn=data_label_fn,
                                                          data_pred_fn=data_pred_fn)
         logger.save_acquisition_data(new_xs, new_ys, all_samples, tx)

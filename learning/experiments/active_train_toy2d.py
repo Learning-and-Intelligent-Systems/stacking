@@ -3,7 +3,7 @@ import argparse
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
-from learning.domains.toy2d.active_utils import get_labels, get_predictions, sample_unlabeled_data
+from learning.domains.toy2d.active_utils import get_labels, get_predictions, sample_unlabeled_data, get_subset
 from learning.domains.toy2d.toy_data import ToyDataset, ToyDataGenerator
 from learning.models.ensemble import Ensemble
 from learning.models.mlp_dropout import MLP
@@ -32,6 +32,7 @@ def run_active_toy2d(args):
                  data_sampler_fn=sample_unlabeled_data, 
                  data_label_fn=get_labels, 
                  data_pred_fn=get_predictions,
+                 data_subset_fn=get_subset,
                  logger=logger, 
                  args=args)
 

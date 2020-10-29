@@ -4,6 +4,7 @@ import pickle
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
+from learning.domains.towers.active_utils import sample_unlabeled_data, get_predictions, get_labels, get_subset
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.gn import FCGN
@@ -43,6 +44,7 @@ def run_active_towers(args):
                  data_sampler_fn=sample_unlabeled_data, 
                  data_label_fn=get_labels, 
                  data_pred_fn=get_predictions,
+                 data_subset_fn=get_subset,
                  logger=logger, 
                  args=args)
 

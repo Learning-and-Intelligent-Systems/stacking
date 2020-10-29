@@ -45,3 +45,7 @@ def get_labels(samples):
     gen = ToyDataGenerator()
     ys = gen.get_labels(samples)
     return ys
+
+
+def get_subset(samples, indices):
+    return samples[indices, :]
