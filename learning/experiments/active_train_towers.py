@@ -1,29 +1,40 @@
 import argparse
+import pickle
 
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
+from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
-from learning.models.mlp_dropout import MLP
+from learning.models.gn import FCGN
 from learning.active.utils import ActiveExperimentLogger
 
 
-def run_active_toy2d(args):
+def run_active_towers(args):
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
     
-    # Initialize ensemble. TODO: Change model to use FCGN with its relevant parameters.
-    ensemble = Ensemble(base_model=MLP,
-                        base_args={'n_hidden': args.n_hidden, 'dropout': args.dropout},
+    # Initialize ensemble. 
+    ensemble = Ensemble(base_model=FCGN,
+                        base_args={'n_hidden': args.n_hidden, 'n_in': 14},
                         n_models=args.n_models)
 
-    # Sample initial dataset. TODO: Redesign Dataset and Dataloader for towers.
-    # TODO: Generate an initial dataset (random or from file).
-    gen = ToyDataGenerator()
-    xs, ys = gen.generate_uniform_dataset(N=args.n_train_init)
-    dataset = ToyDataset(xs, ys)
+    # Sample initial dataset.
+    if len(args.init_data_fname) > 0:
+        # A good dataset to use is learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl
+        with open(args.init_data_fname, 'rb') as handle:
+            towers_dict = pickle.load(handle)
+        dataset = TowerDataset(towers_dict,
+                               augment=True,
+                               K_skip=400) # From this dataset, this means we start with 400 towers/size (before augmentation).
+    else:
+        # TODO: Generate random dataset.
+        raise NotImplementedError()
+    
+    sampler = TowerSampler(dataset=dataset,
+                           batch_size=args.batch_size,
+                           shuffle=True)
     dataloader = DataLoader(dataset,
-                            batch_size=args.batch_size,
-                            shuffle=True) 
+                            batch_sampler=sampler)
 
     # TODO: All these callback functions need to be rewritten for the towers dataset.
     active_train(ensemble=ensemble, 
@@ -44,9 +55,9 @@ if __name__ == '__main__':
                         help='Number of iterations to run the main active learning loop for.')
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--n-models', type=int, default=5, help='Number of models in the ensemble.')
-    parser.add_argument('--n-hidden', type=int, default=128)
-    parser.add_argument('--dropout', type=float, default=0.)
+    parser.add_argument('--n-hidden', type=int, default=64)
     parser.add_argument('--n-epochs', type=int, default=500)
+    parser.add_argument('--init-data-fname', type=str, default='')
     parser.add_argument('--n-train-init', type=int, default=100)
     parser.add_argument('--n-samples', type=int, default=500)
     parser.add_argument('--n-acquire', type=int, default=10)
@@ -54,4 +65,4 @@ if __name__ == '__main__':
     parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')    
     args = parser.parse_args()
 
-    run_active_toy2d(args)
+    run_active_towers(args)
