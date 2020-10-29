@@ -1,7 +1,10 @@
+import copy
+import numpy as np
 import pickle
 import torch
 
-from torch.utils.data import Dataset, Sampler
+from itertools import islice
+from torch.utils.data import Dataset, DataLoader, Sampler
 
 from learning.domains.towers.augment_dataset import augment as augment_towers
 
@@ -64,7 +67,7 @@ class TowerDataset(Dataset):
         start = 0
         for k in self.tower_keys:
             self.start_indices[k] = start
-            indices[k] = torch.arange(start, start+self.tower_tensors[k].shape[0])
+            indices[k] = np.arange(start, start+self.tower_tensors[k].shape[0])
             start += self.tower_tensors[k].shape[0]
         return indices
 
@@ -101,23 +104,42 @@ class TowerDataset(Dataset):
 
 
 class TowerSampler(Sampler):
-    def __init__(self, dataset, batch_size):
+    def __init__(self, dataset, batch_size, shuffle):
         self.dataset = dataset
         self.batch_size = batch_size
+        self.shuffle = shuffle
 
     def __iter__(self):
-        # TODO: Build indices for each tower size. 
+        # Build indices for each tower size. 
         indices = self.dataset.get_indices()
+        if self.shuffle:
+            for k in self.dataset.tower_keys:
+                np.random.shuffle(indices[k])
 
-        # TODO: Shuffle each list of indices.
+        # Make each list an iterable of batches.
+        iterators = {}
+        for k in self.dataset.tower_keys:
+            arr = iter(indices[k])
+            n_batches = (len(indices[k]) + self.batch_size - 1) // self.batch_size
+            batches = [list(islice(arr, self.batch_size)) for _ in range(n_batches)]
+            iterators[k] = iter(batches)
 
-        # TODO: Make each list an iterable of batches.
-
-        # TODO: Loop over batches until all the iterators are empty.
-        pass
-
+        # Loop over batches until all the iterators are empty.
+        valid_tower_sizes = copy.deepcopy(self.dataset.tower_keys)
+        while len(valid_tower_sizes) > 0:
+            key = np.random.choice(valid_tower_sizes)
+            try:
+                yield next(iterators[key])
+            except:
+                valid_tower_sizes.remove(key)
+            
     def __len__(self):
-        pass
+        """ Return the number of batches in the data loader. """
+        n_batches = 0
+        for k in self.dataset.tower_keys:
+            indices = self.dataset.get_indices()
+            n_batches += (len(indices[k]) + self.batch_size - 1) // self.batch_size
+        return n_batches
 
 
 if __name__ == '__main__':
@@ -131,5 +153,10 @@ if __name__ == '__main__':
         x, y = dataset[ix]
         print(x.shape)
 
-    # loader = DataLoader(dataset=dataset,
-    #                     batch_sampler=TowerSampler())
+    sampler = TowerSampler(dataset, 5, True)
+    for batch_ixs in sampler:
+        print(batch_ixs)
+
+    loader = DataLoader(dataset=dataset,
+                        batch_sampler=sampler)
+    print(len(loader))
