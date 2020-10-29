@@ -34,20 +34,7 @@ def get_subsets(data):
             labels.append(label)
     return torch.Tensor(towers), torch.Tensor(labels)
 
-def preprocess(towers):
-    # remove the three color channels at the end of each block encoding
-    # (see block_utils.Object.vectorize for details)
-    towers = towers[...,:14]
-    #towers = towers[...,[0, 1, 2, 4, 5, 7, 8]]
-    # convert absolute xy positions to relative positions
-    #towers[:,1:,7:9] -= towers[:,:-1,7:9]
-    #towers[:,:,1:3] += towers[:,:,7:9]
-    towers[:,:,1:4] /= 0.01 #towers[:,:,4:7]
-    towers[:,:,7:9] /= 0.01 #towers[:,:,4:6]
-    towers[:,:,4:7] = (towers[:,:,4:7] - 0.1) / 0.01
-    towers[:,:,0] = (towers[:,:,0] - 0.55)
 
-    return towers.float()
 
 def load_dataset(name, K=1):
     """ Load all the tower data into TensorDatasets. We need a different
