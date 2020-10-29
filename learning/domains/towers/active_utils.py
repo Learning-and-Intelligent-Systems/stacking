@@ -29,7 +29,10 @@ def sample_unlabeled_data(n_samples):
 
 def get_predictions(dataset, ensemble):
     """
-    :param dataset: Return (N, K) array of flat predictions.
+    :param dataset: A tower_dict structure.
+    :param ensemble: The Ensemble model which to use for predictions.
+    :return: Return (N, K) array of flat predictions. Predictions are 
+    ordered by tower size.
     """
     pass
 
@@ -40,10 +43,34 @@ def get_labels(samples):
     pass
 
 def get_subset(samples, indices):
-    pass
+    """ Given a tower_dict structure and indices that are flat,
+    return a tower_dict structure with only those indices.
+    :param samples: A tower_dict structure.
+    :param indices: Which indices of the original structure to select.
+    """
+    keys = ['2block', '3block', '4block', '5block']
+    selected_towers = {k: {'towers': []} for k in keys}
+    
+    # Initialize tower ranges.
+    start = 0
+    for k in keys:
+        end = start + samples[k]['towers'].shape[0]
+        tower_ixs = indices[np.logical_and(indices >= start,
+                                           indices < end)] - start
+        start = end
+
+        selected_towers[k]['towers'] = samples[k]['towers'][tower_ixs,...]
+
+    return selected_towers
 
 
 if __name__ == '__main__':
-    data = sample_unlabeled_data(1000)
+    data = sample_unlabeled_data(100)
     for k in data.keys():
         print(data[k]['towers'].shape)
+
+    indices = np.random.randint(0, 100, 10)
+    selected_towers = get_subset(data, indices)
+    print(indices)
+    for k in selected_towers.keys():
+        print(selected_towers[k]['towers'].shape)
