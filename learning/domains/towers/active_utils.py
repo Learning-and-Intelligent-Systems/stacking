@@ -2,8 +2,10 @@ import numpy as np
 
 from block_utils import Object, get_rotated_block
 from learning.domains.towers.generate_tower_training_data import sample_random_tower, vectorize
+from tower_planner import TowerPlanner
 
 
+# TODO: Write a version of this function that does pool based active learning from a given file.
 def sample_unlabeled_data(n_samples):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
@@ -37,10 +39,25 @@ def get_predictions(dataset, ensemble):
     pass
 
 def get_labels(samples):
-    """ Takes as input a dictionary from the sampled_unlabeled_data 
-
+    """ Takes as input a dictionary from the get_subset function. 
+    Augment it with stability labels. 
+    :param samples:
+    :return:
     """
-    pass
+    tp = TowerPlanner(stability_mode='contains')
+    for k in samples.keys():
+        n_towers, n_blocks, _ = samples[k]['towers'].shape
+        labels = np.ones((n_towers,))
+
+        for ix in range(0, n_towers):
+            # Convert tower to Block representation.
+            block_tower = [Object.from_vector(samples[k]['towers'][ix, jx, :]) for jx in range(n_blocks)]
+            #  Use tp to check for stability.
+            if not tp.tower_is_stable(block_tower):
+                labels[ix] = 0.
+
+        samples[k]['labels'] = labels
+    return samples
 
 def get_subset(samples, indices):
     """ Given a tower_dict structure and indices that are flat,
@@ -65,12 +82,16 @@ def get_subset(samples, indices):
 
 
 if __name__ == '__main__':
-    data = sample_unlabeled_data(100)
+    data = sample_unlabeled_data(1000)
     for k in data.keys():
         print(data[k]['towers'].shape)
 
-    indices = np.random.randint(0, 100, 10)
+    indices = np.random.randint(0, 1000, 100)
     selected_towers = get_subset(data, indices)
     print(indices)
     for k in selected_towers.keys():
         print(selected_towers[k]['towers'].shape)
+
+    labeled_towers = get_labels(selected_towers)
+    for k in labeled_towers.keys():
+        print(labeled_towers[k]['labels'])
