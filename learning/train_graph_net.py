@@ -135,11 +135,11 @@ def train(model, dataset, test_dataset=None, epochs=100, is_ensemble=False):
             n_blocks = towers.shape[1]
             accuracy = ((preds>0.5) == labels).float().mean()
             accs[n_blocks].append(accuracy.item())
-            losses.append(np.mean(accs[n_blocks][-500:]))
 
+            losses = [np.mean(accs[k][-500:]) for k in range(2, 6)]
 
             if batch_idx % 40 == 0:
-                print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {losses[-4:]}')
+                print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {losses}')
 
         if test_dataset is not None and epoch_idx % 5 == 0:
             model.train(False)
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         model = model.cuda()
 
-    train_dataset = load_dataset('random_blocks_(x40000)_5blocks_all.pkl', augment=True, K=100)
+    train_dataset = load_dataset('random_blocks_(x40000)_5blocks_all.pkl', augment=True, K=32)
     # train_datasets = load_dataset('random_blocks_(x40000)_5blocks_uniform_mass_aug_4.pkl', K=1)
     print('Number of Training Towers')
     print(len(train_dataset))
