@@ -190,13 +190,13 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         model = model.cuda()
 
-    train_dataset = load_dataset('random_blocks_(x40000)_5blocks_all.pkl', augment=True, K=32)
-    # train_datasets = load_dataset('random_blocks_(x40000)_5blocks_uniform_mass_aug_4.pkl', K=1)
+    #train_dataset = load_dataset('random_blocks_(x40000)_5blocks_all.pkl', augment=True, K=32)
+    train_dataset = load_dataset('random_blocks_(x40000)_5blocks_uniform_mass.pkl', K=32,  augment=True)
     print('Number of Training Towers')
     print(len(train_dataset))
 
-    test_dataset = load_dataset('random_blocks_(x2000)_5blocks_all.pkl', augment=False)
-    # test_datasets = load_dataset('random_blocks_(x2000)_5blocks_uniform_mass.pkl', K=1)
+    #test_dataset = load_dataset('random_blocks_(x2000)_5blocks_all.pkl', augment=False)
+    test_dataset = load_dataset('random_blocks_(x2000)_5blocks_uniform_mass.pkl', augment=False)
     #train_datasets = load_dataset('random_blocks_(x5000)_5blocks_pwu.pkl')
     losses = train(model, train_dataset, test_dataset, epochs=500)
     plt.plot(losses)
