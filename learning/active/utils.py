@@ -149,10 +149,9 @@ class ActiveExperimentLogger:
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
         torch.save(ensemble.state_dict(), os.path.join(path))
 
-    def save_acquisition_data(self, new_xs, new_ys, samples, tx):
+    def save_acquisition_data(self, new_data, samples, tx):
         data = {
-            'acquired_xs': new_xs,
-            'acquired_ys': new_ys,
+            'acquired_data': new_data,
             'samples': samples
         }
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)

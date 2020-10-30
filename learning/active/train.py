@@ -42,8 +42,8 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
                 y = y.cuda()
             optimizer.zero_grad()
 
-            model.sample_dropout_masks()
-            pred = model.forward(x).squeeze()
+            #model.sample_dropout_masks()
+            pred = model.forward(x, k=1).squeeze()
             loss = F.binary_cross_entropy(pred, y)
             loss.backward()
 

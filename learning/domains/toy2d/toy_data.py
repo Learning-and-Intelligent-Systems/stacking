@@ -86,12 +86,12 @@ class ToyDataset(Dataset):
     def __getitem__(self, ix):
         return self.xs[ix, :], self.ys[ix]
 
-    def add_to_dataset(self, new_xs, new_ys):
+    def add_to_dataset(self, new_data):
         """ Create a new dataset by adding the new points to the current data.
-        :param new_xs: (n_acquire, 2) 
-        :param new_ys: (n_acquire,)
+        :param new_data: Tuple of (np(n_acquire, 2), np(n_acquire)) 
         :return: A new ToyDataset instance with all datapoints.
         """
+        new_xs, new_ys = new_data
         self.xs = np.concatenate([self.xs, new_xs], axis=0)
         self.ys = np.concatenate([self.ys, new_ys], axis=0)
 

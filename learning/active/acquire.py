@@ -57,5 +57,5 @@ def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn
     """
     unlabeled_pool = data_sampler_fn(n_samples)
     xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
-    ys = data_label_fn(xs)
-    return xs, ys, unlabeled_pool
+    new_data = data_label_fn(xs)
+    return new_data, unlabeled_pool

@@ -30,15 +30,15 @@ def active_train(ensemble, dataset, dataloader, data_sampler_fn, data_label_fn, 
         logger.save_ensemble(ensemble, tx)
 
         # Collect new samples.
-        new_xs, new_ys, all_samples = acquire_datapoints(ensemble=ensemble, 
-                                                         n_samples=args.n_samples, 
-                                                         n_acquire=args.n_acquire, 
-                                                         strategy=args.strategy,
-                                                         data_sampler_fn=data_sampler_fn,
-                                                         data_subset_fn=data_subset_fn,
-                                                         data_label_fn=data_label_fn,
-                                                         data_pred_fn=data_pred_fn)
-        logger.save_acquisition_data(new_xs, new_ys, all_samples, tx)
+        new_data, all_samples = acquire_datapoints(ensemble=ensemble, 
+                                                   n_samples=args.n_samples, 
+                                                   n_acquire=args.n_acquire, 
+                                                   strategy=args.strategy,
+                                                   data_sampler_fn=data_sampler_fn,
+                                                   data_subset_fn=data_subset_fn,
+                                                   data_label_fn=data_label_fn,
+                                                   data_pred_fn=data_pred_fn)
+        logger.save_acquisition_data(new_data, all_samples, tx)
 
         # Add to dataset.
-        dataset.add_to_dataset(new_xs, new_ys)
+        dataset.add_to_dataset(new_data)

@@ -1,5 +1,6 @@
 import numpy as np
 import pickle
+import torch
 
 from torch.utils.data import DataLoader
 
@@ -48,8 +49,11 @@ def get_predictions(dataset, ensemble):
     tower_sampler = TowerSampler(dataset=tower_dataset,
                                  batch_size=64,
                                  shuffle=False)
+    tower_loader = DataLoader(dataset=tower_dataset,
+                              batch_sampler=tower_sampler)
+
     # Iterate through dataset, getting predictions for each.
-    for tensor, _ in tower_sampler:
+    for tensor, _ in tower_loader:
         if torch.cuda.is_available():
             tensor = tensor.cuda()
         with torch.no_grad():
