@@ -1,4 +1,7 @@
 import numpy as np
+import pickle
+
+from torch.utils.data import DataLoader
 
 from block_utils import Object, get_rotated_block
 from learning.domains.towers.generate_tower_training_data import sample_random_tower, vectorize
@@ -104,7 +107,7 @@ if __name__ == '__main__':
     for k in data.keys():
         print(data[k]['towers'].shape)
 
-    indices = np.random.randint(0, 1000, 100)
+    indices = np.random.randint(0, 1000, 10)
     selected_towers = get_subset(data, indices)
     print(indices)
     for k in selected_towers.keys():
@@ -113,3 +116,33 @@ if __name__ == '__main__':
     labeled_towers = get_labels(selected_towers)
     for k in labeled_towers.keys():
         print(labeled_towers[k]['labels'])
+
+    print('----- Test adding new data to dataset -----')
+    with open('learning/data/random_blocks_(x40000)_5blocks_all.pkl', 'rb') as handle:
+        towers_dict = pickle.load(handle)
+
+    dataset = TowerDataset(towers_dict, augment=True, K_skip=10000)
+    sampler = TowerSampler(dataset, 10, False)
+    print('----- Initial batches -----')
+    for batch_ixs in sampler:
+        print(batch_ixs)
+
+    loader = DataLoader(dataset=dataset,
+                        batch_sampler=sampler)
+
+    print('Num Initial Towers:', len(dataset))
+    print('Initial indices per category:')
+    print(dataset.get_indices())
+
+    dataset.add_to_dataset(labeled_towers)
+    print('Num Updated Towers:', len(dataset))
+    print('Updated indices per category:')
+    print(dataset.get_indices())
+
+    print('----- Updated batches -----')
+    for batch_ixs in sampler:
+        print(batch_ixs)
+
+    
+    # print(len(loader))
+

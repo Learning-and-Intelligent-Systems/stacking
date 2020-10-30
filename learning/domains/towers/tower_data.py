@@ -98,8 +98,15 @@ class TowerDataset(Dataset):
         :param tower_dict: A dictionary of the same format as was passed in initially with
         the towers to add to the dataset.
         """
-        # TODO: Preprocess and augment towers.
-        # TODO: Update internal data storage using 
+        augmented_towers = augment_towers(tower_dict, 1, False)
+        for k in self.tower_keys:
+            if augmented_towers[k]['towers'].shape[0] > 0:
+                new_towers = preprocess(torch.Tensor(augmented_towers[k]['towers']))
+                new_labels = torch.Tensor(augmented_towers[k]['labels'])
+
+                self.tower_tensors[k] = torch.cat([self.tower_tensors[k], new_towers], dim=0)
+                self.tower_labels[k] = torch.cat([self.tower_labels[k], new_labels], dim=0)
+
         self.get_indices()
 
 
@@ -127,7 +134,10 @@ class TowerSampler(Sampler):
         # Loop over batches until all the iterators are empty.
         valid_tower_sizes = copy.deepcopy(self.dataset.tower_keys)
         while len(valid_tower_sizes) > 0:
-            key = np.random.choice(valid_tower_sizes)
+            if self.shuffle:
+                key = np.random.choice(valid_tower_sizes)
+            else:
+                key = valid_tower_sizes[0]
             try:
                 yield next(iterators[key])
             except:
@@ -147,12 +157,16 @@ if __name__ == '__main__':
         towers_dict = pickle.load(handle)
 
     dataset = TowerDataset(towers_dict, augment=True, K_skip=10000)
-    print(len(dataset))
+    print('----- Load dataset from file -----')
+    print('Num Towers:', len(dataset))
+    print('Indices per category:')
     print(dataset.get_indices())
+    print('Iterate over dataset:')
     for ix in range(len(dataset)):
         x, y = dataset[ix]
         print(x.shape)
 
+    print('----- Test tower sampler -----')
     sampler = TowerSampler(dataset, 5, True)
     for batch_ixs in sampler:
         print(batch_ixs)
@@ -160,3 +174,5 @@ if __name__ == '__main__':
     loader = DataLoader(dataset=dataset,
                         batch_sampler=sampler)
     print(len(loader))
+
+    
