@@ -128,7 +128,7 @@ def print_split_accuracies(dataset, model):
 def train(model, datasets, test_datasets, args):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     train_losses = []
-    num_data_points = len(datasets[0])
+    num_data_points = max([len(dataset) for dataset in datasets])
     epoch_ids, test_accuracies = [], []
 
     for epoch_idx in range(args.epochs):
@@ -266,7 +266,8 @@ if __name__ == '__main__':
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
-    train_dataset = 'random_blocks_(x5000)_2blocks_uniform_density.pkl'
+
+    train_dataset = 'random_blocks_(x20000)_2to3blocks_uniform_density.pkl'
     test_dataset = 'random_blocks_(x800)_2blocks_uniform_density.pkl'
     train_datasets, _ = load_dataset(train_dataset, args)
     test_datasets, num_test_blocks = load_dataset(test_dataset, args)
