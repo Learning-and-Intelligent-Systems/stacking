@@ -36,7 +36,7 @@ def run_active_towers(args):
                            shuffle=True)
     dataloader = DataLoader(dataset,
                             batch_sampler=sampler)
-
+    
     # TODO: All these callback functions need to be rewritten for the towers dataset.
     active_train(ensemble=ensemble, 
                  dataset=dataset, 

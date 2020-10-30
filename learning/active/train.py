@@ -43,7 +43,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             optimizer.zero_grad()
 
             #model.sample_dropout_masks()
-            pred = model.forward(x, k=1).squeeze()
+            pred = model.forward(x).squeeze()
             loss = F.binary_cross_entropy(pred, y)
             loss.backward()
 

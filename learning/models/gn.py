@@ -84,12 +84,13 @@ class FCGN(nn.Module):
         x = x.view(N, K, self.n_hidden)
         return x
 
-    def forward(self, towers, k):
+    def forward(self, towers):
         """
         :param towers: (N, K, n_in) tensor describing the tower.
         :param k: Number of times to iterate the graph update.
         """
         N, K, _ = towers.shape
+        k=1
         # Initialize hidden state for each node.
         #h = self.init.expand(N, K, self.n_hidden)
         h0 = self.E(towers.view(-1, self.n_in)).view(N, K, self.n_hidden)

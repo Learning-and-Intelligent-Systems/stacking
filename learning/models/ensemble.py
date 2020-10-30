@@ -40,7 +40,7 @@ class Ensemble(nn.Module):
         :param x: (N, *) Input tensor compatible with the base_model.
         :return: (N, n_models), class prediction for each model.
         """
-        preds = [self.models[ix].forward(x, k=1) for ix in range(self.n_models)]
+        preds = [self.models[ix].forward(x) for ix in range(self.n_models)]
         return torch.cat(preds, dim=1)
 
 
