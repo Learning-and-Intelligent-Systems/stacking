@@ -116,7 +116,7 @@ def train(model, dataset, test_dataset=None, epochs=100, is_ensemble=False):
             if torch.cuda.is_available():
                 towers = towers.cuda()
                 labels = labels.cuda()
-            preds = model.forward(towers, k=towers.shape[1]-1)
+            preds = model.forward(towers)
 
             if is_ensemble:
                 # NOTE(izzy): do I run into any weird gradient magnitude issues if
