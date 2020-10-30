@@ -2,6 +2,7 @@ import numpy as np
 
 from block_utils import Object, get_rotated_block
 from learning.domains.towers.generate_tower_training_data import sample_random_tower, vectorize
+from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from tower_planner import TowerPlanner
 
 
@@ -26,8 +27,10 @@ def sample_unlabeled_data(n_samples):
     
     for k in keys:
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
+        sampled_towers[k]['labels'] = np.zeros((sampled_towers[k]['towers'].shape[0],))
 
     return sampled_towers
+
 
 def get_predictions(dataset, ensemble):
     """
@@ -36,7 +39,21 @@ def get_predictions(dataset, ensemble):
     :return: Return (N, K) array of flat predictions. Predictions are 
     ordered by tower size.
     """
-    pass
+    preds = []
+    # Create TowerDataset object.
+    tower_dataset = TowerDataset(dataset, augment=False)
+    tower_sampler = TowerSampler(dataset=tower_dataset,
+                                 batch_size=64,
+                                 shuffle=False)
+    # Iterate through dataset, getting predictions for each.
+    for tensor, _ in tower_sampler:
+        if torch.cuda.is_available():
+            tensor = tensor.cuda()
+        with torch.no_grad():
+            preds.append(ensemble.forward(tensor))
+        
+    return torch.cat(preds, dim=0)
+
 
 def get_labels(samples):
     """ Takes as input a dictionary from the get_subset function. 
@@ -58,6 +75,7 @@ def get_labels(samples):
 
         samples[k]['labels'] = labels
     return samples
+
 
 def get_subset(samples, indices):
     """ Given a tower_dict structure and indices that are flat,
