@@ -116,8 +116,8 @@ def train(model, dataset, test_dataset=None, epochs=100, is_ensemble=False):
             if torch.cuda.is_available():
                 towers = towers.cuda()
                 labels = labels.cuda()
-            preds = model.forward(towers)
-
+            preds = model.forward(towers).squeeze()
+            print(preds.shape, labels.shape)
             if is_ensemble:
                 # NOTE(izzy): do I run into any weird gradient magnitude issues if
                 # i combine the losses for every model in the ensemble? Pretty
@@ -163,7 +163,7 @@ def test(model, dataset, fname='', is_ensemble=False):
             labels = labels.cuda()
         # run the model on everything
         with torch.no_grad():
-            preds = model.forward(towers, k=towers.shape[1]-1)
+            preds = model.forward(towers).squeeze()
 
         if is_ensemble:
             labels = labels[:, None, ...].expand(-1, model.ensemble_size)
