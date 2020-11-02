@@ -84,7 +84,7 @@ def get_labels(samples):
     return samples
 
 
-def get_subset(samples, indices):
+def get_subset(samples, scores, indices):
     """ Given a tower_dict structure and indices that are flat,
     return a tower_dict structure with only those indices.
     :param samples: A tower_dict structure.
@@ -97,11 +97,16 @@ def get_subset(samples, indices):
     start = 0
     for k in keys:
         end = start + samples[k]['towers'].shape[0]
-        tower_ixs = indices[np.logical_and(indices >= start,
-                                           indices < end)] - start
+        if scores is None:
+            tower_ixs = indices[np.logical_and(indices >= start,
+                                            indices < end)] - start
+            selected_towers[k]['towers'] = samples[k]['towers'][tower_ixs,...]
+        else:
+            # Choose top 4 of each tower category.
+            indices = np.argsort(scores[start:end])[::-1][:4]
+            selected_towers[k]['towers'] = samples[k]['towers'][indices]
+            
         start = end
-
-        selected_towers[k]['towers'] = samples[k]['towers'][tower_ixs,...]
 
     return selected_towers
 

@@ -162,4 +162,4 @@ class ActiveExperimentLogger:
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
         with open(path, 'rb') as handle:
             data = pickle.load(handle)
-        return data['acquired_xs'], data['acquired_ys'], data['samples']
+        return data['acquired_data'], data['samples']
