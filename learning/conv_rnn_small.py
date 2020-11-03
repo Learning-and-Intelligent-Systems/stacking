@@ -29,7 +29,7 @@ class TowerConvRNNSmall(nn.Module):
         '''
         self.channel_mult = 16
         self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels=1,
+            nn.Conv2d(in_channels=2,
                      out_channels=self.channel_mult*1,
                      kernel_size=4,
                      stride=1,
