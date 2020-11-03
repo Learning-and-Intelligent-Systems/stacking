@@ -34,9 +34,9 @@ class TowerConvRNNSmall(nn.Module):
                                         out_channels=3*n_hidden,
                                         kernel_size=kernel_size),
                         nn.ReLU(),
-            nn.Conv2d(in_channels=3*n_hidden,
-                    out_channel=1,
-                    kernel_size-kernel_size))
+                        nn.Conv2d(in_channels=3*n_hidden,
+                                out_channel=1,
+                                kernel_size-kernel_size))
 
         self.insert_h = int(image_dim/2-self.hidden_dim/2)
                                        
