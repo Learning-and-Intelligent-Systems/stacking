@@ -64,6 +64,7 @@ class TowerConvRNNSmall(nn.Module):
         for k in range(K-1, -1, -1): # start with the top block
             input = torch.cat([images[:,k,:,:].view(N,1,image_dim, image_dim), h], dim=1)
             h_small = self.encoder(input)
+            print(h_small.shape)
             h = torch.zeros(N, 1, image_dim, image_dim)
             # iterate through each hidden state in the batch
             for n in range(N):
