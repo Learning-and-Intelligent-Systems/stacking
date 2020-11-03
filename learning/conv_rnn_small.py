@@ -18,7 +18,7 @@ class TowerConvRNNSmall(nn.Module):
             W = (image_dim-kernel_size)+1
             W = (W-kernel_size)+1
             W = (W-kernel_size)+1
-		W = (W-kernel_size)+1
+		    W = (W-kernel_size)+1
             return int(W)
         self.hidden_dim = calc_fc_size()
         self.encoder = nn.Sequential(
@@ -27,9 +27,9 @@ class TowerConvRNNSmall(nn.Module):
                                         kernel_size=kernel_size),
                         nn.ReLU(),
                         nn.Conv2d(in_channels=n_hidden,
-					out_channels=2*n_hidden,
-					kernel_size=kernel_size),
-			nn.ReLU(),
+					                   out_channels=2*n_hidden,
+					                   kernel_size=kernel_size),
+			            nn.ReLU(),
                         nn.Conv2d(in_channels=2*n_hidden,
                                         out_channels=3*n_hidden,
                                         kernel_size=kernel_size),
