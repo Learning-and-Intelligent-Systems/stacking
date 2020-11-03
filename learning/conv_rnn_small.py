@@ -45,7 +45,7 @@ class TowerConvRNNSmall(nn.Module):
             nn.BatchNorm2d(self.channel_mult*8),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(self.channel_mult*8, 1, 3, 2, 1),
-            nn.BatchNorm2d(self.channel_mult*16),
+            nn.BatchNorm2d(1),
             nn.LeakyReLU(0.2, inplace=True)
         )
                                        
