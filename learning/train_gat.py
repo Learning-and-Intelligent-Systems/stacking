@@ -159,7 +159,7 @@ def train(model, datasets, test_datasets, args):
                     preds = model.forward(images, k=towers.shape[1]-1)
                 else:
                     preds = model.forward(towers, k=towers.shape[1]-1)
-                l = F.binary_cross_entropy(preds, labels)
+                l = F.binary_cross_entropy(preds.squeeze(), labels.squeeze())
                 l.backward()
                 optimizer.step()
                 accuracy = ((preds.cpu().detach().numpy().squeeze()>0.5) == labels.cpu().detach().numpy()).mean()

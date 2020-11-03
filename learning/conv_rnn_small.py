@@ -5,19 +5,20 @@ from torch.nn import functional as F
 from learning.utils import View
 
 class TowerConvRNNSmall(nn.Module):
-    def __init__(self, image_dim, n_hidden=32):
+    def __init__(self, image_dim, n_hidden=8):
         """ This network is given input of size (N, K, n_in) where N is the batch size, 
         and K is the number of blocks in the tower. K can vary per batch.
         :param image_dim: width/height (square images) number of pixels
         """
         super(TowerConvRNNSmall, self).__init__()
         # make 
-        kernel_size = 9
+        kernel_size = 3
         stride = 3
         def calc_fc_size():
             W = (image_dim-kernel_size)+1
-            W = ((W-kernel_size)/stride)+1
             W = (W-kernel_size)+1
+            W = (W-kernel_size)+1
+		W = (W-kernel_size)+1
             return int(W)
         self.hidden_dim = calc_fc_size()
         self.encoder = nn.Sequential(
@@ -25,12 +26,17 @@ class TowerConvRNNSmall(nn.Module):
                                         out_channels=n_hidden,
                                         kernel_size=kernel_size),
                         nn.ReLU(),
-                        nn.MaxPool2d(kernel_size=kernel_size, 
-                                        stride=stride),
                         nn.Conv2d(in_channels=n_hidden,
-                                        out_channels=1,
+					out_channels=2*n_hidden,
+					kernel_size=kernel_size),
+			nn.ReLU(),
+                        nn.Conv2d(in_channels=2*n_hidden,
+                                        out_channels=3*n_hidden,
                                         kernel_size=kernel_size),
-                        nn.ReLU())
+                        nn.ReLU(),
+			nn.Conv2d(in_channels=3*n_hidden,
+					out_channel=1,
+					kernel_size-kernel_size))
 
         self.insert_h = int(image_dim/2-self.hidden_dim/2)
                                        
