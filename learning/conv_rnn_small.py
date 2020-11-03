@@ -36,16 +36,16 @@ class TowerConvRNNSmall(nn.Module):
                      padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(self.channel_mult*1, self.channel_mult*2, 4, 2, 1),
-            nn.BatchNorm2d(self.channel_mult*2),
+            nn.BatchNorm3d(self.channel_mult*2),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(self.channel_mult*2, self.channel_mult*4, 4, 2, 1),
-            nn.BatchNorm2d(self.channel_mult*4),
+            nn.BatchNorm3d(self.channel_mult*4),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(self.channel_mult*4, self.channel_mult*8, 4, 2, 1),
-            nn.BatchNorm2d(self.channel_mult*8),
+            nn.BatchNorm3d(self.channel_mult*8),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(self.channel_mult*8, 1, 3, 2, 1),
-            nn.BatchNorm2d(self.channel_mult*16),
+            nn.BatchNorm3d(self.channel_mult*16),
             nn.LeakyReLU(0.2, inplace=True)
         )
                                        
