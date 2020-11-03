@@ -17,38 +17,51 @@ class TowerConvRNNSmall(nn.Module):
         kernel_size = 5
         #stride = 3
         def calc_fc_size():
-            W = (image_dim-kernel_size)+1
-            W = (W-kernel_size)+1
-            W = (W-kernel_size)+1
-            W = (W-kernel_size)+1
-            W = (W-kernel_size)+1
+            W = ((image_dim-11)/4)+1
+            W = ((W-3)/2)+1
+            W = (W-5)+1
+            W = ((W-3)/2)+1
+            W = (W-3)+1
+            W = (W-3)+1
+            W = (W-3)+1
             return int(W)
         self.hidden_dim = calc_fc_size()
+        print(self.hidden_dim)
         self.encoder = nn.Sequential(
                         nn.Conv2d(in_channels=2,
-                                        out_channels=4,
-                                        kernel_size=kernel_size),
+                                        out_channels=8,
+                                        kernel_size=11,
+                                        stride=4),
                         nn.ReLU(),
+                        nn.MaxPool2d(kernel_size=3, 
+                                        stride=2),
                         nn.Conv2d(in_channels=4,
-                                       out_channels=8,
-                                       kernel_size=kernel_size),
+                                       out_channels=16,
+                                       kernel_size=5),
                         nn.ReLU(),
-                        nn.Conv2d(in_channels=8,
-                                        out_channels=16,
-                                        kernel_size=kernel_size),
-                        nn.ReLU(),
+                        nn.MaxPool2d(kernel_size=3, 
+                                        stride=2),
                         nn.Conv2d(in_channels=16,
-                                out_channels=32,
-                                kernel_size=kernel_size),
+                                        out_channels=32,
+                                        kernel_size=3),
                         nn.ReLU(),
                         nn.Conv2d(in_channels=32,
+                                out_channels=16,
+                                kernel_size=3),
+                        nn.ReLU(),
+                        nn.Conv2d(in_channels=16,
                                 out_channels=1,
-                                kernel_size=kernel_size))
+                                kernel_size=3))
                                        
         self.output = nn.Sequential(
                         View((-1, image_dim**2)),
                         nn.Linear(image_dim**2, 
-                                        16),
+                                        1000),
+                        nn.ReLU(),
+                        nn.Linear(1000, 
+                                        500),
+                        nn.ReLU(),
+                        nn.Linear(500, 16),
                         nn.ReLU(),
                         nn.Linear(16, 1),
                         nn.Sigmoid())
@@ -68,7 +81,7 @@ class TowerConvRNNSmall(nn.Module):
             h = torch.zeros(N, 1, image_dim, image_dim)
             # iterate through each hidden state in the batch
             for n in range(N):
-                h_small_im = torchvision.transforms.ToPILImage()(h_small[n,:,:])
+                h_small_im = torchvision.transforms.ToPILImage()(h_small[n,:,:].cpu())
                 h[n,:,:,:] = torchvision.transforms.ToTensor()(h_small_im.resize((image_dim, image_dim)))
 
             if torch.cuda.is_available():
