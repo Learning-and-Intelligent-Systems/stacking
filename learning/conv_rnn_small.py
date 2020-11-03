@@ -16,6 +16,7 @@ class TowerConvRNNSmall(nn.Module):
         # make 
         kernel_size = 5
         #stride = 3
+        '''
         def calc_fc_size():
             W = ((image_dim-11)/4)+1
             W = ((W-3)/2)+1
@@ -25,42 +26,24 @@ class TowerConvRNNSmall(nn.Module):
             W = (W-3)+1
             W = (W-3)+1
             return int(W)
-        self.hidden_dim = calc_fc_size()
-        print(self.hidden_dim)
+        '''
+
         self.encoder = nn.Sequential(
-                        nn.Conv2d(in_channels=2,
-                                        out_channels=8,
-                                        kernel_size=3),
-                        nn.ReLU(),
-                        nn.MaxPool2d(kernel_size=3),
-                        nn.Conv2d(in_channels=8,
-                                       out_channels=16,
-                                       kernel_size=3),
-                        nn.ReLU(),
-                        nn.MaxPool2d(kernel_size=3),
-                        nn.Conv2d(in_channels=16,
-                                        out_channels=32,
-                                        kernel_size=3),
-                        nn.ReLU(),
-                        nn.Conv2d(in_channels=32,
-                                out_channels=16,
-                                kernel_size=3),
-                        nn.ReLU(),
-                        nn.Conv2d(in_channels=16,
-                                out_channels=1,
-                                kernel_size=3))
+                        nn.Conv2d(2, 16, 3, stride=3, padding=1),  # b, 16, 10, 10
+                        nn.ReLU(True),
+                        nn.MaxPool2d(2, stride=2),  # b, 16, 5, 5
+                        nn.Conv2d(16, 8, 3, stride=2, padding=1),  # b, 8, 3, 3
+                        nn.ReLU(True),
+                        nn.MaxPool2d(2, stride=1)  # b, 8, 2, 2
+                    )
                                        
         self.output = nn.Sequential(
                         View((-1, image_dim**2)),
                         nn.Linear(image_dim**2, 
-                                        1000),
+                                        16),
                         nn.ReLU(),
-                        nn.Linear(1000, 
-                                        500),
-                        nn.ReLU(),
-                        nn.Linear(500, 16),
-                        nn.ReLU(),
-                        nn.Linear(16, 1),
+                        nn.Linear(16, 
+                                    1),
                         nn.Sigmoid())
 
     def forward(self, images, k=None):
