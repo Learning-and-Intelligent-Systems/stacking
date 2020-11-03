@@ -29,10 +29,10 @@ class TowerConvRNNSmall(nn.Module):
         '''
 
         self.encoder = nn.Sequential(
-                        nn.Conv2d(2, 16, 3, stride=3, padding=1),  # b, 16, 10, 10
+                        nn.Conv2d(2, 32, 3, stride=3, padding=1),  # b, 16, 10, 10
                         nn.ReLU(True),
                         nn.MaxPool2d(2, stride=2),  # b, 16, 5, 5
-                        nn.Conv2d(16, 1, 3, stride=2, padding=1),  # b, 8, 3, 3
+                        nn.Conv2d(32, 1, 3, stride=2, padding=1),  # b, 8, 3, 3
                         nn.ReLU(True),
                     )
                                        
