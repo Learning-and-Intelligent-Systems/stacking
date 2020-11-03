@@ -27,14 +27,27 @@ class TowerConvRNNSmall(nn.Module):
             W = (W-3)+1
             return int(W)
         '''
-
+        self.channel_mult = 16
         self.encoder = nn.Sequential(
-                        nn.Conv2d(2, 32, 3, stride=3, padding=1),  # b, 16, 10, 10
-                        nn.ReLU(True),
-                        nn.MaxPool2d(2, stride=2),  # b, 16, 5, 5
-                        nn.Conv2d(32, 1, 3, stride=2, padding=1),  # b, 8, 3, 3
-                        nn.ReLU(True),
-                    )
+            nn.Conv2d(in_channels=1,
+                     out_channels=self.channel_mult*1,
+                     kernel_size=4,
+                     stride=1,
+                     padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(self.channel_mult*1, self.channel_mult*2, 4, 2, 1),
+            nn.BatchNorm2d(self.channel_mult*2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(self.channel_mult*2, self.channel_mult*4, 4, 2, 1),
+            nn.BatchNorm2d(self.channel_mult*4),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(self.channel_mult*4, self.channel_mult*8, 4, 2, 1),
+            nn.BatchNorm2d(self.channel_mult*8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(self.channel_mult*8, self.channel_mult*16, 3, 2, 1),
+            nn.BatchNorm2d(self.channel_mult*16),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
                                        
         self.output = nn.Sequential(
                         View((-1, image_dim**2)),
