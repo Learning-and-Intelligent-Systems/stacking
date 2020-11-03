@@ -46,9 +46,9 @@ class TowerConvRNNSmall(nn.Module):
         self.output = nn.Sequential(
                         View((-1, image_dim**2)),
                         nn.Linear(image_dim**2, 
-                                        16),
+                                        32),
                         nn.ReLU(),
-                        nn.Linear(16, 
+                        nn.Linear(32, 
                                     1),
                         nn.Sigmoid())
 
