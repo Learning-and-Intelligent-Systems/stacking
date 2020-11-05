@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 import pickle
 
 from torch.utils.data import DataLoader
@@ -22,6 +23,10 @@ def train_ensemble(args):
 
     with open(args.data_fname, 'rb') as handle:
         dataset = pickle.load(handle)
+
+    for k in dataset.tower_keys:
+        shape = dataset.tower_tensors[k].shape
+        dataset.tower_tensors[k][:, :, 7:9] += np.random.randn(shape[0]*shape[1]*2).reshape((shape[0], shape[1], 2))*0.0025*100
 
     sampler = TowerSampler(dataset=dataset,
                            batch_size=args.batch_size,
