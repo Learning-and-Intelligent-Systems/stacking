@@ -104,7 +104,7 @@ class TowerDataset(Dataset):
         :param tower_dict: A dictionary of the same format as was passed in initially with
         the towers to add to the dataset.
         """
-        augmented_towers = augment_towers(tower_dict, 1, False)
+        augmented_towers = augment_towers(tower_dict, 1, mirror=True)
         for k in self.tower_keys:
             if augmented_towers[k]['towers'].shape[0] > 0:
                 new_towers = torch.Tensor(augmented_towers[k]['towers'])
