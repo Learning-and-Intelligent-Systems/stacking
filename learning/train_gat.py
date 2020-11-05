@@ -22,6 +22,7 @@ from learning.gated_gn import GatedGN
 from learning.cnn import TowerCNN
 from learning.conv_rnn import TowerConvRNN
 from learning.conv_rnn_small import TowerConvRNNSmall
+from learning.conv_rnn_orig import TowerConvRNNOrig
 
 def get_subsets(data):
     towers, labels = [], []
@@ -247,7 +248,8 @@ def main(args):
     #model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
     #model = TowerCNN(150)
     #model = TowerConvRNN(150)
-    model = TowerConvRNNSmall(150)
+    #model = TowerConvRNNSmall(150)
+    model = TowerConvRNNOrig(150)
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
@@ -292,6 +294,8 @@ def main(args):
         model_type = 'TowerConvRNN'
     elif isinstance(model, TowerConvRNNSmall):
         model_type = 'TowerConvRNNSmall'
+    elif isinstance(model, TowerConvRNNOrig)
+        model_type = 'TowerConvRNNOrig'
     else:
         print('Model type could not be determined.')
     
