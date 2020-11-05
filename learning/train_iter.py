@@ -1,20 +1,20 @@
 from argparse import Namespace
 import pickle
-from matplotlib.pyplot import plt
+import matplotlib.pyplot as plt
 
-from train_gat import main
+from learning.train_gat import main
 
-args = Namespace('visual'=True, 'batch-size'=32, 'epochs'=50)
+args = Namespace(visual=True, batch_size=2, epochs=5)
 all_train_losses = []
-all_test_losses = []
+all_test_accs = []
 
 for _ in range(5):
     train_losses, epoch_ids, test_accuracies = main(args)
-    all_train_losses += [[train_losses]]
-    all_test_losses += [[test_losses]]
+    all_train_losses += [train_losses]
+    all_test_accs += [test_accuracies]
 
-with open(fname, 'wb') as handle:
-    pickle.dump([all_train_losses, all_test_losses, epoch_ids], handle)
+with open('results.pickle', 'wb') as handle:
+    pickle.dump([all_train_losses, all_test_accs, epoch_ids], handle)
     
 # plot
 fig_train, ax_train = plt.subplots()
@@ -24,7 +24,7 @@ for i in range(5):
     ax_train.set_xlabel('Batch #')
     ax_train.set_ylabel('Train Losses')
     
-    ax_test.plot(list(range(len(all_test_losses[i]))), all_test_losses[i])
+    ax_test.plot(list(range(len(all_test_accs[i]))), all_test_accs[i])
     ax_test.set_xlabel('Epoch #')
     ax_test.set_ylabel('Test Accuracies')
     
