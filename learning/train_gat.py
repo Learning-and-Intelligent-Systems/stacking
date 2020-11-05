@@ -163,13 +163,11 @@ def train(model, datasets, test_datasets, args):
                 l.backward()
                 optimizer.step()
                 accuracy = ((preds.cpu().detach().numpy().squeeze()>0.5) == labels.cpu().detach().numpy()).mean()
+                # train_losses is a vector of training accuracies for each batch
                 train_losses.append(accuracy.item())
+        # print average loss for this epoch
         print('training acc: ', np.mean(train_losses[-(num_data_points // args.batch_size):]))
-        # train_losses is a vector of running average accuracies for each tower size
-
-        #print(preds, labels)
-            
-
+        
 
             #if batch_idx % 40 == 0:
             #    print(f'Epoch {epoch_idx}\tBatch {batch_idx}:\t {train_losses[-4:]}')
@@ -179,8 +177,8 @@ def train(model, datasets, test_datasets, args):
 
             accuracies = test(model, test_datasets, args, fname='lstm_preds.pkl')
             test_accuracies.append(accuracies)
+            # print test epoch accuracy
             print('test acc: ', accuracies)
-            #print('Val:', accuracies)
         
         
         #print('EPOCH: Total memory, cached, allocated [GiB]:', t/1073741824, c/1073741824, a/1073741824)
@@ -237,20 +235,7 @@ def test(model, datasets, args, fname=''):
     #        pickle.dump(results, handle)
     return accuracies
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    # NOTE(caris): this has only been tested for the GatedGN network!!
-    parser.add_argument('--visual', action='store_true') 
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--batch-size', default=32, type=int)
-    parser.add_argument('--epochs', default=100, type=int)
-    parser.add_argument('--n-hidden', default=32, type=int)
-    args = parser.parse_args()
-    
-    if args.debug:
-        import pdb; pdb.set_trace()
-    
+def main(args):
     # needed to work with lis-cloud GPUs
     torch.backends.cudnn.enabled = False
     
@@ -273,6 +258,7 @@ if __name__ == '__main__':
     test_datasets, num_test_blocks = load_dataset(test_dataset, args)
     
     train_losses, epoch_ids, test_accuracies = train(model, train_datasets, test_datasets, args)
+    '''
     fig, ax = plt.subplots()
     ax.plot(train_losses)
     ax.set_title('Training Loss')
@@ -287,7 +273,7 @@ if __name__ == '__main__':
     ax.set_xlabel('Epoch ID')
     ax.set_ylabel('Accuracy')
     fig.savefig('test_accuracies.png')
-    
+    '''
     # write training params to a file
     model_type = None
     if isinstance(model, FCGAT):
@@ -320,3 +306,21 @@ if __name__ == '__main__':
     file.write("epochs : " + str(args.epochs) + " \n") 
     file.write("batch size: " + str(args.batch_size) + " \n") 
     file.close()
+    
+    return train_losses, epoch_ids, test_accuracies
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    # NOTE(caris): this has only been tested for the GatedGN network!!
+    parser.add_argument('--visual', action='store_true') 
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--batch-size', default=32, type=int)
+    parser.add_argument('--epochs', default=100, type=int)
+    parser.add_argument('--n-hidden', default=32, type=int)
+    args = parser.parse_args()
+    
+    if args.debug:
+        import pdb; pdb.set_trace()
+    
+    main(args)
+    
