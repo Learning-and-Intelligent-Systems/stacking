@@ -53,15 +53,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--max-acquisitions', 
                         type=int, 
-                        default=200,
+                        default=1000,
                         help='Number of iterations to run the main active learning loop for.')
     parser.add_argument('--batch-size', type=int, default=16)
-    parser.add_argument('--n-models', type=int, default=5, help='Number of models in the ensemble.')
+    parser.add_argument('--n-models', type=int, default=7, help='Number of models in the ensemble.')
     parser.add_argument('--n-hidden', type=int, default=64)
-    parser.add_argument('--n-epochs', type=int, default=500)
+    parser.add_argument('--n-epochs', type=int, default=50)
     parser.add_argument('--init-data-fname', type=str, default='')
     parser.add_argument('--n-train-init', type=int, default=100)
-    parser.add_argument('--n-samples', type=int, default=500)
+    parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')    

@@ -117,7 +117,6 @@ def train(model, dataset, test_dataset=None, epochs=100, is_ensemble=False):
                 towers = towers.cuda()
                 labels = labels.cuda()
             preds = model.forward(towers).squeeze()
-            print(preds.shape, labels.shape)
             if is_ensemble:
                 # NOTE(izzy): do I run into any weird gradient magnitude issues if
                 # i combine the losses for every model in the ensemble? Pretty
