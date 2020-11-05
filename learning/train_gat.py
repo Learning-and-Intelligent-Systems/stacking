@@ -294,7 +294,7 @@ def main(args):
         model_type = 'TowerConvRNN'
     elif isinstance(model, TowerConvRNNSmall):
         model_type = 'TowerConvRNNSmall'
-    elif isinstance(model, TowerConvRNNOrig)
+    elif isinstance(model, TowerConvRNNOrig):
         model_type = 'TowerConvRNNOrig'
     else:
         print('Model type could not be determined.')

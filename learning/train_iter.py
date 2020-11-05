@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from learning.train_gat import main
 
-args = Namespace(visual=True, batch_size=2, epochs=5)
+args = Namespace(visual=True, batch_size=32, epochs=50)
 all_train_losses = []
 all_test_accs = []
 

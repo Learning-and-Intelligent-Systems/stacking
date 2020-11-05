@@ -10,7 +10,7 @@ class TowerConvRNNOrig(nn.Module):
         and K is the number of blocks in the tower. K can vary per batch.
         :param image_dim: width/height (square images) number of pixels
         """
-        super(TowerConvRNN, self).__init__()
+        super(TowerConvRNNOrig, self).__init__()
         # make 
         kernel_size = 9
         stride = 3
