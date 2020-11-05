@@ -41,7 +41,7 @@ def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn
         
     # Return the n_acquire points with the highest score.
     acquire_indices = np.argsort(scores)[::-1][:n_acquire]
-    return data_subset_fn(samples, scores, acquire_indices)
+    return data_subset_fn(samples, None, acquire_indices)
 
 def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn):
     """ Get new datapoints given the current ensemble.
