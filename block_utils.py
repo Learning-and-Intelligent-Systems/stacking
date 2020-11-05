@@ -444,6 +444,7 @@ def group_blocks(bottom, top):
 
     return new_block
 
+ROTS = {}
 def get_rotated_block(block):
     """ Take a block which is rotated by an element of the rotation group of a
     cube, and produce a new block with no rotation, but with changed COM and
@@ -461,7 +462,11 @@ def get_rotated_block(block):
     new_pose = Pose(block.pose.pos, Quaternion(0,0,0,1))
     new_block.set_pose(new_pose)
     # get the original block's rotation
-    r = R.from_quat(block.pose.orn)
+    if block.pose.orn in ROTS:
+        r = ROTS[block.pose.orn]
+    else:
+        r = R.from_quat(block.pose.orn)
+        ROTS[block.pose.orn] = r
     vs = np.array([block.com, block.dimensions])
     vs_rot = r.apply(vs)
     # rotate the old center of mass

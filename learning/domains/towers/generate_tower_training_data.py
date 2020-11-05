@@ -17,10 +17,11 @@ import matplotlib.pyplot as plt
 def vectorize(tower):
     return [b.vectorize() for b in tower]
 
+ROTATIONS = list(rotation_group())
 def sample_random_tower(blocks):
     num_blocks = len(blocks)
     # pick random orientations for the blocks
-    orns = sample_with_replacement(list(rotation_group()), k=num_blocks)
+    orns = sample_with_replacement(ROTATIONS, k=num_blocks)
     orns = [Quaternion(*orn.as_quat()) for orn in orns]
     # apply the rotations to each block
     rotated_blocks = []

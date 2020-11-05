@@ -92,6 +92,8 @@ class ToyDataset(Dataset):
         :return: A new ToyDataset instance with all datapoints.
         """
         new_xs, new_ys = new_data
+        # TODO: Add noise to dataset.
+        new_xs += np.random.randn(new_xs.shape[0]*2).reshape((new_xs.shape[0], 2))*0.01
         self.xs = np.concatenate([self.xs, new_xs], axis=0)
         self.ys = np.concatenate([self.ys, new_ys], axis=0)
 
