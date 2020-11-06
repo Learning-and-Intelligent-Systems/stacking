@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+import torchvision
 
 from learning.utils import View
 
@@ -55,6 +56,11 @@ class TowerConvRNNOrig(nn.Module):
             input = torch.cat([images[:,k,:,:].view(N,1,image_dim, image_dim), h], dim=1)
             h_small = self.encoder(input)
             h = torch.zeros(N, 1, image_dim, image_dim)
+            # iterate through each hidden state in the batch
+            for n in range(N):
+                h_small_im = torchvision.transforms.ToPILImage()(h_small[n,:,:].cpu())
+                h[n,:,:,:] = torchvision.transforms.ToTensor()(h_small_im.resize((image_dim, image_dim)))
+
             if torch.cuda.is_available():
                 h = h.cuda()
             h[:,:,self.insert_h:self.insert_h+self.hidden_dim, self.insert_h:self.insert_h+self.hidden_dim] = h_small
