@@ -5,8 +5,6 @@ from math import cos, pi, sin
 
 physicsClient = p.connect(p.GUI)
 
-#p.setAdditionalSearchPath(pybullet_data.getDataPath())
-
 p.resetSimulation(p.RESET_USE_DEFORMABLE_WORLD)
 
 p.setGravity(0, 0, -10)
@@ -14,12 +12,25 @@ p.setGravity(0, 0, -10)
 planeOrn = [0,0,0,1]
 planeId = p.loadURDF("geo/plane.urdf", [0,0,0], planeOrn)
 
+
+#tower demo
+num_blocks=2
+for i in range(num_blocks):
+    if i==num_blocks-1:
+      innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
+    else:
+      innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
+    hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0+i*1], flags=p.URDF_USE_SELF_COLLISION)
+    # if i==2:
+    #   innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
+    # else:
+    #   innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
 #cool experiment to show rigid v deformable com requirements
 #shows how the com needs to change to maintain stability (no cover around -0.2 m but for deformables u need about -0.5 m)
-#innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5], useMaximalCoordinates = True)
-#hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0], flags=p.URDF_USE_SELF_COLLISION)
-#innerbox2=p.loadURDF("geo/block2.urdf", [1,0.5,1.5], useMaximalCoordinates = True)
-hollow2= p.loadURDF("geo/cover_deform.urdf", [0.5,0,2],flags=p.URDF_USE_SELF_COLLISION)
+# innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5], useMaximalCoordinates = True)
+# hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0], flags=p.URDF_USE_SELF_COLLISION)
+# innerbox2=p.loadURDF("geo/block2.urdf", [1,0.5,1.5], useMaximalCoordinates = True)
+# hollow2= p.loadURDF("geo/cover_deform.urdf", [0.5,0,1],flags=p.URDF_USE_SELF_COLLISION)
 
 # #good example of tile on block, commented out clothId uses spring model
 # boxId = p.loadURDF("geo/cube.urdf", [0,0,2.5], useMaximalCoordinates = True) #no rigid bodies
@@ -58,11 +69,13 @@ hollow2= p.loadURDF("geo/cover_deform.urdf", [0.5,0,2],flags=p.URDF_USE_SELF_COL
 #     while count<8:
 #       p.createSoftBodyAnchor(cover,mesh_verts[count2],body2,vertices[count2])
 
-
 p.setPhysicsEngineParameter(sparseSdfVoxelSize=0.25)
 p.setRealTimeSimulation(1)
 
+counter=0
 while p.isConnected():
   p.stepSimulation()
-  #p.setGravity(0,0,-10)
+  #p.setGravity(0, 0, -10)
   sleep(1./240.)
+
+

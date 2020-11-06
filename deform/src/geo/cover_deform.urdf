@@ -9,7 +9,7 @@
     <collision_margin value="0.01"/> 
     <repulsion_stiffness value="800.0"/>
     <friction value= "0.5"/>
-    <neohookean mu= "90" lambda= "200" damping= "0.01" />
+    <neohookean mu= "570" lambda= "570" damping= "0.03" />
     <visual filename="res_2_cover_6_in.vtk"/>
   </deformable>  
 </robot>

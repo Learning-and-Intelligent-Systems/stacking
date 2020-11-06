@@ -38,6 +38,7 @@
 
 \section{General Simulation Notes}
 \begin{itemize}
+    \item Parameters: lame parameters (mu, lambda), damping (of single deformable), mass of block, center of mass, offset from parent position, collision margin (currently const). 
     \item For the simulation not to crash, a hole is needed in the new deformable architecture (inner rigid inside of a deformable cover)
           This is most likely due to a watertight requirement by the simulation. The current hole size we have been using has 0.1 m radius because
           anything too small (e.g 0.01 m) causes the mesh geometry to greatly increase in complexity around the hole causing the simulation to crash.

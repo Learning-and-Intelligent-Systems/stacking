@@ -3,7 +3,7 @@
  <link  name="blocka" >
   <inertial >
    <origin  xyz="0 0 0"  rpy="0 0 0" />
-   <mass  value="1.0" />
+   <mass  value="1.6" />
    <inertia  iyy="0.001"  ixx="0.001"  iyz="0"  izz="0.001"  ixy="0"  ixz="0" />
   </inertial>
   <collision >
