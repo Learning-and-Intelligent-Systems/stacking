@@ -51,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-train-init', type=int, default=100)
     parser.add_argument('--n-samples', type=int, default=500)
     parser.add_argument('--n-acquire', type=int, default=10)
-    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
+    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Random number if not specified.')
     parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')    
     args = parser.parse_args()
 

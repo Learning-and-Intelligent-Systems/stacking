@@ -355,10 +355,10 @@ def inspect_2block_towers(logger):
     print('-----')
     for ix in acquire_indices:
         d = decision_distance(unlabeled['2block']['towers'][ix,:,:])
-        print(np.around(preds2[ix,:].numpy(), 2), np.around(bald_scores2[ix], 3), d)
+        print(np.around(preds2[ix,:].numpy(), 4), np.around(bald_scores2[ix], 3), d)
 
     for ix in acquire_indices:
-        unlabeled['2block']['towers'][ix,1,7:8] += 0.01
+        unlabeled['2block']['towers'][ix,1,7:8] += 0.00
     new_preds = get_predictions(unlabeled, ensemble)
     print('-----')
     for ix in acquire_indices:
@@ -371,13 +371,47 @@ def inspect_2block_towers(logger):
         p, b = preds[start:end, :], bald_scores[start:end]
         informative = b[b > 0.3]
         print(p.shape, informative.shape)
+
+    accs = {k: [] for k in tower_keys}
+    with open('learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl', 'rb') as handle:
+        val_towers = pickle.load(handle)
+
+    preds = get_predictions(val_towers, ensemble).mean(1).numpy()
+
+    start = 0
+    for k in tower_keys:
+        end = start + val_towers[k]['towers'].shape[0]
+        acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
+        accs[k].append(acc)
+        start = end
+    print(accs)
+
+
+def single_2block_tower_analysis(logger):
+    tower_keys = ['2block', '3block', '4block', '5block']
+    ensemble = logger.get_ensemble(logger.args.max_acquisitions - 1)
+    unlabeled = sample_unlabeled_data(1000)
+    tower = unlabeled['2block']['towers'][0:1,:,:].copy()
+    displacements = np.linspace(-0.1, 0.1, 1000).reshape(1000,1,1)
+    unlabeled['2block']['towers'] = np.resize(tower, (1000, 2, 17))
+    unlabeled['2block']['labels'] = np.zeros((1000,))
+    unlabeled['2block']['towers'][:,:,7:8] += displacements
+
+    preds = get_predictions(unlabeled, ensemble)[:1000,...]
+
+    for ix in range(1000):
+        dim_x = unlabeled['2block']['towers'][ix, 0, 4]/2.
+        com_x = unlabeled['2block']['towers'][ix, 1, 1] + unlabeled['2block']['towers'][ix, 1, 7]
+        print(np.around(preds[ix,:], 3), dim_x, com_x)
+    bald_scores = bald(preds).numpy()
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path', type=str, required=True)
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 335
+    logger.args.max_acquisitions = 224
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
@@ -394,4 +428,5 @@ if __name__ == '__main__':
     #analyze_acquisition_value_with_sampling_size(logger)
     #plot_acquisition_value_with_sampling_size(logger)
 
-    inspect_2block_towers(logger)
+    single_2block_tower_analysis(logger)
+    #inspect_2block_towers(logger)

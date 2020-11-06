@@ -4,7 +4,7 @@ import pickle
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
-from learning.domains.towers.active_utils import sample_unlabeled_data, get_predictions, get_labels, get_subset
+from learning.domains.towers.active_utils import sample_unlabeled_data, get_predictions, get_labels, get_subset, PoolSampler
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.gn import FCGN
@@ -37,14 +37,23 @@ def run_active_towers(args):
     dataloader = DataLoader(dataset,
                             batch_sampler=sampler)
     
+    if len(args.pool_fname) > 0:
+        print('HERE')
+        pool_sampler = PoolSampler(args.pool_fname)
+        data_subset_fn = pool_sampler.get_subset
+        data_sampler_fn = pool_sampler.sample_unlabeled_data
+    else:
+        data_subset_fn = get_subset
+        data_sampler_fn = sample_unlabeled_data
+    
     # TODO: All these callback functions need to be rewritten for the towers dataset.
     active_train(ensemble=ensemble, 
                  dataset=dataset, 
                  dataloader=dataloader, 
-                 data_sampler_fn=sample_unlabeled_data, 
+                 data_sampler_fn=data_sampler_fn, 
                  data_label_fn=get_labels, 
                  data_pred_fn=get_predictions,
-                 data_subset_fn=get_subset,
+                 data_subset_fn=data_subset_fn,
                  logger=logger, 
                  args=args)
 
@@ -64,7 +73,8 @@ if __name__ == '__main__':
     parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
-    parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')    
+    parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')
+    parser.add_argument('--pool-fname', type=str, default='')        
     args = parser.parse_args()
 
     run_active_towers(args)

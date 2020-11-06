@@ -108,7 +108,7 @@ class TowerDataset(Dataset):
         for k in self.tower_keys:
             if augmented_towers[k]['towers'].shape[0] > 0:
                 new_towers = torch.Tensor(augmented_towers[k]['towers'])
-                new_towers = add_placement_noise(new_towers)
+                #new_towers = add_placement_noise(new_towers)
                 new_towers = preprocess(new_towers)
                 new_labels = torch.Tensor(augmented_towers[k]['labels'])
                 

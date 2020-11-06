@@ -105,6 +105,46 @@ def get_subset(samples, indices):
     return selected_towers
 
 
+class PoolSampler:
+
+    def __init__(self, pool_fname):
+        self.pool_fname = pool_fname
+        self.keys = ['2block', '3block', '4block', '5block']
+        with open(self.pool_fname, 'rb') as handle:
+            self.pool = pickle.load(handle)
+
+    def sample_unlabeled_data(self, n_samples):
+        """
+        Return all examples that haven't been chosen so far.
+        """
+        return self.pool
+
+    def get_subset(self, samples, indices):
+        """
+        Remove chosen examples from the pool.
+        """
+        selected_towers = {k: {'towers': []} for k in self.keys}
+
+        start = 0
+        for k in self.keys:
+            end = start + self.pool[k]['towers'].shape[0]
+            
+            tower_ixs = indices[np.logical_and(indices >= start,
+                                        indices < end)] - start
+            selected_towers[k]['towers'] = self.pool[k]['towers'][tower_ixs,...]
+ 
+            mask = np.ones(self.pool[k]['towers'].shape[0], dtype=bool)
+
+            mask[tower_ixs] = False
+            self.pool[k]['towers'] = self.pool[k]['towers'][mask,...]
+            self.pool[k]['labels'] = self.pool[k]['labels'][mask,...]
+            
+            start = end
+        
+        return selected_towers
+        
+
+
 if __name__ == '__main__':
     data = sample_unlabeled_data(1000)
     for k in data.keys():
@@ -149,3 +189,12 @@ if __name__ == '__main__':
     
     # print(len(loader))
 
+    print('----- Pool Sampler Test -----')
+    sampler = PoolSampler('learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl')
+    pool = sampler.sample_unlabeled_data(10)
+    for k in sampler.keys:
+        print(pool[k]['towers'].shape) 
+
+    sampler.get_subset(np.array([0, 1, 2, 3, 4, 20000, 20005]))
+    for k in sampler.keys:
+        print(pool[k]['towers'].shape) 
