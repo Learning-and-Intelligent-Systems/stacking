@@ -345,13 +345,16 @@ def inspect_2block_towers(logger):
     unlabeled = sample_unlabeled_data(10000)
     preds = get_predictions(unlabeled, ensemble)
     bald_scores = bald(preds).numpy()
-    
+    print('Best BALD')
+    ixs = np.argsort(bald_scores)[::-1][:10]
+    print(bald_scores[ixs])
+    input()
     
     preds2 = preds[:unlabeled['2block']['towers'].shape[0], :]
     bald_scores2 = bald_scores[:unlabeled['2block']['towers'].shape[0]]
     acquire_indices = np.argsort(bald_scores2)[::-1][:10]
-    for ix in range(preds2.shape[0]):
-        print(np.around(preds2[ix,:].numpy(), 2), np.around(bald_scores2[ix], 3))
+    # for ix in range(preds2.shape[0]):
+    #     print(np.around(preds2[ix,:].numpy(), 2), np.around(bald_scores2[ix], 3))
     print('-----')
     for ix in acquire_indices:
         d = decision_distance(unlabeled['2block']['towers'][ix,:,:])
@@ -411,22 +414,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 104
+    logger.args.max_acquisitions = 1
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
     #get_acquisition_scores_over_time(logger)
     #plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
-    get_dataset_statistics(logger)
-    accs = get_validation_accuracy(logger,
-                                  'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
-    plot_val_accuracy(logger)
-    analyze_collected_2block_towers(logger)
-    print(accs)
+    # get_dataset_statistics(logger)
+    # accs = get_validation_accuracy(logger,
+    #                               'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
+    # plot_val_accuracy(logger)
+    # #analyze_collected_2block_towers(logger)
+    # print(accs)
 
     #analyze_acquisition_value_with_sampling_size(logger)
     #plot_acquisition_value_with_sampling_size(logger)
 
     #single_2block_tower_analysis(logger)
-    #inspect_2block_towers(logger)
+    inspect_2block_towers(logger)

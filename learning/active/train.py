@@ -32,6 +32,10 @@ def evaluate(loader, model):
 
 
 def train(dataloader, val_dataloader, model, n_epochs=20):
+    """
+    :param val_dataloader: If a validation set is given, will return the model
+    with the lowest validation loss.
+    """
     optimizer = Adam(model.parameters(), lr=1e-3)
     if torch.cuda.is_available():
         model.cuda()
@@ -55,14 +59,15 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
 
             accuracy = ((pred>0.5) == y).float().mean()
             acc.append(accuracy.item())
-
-        val_loss = evaluate(val_dataloader, model)
-        if val_loss < best_loss:
-            best_loss = val_loss
-            best_weights = copy.deepcopy(model.state_dict())
-            print('Saved')    
-        print(np.mean(acc))
-    model.load_state_dict(best_weights)
+        if val_dataloader is not None:
+            val_loss = evaluate(val_dataloader, model)
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_weights = copy.deepcopy(model.state_dict())
+                print('Saved')    
+            print(np.mean(acc))
+    if val_dataloader is not None:
+        model.load_state_dict(best_weights)
     return model
 
 if __name__ == '__main__':

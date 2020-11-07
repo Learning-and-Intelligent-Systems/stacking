@@ -27,6 +27,12 @@ def run_active_towers(args):
         dataset = TowerDataset(towers_dict,
                                augment=True,
                                K_skip=400) # From this dataset, this means we start with 400 towers/size (before augmentation).
+        with open('learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl', 'rb') as handle:
+            val_dict = pickle.load(handle)
+        val_dataset = TowerDataset(val_dict, 
+                                   augment=False,
+                                   K_skip=200)
+    
     else:
         # TODO: Generate random dataset.
         raise NotImplementedError()
@@ -37,6 +43,12 @@ def run_active_towers(args):
     dataloader = DataLoader(dataset,
                             batch_sampler=sampler)
     
+    val_sampler = TowerSampler(dataset=val_dataset,
+                               batch_size=args.batch_size,
+                               shuffle=False)
+    val_dataloader = DataLoader(val_dataset,
+                                batch_sampler=val_sampler)
+
     if len(args.pool_fname) > 0:
         print('HERE')
         pool_sampler = PoolSampler(args.pool_fname)
@@ -49,7 +61,9 @@ def run_active_towers(args):
     # TODO: All these callback functions need to be rewritten for the towers dataset.
     active_train(ensemble=ensemble, 
                  dataset=dataset, 
+                 val_dataset=val_dataset,
                  dataloader=dataloader, 
+                 val_dataloader=val_dataloader,
                  data_sampler_fn=data_sampler_fn, 
                  data_label_fn=get_labels, 
                  data_pred_fn=get_predictions,
