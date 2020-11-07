@@ -33,8 +33,8 @@ num_steps=2000
 
 
 #######CODE########
-#filename for cover, filename for upper inner block, mu, lambda, damping, friction, mass of second block
-filename1, filename2, m, l, d, f, mass = sys.argv[1:]
+#filename for where data is consolidated, filename for cover, filename for upper inner block, mu, lambda, damping, friction, mass of second block
+data_filename, filename1, filename2, m, l, d, f, mass = sys.argv[1:]
 #generate urdfs
 cover = Robot(Deformable(
             Inertial(
@@ -109,3 +109,5 @@ for loc in last_loc:
 if not unstable:
   print("SUCCESS")
   #SAVE SOMEHOW
+  with open(filename1, 'a+') as handle:
+        handle.write("{}".format((m,l,d,f,mass)))
