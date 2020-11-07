@@ -61,8 +61,8 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             best_loss = val_loss
             best_weights = copy.deepcopy(model.state_dict())
             print('Saved')    
-        model.load_state_dict(best_weights)
         print(np.mean(acc))
+    model.load_state_dict(best_weights)
     return model
 
 if __name__ == '__main__':
