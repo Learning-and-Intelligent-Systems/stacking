@@ -23,10 +23,26 @@ def train_ensemble(args):
 
     with open(args.data_fname, 'rb') as handle:
         dataset = pickle.load(handle)
+    with open(args.data_fname, 'rb') as handle:
+        val_dataset = pickle.load(handle)
 
     for k in dataset.tower_keys:
         shape = dataset.tower_tensors[k].shape
         dataset.tower_tensors[k][:, :, 7:9] += np.random.randn(shape[0]*shape[1]*2).reshape((shape[0], shape[1], 2))*0.0025*100
+        val_dataset.tower_tensors[k][:, :, 7:9] += np.random.randn(shape[0]*shape[1]*2).reshape((shape[0], shape[1], 2))*0.0025*100
+
+        train_mask = np.ones(dataset.tower_tensors[k].shape[0], dtype=bool)
+        train_mask[::5] = False
+        val_mask = ~train_mask
+
+        dataset.tower_tensors[k] = dataset.tower_tensors[k][train_mask, ...]
+        dataset.tower_labels[k] = dataset.tower_labels[k][train_mask, ...]
+
+        val_dataset.tower_tensors[k] = val_dataset.tower_tensors[k][val_mask, ...]
+        val_dataset.tower_labels[k] = val_dataset.tower_labels[k][val_mask, ...]
+
+    dataset.get_indices()
+    val_dataset.get_indices()
 
     sampler = TowerSampler(dataset=dataset,
                            batch_size=args.batch_size,
@@ -34,12 +50,18 @@ def train_ensemble(args):
     dataloader = DataLoader(dataset,
                             batch_sampler=sampler)
     
+    val_sampler = TowerSampler(dataset=val_dataset,
+                               batch_size=args.batch_size,
+                               shuffle=False)
+    val_dataloader = DataLoader(val_dataset,
+                                batch_sampler=val_sampler)
+    
     logger.save_dataset(dataset, 0)
 
     # Initialize and train models.
     ensemble.reset()
     for model in ensemble.models:
-        train(dataloader, dataloader, model, args.n_epochs)
+        train(dataloader, val_dataloader, model, args.n_epochs)
     
     logger.save_ensemble(ensemble, 0)
 

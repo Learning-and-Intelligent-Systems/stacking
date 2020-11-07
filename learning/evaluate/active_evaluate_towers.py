@@ -411,22 +411,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 224
+    logger.args.max_acquisitions = 104
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
     #get_acquisition_scores_over_time(logger)
     #plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
-    # get_dataset_statistics(logger)
-    # accs = get_validation_accuracy(logger,
-    #                               'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
-    # plot_val_accuracy(logger)
-    # analyze_collected_2block_towers(logger)
-    # print(accs)
+    get_dataset_statistics(logger)
+    accs = get_validation_accuracy(logger,
+                                  'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
+    plot_val_accuracy(logger)
+    analyze_collected_2block_towers(logger)
+    print(accs)
 
     #analyze_acquisition_value_with_sampling_size(logger)
     #plot_acquisition_value_with_sampling_size(logger)
 
-    single_2block_tower_analysis(logger)
+    #single_2block_tower_analysis(logger)
     #inspect_2block_towers(logger)

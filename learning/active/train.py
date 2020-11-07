@@ -1,4 +1,5 @@
 import argparse
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -14,18 +15,20 @@ from learning.active.utils import ExperimentLogger
 
 def evaluate(loader, model):
     acc = []
+    losses = []
     for x, y in loader:
         if torch.cuda.is_available():
             x = x.cuda()
             y = y.cuda()
-        # TODO: When doing validation on dropout, average models.
-        model.sample_dropout_masks()
+
         pred = model.forward(x).squeeze()
+        loss = F.binary_cross_entropy(pred, y)
 
         accuracy = ((pred>0.5) == y).float().mean()
         acc.append(accuracy.item())
+        losses.append(loss.item())
 
-    return np.mean(acc)
+    return np.mean(losses)
 
 
 def train(dataloader, val_dataloader, model, n_epochs=20):
@@ -33,6 +36,8 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     if torch.cuda.is_available():
         model.cuda()
 
+    best_loss = 1000
+    best_weights = None
     for ex in range(n_epochs):
         print('Epoch', ex)
         acc = []
@@ -42,7 +47,6 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
                 y = y.cuda()
             optimizer.zero_grad()
 
-            #model.sample_dropout_masks()
             pred = model.forward(x).squeeze()
             loss = F.binary_cross_entropy(pred, y)
             loss.backward()
@@ -52,6 +56,12 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             accuracy = ((pred>0.5) == y).float().mean()
             acc.append(accuracy.item())
 
+        val_loss = evaluate(val_dataloader, model)
+        if val_loss < best_loss:
+            best_loss = val_loss
+            best_weights = copy.deepcopy(model.state_dict())
+            print('Saved')    
+        model.load_state_dict(best_weights)
         print(np.mean(acc))
     return model
 
