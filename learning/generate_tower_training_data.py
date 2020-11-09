@@ -95,10 +95,10 @@ def get_filename(num_towers, use_block_set, block_set_size, suffix):
 
 def generate_training_images(world):
     # NOTE (caris): these images do not capture anything about the mass of the block
-    scale = .009                           # meters in a pixel
+    scale = .0035                           # meters in a pixel
     height, width = 150, 150              # dimensions of output images
     pixel_origin = (height/2, width/2)    # pixel corresponding to world frame origin
-    com_marker_width = 3                  # in pixels
+    com_marker_width = 5                  # in pixels
 
     def pixel_to_world(pixel):
         x = scale*(pixel[0]-pixel_origin[0])
