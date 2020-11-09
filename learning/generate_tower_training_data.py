@@ -3,7 +3,8 @@
 Izzy Brand, 2020
 """
 from agents.teleport_agent import TeleportAgent
-from block_utils import World, Environment, Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block
+from block_utils import World, Environment, Object, Quaternion, Pose, ZERO_POS, \
+    rotation_group, get_rotated_block, Position, Quaternion, Dimensions
 from tower_planner import TowerPlanner
 from pybullet_utils import transformation
 import argparse
@@ -141,9 +142,11 @@ def generate_training_images(world):
         min_y_pixel = int(min([y for (x,y) in pixel_endpoints]))
         max_y_pixel = int(max([y for (x,y) in pixel_endpoints]))
         if min_x_pixel < 0 or max_x_pixel > width or min_y_pixel < 0 or max_y_pixel > height:
-            raise Exception('Object is at the edge of the image! Increase scale and try again.')
+            return None, False
+            #raise Exception('Object is at the edge of the image! Increase scale and try again.')
         else:
             image[min_y_pixel:max_y_pixel, min_x_pixel:max_x_pixel] = 1.0
+            return image, True
 
     def add_object_rot(image):
         image_xs = np.linspace(0, width-1, width).astype(np.uint32)
@@ -162,9 +165,10 @@ def generate_training_images(world):
         # draw object (white)
         all_zero_rot = True # all block orn = (0,0,0,1)
         if all_zero_rot:
-            add_object(image)
+            image, success = add_object(image)
         else: # TODO: need way to detect if it's at the edge
             add_object_rot(image, width, height)
+            success = True
         
         # draw COM in object (gray)
         com_world = transformation(object.com, object.pose.pos, object.pose.orn)
@@ -175,13 +179,15 @@ def generate_training_images(world):
         com_ys = np.linspace(com_pixel[1]-(com_marker_width-1)/2,
                                 com_pixel[1]+(com_marker_width-1)/2,
                                 com_marker_width).astype(np.uint32)
-        for com_x in com_xs:
-            for com_y in com_ys:
-                try:
-                    image[com_y, com_x] = 0.5
-                except:
-                    raise Exception('Object is at the edge of the image! Increase scale and try again.')
-        return image
+        if success:
+            for com_x in com_xs:
+                for com_y in com_ys:
+                    try:
+                        image[com_y, com_x] = 0.5
+                    except:
+                        success = False
+                        #raise Exception('Object is at the edge of the image! Increase scale and try again.')
+        return image, success
 
     def plot_image(image):
         plt.imshow(image, cmap='gray')
@@ -193,11 +199,14 @@ def generate_training_images(world):
 
     images = []
     for object in world.objects:
-        image = get_object_training_image(object)
+        image, success = get_object_training_image(object)
         #plot_image(image)
-        images.append(image)
-
-    return images
+        if success:
+            images.append(image)
+        else:
+            print('failed')
+            return None, success
+    return images, success
 
 def main(args, vis_tower=False):
     # This is a dictionary from stable/unstable label to what subsets of [COG_Stable, PW_Stable] to include.
@@ -261,8 +270,11 @@ def main(args, vis_tower=False):
                     # the images will be of the object final positions
                     if args.save_images:
                         w = World(tower)
-                        training_images = generate_training_images(w)
-                        images.append(training_images)
+                        training_images, success = generate_training_images(w)
+                        if success:
+                            images.append(training_images)
+                        else:
+                            continue
 
                     if vis_tower:
                         w = World(tower)
@@ -299,6 +311,46 @@ def main(args, vis_tower=False):
     with open(filename, 'wb') as f:
         pickle.dump(dataset, f)
 
+def vector_to_block(vec):
+    block = Object('', Dimensions(*vec[4:7]), vec[0], vec[1:4], vec[14:17])
+    block.pose = Pose(Position(*vec[7:10]), Quaternion(*vec[10:14]))
+    return block
+
+def zoom_images():
+    filename = 'learning/data/random_blocks_(x10000)_2to5blocks_uniform_density.pkl'
+    with open(filename, 'rb') as handle:
+        old_dataset = pickle.load(handle)
+    dataset = {}
+    num_blocks = [2]
+    for num_blocks in num_blocks:
+        all_vec_blocks = old_dataset[f'{num_blocks}block']['towers']
+        labels = old_dataset[f'{num_blocks}block']['labels']
+        old_images = old_dataset[f'{num_blocks}block']['images']
+        images = []
+        
+        for i, vec_blocks in enumerate(all_vec_blocks):
+            print(str(i)+'/5000')
+            
+            tower = [vector_to_block(vec_block) for vec_block in vec_blocks]
+            w = World(tower)
+            training_images, _ = generate_training_images(w)
+            images.append(training_images)
+        
+
+        data = {
+            'towers': all_vec_blocks,
+            'labels': labels,
+            'images': images
+        }
+
+        dataset[f'{num_blocks}block'] = data
+        
+    # save the generate data
+    filename = 'new_2.plk'
+    print('Saving to', filename)
+    with open(filename, 'wb') as f:
+        pickle.dump(dataset, f)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -307,6 +359,11 @@ if __name__ == '__main__':
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--save-images', action='store_true')
     parser.add_argument('--towers-per-cat', default=5000, type=int)
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
+    
+    if args.debug:
+        import pdb; pdb.set_trace()
 
     main(args, vis_tower=False)
+    #zoom_images()
