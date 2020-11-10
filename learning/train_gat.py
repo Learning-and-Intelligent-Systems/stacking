@@ -249,11 +249,11 @@ def main(args):
     #model = FCGAT(14+M, M)
     #model = MLP(5, 256)
     #model = FCGN(14, 64, visual=args.visual, image_dim=150)
-    #model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
+    model = TowerLSTM(14, args.n_hidden, visual=args.visual, image_dim=150)
     #model = TowerCNN(150)
     #model = TowerConvRNN(150)
     #model = TowerConvRNNSmall(150)
-    model = TowerConvRNNOrig(150)
+    #model = TowerConvRNNOrig(150)
     #model = GatedGN(14, 32, visual=args.visual, image_dim=150)
     if torch.cuda.is_available():
         model = model.cuda()
@@ -326,7 +326,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--batch-size', default=32, type=int)
     parser.add_argument('--epochs', default=100, type=int)
-    parser.add_argument('--n-hidden', default=32, type=int)
+    parser.add_argument('--n-hidden', default=16, type=int)
     args = parser.parse_args()
     
     if args.debug:

@@ -18,14 +18,12 @@ class TowerLSTM(nn.Module):
         self.visual = visual
         if self.visual:
             self.image_dim = image_dim
-            kernel_size = 9
+            kernel_size = 6
             stride = 3
             def calc_fc_size():
                 W = (self.image_dim-kernel_size)+1
                 W = ((W-kernel_size)/stride)+1
                 W = (W-kernel_size)+1
-                W = (W-kernel_size)+1
-                W = ((W-kernel_size)/stride)+1
                 return int(W)
             fc_layer_size = calc_fc_size()
             self.encoder = nn.Sequential(
@@ -36,20 +34,12 @@ class TowerLSTM(nn.Module):
                             nn.MaxPool2d(kernel_size=kernel_size, 
                                             stride=stride),
                             nn.Conv2d(in_channels=n_hidden,
-                                            out_channels=n_hidden,
+                                            out_channels=1,
                                             kernel_size=kernel_size),
                             nn.ReLU(),
-                            nn.Conv2d(in_channels=n_hidden,
-                                            out_channels=n_hidden,
-                                            kernel_size=kernel_size),
-                            nn.ReLU(),
-                            nn.MaxPool2d(kernel_size=kernel_size, 
-                                            stride=stride),
-                            View((-1, n_hidden*fc_layer_size**2)),
-                            nn.Linear(n_hidden*fc_layer_size**2, 
-                                            n_hidden),
-                            nn.Linear(n_hidden, 
-                                            n_hidden))
+                            View((-1, fc_layer_size**2)),
+                            nn.Linear(fc_layer_size**2, 
+                                            n_hidden))                
             gru_input_size = n_hidden
         else:
             gru_input_size = n_in
@@ -59,11 +49,7 @@ class TowerLSTM(nn.Module):
                             num_layers=2,
                             batch_first=True)
 
-
-
         self.O = nn.Sequential(nn.Linear(n_hidden, n_hidden),
-                               nn.ReLU(),
-                               nn.Linear(n_hidden, n_hidden),
                                nn.ReLU(),
                                nn.Linear(n_hidden, 1))
         
