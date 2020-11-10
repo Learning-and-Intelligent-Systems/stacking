@@ -51,8 +51,7 @@ def load_dataset(name, args):
     """
     with open(f'learning/data/{name}', 'rb') as f:
         all_data = pickle.load(f)
-    #all_num_blocks = [int(num_blocks[0]) for num_blocks in all_data.keys()]
-    all_num_blocks = [2,]
+    all_num_blocks = [int(num_blocks[0]) for num_blocks in all_data.keys()]
     datasets = []
     for num_blocks in all_num_blocks:
         data = all_data[f'{num_blocks}block']
@@ -129,17 +128,22 @@ def print_split_accuracies(dataset, model):
 def train(model, datasets, test_datasets, args):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     train_losses = []
-    num_data_points = max([len(dataset) for dataset in datasets])
     epoch_ids, test_accuracies = [], []
-
+    # number of datapoints in 2 tower
+    num_data_points = len(datasets[0])
+    num_batches = num_data_points // args.batch_size
+    
     for epoch_idx in range(args.epochs):
         print('epoch', epoch_idx)
         #print_memory()
         # create a dataloader for each tower size
-        iterable_dataloaders = [
-            iter(DataLoader(d, batch_size=args.batch_size, shuffle=True))
-            for d in datasets]
-        for batch_idx in range(num_data_points // args.batch_size):
+        # HACK: this assumes that the first dataset is always half the size of
+        # the rest
+        iterable_dataloaders = []
+        for tower_size, d in enumerate(datasets):
+            batch_size = args.batch_size if tower_size == 0 else 2*args.batch_size
+            iterable_dataloaders += [iter(DataLoader(d, batch_size, shuffle=True))]
+        for batch_idx in range(num_batches):
             #print('batch', batch_idx)
             #print_memory()
             # shuffle(iterable_dataloaders)
@@ -254,12 +258,13 @@ def main(args):
     if torch.cuda.is_available():
         model = model.cuda()
 
-    train_dataset = 'random_blocks_(x20000)_2blocks_uniform_density.pkl'
-    test_dataset = 'random_blocks_(x800)_2blocks_uniform_density.pkl'
+    train_dataset = 'random_blocks_(x20000)_2to3blocks_uniform_density.pkl'
+    test_dataset = 'random_blocks_(x800)_2to3blocks_uniform_density.pkl'
     train_datasets, _ = load_dataset(train_dataset, args)
     test_datasets, num_test_blocks = load_dataset(test_dataset, args)
     
     train_losses, epoch_ids, test_accuracies = train(model, train_datasets, test_datasets, args)
+
     '''
     fig, ax = plt.subplots()
     ax.plot(train_losses)
@@ -269,7 +274,8 @@ def main(args):
     plt.close()
     
     fig, ax = plt.subplots()
-    ax.plot(epoch_ids, test_accuracies, label=num_test_blocks)
+    for num_blocks, block_accs in zip(num_test_blocks, np.array(test_accuracies).T):
+        ax.plot(epoch_ids, block_accs, label=num_blocks)
     ax.legend(title='number of blocks')
     ax.set_title('Test Accuracy')
     ax.set_xlabel('Epoch ID')
@@ -311,7 +317,7 @@ def main(args):
     file.write("batch size: " + str(args.batch_size) + " \n") 
     file.close()
     
-    return train_losses, epoch_ids, test_accuracies
+    return train_losses, epoch_ids, test_accuracies, num_test_blocks
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

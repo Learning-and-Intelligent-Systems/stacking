@@ -6,14 +6,14 @@ import torchvision
 from learning.utils import View
 
 class TowerConvRNNOrig(nn.Module):
-    def __init__(self, image_dim, n_hidden=32):
+    def __init__(self, image_dim, n_hidden=16):
         """ This network is given input of size (N, K, n_in) where N is the batch size, 
         and K is the number of blocks in the tower. K can vary per batch.
         :param image_dim: width/height (square images) number of pixels
         """
         super(TowerConvRNNOrig, self).__init__()
         # make 
-        kernel_size = 9
+        kernel_size = 6
         stride = 3
         def calc_fc_size():
             W = (image_dim-kernel_size)+1
