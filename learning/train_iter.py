@@ -6,7 +6,7 @@ import numpy as np
 from learning.train_gat import main
 
 num_exps = 3
-args = Namespace(visual=True, batch_size=64, epochs=50)
+args = Namespace(visual=True, batch_size=64, epochs=50, n_hidden=16)
 all_train_losses = []
 all_test_accs = []
 
