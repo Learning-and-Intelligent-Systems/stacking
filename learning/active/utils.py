@@ -24,6 +24,8 @@ class ExperimentLogger:
         and parameters relating to an experiment.
         """
         root = 'learning/active/experiments'
+        if not os.path.exists(root): os.makedirs(root)
+
         exp_name = args.exp_name if len(args.exp_name) > 0 else 'exp'
         ts = time.strftime('%Y%m%d-%H%M%S')
         exp_dir = '%s-%s' % (exp_name, ts)
@@ -80,6 +82,8 @@ class ActiveExperimentLogger:
         and parameters relating to an experiment.
         """
         root = 'learning/experiments/logs'
+        if not os.path.exists(root): os.makedirs(root)
+
         exp_name = args.exp_name if len(args.exp_name) > 0 else 'exp'
         ts = time.strftime('%Y%m%d-%H%M%S')
         exp_dir = '%s-%s' % (exp_name, ts)
