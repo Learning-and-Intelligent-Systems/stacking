@@ -54,6 +54,10 @@ def run_active_towers(args):
         pool_sampler = PoolSampler(args.pool_fname)
         data_subset_fn = pool_sampler.get_subset
         data_sampler_fn = pool_sampler.sample_unlabeled_data
+    elif args.block_set_fname is not '':
+        data_subset_fn = get_subset
+        with open(args.block_set_fname) as f: block_set = pickle.load(f)
+        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
     else:
         data_subset_fn = get_subset
         data_sampler_fn = sample_unlabeled_data
@@ -83,6 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-hidden', type=int, default=64)
     parser.add_argument('--n-epochs', type=int, default=50)
     parser.add_argument('--init-data-fname', type=str, default='')
+    parser.add_argument('--block-set-fname', type=str, default='')
     parser.add_argument('--n-train-init', type=int, default=100)
     parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
