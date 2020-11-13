@@ -109,5 +109,5 @@ for loc in last_loc:
 if not unstable:
   print("SUCCESS")
   #SAVE SOMEHOW
-  with open(filename1, 'a+') as handle:
+  with open(data_filename, 'a+') as handle:
         handle.write("{}".format((m,l,d,f,mass)))
