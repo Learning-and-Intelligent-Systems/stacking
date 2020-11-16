@@ -26,7 +26,7 @@ def run_active_towers(args):
             towers_dict = pickle.load(handle)
         dataset = TowerDataset(towers_dict,
                                augment=True,
-                               K_skip=400) # From this dataset, this means we start with 400 towers/size (before augmentation).
+                               K_skip=4000) # From this dataset, this means we start with 10 towers/size (before augmentation).
         with open('learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl', 'rb') as handle:
             val_dict = pickle.load(handle)
         val_dataset = TowerDataset(val_dict, 
