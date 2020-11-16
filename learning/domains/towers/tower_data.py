@@ -27,7 +27,7 @@ def preprocess(towers):
 def add_placement_noise(towers):
     for ix in range(towers.shape[0]):
         for bx in range(towers.shape[1]):
-            towers[ix, bx, 7:9] += np.random.randn(2)*0.0025
+            towers[ix, bx, 7:9] += np.random.randn(2)*0.001
     return towers
 
 class TowerDataset(Dataset):
@@ -104,7 +104,7 @@ class TowerDataset(Dataset):
         :param tower_dict: A dictionary of the same format as was passed in initially with
         the towers to add to the dataset.
         """
-        augmented_towers = augment_towers(tower_dict, 1, mirror=True)
+        augmented_towers = augment_towers(tower_dict, 1, mirror=False)
         for k in self.tower_keys:
             if augmented_towers[k]['towers'].shape[0] > 0:
                 new_towers = torch.Tensor(augmented_towers[k]['towers'])
