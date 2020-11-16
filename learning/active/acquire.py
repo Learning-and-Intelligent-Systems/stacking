@@ -38,7 +38,7 @@ def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn
     if strategy == 'bald':
         scores = bald(preds).cpu().numpy()
     elif strategy == 'random':
-        scores = np.ones((preds.shape[0],), dtype='float32')
+        scores = np.random.uniform(size=preds.shape[0]).astype('float32')
         
     # Return the n_acquire points with the highest score.
     acquire_indices = np.argsort(scores)[::-1][:n_acquire]

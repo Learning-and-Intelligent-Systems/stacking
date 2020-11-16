@@ -11,27 +11,45 @@ from tower_planner import TowerPlanner
 
 
 # TODO: Write a version of this function that does pool based active learning from a given file.
-def sample_unlabeled_data(n_samples):
+def sample_unlabeled_data(n_samples, block_set=None):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
     :param n_samples: Number of random towers to consider.
+    :param block_set (optional): blocks to use in towers. generate new blocks if None
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
     keys = ['2block', '3block', '4block', '5block']
-    sampled_towers = {k: {'towers': []} for k in keys}
 
+    # initialize a dictionary of lists to store the generated data
+    sampled_towers = {k: {} for k in keys}
+    for k in keys:
+        sampled_towers[k]['towers'] = []
+        sampled_towers[k]['labels'] = []
+        if block_set is not None:
+            sampled_towers[k]['block_ids'] = []
+
+    # sample random towers and add them to the lists in the dictionary
     for ix in range(n_samples):
         n_blocks = np.random.randint(2, 6)
-        blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
+        # get n_blocks, either from scratch or from the block set
+        if block_set is not None: blocks = np.random.choice(block_set, n_blocks)
+        else: blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
+        # sample a new tower
         tower = sample_random_tower(blocks)
         rotated_tower = [get_rotated_block(b) for b in tower]
-
+        # and save that tower in the sampled_towers dict
         sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(rotated_tower))
+        if block_set is not None:
+            block_ids = [int(block.name.strip('obj_')) for block in rotated_tower]
+            sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
     
+    # convert all the sampled towers to numpy arrays
     for k in keys:
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
         sampled_towers[k]['labels'] = np.zeros((sampled_towers[k]['towers'].shape[0],))
+        if block_set is not None:
+            sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
 
     return sampled_towers
 
