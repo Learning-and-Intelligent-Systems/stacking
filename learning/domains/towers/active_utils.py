@@ -95,7 +95,7 @@ def get_labels(samples):
             # Convert tower to Block representation.
             block_tower = [Object.from_vector(samples[k]['towers'][ix, jx, :]) for jx in range(n_blocks)]
             #  Use tp to check for stability.
-            if not tp.tower_is_stable(block_tower):
+            if not tp.tower_is_constructable(block_tower):
                 labels[ix] = 0.
 
         samples[k]['labels'] = labels
