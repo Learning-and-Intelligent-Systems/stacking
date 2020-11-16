@@ -18,16 +18,22 @@ def vectorize(tower):
     return [b.vectorize() for b in tower]
 
 ROTATIONS = list(rotation_group())
-def sample_random_tower(blocks):
+QUATERNIONS = [Quaternion(*o.as_quat()) for o in ROTATIONS]
+ROTATED_BLOCKS = {}
+def sample_random_tower(blocks, ret_rotated=False):
     num_blocks = len(blocks)
     # pick random orientations for the blocks
-    orns = sample_with_replacement(ROTATIONS, k=num_blocks)
-    orns = [Quaternion(*orn.as_quat()) for orn in orns]
+    orns = sample_with_replacement(QUATERNIONS, k=num_blocks)
+    #orns = [Quaternion(*orn.as_quat()) for orn in orns]
     # apply the rotations to each block
     rotated_blocks = []
     for orn, block in zip(orns, blocks):
         block.pose = Pose(ZERO_POS, orn)
-        rotated_blocks.append(get_rotated_block(block))
+        if block not in ROTATED_BLOCKS:
+            ROTATED_BLOCKS[block] = {}
+        if orn not in ROTATED_BLOCKS[block]:
+            ROTATED_BLOCKS[block][orn] = get_rotated_block(block)
+        rotated_blocks.append(ROTATED_BLOCKS[block][orn])
 
     # pick random positions for each block
     # get the x and y dimensions of each block (after the rotation)
@@ -51,9 +57,12 @@ def sample_random_tower(blocks):
 
     # apply the positions to each block
     pos_xyz = np.hstack([pos_xy, pos_z[:,None]])
-    for pos, orn, block in zip(pos_xyz, orns, blocks):
+    for pos, orn, block, rblock in zip(pos_xyz, orns, blocks, rotated_blocks):
         block.pose = Pose(pos, orn)
+        rblock.pose = Pose(pos, (0,0,0,1))
 
+    if ret_rotated:
+        return blocks, rotated_blocks
     return blocks
 
 def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
