@@ -65,7 +65,7 @@ def sample_random_tower(blocks, ret_rotated=False):
         return blocks, rotated_blocks
     return blocks
 
-def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
+def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
     """ Build a tower with the specified stability properties.
     :param blocks: if this is a list of blocks, use those blocks. if int, generate that many new blocks
     :param stable: Overall tower stability.
@@ -92,10 +92,16 @@ def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=
         # if the tower is stable, visualize it for debugging
         rotated_tower = [get_rotated_block(b) for b in tower]
         # save the tower if it's stable
-        if tp.tower_is_stable(rotated_tower) == stable and \
-           tp.tower_is_constructible(rotated_tower) == pairwise_stable: #and \
-           #tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
-            return rotated_tower
+        if not stable is None:
+            if tp.tower_is_stable(rotated_tower) == stable and \
+            tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
+            tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
+                return rotated_tower
+        elif not constructable is None:
+            if tp.tower_is_constructable(rotated_tower) == constructable and \
+            tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
+            tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
+                return rotated_tower
 
     return None
 
@@ -195,7 +201,7 @@ def main(args, vis_tower=False):
     }
 
     # specify the number of towers to generate
-    num_towers_per_cat = 5000
+    num_towers_per_cat = 250
     num_towers = num_towers_per_cat * 4 * 2
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
@@ -220,6 +226,8 @@ def main(args, vis_tower=False):
                 # PW Stability is the same as global stability for two blocks.
                 if num_blocks == 2 and pw_stable != stable:
                     continue
+                elif (args.criteria == 'constructable') and pw_stable != stable:
+                    continue
 
                 count = 0
                 while count < num_towers_per_cat:
@@ -238,10 +246,18 @@ def main(args, vis_tower=False):
                         blocks = [Object.random(f'obj_{ix}') for ix in range(num_blocks)]
 
                     # generate a random tower
-                    tower = build_tower(blocks, 
-                                        stable=stable, 
-                                        pairwise_stable=pw_stable, 
-                                        cog_stable=cog_stable)
+                    if args.criteria == 'stable':
+                        tower = build_tower(blocks, 
+                                            stable=stable, 
+                                            pairwise_stable=pw_stable, 
+                                            cog_stable=cog_stable)
+                    elif args.criteria == 'constructable':
+                        tower = build_tower(blocks, 
+                                            constructable=stable, 
+                                            pairwise_stable=pw_stable, 
+                                            cog_stable=cog_stable)
+                    else:
+                        raise NotImplementedError()
                     
                     if tower is None:
                         continue
@@ -266,7 +282,7 @@ def main(args, vis_tower=False):
                     # append the tower to the list
                     vectorized_towers.append(vectorize(tower))
                     block_names.append([b.name for b in blocks])
-        if num_blocks == 2:
+        if num_blocks == 2 or args.criteria == 'constructable':
             stability_labels = np.zeros(num_towers//2, dtype=int)
             stability_labels[num_towers // 4:] = 1
         else:
@@ -283,6 +299,8 @@ def main(args, vis_tower=False):
         dataset[f'{num_blocks}block'] = data
 
     # save the generate data
+    if args.criteria == 'constructable':
+        num_towers /= 2
     filename = get_filename(num_towers, use_block_set, block_set_size, args.suffix)
     print('Saving to', filename)
     with open(filename, 'wb') as f:
@@ -295,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-blocks', type=int, required=True)
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--save-images', action='store_true')
+    parser.add_argument('--criteria', default='constructable', choices=['stable', 'constructible'])
     args = parser.parse_args()
 
     main(args, vis_tower=False)
