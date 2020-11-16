@@ -1,12 +1,19 @@
 import argparse
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import torch
 
+from block_utils import Object, get_rotated_block
 from learning.active.acquire import bald
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.towers.active_utils import get_predictions, sample_unlabeled_data
+from learning.domains.towers.generate_tower_training_data import sample_random_tower
+from learning.domains.towers.tower_data import TowerDataset, TowerSampler, add_placement_noise
+from tower_planner import TowerPlanner
+
+from torch.utils.data import DataLoader
 
 
 def get_validation_accuracy(logger, fname):
@@ -16,7 +23,7 @@ def get_validation_accuracy(logger, fname):
     with open(fname, 'rb') as handle:
         val_towers = pickle.load(handle)
 
-    for tx in range(logger.args.max_acquisitions):
+    for tx in range(0, logger.args.max_acquisitions):
         if tx % 10 == 0:
             print('Eval timestep, ', tx)
         ensemble = logger.get_ensemble(tx)
@@ -27,7 +34,15 @@ def get_validation_accuracy(logger, fname):
             end = start + val_towers[k]['towers'].shape[0]
             acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
             accs[k].append(acc)
+            mask = (preds[start:end] > 0.9) | (preds[start:end] < 0.1)
+            #print(mask)
+            conf_preds = preds[start:end][mask]
+            #print(conf_preds)
+            conf_labels = val_towers[k]['labels'][mask]
+            conf = ((conf_preds>0.5) == conf_labels)
+            #print(k, conf.mean())
             start = end
+        
     
     with open(logger.get_figure_path('val_accuracies.pkl'), 'wb') as handle:
         pickle.dump(accs, handle)
@@ -160,6 +175,63 @@ def plot_acquisition_scores_over_time(logger):
     plt.xlabel('Acquisition Step')
     plt.savefig(logger.get_figure_path('acquisition_over_time.png'))
 
+
+def analyze_acquisition_histogram(logger):
+    """ When we generate unlabeled samples, we do so hoping to find informative
+    towers (based on the BALD acquisition function). However, it is unclear how 
+    many samples are needed.
+
+    This function will plot the acquisition function for the most informative 
+    sample found vs. number of samples.
+    """
+    n_repeats = 1
+    tower_keys = ['2block', '3block', '4block', '5block']
+
+
+    overall_data = {}
+    
+    for n_samples in [10000]:
+        
+        unlabeled_data = [sample_unlabeled_data(n_samples) for _ in range(n_repeats)]
+        # noisy_data = copy.deepcopy(unlabeled_data)
+        # for unlabeled in noisy_data:
+        #     for k in tower_keys:
+        #         unlabeled[k]['towers'] = add_placement_noise(unlabeled[k]['towers'])
+        
+        for tx in range(0, logger.args.max_acquisitions, 20):
+            print(tx)
+            ensemble = logger.get_ensemble(tx)
+            it_scores = {k: [] for k in tower_keys}
+            for ux in range(n_repeats):
+                unlabeled = unlabeled_data[ux]
+                #noisy = noisy_data[ux]
+                with open('learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl', 'rb') as handle:
+                    unlabeled = pickle.load(handle)
+                preds = get_predictions(unlabeled, ensemble)[:,:]
+                #noisy_preds = get_predictions(noisy, ensemble)
+                
+                bald_scores = bald(preds).numpy()
+                #noisy_bald_scores = bald(noisy_preds).numpy()
+
+                # Get the max score per tower_height.
+                start = 0
+                fig, axes = plt.subplots(4, figsize=(10, 20), sharex=True)
+                for kx, k in enumerate(tower_keys):
+                    end = start + unlabeled[k]['towers'].shape[0]
+                    acquire_indices = np.argsort(bald_scores[start:end])[::-1][:100]
+                    
+                    print(k)
+                    print(preds.numpy()[start:end][acquire_indices[0:10],:])
+                    print(bald_scores[start:end][acquire_indices[0:10]])
+                    it_scores[k].append(bald_scores[start:end][acquire_indices[0]])
+                    #it_scores[k].append(np.mean(bald_scores[start:end][acquire_indices]))
+                    axes[kx].hist(bald_scores[start:end][acquire_indices], bins=50)
+                    #axes[kx].hist(preds.mean(1)[start:end], bins=50)
+                    start = end
+       
+                plt.show()
+
+
 def analyze_acquisition_value_with_sampling_size(logger):
     """ When we generate unlabeled samples, we do so hoping to find informative
     towers (based on the BALD acquisition function). However, it is unclear how 
@@ -180,21 +252,24 @@ def analyze_acquisition_value_with_sampling_size(logger):
         overall_data[n_samples]['lower'] = {k: [] for k in tower_keys}
         overall_data[n_samples]['upper'] = {k: [] for k in tower_keys}
         
-        for tx in range(200, logger.args.max_acquisitions):
+        unlabeled_data = [sample_unlabeled_data(n_samples) for _ in range(n_repeats)]
+
+        for tx in range(0, logger.args.max_acquisitions):
             print(tx)
             ensemble = logger.get_ensemble(tx)
             it_scores = {k: [] for k in tower_keys}
-            for _ in range(n_repeats):
-                unlabeled = sample_unlabeled_data(n_samples)
+            for ux in range(n_repeats):
+                unlabeled = unlabeled_data[ux]
 
-                preds = get_predictions(unlabeled, ensemble)
+                preds = get_predictions(unlabeled, ensemble)[:,:]
                 bald_scores = bald(preds).numpy()
                 # Get the max score per tower_height.
                 start = 0
                 for k in tower_keys:
                     end = start + unlabeled[k]['towers'].shape[0]
                     acquire_indices = np.argsort(bald_scores[start:end])[::-1][:10]
-                    it_scores[k].append(bald_scores[start:end][acquire_indices[0]])
+                    #it_scores[k].append(bald_scores[start:end][acquire_indices[0]])
+                    it_scores[k].append(np.mean(bald_scores[start:end][acquire_indices]))
                     start = end
             for k in tower_keys:
                 overall_data[n_samples]['median'][k].append(np.median(it_scores[k]))
@@ -202,12 +277,12 @@ def analyze_acquisition_value_with_sampling_size(logger):
                 overall_data[n_samples]['upper'][k].append(np.quantile(it_scores[k], 0.95))
 
     
-            with open(logger.get_figure_path('time_acquisitions.pkl'), 'wb') as handle:
+            with open(logger.get_figure_path('time_acquisitions_mean.pkl'), 'wb') as handle:
                 pickle.dump(overall_data, handle)
 
 def plot_acquisition_value_with_sampling_size(logger):
     tower_keys = ['2block', '3block', '4block', '5block']
-    with open(logger.get_figure_path('time_acquisitions.pkl'), 'rb') as handle:
+    with open(logger.get_figure_path('time_acquisitions_mean.pkl'), 'rb') as handle:
         overall_data = pickle.load(handle)
     
     fig, axes = plt.subplots(4, figsize=(10, 16))
@@ -221,8 +296,9 @@ def plot_acquisition_value_with_sampling_size(logger):
             axes[kx].set_xlabel('Acquisition Step')
             axes[kx].plot(np.arange(0, len(med)), med, label=n_samples)
             axes[kx].fill_between(np.arange(0, len(med)), low, high, alpha=0.2)
+            axes[kx].set_ylim(0, 0.5)
             axes[kx].legend()
-    plt.savefig(logger.get_figure_path('bald_vs_sample_size.png'))
+    plt.savefig(logger.get_figure_path('mean_bald_vs_sample_size.png'))
 
     
 def analyze_sample_efficiency(logger, tx):
@@ -352,7 +428,7 @@ def inspect_2block_towers(logger):
     
     preds2 = preds[:unlabeled['2block']['towers'].shape[0], :]
     bald_scores2 = bald_scores[:unlabeled['2block']['towers'].shape[0]]
-    acquire_indices = np.argsort(bald_scores2)[::-1][:10]
+    acquire_indices = np.argsort(bald_scores2)[::-1][:50]
     # for ix in range(preds2.shape[0]):
     #     print(np.around(preds2[ix,:].numpy(), 2), np.around(bald_scores2[ix], 3))
     print('-----')
@@ -380,6 +456,13 @@ def inspect_2block_towers(logger):
         val_towers = pickle.load(handle)
 
     preds = get_predictions(val_towers, ensemble).mean(1).numpy()
+    dists = []
+    for ix in range(0, val_towers['2block']['towers'].shape[0]):
+        d = decision_distance(val_towers['2block']['towers'][ix,:,:])
+        dists.append(d)
+    print(len(dists))
+    plt.hist(dists, bins=100)
+    plt.show()
 
     start = 0
     for k in tower_keys:
@@ -398,7 +481,8 @@ def single_2block_tower_analysis(logger):
     displacements = np.linspace(-0.1, 0.1, 1000).reshape(1000,1,1)
     unlabeled['2block']['towers'] = np.resize(tower, (1000, 2, 17))
     unlabeled['2block']['labels'] = np.zeros((1000,))
-    unlabeled['2block']['towers'][:,:,7:8] += displacements
+    print(displacements.shape, unlabeled['2block']['towers'][:,1,7:8].shape)
+    unlabeled['2block']['towers'][:,1:2,7:8] += displacements
 
     preds = get_predictions(unlabeled, ensemble)[:1000,...]
 
@@ -406,30 +490,244 @@ def single_2block_tower_analysis(logger):
         dim_x = unlabeled['2block']['towers'][ix, 0, 4]/2.
         com_x = unlabeled['2block']['towers'][ix, 1, 1] + unlabeled['2block']['towers'][ix, 1, 7]
         print(np.around(preds[ix,:], 3), dim_x, com_x)
+    dim_y = unlabeled['2block']['towers'][ix, 0, 5]/2.
+    com_y = unlabeled['2block']['towers'][ix, 1, 2] + unlabeled['2block']['towers'][ix, 1, 8]
+    print(dim_y, com_y)
     bald_scores = bald(preds).numpy()
+
+
+def check_validation_robustness(noise=0.001, n_attempts=10):
+    """
+    Try adding noise to the placement of each block in the validation set
+    to see how many of the towers are robust to placement noise.
+    """
+    with open('learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl', 'rb') as handle:
+        val_towers = pickle.load(handle)
+    robust = {k: 0 for k in val_towers.keys()}
+    tp = TowerPlanner(stability_mode='contains')
+    stable_towers = copy.deepcopy(val_towers)
+    unstable_towers = copy.deepcopy(val_towers)
+    for k in robust.keys():
+        stable_indices = []
+        unstable_indices = []
+        for ix in range(0, val_towers[k]['towers'].shape[0]):
+            stable = True
+
+            for _ in range(n_attempts):
+                tower = val_towers[k]['towers'][ix, :, :].copy()
+                label = val_towers[k]['labels'][ix]
+                tower[:, 7:9] += np.random.randn(2*tower.shape[0]).reshape(tower.shape[0], 2)*noise
+
+                block_tower = [Object.from_vector(tower[kx, :]) for kx in range(tower.shape[0])]
+
+                if tp.tower_is_stable(block_tower) != label:
+                    stable = False
+
+            if stable:
+                robust[k] += 1
+                stable_indices.append(ix)
+            else:
+                unstable_indices.append(ix)
+        
+        stable_towers[k]['towers'] = stable_towers[k]['towers'][stable_indices,...]
+        stable_towers[k]['labels'] = stable_towers[k]['labels'][stable_indices]
+        
+        unstable_towers[k]['towers'] = unstable_towers[k]['towers'][unstable_indices,...]
+        unstable_towers[k]['labels'] = unstable_towers[k]['labels'][unstable_indices]
+        
+        with open('learning/data/stable_val.pkl', 'wb') as handle:
+            pickle.dump(stable_towers, handle)
+
+        with open('learning/data/unstable_val.pkl', 'wb') as handle:
+            pickle.dump(unstable_towers, handle)
+        
+        print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
+
+
+def plan_with_ensemble_random(blocks, ensemble):
+    n = len(blocks)
+    max_height = 0
+    max_tower = []
+    # Speedup: order towers from tallest to lowest and stop once 
+    # we've found the tallest stable tower.
+    # Step (1): Build dataset of potential towers. 
+    tower_keys = ['2block', '3block', '4block', '5block']
+    tower_vectors = []
+    heights = []
+    max_towers = 10000
+    n_towers = 0
     
+    for _ in range(0, max_towers):
+        tower, rotated_tower = sample_random_tower(blocks, ret_rotated=True)
+        #rotated_tower = [get_rotated_block(b) for b in tower]
+        # print('-----')
+        # print([b.vectorize() for b in tower])
+        # print([b.vectorize() for b in rot])
+        # print([b.vectorize() for b in  rotated_tower])
+        tower_vectors.append([b.vectorize() for b in rotated_tower])
+        heights.append(np.sum([b.dimensions.z for b in rotated_tower]))
+    
+    towers = np.array(tower_vectors)
+    labels = np.zeros((towers.shape[0],))
+    tower_dict = {}
+    for k in tower_keys:
+        tower_dict[k] = {}
+        if k == '2block':
+            tower_dict[k]['towers'] = towers
+            tower_dict[k]['labels'] = labels
+        else:
+            tower_dict[k]['towers'] = towers[:5,...]
+            tower_dict[k]['labels'] = labels[:5]
+
+
+    # Step (2): Get predictions for each tower.
+    preds = []
+    tower_dataset = TowerDataset(tower_dict, augment=False)
+    tower_sampler = TowerSampler(dataset=tower_dataset,
+                                batch_size=64,
+                                shuffle=False)
+    tower_loader = DataLoader(dataset=tower_dataset,
+                            batch_sampler=tower_sampler)
+
+    for tensor, _ in tower_loader:
+        if torch.cuda.is_available():
+            tensor = tensor.cuda()
+        with torch.no_grad():
+            preds.append(ensemble.forward(tensor))
+
+    p_stables = torch.cat(preds, dim=0)[:,:5].mean(dim=1)
+    # Step (3): Find the tallest tower of a given height.
+    max_height = -1
+    max_exp_height = -1
+    max_tower = None
+    max_stable = 0
+    for ix, (p, h) in enumerate(zip(p_stables, heights)):
+        # save the tallest tower
+        # if p > max_stable and max_stable < 0.9:
+        #     max_tower = tower_vectors[ix]
+        #     max_height = h
+        #     max_stable = p
+        exp_h = p*h
+        if exp_h >= max_exp_height and p > 0.5:
+            if exp_h > max_height or (exp_h == max_height and p > max_stable):
+                max_tower = tower_vectors[ix]
+                max_height = h
+                max_exp_height = exp_h
+                max_stable = p
+        # exp_height = p*h
+        # if exp_height > max_height:
+        #     max_tower = tower_vectors[ix]
+        #     max_height = h
+
+
+    if max_tower is None:
+        print('None Found')
+        max_tower = tower_vectors[0]
+        max_height = heights[0]
+
+    return max_tower, max_height
+
+
+
+def tallest_tower_regret_evaluation(logger, n_towers=50):
+    tower_keys = ['2block', '3block', '4block', '5block']
+    tower_sizes = [2, 3, 4, 5]
+    tp = TowerPlanner(stability_mode='contains')
+
+    # Store regret for towers of each size.
+    regrets = {k: [] for k in tower_keys}
+
+    for tx in range(0, 101, 10):#logger.args.max_acquisitions):
+        print(tx)
+        ensemble = logger.get_ensemble(tx)
+
+        for k, size in zip(tower_keys, tower_sizes):
+            print(k)
+            curr_regrets = []
+            for _ in range(0, n_towers):
+                blocks = [Object.random() for _ in range(size)]
+                tower, height = plan_with_ensemble_random(blocks, ensemble)
+                block_tower = [Object.from_vector(tower[bx]) for bx in range(len(tower))]
+                if not tp.tower_is_stable(block_tower):
+                    height = 0
+                
+                max_height = np.sum([np.max(b.dimensions) for b in blocks])
+                
+                # TODO: Compare heights and calculate regret.
+                regret = (max_height - height)/max_height
+                print(regret)
+                curr_regrets.append(regret)
+            regrets[k].append(curr_regrets)
+
+        with open(logger.get_figure_path('regrets.pkl'), 'wb') as handle:
+            pickle.dump(regrets, handle)
+
+def plot_tallest_tower_regret(logger):
+    with open(logger.get_figure_path('regrets.pkl'), 'rb') as handle:
+        regrets = pickle.load(handle)
+
+    tower_keys = ['2block', '3block', '4block', '5block']
+    upper975 = {k: [] for k in tower_keys}
+    upper75 = {k: [] for k in tower_keys}
+    median = {k: [] for k in tower_keys}
+    lower25 = {k: [] for k in tower_keys}
+    lower025 = {k: [] for k in tower_keys}
+    for k in tower_keys:
+        rs = regrets[k]
+        print(rs)
+        for tx in range(len(rs)):
+            median[k].append(np.median(rs[tx]))
+            lower025[k].append(np.quantile(rs[tx], 0.05))
+            lower25[k].append(np.quantile(rs[tx], 0.25))
+            upper75[k].append(np.quantile(rs[tx], 0.75))
+            upper975[k].append(np.quantile(rs[tx], 0.95))
+    fig, axes = plt.subplots(4, sharex=True, figsize=(10,20))
+    for kx, k in enumerate(tower_keys):
+        #xs = np.arange(400, 400+100*len(median[k]), 100)
+        xs = np.arange(10, 10+100*len(median[k]), 100)
+        axes[kx].plot(xs, median[k], label=k)
+        axes[kx].fill_between(xs, lower25[k], upper75[k], alpha=0.2)
+        #axes[kx].fill_between(xs, lower025[k], upper975[k], alpha=0.2)
+        axes[kx].set_ylim(0.0, 1.1)
+        axes[kx].set_ylabel('Regret (Normalized)')
+        axes[kx].set_xlabel('Number of training towers')
+        axes[kx].legend()
+    plt.savefig(logger.get_figure_path('tallest_tower_regret.png'))
+
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path', type=str, required=True)
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 1
+    logger.args.max_acquisitions = 18
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
     #get_acquisition_scores_over_time(logger)
     #plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
-    # get_dataset_statistics(logger)
+    get_dataset_statistics(logger)
+    accs = get_validation_accuracy(logger,
+                                  'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
     # accs = get_validation_accuracy(logger,
-    #                               'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
-    # plot_val_accuracy(logger)
-    # #analyze_collected_2block_towers(logger)
-    # print(accs)
+    #                               'learning/data/unstable_val.pkl')
+    
+    plot_val_accuracy(logger)
+    #analyze_collected_2block_towers(logger)
+    print(accs)
 
     #analyze_acquisition_value_with_sampling_size(logger)
     #plot_acquisition_value_with_sampling_size(logger)
 
+    #analyze_acquisition_histogram(logger)
     #single_2block_tower_analysis(logger)
-    inspect_2block_towers(logger)
+    #inspect_2block_towers(logger)
+
+    #check_validation_robustness()
+
+    #tallest_tower_regret_evaluation(logger)
+    #plot_tallest_tower_regret(logger)
