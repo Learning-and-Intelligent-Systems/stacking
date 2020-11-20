@@ -1,8 +1,7 @@
-import pybullet as p
-from odio_urdf import *
+import pybullet as p #2.8.2
+from odio_urdf import * #https://github.com/The-Ripp3r/odio_urdf
 import os
 import sys
-import pybullet_data
 import time
 
 

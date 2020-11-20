@@ -12,15 +12,17 @@ p.setGravity(0, 0, -10)
 planeOrn = [0,0,0,1]
 planeId = p.loadURDF("geo/plane.urdf", [0,0,0], planeOrn)
 
+#hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0.1], flags=p.URDF_USE_SELF_COLLISION)
 
-#tower demo
+sleep(3)
+# #tower demo
 num_blocks=2
 for i in range(num_blocks):
     if i==num_blocks-1:
-      innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
+      innerbox=p.loadURDF("geo/block.urdf", [0.05,0.05,0.05+i*0.1], useMaximalCoordinates = True)
     else:
-      innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
-    hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0+i*1], flags=p.URDF_USE_SELF_COLLISION)
+      innerbox=p.loadURDF("geo/block.urdf", [0.05,0.05,0.05+i*0.1], useMaximalCoordinates = True)
+    hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0+i*0.1], flags=p.URDF_USE_SELF_COLLISION)
     # if i==2:
     #   innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
     # else:
