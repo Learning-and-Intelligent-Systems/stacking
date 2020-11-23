@@ -112,12 +112,12 @@ def generate_training_images(world):
         y = pixel_origin[1] - point[1]/scale
         return np.array([x, y])
         
-    def xy_in_obj(xy, object):
+    def xy_in_obj(xy, object, relative_pos):
         endpoints_obj = [[-object.dimensions.x/2, -object.dimensions.y/2],
                         [-object.dimensions.x/2, +object.dimensions.y/2],
                         [object.dimensions.x/2, +object.dimensions.y/2],
                         [object.dimensions.x/2, -object.dimensions.y/2]]
-        endpoints_world = [transformation([epo[0], epo[1], 0.], object.pose.pos, object.pose.orn)[:2] for epo in endpoints_obj]
+        endpoints_world = [transformation([epo[0], epo[1], 0.], relative_pos, object.pose.orn)[:2] for epo in endpoints_obj]
         line_segment_indices = [(0,1),(1,2),(2,3),(3,0)]
         inside = True
         for line_indices in line_segment_indices:
@@ -130,12 +130,12 @@ def generate_training_images(world):
                 inside = inside and False
         return inside
         
-    def add_object(image):
+    def add_object(image, relative_pos):
         endpoints_obj = [[-object.dimensions.x/2, -object.dimensions.y/2],
                         [-object.dimensions.x/2, +object.dimensions.y/2],
                         [object.dimensions.x/2, +object.dimensions.y/2],
                         [object.dimensions.x/2, -object.dimensions.y/2]]
-        endpoints_world = [transformation([epo[0], epo[1], 0.], object.pose.pos, object.pose.orn)[:2] for epo in endpoints_obj]
+        endpoints_world = [transformation([epo[0], epo[1], 0.], relative_pos, object.pose.orn)[:2] for epo in endpoints_obj]
         pixel_endpoints = [world_to_pixel(endpoint) for endpoint in endpoints_world]
         min_x_pixel = int(min([x for (x,y) in pixel_endpoints]))
         max_x_pixel = int(max([x for (x,y) in pixel_endpoints]))
@@ -148,30 +148,30 @@ def generate_training_images(world):
             image[min_y_pixel:max_y_pixel, min_x_pixel:max_x_pixel] = 1.0
             return image, True
 
-    def add_object_rot(image):
+    def add_object_rot(image, relative_pos):
         image_xs = np.linspace(0, width-1, width).astype(np.uint32)
         image_ys = np.linspace(0, height-1, height).astype(np.uint32)
         found_obj = False
         for pixel_x in image_xs:
             for pixel_y in image_ys:
                 world_xy = pixel_to_world([pixel_x, pixel_y])
-                if xy_in_obj(world_xy, object):
+                if xy_in_obj(world_xy, object, relative_pos):
                     found_obj = True
                     image[pixel_y, pixel_x] = 1.0
     
-    def get_object_training_image(object):
+    def get_object_training_image(object, relative_pos):
         image = np.zeros((width, height)) #(black)
         
         # draw object (white)
         all_zero_rot = True # all block orn = (0,0,0,1)
         if all_zero_rot:
-            image, success = add_object(image)
+            image, success = add_object(image, relative_pos)
         else: # TODO: need way to detect if it's at the edge
-            add_object_rot(image, width, height)
+            add_object_rot(image, width, height, relative_pos)
             success = True
         
         # draw COM in object (gray)
-        com_world = transformation(object.com, object.pose.pos, object.pose.orn)
+        com_world = transformation(object.com, relative_pos, object.pose.orn)
         com_pixel = world_to_pixel(com_world[:2])
         com_xs = np.linspace(com_pixel[0]-(com_marker_width-1)/2,
                                 com_pixel[0]+(com_marker_width-1)/2,
@@ -198,8 +198,13 @@ def generate_training_images(world):
 
 
     images = []
-    for object in world.objects:
-        image, success = get_object_training_image(object)
+    for oi, object in enumerate(world.objects):
+        # generate image of objects relative to the object above them
+        if oi == len(world.objects)-1:
+            relative_pos = ZERO_POS
+        else:
+            relative_pos = np.subtract(object.pose.pos, world.objects[oi+1].pose.pos)
+        image, success = get_object_training_image(object, relative_pos)
         #plot_image(image)
         if success:
             images.append(image)
