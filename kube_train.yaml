@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: train-stacking
+spec:
+  template:
+    spec:
+      containers:
+      - name: train-stacking
+        image: carismoses/stacking:latest
+        resources:
+          limits:
+            cpu: 9
+            memory: 90Gi
+            nvidia.com/gpu: 1
+          requests:
+            cpu: 9
+            memory: 90Gi
+            nvidia.com/gpu: 1
+        ports:
+        - containerPort: 6006
+        envFrom:
+        - configMapRef:
+            name: object-store
+        - configMapRef:
+            name: github-key
+        - secretRef:
+            name: github-key
+        - secretRef:
+            name: object-store
+      restartPolicy: Never
+  backoffLimit: 4

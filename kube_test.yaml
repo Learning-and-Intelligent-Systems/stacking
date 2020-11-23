@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stacking-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stacking
+  template:
+    metadata:
+      labels:
+        app: stacking
+    spec:
+      containers:
+      - name: stacking-test
+        image: carismoses/stacking:latest
+        command: ["bash"]
+        resources:
+          limits:
+            cpu: 8
+            memory: 32Gi
+            nvidia.com/gpu: 1
+          requests:
+            cpu: 8
+            memory: 32Gi
+            nvidia.com/gpu: 1
+        tty: true
+        ports:
+        - containerPort: 6006
+        envFrom:
+        - configMapRef:
+            name: object-store
+        - configMapRef:
+            name: github-key
+        - secretRef:
+            name: github-key
+        - secretRef:
+            name: object-store
+        

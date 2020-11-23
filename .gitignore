@@ -20,9 +20,4 @@ learning/data/random_blocks_(x800)_2blocks_uniform_density.pkl
 # training results
 results/
 
-# docker stuff
-Dockerfile
-.dockerignore
-train.sh
-kube_train.yaml
-kube_test.yaml
+
