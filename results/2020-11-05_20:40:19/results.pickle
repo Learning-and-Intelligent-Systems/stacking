@@ -1,0 +1,8 @@
+model type : TowerConvRNNSmall 
+visual : True 
+train dataset : random_blocks_(x24)_2blocks_uniform_density.pkl 
+test dataset : random_blocks_(x24)_2blocks_uniform_density.pkl 
+final test accuracy : [0.5] 
+ 
+epochs : 5 
+batch size: 2 

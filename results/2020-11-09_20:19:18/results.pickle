@@ -1,0 +1,8 @@
+model type : TowerConvRNNOrig 
+visual : True 
+train dataset : random_blocks_(x20000)_2blocks_uniform_density.pkl 
+test dataset : random_blocks_(x800)_2blocks_uniform_density.pkl 
+final test accuracy : [0.9049999999999999] 
+ 
+epochs : 50 
+batch size: 128 

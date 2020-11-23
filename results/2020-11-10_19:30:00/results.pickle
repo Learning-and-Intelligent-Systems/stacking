@@ -1,0 +1,8 @@
+model type : TowerLSTM 
+visual : True 
+train dataset : random_blocks_(x20000)_2to3blocks_uniform_density.pkl 
+test dataset : random_blocks_(x800)_2to3blocks_uniform_density.pkl 
+final test accuracy : [0.52, 0.49250000000000005] 
+ 
+epochs : 50 
+batch size: 64 
