@@ -13,7 +13,7 @@ class TowerConvRNNOrig(nn.Module):
         """
         super(TowerConvRNNOrig, self).__init__()
         # make 
-        kernel_size = 6
+        kernel_size = 9
         stride = 3
         def calc_fc_size():
             W = (image_dim-kernel_size)+1
