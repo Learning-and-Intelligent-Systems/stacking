@@ -108,6 +108,39 @@ def get_dataset_statistics(logger):
     plt.legend()
     plt.savefig(logger.get_figure_path('acquisition_breakdown.png'))
 
+def plot_constructability_over_time(logger):
+    tower_keys = ['2block', '3block', '4block', '5block']
+    tallest_stable_over_time = np.zeros((logger.args.max_acquisitions, 5))
+    tp = TowerPlanner(stability_mode='contains')
+    for tx in range(logger.args.max_acquisitions):
+        acquired_data, _ = logger.load_acquisition_data(tx)
+
+        # For each tower, figure out when it fell over.
+        for kx, k in enumerate(tower_keys):
+            towers = acquired_data[k]['towers']
+            for ix in range(0, towers.shape[0]):
+                height = 1
+                for top_id in range(1, towers.shape[1]):
+                    block_tower = [Object.from_vector(towers[ix, bx, :]) for bx in range(0, top_id+1)]
+                    if not tp.tower_is_constructable(block_tower):
+                        break
+                    height += 1
+                tallest_stable_over_time[tx, height-1] += 1
+
+    max_x = 40 + 10*logger.args.max_acquisitions
+    xs = np.arange(40, max_x, 10)
+
+    w = 10
+    plt.figure(figsize=(20, 10))
+    plt.bar(xs, tallest_stable_over_time[:, 0], width=w, label=1)
+    for kx in range(1, 5):
+        plt.bar(xs, tallest_stable_over_time[:, kx], bottom=np.sum(tallest_stable_over_time[:, :kx], axis=1), width=w, label=kx+1)
+    
+    plt.xlabel('Acquisition Step')
+    plt.ylabel('Height of tallest stable subtower')
+    plt.legend()
+    plt.savefig(logger.get_figure_path('tallest_breakdown.png'))
+
 def analyze_single_dataset(logger):
     tx = 200
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -708,6 +741,7 @@ if __name__ == '__main__':
     #check_validation_robustness()
 
     #min_contact_regret_evaluation(logger)
-    tallest_tower_regret_evaluation(logger)
+    #tallest_tower_regret_evaluation(logger)
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     #plot_tallest_tower_regret(logger)
+    plot_constructability_over_time(logger)
