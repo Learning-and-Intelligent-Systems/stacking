@@ -106,5 +106,7 @@ class FCGN(nn.Module):
         x = torch.mean(h, dim=1)
         x = self.O(x).view(N)
         return torch.sigmoid(x).unsqueeze(-1)
-        
+        #x = self.O(h)
+        #x = torch.sigmoid(x).prod(dim=1)
+        #return x
         

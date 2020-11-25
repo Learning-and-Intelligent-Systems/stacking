@@ -33,8 +33,10 @@ def sample_unlabeled_data(n_samples, block_set=None):
     for ix in range(n_samples):
         n_blocks = np.random.randint(2, 6)
         # get n_blocks, either from scratch or from the block set
-        if block_set is not None: blocks = np.random.choice(block_set, n_blocks)
-        else: blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
+        if block_set is not None: 
+            blocks = np.random.choice(block_set, n_blocks, replace=False)
+        else:
+            blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
         # sample a new tower
         tower = sample_random_tower(blocks)
         rotated_tower = [get_rotated_block(b) for b in tower]

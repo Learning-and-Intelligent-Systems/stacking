@@ -62,13 +62,13 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             acc.append(accuracy.item())
 
             it += 1
-            if it % 10 == 0 and val_dataloader is not None:
-                val_loss = evaluate(val_dataloader, model)
-                if val_loss < best_loss:
-                    best_loss = val_loss
-                    best_weights = copy.deepcopy(model.state_dict())
-                    print('Saved')    
-                print(np.mean(acc), val_loss, loss)
+        if val_dataloader is not None:
+            val_loss = evaluate(val_dataloader, model)
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_weights = copy.deepcopy(model.state_dict())
+                print('Saved')    
+            print(np.mean(acc), val_loss, loss)
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
     return model
