@@ -19,6 +19,20 @@ def run_active_towers(args):
                         base_args={'n_hidden': args.n_hidden, 'n_in': 14},
                         n_models=args.n_models)
 
+    # Choose a sampler and check if we are limiting the blocks to work with.
+    block_set = None
+    if len(args.pool_fname) > 0:
+        pool_sampler = PoolSampler(args.pool_fname)
+        data_subset_fn = pool_sampler.get_subset
+        data_sampler_fn = pool_sampler.sample_unlabeled_data
+    elif args.block_set_fname is not '':
+        data_subset_fn = get_subset
+        with open(args.block_set_fname, 'rb') as f: block_set = pickle.load(f)
+        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
+    else:
+        data_subset_fn = get_subset
+        data_sampler_fn = sample_unlabeled_data
+
     # Sample initial dataset.
     if len(args.init_data_fname) > 0:
         # A good dataset to use is learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl
@@ -34,8 +48,14 @@ def run_active_towers(args):
                                    K_skip=200)
     
     else:
-        # TODO: Generate random dataset.
-        raise NotImplementedError()
+        towers_dict = sample_unlabeled_data(40, block_set=block_set)
+        towers_dict = get_labels(towers_dict)
+        dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
+
+        val_towers_dict = sample_unlabeled_data(40, block_set=block_set)
+        val_towers_dict = get_labels(val_towers_dict)
+        val_dataset = TowerDataset(val_towers_dict, augment=True, K_skip=1)
+
     
     sampler = TowerSampler(dataset=dataset,
                            batch_size=args.batch_size,
@@ -49,20 +69,7 @@ def run_active_towers(args):
     val_dataloader = DataLoader(val_dataset,
                                 batch_sampler=val_sampler)
 
-    if len(args.pool_fname) > 0:
-        print('HERE')
-        pool_sampler = PoolSampler(args.pool_fname)
-        data_subset_fn = pool_sampler.get_subset
-        data_sampler_fn = pool_sampler.sample_unlabeled_data
-    elif args.block_set_fname is not '':
-        data_subset_fn = get_subset
-        with open(args.block_set_fname) as f: block_set = pickle.load(f)
-        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
-    else:
-        data_subset_fn = get_subset
-        data_sampler_fn = sample_unlabeled_data
-    
-    # TODO: All these callback functions need to be rewritten for the towers dataset.
+
     active_train(ensemble=ensemble, 
                  dataset=dataset, 
                  val_dataset=val_dataset,
