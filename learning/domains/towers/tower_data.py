@@ -50,7 +50,7 @@ class TowerDataset(Dataset):
 
         # First augment the given towers with rotations. 
         if augment:
-            augmented_towers = augment_towers(tower_dict, K_skip, mirror=True)
+            augmented_towers = augment_towers(tower_dict, K_skip, mirror=False)
         else:
             augmented_towers = tower_dict
 

@@ -40,12 +40,12 @@ def run_active_towers(args):
             towers_dict = pickle.load(handle)
         dataset = TowerDataset(towers_dict,
                                augment=True,
-                               K_skip=4000) # From this dataset, this means we start with 10 towers/size (before augmentation).
-        with open('learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl', 'rb') as handle:
+                               K_skip=100) # From this dataset, this means we start with 10 towers/size (before augmentation).
+        with open('learning/data/random_blocks_(x1000)_constructable_val.pkl', 'rb') as handle:
             val_dict = pickle.load(handle)
         val_dataset = TowerDataset(val_dict, 
                                    augment=False,
-                                   K_skip=200)
+                                   K_skip=100)
     
     else:
         towers_dict = sample_unlabeled_data(40, block_set=block_set)
@@ -68,7 +68,6 @@ def run_active_towers(args):
                                shuffle=False)
     val_dataloader = DataLoader(val_dataset,
                                 batch_sampler=val_sampler)
-
 
     active_train(ensemble=ensemble, 
                  dataset=dataset, 
