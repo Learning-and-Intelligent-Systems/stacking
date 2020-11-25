@@ -3,14 +3,17 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
+import time
 import torch
 
-from block_utils import Object, get_rotated_block
+from block_utils import Object, get_rotated_block, World, Environment
 from learning.active.acquire import bald
 from learning.active.utils import ActiveExperimentLogger
-from learning.domains.towers.active_utils import get_predictions, sample_unlabeled_data
+from learning.domains.towers.active_utils import get_predictions, sample_unlabeled_data, get_labels
 from learning.domains.towers.generate_tower_training_data import sample_random_tower
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler, add_placement_noise
+from learning.evaluate.planner import EnsemblePlanner
+
 from tower_planner import TowerPlanner
 
 from torch.utils.data import DataLoader
@@ -105,6 +108,39 @@ def get_dataset_statistics(logger):
     plt.legend()
     plt.savefig(logger.get_figure_path('acquisition_breakdown.png'))
 
+def plot_constructability_over_time(logger):
+    tower_keys = ['2block', '3block', '4block', '5block']
+    tallest_stable_over_time = np.zeros((logger.args.max_acquisitions, 5))
+    tp = TowerPlanner(stability_mode='contains')
+    for tx in range(logger.args.max_acquisitions):
+        acquired_data, _ = logger.load_acquisition_data(tx)
+
+        # For each tower, figure out when it fell over.
+        for kx, k in enumerate(tower_keys):
+            towers = acquired_data[k]['towers']
+            for ix in range(0, towers.shape[0]):
+                height = 1
+                for top_id in range(1, towers.shape[1]):
+                    block_tower = [Object.from_vector(towers[ix, bx, :]) for bx in range(0, top_id+1)]
+                    if not tp.tower_is_constructable(block_tower):
+                        break
+                    height += 1
+                tallest_stable_over_time[tx, height-1] += 1
+
+    max_x = 40 + 10*logger.args.max_acquisitions
+    xs = np.arange(40, max_x, 10)
+
+    w = 10
+    plt.figure(figsize=(20, 10))
+    plt.bar(xs, tallest_stable_over_time[:, 0], width=w, label=1)
+    for kx in range(1, 5):
+        plt.bar(xs, tallest_stable_over_time[:, kx], bottom=np.sum(tallest_stable_over_time[:, :kx], axis=1), width=w, label=kx+1)
+    
+    plt.xlabel('Acquisition Step')
+    plt.ylabel('Height of tallest stable subtower')
+    plt.legend()
+    plt.savefig(logger.get_figure_path('tallest_breakdown.png'))
+
 def analyze_single_dataset(logger):
     tx = 200
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -198,18 +234,18 @@ def analyze_acquisition_histogram(logger):
         #     for k in tower_keys:
         #         unlabeled[k]['towers'] = add_placement_noise(unlabeled[k]['towers'])
         
-        for tx in range(0, logger.args.max_acquisitions, 20):
+        for tx in range(0, logger.args.max_acquisitions, 1):
             print(tx)
             ensemble = logger.get_ensemble(tx)
             it_scores = {k: [] for k in tower_keys}
             for ux in range(n_repeats):
                 unlabeled = unlabeled_data[ux]
                 #noisy = noisy_data[ux]
-                with open('learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl', 'rb') as handle:
-                    unlabeled = pickle.load(handle)
+                # with open('learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl', 'rb') as handle:
+                #     unlabeled = pickle.load(handle)
                 preds = get_predictions(unlabeled, ensemble)[:,:]
                 #noisy_preds = get_predictions(noisy, ensemble)
-                
+                labels = get_labels(unlabeled)
                 bald_scores = bald(preds).numpy()
                 #noisy_bald_scores = bald(noisy_preds).numpy()
 
@@ -221,6 +257,7 @@ def analyze_acquisition_histogram(logger):
                     acquire_indices = np.argsort(bald_scores[start:end])[::-1][:100]
                     
                     print(k)
+                    print(labels[k]['labels'][acquire_indices[0:10]])
                     print(preds.numpy()[start:end][acquire_indices[0:10],:])
                     print(bald_scores[start:end][acquire_indices[0:10]])
                     it_scores[k].append(bald_scores[start:end][acquire_indices[0]])
@@ -544,98 +581,52 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def plan_with_ensemble_random(blocks, ensemble):
-    n = len(blocks)
-    max_height = 0
-    max_tower = []
-    # Speedup: order towers from tallest to lowest and stop once 
-    # we've found the tallest stable tower.
-    # Step (1): Build dataset of potential towers. 
-    tower_keys = ['2block', '3block', '4block', '5block']
-    tower_vectors = []
-    heights = []
-    max_towers = 10000
-    n_towers = 0
-    
-    for _ in range(0, max_towers):
-        tower, rotated_tower = sample_random_tower(blocks, ret_rotated=True)
-        #rotated_tower = [get_rotated_block(b) for b in tower]
-        # print('-----')
-        # print([b.vectorize() for b in tower])
-        # print([b.vectorize() for b in rot])
-        # print([b.vectorize() for b in  rotated_tower])
-        tower_vectors.append([b.vectorize() for b in rotated_tower])
-        heights.append(np.sum([b.dimensions.z for b in rotated_tower]))
-    
-    towers = np.array(tower_vectors)
-    labels = np.zeros((towers.shape[0],))
-    tower_dict = {}
-    for k in tower_keys:
-        tower_dict[k] = {}
-        if k == '2block':
-            tower_dict[k]['towers'] = towers
-            tower_dict[k]['labels'] = labels
-        else:
-            tower_dict[k]['towers'] = towers[:5,...]
-            tower_dict[k]['labels'] = labels[:5]
+def tallest_tower_regret_evaluation(logger, n_towers=50, block_set=''):
+    def tower_height(tower):
+        """
+        :param tower: A vectorized version of the tower.
+        """
+        return np.sum(tower[:, 6])
 
+    return evaluate_planner(logger, n_towers, tower_height, block_set, fname='height_regret_blocks.pkl')
 
-    # Step (2): Get predictions for each tower.
-    preds = []
-    tower_dataset = TowerDataset(tower_dict, augment=False)
-    tower_sampler = TowerSampler(dataset=tower_dataset,
-                                batch_size=64,
-                                shuffle=False)
-    tower_loader = DataLoader(dataset=tower_dataset,
-                            batch_sampler=tower_sampler)
+def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
+    def contact_area(tower):
+        """
+        :param tower: A vectorized version of the tower.
+        """
+        lefts, rights = tower[:, 7] - tower[:, 4]/2., tower[:, 7] + tower[:, 4]/2.
+        bottoms, tops = tower[:, 8] - tower[:, 5]/2., tower[:, 8] + tower[:, 5]/2.
 
-    for tensor, _ in tower_loader:
-        if torch.cuda.is_available():
-            tensor = tensor.cuda()
-        with torch.no_grad():
-            preds.append(ensemble.forward(tensor))
+        area = 0.
+        for tx in range(1, tower.shape[0]):
+            bx = tx - 1
 
-    p_stables = torch.cat(preds, dim=0)[:,:5].mean(dim=1)
-    # Step (3): Find the tallest tower of a given height.
-    max_height = -1
-    max_exp_height = -1
-    max_tower = None
-    max_stable = 0
-    for ix, (p, h) in enumerate(zip(p_stables, heights)):
-        # save the tallest tower
-        # if p > max_stable and max_stable < 0.9:
-        #     max_tower = tower_vectors[ix]
-        #     max_height = h
-        #     max_stable = p
-        exp_h = p*h
-        if exp_h >= max_exp_height and p > 0.5:
-            if exp_h > max_height or (exp_h == max_height and p > max_stable):
-                max_tower = tower_vectors[ix]
-                max_height = h
-                max_exp_height = exp_h
-                max_stable = p
-        # exp_height = p*h
-        # if exp_height > max_height:
-        #     max_tower = tower_vectors[ix]
-        #     max_height = h
+            
 
+            l, r = max(lefts[bx], lefts[tx]), min(rights[bx], rights[tx])
+            b, t = max(bottoms[bx], bottoms[tx]), min(tops[bx], tops[tx])
+            
+            top_area = tower[tx, 4]*tower[tx, 5]
+            contact = (r-l)*(t-b)
+            area += top_area - contact
 
-    if max_tower is None:
-        print('None Found')
-        max_tower = tower_vectors[0]
-        max_height = heights[0]
+        return area
 
-    return max_tower, max_height
+    return evaluate_planner(logger, n_towers, contact_area, block_set, fname='contact_regret.pkl')
 
-
-
-def tallest_tower_regret_evaluation(logger, n_towers=50):
+def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
     tower_keys = ['2block', '3block', '4block', '5block']
     tower_sizes = [2, 3, 4, 5]
     tp = TowerPlanner(stability_mode='contains')
+    ep = EnsemblePlanner(n_samples=5000)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
+
+    if len(block_set) > 0:
+        with open(block_set, 'rb') as handle:
+            all_blocks = pickle.load(handle)
 
     for tx in range(0, 101, 10):#logger.args.max_acquisitions):
         print(tx)
@@ -645,25 +636,44 @@ def tallest_tower_regret_evaluation(logger, n_towers=50):
             print(k)
             curr_regrets = []
             for _ in range(0, n_towers):
-                blocks = [Object.random() for _ in range(size)]
-                tower, height = plan_with_ensemble_random(blocks, ensemble)
+                if len(block_set) > 0:
+                    blocks = np.random.choice(all_blocks, size, replace=False)
+                    blocks = copy.deepcopy(blocks)
+                else:
+                    blocks = [Object.random() for _ in range(size)]
+                    #blocks = [Object.adversarial() for _ in range(size)]
+
+                tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn)
+
+                #print(reward, max_reward)
                 block_tower = [Object.from_vector(tower[bx]) for bx in range(len(tower))]
-                if not tp.tower_is_stable(block_tower):
-                    height = 0
+                if not tp.tower_is_constructable(block_tower):
+                    reward = 0
+                if False:
+                    print(reward)
+                    w = World(block_tower)
+                    env = Environment([w], vis_sim=True, vis_frames=True)
+                    input()
+                    for tx in range(240):
+                        env.step(vis_frames=True)
+                        time.sleep(1/240.)
+                    env.disconnect()
                 
-                max_height = np.sum([np.max(b.dimensions) for b in blocks])
-                
-                # TODO: Compare heights and calculate regret.
-                regret = (max_height - height)/max_height
+                # Note that in general max reward may not be the best possible due to sampling.
+                #ground_truth = np.sum([np.max(b.dimensions) for b in blocks])
+                #print(max_reward, ground_truth)
+
+                # Compare heights and calculate regret.
+                regret = (max_reward - reward)/max_reward
                 print(regret)
                 curr_regrets.append(regret)
             regrets[k].append(curr_regrets)
 
-        with open(logger.get_figure_path('regrets.pkl'), 'wb') as handle:
+        with open(logger.get_figure_path(fname), 'wb') as handle:
             pickle.dump(regrets, handle)
 
 def plot_tallest_tower_regret(logger):
-    with open(logger.get_figure_path('regrets.pkl'), 'rb') as handle:
+    with open(logger.get_figure_path('height_regret_blocks.pkl'), 'rb') as handle:
         regrets = pickle.load(handle)
 
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -684,7 +694,8 @@ def plot_tallest_tower_regret(logger):
     fig, axes = plt.subplots(4, sharex=True, figsize=(10,20))
     for kx, k in enumerate(tower_keys):
         #xs = np.arange(400, 400+100*len(median[k]), 100)
-        xs = np.arange(10, 10+100*len(median[k]), 100)
+        xs = np.arange(40, 40+100*len(median[k]), 100)
+        #xs = np.arange(40, 40+10*len(median[k]), 10)
         axes[kx].plot(xs, median[k], label=k)
         axes[kx].fill_between(xs, lower25[k], upper75[k], alpha=0.2)
         #axes[kx].fill_between(xs, lower025[k], upper975[k], alpha=0.2)
@@ -692,7 +703,7 @@ def plot_tallest_tower_regret(logger):
         axes[kx].set_ylabel('Regret (Normalized)')
         axes[kx].set_xlabel('Number of training towers')
         axes[kx].legend()
-    plt.savefig(logger.get_figure_path('tallest_tower_regret.png'))
+    plt.savefig(logger.get_figure_path('height_regret_blocks.png'))
 
 
 
@@ -703,22 +714,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 18
+    logger.args.max_acquisitions = 101
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
     #get_acquisition_scores_over_time(logger)
     #plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
-    get_dataset_statistics(logger)
-    accs = get_validation_accuracy(logger,
-                                  'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
+    #get_dataset_statistics(logger)
     # accs = get_validation_accuracy(logger,
-    #                               'learning/data/unstable_val.pkl')
+    #                               'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
+    # # accs = get_validation_accuracy(logger,
+    # #                               'learning/data/unstable_val.pkl')
     
-    plot_val_accuracy(logger)
-    #analyze_collected_2block_towers(logger)
-    print(accs)
+    # plot_val_accuracy(logger)
+    # #analyze_collected_2block_towers(logger)
+    # print(accs)
 
     #analyze_acquisition_value_with_sampling_size(logger)
     #plot_acquisition_value_with_sampling_size(logger)
@@ -729,5 +740,8 @@ if __name__ == '__main__':
 
     #check_validation_robustness()
 
+    #min_contact_regret_evaluation(logger)
     #tallest_tower_regret_evaluation(logger)
+    #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     #plot_tallest_tower_regret(logger)
+    plot_constructability_over_time(logger)

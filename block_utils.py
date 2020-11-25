@@ -124,6 +124,20 @@ class Object:
         return Object(name, dims, mass, com, color)
 
     @staticmethod
+    def adversarial(name=None):
+        # blocks range in size from 0.05 to 0.15
+        dims = Dimensions(*(np.random.rand(3) * 0.1 + 0.05))
+        mass = np.random.uniform(0.1, 1.0)
+        # center of mass lies outside the middle 0.5 of the block along each axis
+        pct = np.random.uniform(0.45, 0.5, size=3)*np.random.choice([-1., 1.])
+
+        com = Position(*(pct * 0.9 * dims))
+        # pick a random color
+        color = Color(*np.random.rand(3))
+        # and add the new block to the list
+        return Object(name, dims, mass, com, color)
+
+    @staticmethod
     def platform():
         leg_height = 0.15
 
