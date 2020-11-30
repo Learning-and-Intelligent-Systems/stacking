@@ -78,7 +78,6 @@ def get_predictions(dataset, ensemble):
             tensor = tensor.cuda()
         with torch.no_grad():
             preds.append(ensemble.forward(tensor))
-        
     return torch.cat(preds, dim=0)
 
 

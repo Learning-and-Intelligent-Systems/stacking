@@ -34,7 +34,7 @@ def run_active_towers(args):
         raise NotImplementedError()
 
     ensemble = Ensemble(base_model=base_model,
-                        base_args={'n_hidden': args.n_hidden, 'n_in': 14},
+                        base_args=base_args,
                         n_models=args.n_models)
 
     # Choose a sampler and check if we are limiting the blocks to work with.
