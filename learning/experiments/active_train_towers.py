@@ -8,6 +8,7 @@ from learning.domains.towers.active_utils import sample_unlabeled_data, get_pred
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.gn import FCGN
+from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
 
 
@@ -15,7 +16,14 @@ def run_active_towers(args):
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
     
     # Initialize ensemble. 
-    ensemble = Ensemble(base_model=FCGN,
+    if args.model == 'fcgn':
+        base_model = FCGN
+    elif args.model == 'lstm':
+        base_model = TowerLSTM
+    else:
+        raise NotImplementedError()
+
+    ensemble = Ensemble(base_model=base_model,
                         base_args={'n_hidden': args.n_hidden, 'n_in': 14},
                         n_models=args.n_models)
 
@@ -54,7 +62,7 @@ def run_active_towers(args):
 
         val_towers_dict = sample_unlabeled_data(40, block_set=block_set)
         val_towers_dict = get_labels(val_towers_dict)
-        val_dataset = TowerDataset(val_towers_dict, augment=True, K_skip=1)
+        val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
     
     sampler = TowerSampler(dataset=dataset,
@@ -99,7 +107,8 @@ if __name__ == '__main__':
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')
-    parser.add_argument('--pool-fname', type=str, default='')        
+    parser.add_argument('--pool-fname', type=str, default='')  
+    parser.add_argument('--model', default='fcgn', choices=['fcgn', 'lstm'])      
     args = parser.parse_args()
 
     run_active_towers(args)
