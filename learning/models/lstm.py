@@ -34,6 +34,6 @@ class TowerLSTM(nn.Module):
         x, _ = self.lstm(x)
 
         x = torch.sigmoid(self.O(x.reshape(-1, self.n_hidden)).view(N, K))
-        return x.prod(dim=1)
+        return x.prod(dim=1).unsqueeze(-1)
 
         
