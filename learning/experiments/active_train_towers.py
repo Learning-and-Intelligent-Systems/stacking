@@ -44,7 +44,7 @@ def run_active_towers(args):
         with open('learning/data/random_blocks_(x1000)_constructable_val.pkl', 'rb') as handle:
             val_dict = pickle.load(handle)
         val_dataset = TowerDataset(val_dict, 
-                                   augment=False,
+                                   augment=True,
                                    K_skip=100)
     
     else:
@@ -56,7 +56,7 @@ def run_active_towers(args):
         val_towers_dict = get_labels(val_towers_dict)
         val_dataset = TowerDataset(val_towers_dict, augment=True, K_skip=1)
 
-    
+    print(len(dataset), len(val_dataset)) 
     sampler = TowerSampler(dataset=dataset,
                            batch_size=args.batch_size,
                            shuffle=True)
