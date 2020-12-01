@@ -496,6 +496,34 @@ def get_rotated_block(block):
 
     return new_block
 
+def all_rotations():
+    return [
+        R.from_euler('zyx', [0., 0., 0.]),
+        R.from_euler('zyx', [np.pi/2., 0., 0.]),
+        R.from_euler('zyx', [np.pi, 0., 0.]),
+        R.from_euler('zyx', [3*np.pi/2., 0., 0.]),
+        R.from_euler('zyx', [0., np.pi, 0.]),
+        R.from_euler('zyx', [np.pi/2., np.pi, 0.]),
+        R.from_euler('zyx', [np.pi, np.pi, 0.]),
+        R.from_euler('zyx', [3*np.pi/2., np.pi, 0.]),
+        R.from_euler('zyx', [0., np.pi/2., 0.]),
+        R.from_euler('zyx', [np.pi/2., np.pi/2., 0.]),
+        R.from_euler('zyx', [np.pi, np.pi/2., 0.]),
+        R.from_euler('zyx', [3*np.pi/2., np.pi/2., 0.]),
+        R.from_euler('zyx', [0., 3*np.pi/2., 0.]),
+        R.from_euler('zyx', [np.pi/2., 3*np.pi/2., 0.]),
+        R.from_euler('zyx', [np.pi, 3*np.pi/2., 0.]),
+        R.from_euler('zyx', [3*np.pi/2., 3*np.pi/2., 0.]),
+        R.from_euler('zyx', [0., 0, 3*np.pi/2.]),
+        R.from_euler('zyx', [np.pi/2., 0, np.pi/2.]),
+        R.from_euler('zyx', [np.pi, 0, 3*np.pi/2.]),
+        R.from_euler('zyx', [3*np.pi/2., 0, np.pi/2.]),
+        R.from_euler('zyx', [0., 0, 3*np.pi/2.]),
+        R.from_euler('zyx', [np.pi/2., 0, np.pi/2.]),
+        R.from_euler('zyx', [np.pi, 0, np.pi/2.]),
+        R.from_euler('zyx', [3*np.pi/2., 0, np.pi/2.]),
+    ]
+
 def rotation_group():
     V = np.eye(3) * np.pi/2
     for v in V:
