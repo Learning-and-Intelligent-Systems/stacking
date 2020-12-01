@@ -741,7 +741,7 @@ if __name__ == '__main__':
     #check_validation_robustness()
 
     #min_contact_regret_evaluation(logger)
-    #tallest_tower_regret_evaluation(logger)
+    tallest_tower_regret_evaluation(logger)
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
-    #plot_tallest_tower_regret(logger)
-    plot_constructability_over_time(logger)
+    plot_tallest_tower_regret(logger)
+    #plot_constructability_over_time(logger)
