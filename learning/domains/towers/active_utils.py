@@ -11,7 +11,7 @@ from tower_planner import TowerPlanner
 
 
 # TODO: Write a version of this function that does pool based active learning from a given file.
-def sample_unlabeled_data(n_samples, block_set=None):
+def sample_unlabeled_data(n_samples, block_set=None, tower_heights=['2', '3', '4', '5']):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
@@ -19,8 +19,9 @@ def sample_unlabeled_data(n_samples, block_set=None):
     :param block_set (optional): blocks to use in towers. generate new blocks if None
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
-    keys = ['2block', '3block', '4block', '5block']
-
+    keys = [th+'block' for th in tower_heights]
+    int_tower_heights = [int(th) for th in tower_heights]
+    
     # initialize a dictionary of lists to store the generated data
     sampled_towers = {k: {} for k in keys}
     for k in keys:
@@ -31,7 +32,7 @@ def sample_unlabeled_data(n_samples, block_set=None):
 
     # sample random towers and add them to the lists in the dictionary
     for ix in range(n_samples):
-        n_blocks = np.random.randint(2, 6)
+        n_blocks = np.random.randint(min(int_tower_heights), max(int_tower_heights)+1)
         # get n_blocks, either from scratch or from the block set
         if block_set is not None: 
             blocks = np.random.choice(block_set, n_blocks, replace=False)
@@ -110,7 +111,7 @@ def get_subset(samples, indices):
     :param samples: A tower_dict structure.
     :param indices: Which indices of the original structure to select.
     """
-    keys = ['2block', '3block', '4block', '5block']
+    keys = list(samples.keys())
     selected_towers = {k: {'towers': []} for k in keys}
     
     # Initialize tower ranges.
