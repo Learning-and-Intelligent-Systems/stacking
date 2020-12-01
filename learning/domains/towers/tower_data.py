@@ -27,7 +27,10 @@ def preprocess(towers):
 def add_placement_noise(towers):
     for ix in range(towers.shape[0]):
         for bx in range(towers.shape[1]):
-            towers[ix, bx, 7:9] += np.random.randn(2)*0.001
+            if torch.cuda.is_available():
+                towers[ix, bx, 7:9] += torch.randn(2)*0.001
+            else:
+                towers[ix, bx, 7:9] += np.random.randn(2)*0.001
     return towers
 
 class TowerDataset(Dataset):

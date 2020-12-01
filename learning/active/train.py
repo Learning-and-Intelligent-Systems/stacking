@@ -24,7 +24,7 @@ def evaluate(loader, model):
         pred = model.forward(x).squeeze()
         loss = F.binary_cross_entropy(pred, y)
 
-        accuracy = ((pred>0.5) == y).float().mean()
+        accuracy = ((pred.cpu().detach().numpy()>0.5) == y.cpu().detach().numpy()).mean()
         acc.append(accuracy.item())
         losses.append(loss.item())
 
@@ -58,7 +58,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
 
             optimizer.step()
 
-            accuracy = ((pred>0.5) == y).float().mean()
+            accuracy = ((pred.cpu().detach().numpy()>0.5) == y.cpu().detach().numpy()).mean()
             acc.append(accuracy.item())
 
             it += 1

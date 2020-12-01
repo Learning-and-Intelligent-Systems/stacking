@@ -88,6 +88,8 @@ def run_active_towers(args):
                  data_subset_fn=data_subset_fn,
                  logger=logger, 
                  args=args)
+                 
+    print('saved to: ', logger.exp_path)
 
 
 if __name__ == '__main__':
