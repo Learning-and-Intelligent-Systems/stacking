@@ -47,6 +47,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
         print('Epoch', ex)
         acc = []
         for x, y in dataloader:
+            print(x.shape)
             if torch.cuda.is_available():
                 x = x.cuda()
                 y = y.cuda()

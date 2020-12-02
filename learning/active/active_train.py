@@ -62,7 +62,7 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
         logger.save_ensemble(ensemble, tx)
 
         # Collect new samples.
-        new_data, all_samples = acquire_datapoints(ensemble=ensemble, 
+        new_data, all_samples = acquire_datapoints(tx, ensemble=ensemble, 
                                                    n_samples=args.n_samples, 
                                                    n_acquire=args.n_acquire, 
                                                    strategy=args.strategy,

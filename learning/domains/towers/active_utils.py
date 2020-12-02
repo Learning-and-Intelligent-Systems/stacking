@@ -11,7 +11,7 @@ from tower_planner import TowerPlanner
 
 
 # TODO: Write a version of this function that does pool based active learning from a given file.
-def sample_unlabeled_data(n_samples, block_set=None, tower_heights=['2', '3', '4', '5']):
+def sample_unlabeled_data(n_samples, tx=None, block_set=None, tower_heights=['2', '3', '4', '5']):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
@@ -19,6 +19,17 @@ def sample_unlabeled_data(n_samples, block_set=None, tower_heights=['2', '3', '4
     :param block_set (optional): blocks to use in towers. generate new blocks if None
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
+    if tx is None:
+        tower_heights=['2']
+    else:
+        if tx < 25:
+            tower_heights=['2']
+        elif tx < 50:
+            tower_heights=['2', '3']
+        elif tx < 75:
+            tower_heights=['2','3','4']
+        else:
+            tower_heights=['2','3','4','5']
     keys = [th+'block' for th in tower_heights]
     int_tower_heights = [int(th) for th in tower_heights]
     

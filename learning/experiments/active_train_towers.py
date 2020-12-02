@@ -36,7 +36,7 @@ def run_active_towers(args):
     elif args.block_set_fname is not '':
         data_subset_fn = get_subset
         with open(args.block_set_fname, 'rb') as f: block_set = pickle.load(f)
-        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, tower_heights=args.tower_heights)
+        data_sampler_fn = lambda n, tx: sample_unlabeled_data(n, tx, block_set=block_set, tower_heights=args.tower_heights)
     else:
         data_subset_fn = get_subset
         data_sampler_fn = sample_unlabeled_data
@@ -56,11 +56,11 @@ def run_active_towers(args):
                                    K_skip=100)
     
     else:
-        towers_dict = sample_unlabeled_data(40, block_set=block_set, tower_heights=args.tower_heights)
+        towers_dict = sample_unlabeled_data(1, block_set=block_set, tower_heights=args.tower_heights)
         towers_dict = get_labels(towers_dict)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
-        val_towers_dict = sample_unlabeled_data(40, block_set=block_set, tower_heights=args.tower_heights)
+        val_towers_dict = sample_unlabeled_data(1, block_set=block_set, tower_heights=args.tower_heights)
         val_towers_dict = get_labels(val_towers_dict)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
