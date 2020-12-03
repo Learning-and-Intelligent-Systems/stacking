@@ -32,6 +32,7 @@ def sample_unlabeled_data(n_samples, block_set=None):
     # sample random towers and add them to the lists in the dictionary
     for ix in range(n_samples):
         n_blocks = np.random.randint(2, 6)
+    
         # get n_blocks, either from scratch or from the block set
         if block_set is not None: 
             blocks = np.random.choice(block_set, n_blocks, replace=False)

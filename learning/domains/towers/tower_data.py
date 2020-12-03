@@ -24,6 +24,13 @@ def preprocess(towers):
 
     return towers.float()
 
+def unprocess(towers):
+    towers[:,:,1:4] *= 0.01 #towers[:,:,4:7]
+    towers[:,:,7:9] *= 0.01 #towers[:,:,4:6]
+    towers[:,:,4:7] = towers[:,:,4:7]*0.01 + 0.1 
+    towers[:,:,0] = (towers[:,:,0] + 0.55)
+    return towers
+
 def add_placement_noise(towers):
     for ix in range(towers.shape[0]):
         for bx in range(towers.shape[1]):

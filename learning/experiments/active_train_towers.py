@@ -8,7 +8,7 @@ from learning.domains.towers.active_utils import sample_unlabeled_data, get_pred
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.bottomup_net import BottomUpNet
-from learning.models.gn import FCGN
+from learning.models.gn import FCGN, ConstructableFCGN
 from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
 
@@ -19,6 +19,9 @@ def run_active_towers(args):
     # Initialize ensemble. 
     if args.model == 'fcgn':
         base_model = FCGN
+        base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
+    elif args.model == 'fcgn-con':
+        base_model = ConstructableFCGN
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
     elif args.model == 'lstm':
         base_model = TowerLSTM
@@ -118,7 +121,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')
     parser.add_argument('--pool-fname', type=str, default='')  
-    parser.add_argument('--model', default='fcgn', choices=['fcgn', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      
+    parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      
     args = parser.parse_args()
 
     run_active_towers(args)
