@@ -47,26 +47,44 @@ class TowerDataset(Dataset):
         :param K_skip: Option to this the original dataset by taking every K_skip tower. Must be used with augment.
         :param augment: Whether to include augmented towers in the dataset.
         """
-        self.tower_keys = list(tower_dict.keys())
+        self.tower_keys = ['2block', '3block', '4block', '5block']#list(tower_dict.keys())
         self.tower_tensors = {}
         self.tower_labels = {}
 
-        # First augment the given towers with rotations. 
-        if augment:
-            augmented_towers = augment_towers(tower_dict, K_skip, mirror=False)
-        else:
-            augmented_towers = tower_dict
+        # First augment the given towers with rotations.    
+        augmented_towers = {}
+        for tower_height in tower_dict:
+            if 'towers' in tower_dict[tower_height] and \
+                    len(tower_dict[tower_height]['towers']) > 0:
+                tower_data = tower_dict[tower_height]
+                if augment:
+                    augmented_towers_height = augment_towers({tower_height:tower_data}, K_skip, mirror=False)[tower_height]
+                else:
+                    augmented_towers_height = tower_data
+                augmented_towers[tower_height] = augmented_towers_height
 
         for key in self.tower_keys:
-            towers = torch.Tensor(augmented_towers[key]['towers'])
-            labels = torch.Tensor(augmented_towers[key]['labels'])
-
-            self.tower_tensors[key] = preprocess(towers)
-            self.tower_labels[key] = labels
-        
+            if key in augmented_towers:
+                towers = torch.Tensor(augmented_towers[key]['towers'])
+                labels = torch.Tensor(augmented_towers[key]['labels'])
+                self.tower_tensors[key] = preprocess(towers)
+                self.tower_labels[key] = labels
+            else:
+                self.tower_tensors[key] = torch.empty(0)
+                self.tower_labels[key] = torch.empty(0)
+                
         # Same order as 
         self.start_indices = {}
         self.get_indices()
+        
+        # check if there is any data in the dataset
+        self.has_data = self.check_has_data()
+        
+    def check_has_data(self):
+        for key in self.tower_keys:
+            if self.tower_tensors[key].numel() != 0:
+                return True
+        return False
 
     def get_indices(self):
         """
@@ -108,7 +126,7 @@ class TowerDataset(Dataset):
         the towers to add to the dataset.
         """
         augmented_towers = augment_towers(tower_dict, 1, mirror=False)
-        for k in self.tower_keys:
+        for k in augmented_towers.keys():
             if augmented_towers[k]['towers'].shape[0] > 0:
                 new_towers = torch.Tensor(augmented_towers[k]['towers'])
                 new_towers = add_placement_noise(new_towers)
@@ -119,8 +137,9 @@ class TowerDataset(Dataset):
                 self.tower_labels[k] = torch.cat([self.tower_labels[k], new_labels], dim=0)
 
         self.get_indices()
-
-
+        self.has_data = self.check_has_data()
+        
+        
 class TowerSampler(Sampler):
     def __init__(self, dataset, batch_size, shuffle):
         self.dataset = dataset

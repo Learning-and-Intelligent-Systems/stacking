@@ -102,17 +102,20 @@ def get_labels(samples):
     """
     tp = TowerPlanner(stability_mode='contains')
     for k in samples.keys():
-        n_towers, n_blocks, _ = samples[k]['towers'].shape
-        labels = np.ones((n_towers,))
+        if len(samples[k]['towers'].shape) > 1:
+            n_towers, n_blocks, _ = samples[k]['towers'].shape
+            labels = np.ones((n_towers,))
 
-        for ix in range(0, n_towers):
-            # Convert tower to Block representation.
-            block_tower = [Object.from_vector(samples[k]['towers'][ix, jx, :]) for jx in range(n_blocks)]
-            #  Use tp to check for stability.
-            if not tp.tower_is_constructable(block_tower):
-                labels[ix] = 0.
+            for ix in range(0, n_towers):
+                # Convert tower to Block representation.
+                block_tower = [Object.from_vector(samples[k]['towers'][ix, jx, :]) for jx in range(n_blocks)]
+                #  Use tp to check for stability.
+                if not tp.tower_is_constructable(block_tower):
+                    labels[ix] = 0.
 
-        samples[k]['labels'] = labels
+            samples[k]['labels'] = labels
+        else:
+            samples[k]['labels'] = np.empty(0)
     return samples
 
 

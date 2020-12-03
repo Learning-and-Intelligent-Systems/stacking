@@ -1,6 +1,7 @@
 import argparse
 import pickle
 
+import torch
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
@@ -26,6 +27,8 @@ def run_active_towers(args):
     ensemble = Ensemble(base_model=base_model,
                         base_args={'n_hidden': args.n_hidden, 'n_in': 14},
                         n_models=args.n_models)
+    if torch.cuda.is_available():
+        ensemble.cuda()
 
     # Choose a sampler and check if we are limiting the blocks to work with.
     block_set = None
@@ -56,11 +59,11 @@ def run_active_towers(args):
                                    K_skip=100)
     
     else:
-        towers_dict = sample_unlabeled_data(1, block_set=block_set, tower_heights=args.tower_heights)
+        towers_dict = sample_unlabeled_data(0, block_set=block_set, tower_heights=args.tower_heights)
         towers_dict = get_labels(towers_dict)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
-        val_towers_dict = sample_unlabeled_data(1, block_set=block_set, tower_heights=args.tower_heights)
+        val_towers_dict = sample_unlabeled_data(0, block_set=block_set, tower_heights=args.tower_heights)
         val_towers_dict = get_labels(val_towers_dict)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
@@ -111,6 +114,10 @@ if __name__ == '__main__':
     parser.add_argument('--pool-fname', type=str, default='')  
     parser.add_argument('--model', default='fcgn', choices=['fcgn', 'lstm'])      
     parser.add_argument('--tower-heights', nargs='*', default=['2','3','4','5'], help='Tower sizes to train with. Only used if block-set-fname argument is also set.')
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
+    
+    if args.debug:
+        import pdb; pdb.set_trace()
 
     run_active_towers(args)
