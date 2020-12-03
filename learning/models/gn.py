@@ -103,6 +103,7 @@ class FCGN(nn.Module):
             h = self.node_fn(towers, h, e)
             
         # Calculate output predictions.
-        x = torch.mean(h, dim=1)
-        x = self.O(x).view(N)
+        #x = torch.mean(h, dim=1)
+        h_bottom_block = h[:,0,:].view(N, self.n_hidden)
+        x = self.O(h_bottom_block).view(N)
         return torch.sigmoid(x).unsqueeze(-1)

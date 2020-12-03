@@ -19,6 +19,8 @@ def sample_unlabeled_data(n_samples, tx=None, block_set=None, tower_heights=['2'
     :param block_set (optional): blocks to use in towers. generate new blocks if None
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
+    '''
+    # uncomment to use a curriculum
     if tx is None:
         tower_heights=['2']
     else:
@@ -30,6 +32,7 @@ def sample_unlabeled_data(n_samples, tx=None, block_set=None, tower_heights=['2'
             tower_heights=['2','3','4']
         else:
             tower_heights=['2','3','4','5']
+    '''
     keys = [th+'block' for th in tower_heights]
     int_tower_heights = [int(th) for th in tower_heights]
     
