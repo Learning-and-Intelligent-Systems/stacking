@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from PIL import Image
 
 # Load the predefined dictionary
 dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
@@ -7,7 +8,7 @@ dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
 ppcm = 300 # pixels per cm
 marker_scale = 0.9 # scale of the aruco tag on the face
 
-
+dpi = ppcm*2.54
 
 def generate_texture(block_id, block_dimensions):
     images = []
@@ -37,8 +38,11 @@ def generate_texture(block_id, block_dimensions):
         side_image[[0,-1]] = 0
         side_image[:,[0,-1]] = 0
 
-        cv2.imshow('test', side_image)
-        cv2.waitKey(300)
+        # cv2.imwrite(f'tags/block_{block_id}_face_{face}.png', side_image)
+        pil_side_image = Image.fromarray(side_image)
+        pil_side_image.save(f'tags/block_{block_id}_face_{face}.png', format='PNG', dpi=(dpi, dpi))
+        # cv2.imshow('display', side_image)
+        # cv2.waitKey(500)
 
         images.append(side_image)
         marker_ids.append(marker_id)
@@ -48,6 +52,6 @@ def generate_texture(block_id, block_dimensions):
 
 
 if __name__ == '__main__':
-    block_dimensions = np.array([5,6,7])
+    block_dimensions = np.array([6,6,10])
     block_id = 4
     images, marker_ids, marker_sizes = generate_texture(block_id, block_dimensions)
