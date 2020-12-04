@@ -80,12 +80,18 @@ def get_dataset_statistics(logger):
     for tx in range(logger.args.max_acquisitions):
         acquired_data, _ = logger.load_acquisition_data(tx)
         
-        nums = [acquired_data[k]['towers'].shape[0] for k in tower_keys]
-        pos = [np.sum(acquired_data[k]['labels']) for k in tower_keys]
-        print(nums, pos)
+        nums = []
+        pos = []
+        for kx, key in enumerate(tower_keys):
+            if key in acquired_data:
+                nums += [acquired_data[key]['towers'].shape[0]]
+                pos += [np.sum(acquired_data[key]['labels'])]
+        #nums = [acquired_data[k]['towers'].shape[0] for k in tower_keys]
+        #pos = [np.sum(acquired_data[k]['labels']) for k in tower_keys]
+                print(nums, pos)
 
-        for kx, k in enumerate(tower_keys):
-            aq_over_time[tx, kx] = acquired_data[k]['towers'].shape[0]
+        
+                aq_over_time[tx, kx] = acquired_data[key]['towers'].shape[0]
 
     
 
@@ -721,7 +727,7 @@ if __name__ == '__main__':
     #get_acquisition_scores_over_time(logger)
     #plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
-    #get_dataset_statistics(logger)
+    get_dataset_statistics(logger)
     # accs = get_validation_accuracy(logger,
     #                               'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
     # # accs = get_validation_accuracy(logger,
@@ -741,7 +747,7 @@ if __name__ == '__main__':
     #check_validation_robustness()
 
     #min_contact_regret_evaluation(logger)
-    tallest_tower_regret_evaluation(logger)
+    #tallest_tower_regret_evaluation(logger)
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
-    plot_tallest_tower_regret(logger)
+    #plot_tallest_tower_regret(logger)
     #plot_constructability_over_time(logger)
