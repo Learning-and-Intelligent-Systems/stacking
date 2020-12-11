@@ -94,8 +94,8 @@ def get_dataset_statistics(logger):
         dataset = logger.load_dataset(tx)
         print([dataset.tower_tensors[k].shape[0] for k in tower_keys])
 
-    max_x = 400 + 10*logger.args.max_acquisitions
-    xs = np.arange(400, max_x, 10)
+    max_x = 40 + 10*logger.args.max_acquisitions
+    xs = np.arange(40, max_x, 10)
 
     w = 10
     plt.figure(figsize=(20, 10))
@@ -590,7 +590,7 @@ def tallest_tower_regret_evaluation(logger, n_towers=50, block_set=''):
 
     return evaluate_planner(logger, n_towers, tower_height, block_set, fname='height_regret_blocks.pkl')
 
-def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
+def min_contact_regret_evaluation(logger, n_towers=50, block_set=''):
     def contact_area(tower):
         """
         :param tower: A vectorized version of the tower.
@@ -619,7 +619,7 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
     tower_keys = ['2block', '3block', '4block', '5block']
     tower_sizes = [2, 3, 4, 5]
     tp = TowerPlanner(stability_mode='contains')
-    ep = EnsemblePlanner(n_samples=5000)
+    ep = EnsemblePlanner(n_samples=10000)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
@@ -631,6 +631,8 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
     for tx in range(0, 101, 10):#logger.args.max_acquisitions):
         print(tx)
         ensemble = logger.get_ensemble(tx)
+        if torch.cuda.is_available():
+            ensemble = ensemble.cuda()
 
         for k, size in zip(tower_keys, tower_sizes):
             print(k)
@@ -741,7 +743,7 @@ if __name__ == '__main__':
     #check_validation_robustness()
 
     #min_contact_regret_evaluation(logger)
-    #tallest_tower_regret_evaluation(logger)
+    tallest_tower_regret_evaluation(logger)#, block_set='learning/data/block_set_10_cog.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     #plot_tallest_tower_regret(logger)
-    plot_constructability_over_time(logger)
+    #plot_constructability_over_time(logger)
