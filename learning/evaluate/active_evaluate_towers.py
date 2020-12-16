@@ -3,6 +3,7 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
+import pybullet as p
 import time
 import torch
 
@@ -16,6 +17,7 @@ from learning.evaluate.planner import EnsemblePlanner
 
 from tower_planner import TowerPlanner
 
+from sklearn.metrics import f1_score, precision_score, recall_score
 from torch.utils.data import DataLoader
 
 
@@ -36,6 +38,8 @@ def get_validation_accuracy(logger, fname):
         for k in tower_keys:
             end = start + val_towers[k]['towers'].shape[0]
             acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
+
+            f1 = recall_score(val_towers[k]['labels'], preds[start:end] > 0.5)
             accs[k].append(acc)
             mask = (preds[start:end] > 0.9) | (preds[start:end] < 0.1)
             #print(mask)
@@ -94,18 +98,34 @@ def get_dataset_statistics(logger):
         dataset = logger.load_dataset(tx)
         print([dataset.tower_tensors[k].shape[0] for k in tower_keys])
 
+    plt.clf()
+    bars = plt.bar([2, 3, 4, 5], [dataset.tower_tensors[k].shape[0]/4 for k in tower_keys])
+    plt.xticks([2, 3, 4, 5], ['2 Blocks', '3 Blocks', '4 Blocks', '5 Blocks'])
+    bars[0].set_color('b')
+    bars[1].set_color('tab:orange')
+    bars[2].set_color('g')
+    bars[3].set_color('r')
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    plt.ylabel('Number of Towers', fontsize=20)
+    plt.show()
+
     max_x = 40 + 10*logger.args.max_acquisitions
     xs = np.arange(40, max_x, 10)
+    print(xs.shape)
+    xs = np.arange(1, logger.args.max_acquisitions+1)
+    print(xs.shape, aq_over_time.shape)
+    print(xs)
 
-    w = 10
+    w = 1
     plt.figure(figsize=(20, 10))
     plt.bar(xs, aq_over_time[:, 0], width=w, label='2block')
     for kx in range(1, len(tower_keys)):
         plt.bar(xs, aq_over_time[:, kx], bottom=np.sum(aq_over_time[:, :kx], axis=1), width=w, label=tower_keys[kx])
     
-    plt.xlabel('Acquisition Step')
-    plt.ylabel('Number of Collected Samples')
-    plt.legend()
+    plt.xlabel('Acquisition Step', fontsize=20)
+    plt.ylabel('Number of Collected Samples', fontsize=20)
+    plt.legend(prop={'size': 20})
+    plt.tick_params(axis='both', which='major', labelsize=16)
     plt.savefig(logger.get_figure_path('acquisition_breakdown.png'))
 
 def plot_constructability_over_time(logger):
@@ -235,7 +255,7 @@ def analyze_acquisition_histogram(logger):
         #     for k in tower_keys:
         #         unlabeled[k]['towers'] = add_placement_noise(unlabeled[k]['towers'])
         
-        for tx in range(65, 171, 1):
+        for tx in range(100, 101, 1):
             print(tx)
             ensemble = logger.get_ensemble(tx)
             it_scores = {k: [] for k in tower_keys}
@@ -248,22 +268,59 @@ def analyze_acquisition_histogram(logger):
                 #noisy_preds = get_predictions(noisy, ensemble)
                 labels = get_labels(unlabeled)
                 bald_scores = bald(preds).numpy()
+
+                
+
                 #noisy_bald_scores = bald(noisy_preds).numpy()
 
                 # Get the max score per tower_height.
                 start = 0
                 fig, axes = plt.subplots(4, figsize=(10, 20), sharex=True)
                 for kx, k in enumerate(tower_keys):
+
+                    print(k)
                     end = start + unlabeled[k]['towers'].shape[0]
                     acquire_indices = np.argsort(bald_scores[start:end])[::-1][:100]
                     
-                    print(k)
-                    print(labels[k]['labels'][acquire_indices[0:10]])
-                    print(preds.numpy()[start:end][acquire_indices[0:10],:])
-                    print(bald_scores[start:end][acquire_indices[0:10]])
+
+                    # Print information about how many non-informative towers are wrong.
+                    #low_indices = np.argsort(bald_scores[start:end])[:]
+                    low_indices = (bald_scores[start:end] > 0.1).nonzero()[0]
+
+                    masses = unlabeled[k]['towers'][low_indices, :, 0]
+                    block_sets = set([tuple(masses[ix, :].tolist()) for ix in range(masses.shape[0])])
+                    print(low_indices.shape[0], len(block_sets))
+                    print(bald_scores.shape)
+                    ls = labels[k]['labels'][low_indices]
+                    ps = preds.numpy()[start:end][low_indices]
+                    bs = bald_scores[start:end][low_indices]
+
+                    acc = ((ps.mean(1) > 0.5) == ls).mean()
+                    
+                    print(acc)
+                    for lx in range(0, low_indices.shape[0]):
+                        print(ls[-lx], ps[-lx,:].mean(), ps[-lx,:], bs[-lx])
+
+                    # Print information about top scoring towers.
+                    # print(k) 
+                    # print(labels[k]['labels'][acquire_indices[0:10]])
+                    # print(preds.numpy()[start:end][acquire_indices[0:10],:])
+                    # print(bald_scores[start:end][acquire_indices[0:10]])
+
+                    # Check acquire indices to see if we already have that tower.
+                    block_orders = set()
+                    pruned_indices = []
+                    for ix in acquire_indices:
+                        masses = tuple(unlabeled[k]['towers'][ix, :, 0].tolist())
+                        if masses not in block_orders:
+                            pruned_indices.append(ix)
+                            block_orders.add(tuple(masses))
+                    print(len(acquire_indices), len(pruned_indices))
+
+
                     it_scores[k].append(bald_scores[start:end][acquire_indices[0]])
                     #it_scores[k].append(np.mean(bald_scores[start:end][acquire_indices]))
-                    axes[kx].hist(bald_scores[start:end][acquire_indices], bins=50)
+                    axes[kx].hist(bald_scores[start:end][pruned_indices], bins=50)
                     #axes[kx].hist(preds.mean(1)[start:end], bins=50)
                     start = end
                     axes[kx].set_xlim(0, 0.5)
@@ -465,7 +522,7 @@ def inspect_2block_towers(logger):
     ixs = np.argsort(bald_scores)[::-1][:10]
     print(bald_scores[ixs])
     input()
-    
+    tp = TowerPlanner(stability_mode='contains')
     preds2 = preds[:unlabeled['2block']['towers'].shape[0], :]
     bald_scores2 = bald_scores[:unlabeled['2block']['towers'].shape[0]]
     acquire_indices = np.argsort(bald_scores2)[::-1][:50]
@@ -474,7 +531,9 @@ def inspect_2block_towers(logger):
     print('-----')
     for ix in acquire_indices:
         d = decision_distance(unlabeled['2block']['towers'][ix,:,:])
-        print(np.around(preds2[ix,:].numpy(), 4), np.around(bald_scores2[ix], 3), d)
+        tower = unlabeled['2block']['towers'][ix,:,:]
+        l = tp.tower_is_constructable([Object.from_vector(tower[bx, :]) for bx in range(tower.shape[0])])
+        print(np.around(preds2[ix,:].numpy(), 4), np.around(bald_scores2[ix], 3), d, l)
 
     for ix in acquire_indices:
         unlabeled['2block']['towers'][ix,1,7:8] += 0.0
@@ -483,6 +542,8 @@ def inspect_2block_towers(logger):
     for ix in acquire_indices:
         d = decision_distance(unlabeled['2block']['towers'][ix,:,:])
         print(np.around(new_preds[ix,:].numpy(), 2))
+    plt.hist(unlabeled['2block']['towers'][acquire_indices,1,0])
+    plt.show()
     print('-----')
     start = 0
     for k in tower_keys:
@@ -511,6 +572,14 @@ def inspect_2block_towers(logger):
         accs[k].append(acc)
         start = end
     print(accs)
+
+def plot_2block_BALD_heatmap(logger):
+    # TODO: Find informative 2-block tower.
+
+    # TODO: Grid the x-y position of the top block.
+
+    # TODO: Plot the predictions overlayed on the top block.
+    pass
 
 
 def single_2block_tower_analysis(logger):
@@ -628,7 +697,7 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
     tower_keys = ['2block', '3block', '4block', '5block']
     tower_sizes = [2, 3, 4, 5]
     tp = TowerPlanner(stability_mode='contains')
-    ep = EnsemblePlanner(n_samples=10000)
+    ep = EnsemblePlanner(n_samples=50000)
 
     tower_keys = ['5block']
     tower_sizes = [5]
@@ -644,7 +713,7 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
 
 
     
-    for tx in range(120, 901, 10):#logger.args.max_acquisitions):
+    for tx in range(85, 901, 10):#logger.args.max_acquisitions):
         print(tx)
         ensemble = logger.get_ensemble(tx)
 
@@ -690,7 +759,7 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
                 print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
                 print('Global Stable:', tp.tower_is_stable(block_tower))
 
-                if False:
+                if False and reward != 0:
                     print(reward, max_reward)
                     w = World(block_tower)
                     env = Environment([w], vis_sim=True, vis_frames=True)
@@ -773,6 +842,35 @@ def get_stability_composition(logger, tx):
         print(stable)
 
 
+def validate(logger, tx):
+    tower_keys = ['2block', '3block', '4block', '5block']
+    tp = TowerPlanner(stability_mode='contains')
+    with open('learning/data/random_blocks_(x1000.0)_constructable_val.pkl', 'rb') as handle:
+        val_towers = pickle.load(handle)
+
+    ensemble = logger.get_ensemble(tx)
+    all_preds = get_predictions(val_towers, ensemble).numpy()
+    preds = all_preds.mean(1)
+
+    start = 0
+    for k in tower_keys:
+        end = start + val_towers[k]['towers'].shape[0]
+        acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
+        print((preds[start:end]>0.5).sum() )
+
+        for ix in range(0, val_towers[k]['towers'].shape[0]):
+            tower = val_towers[k]['towers'][ix, :, :]
+            block_tower = [Object.from_vector(tower[bx]) for bx in range(0, tower.shape[0])]
+            
+            # if (preds[start:end][ix] > 0.5) != val_towers[k]['labels'][ix] and ix > 500:
+            #     print(all_preds[start:end][ix,:], )
+            assert tp.tower_is_constructable(block_tower) == val_towers[k]['labels'][ix]
+
+
+        print(k, acc)
+        start = end
+
+
 def validate_by_stability_type(logger, tx):
     tower_keys = ['2block', '3block', '4block', '5block']
     tp = TowerPlanner(stability_mode='contains')
@@ -814,7 +912,47 @@ def get_percent_stable(logger):
 
     for k in tower_keys:
         print(k, dataset.tower_labels)
-    
+
+
+def save_collected_tower_images(logger):
+    tower_keys = ['2block', '3block', '4block', '5block']
+    for tx in range(0, 20):
+        towers, _ = logger.load_acquisition_data(tx)
+        
+        ix = np.random.randint(0, 10)
+        print(towers['2block']['towers'].shape)
+        start = 0 
+        for k in tower_keys:
+            end = start + towers[k]['towers'].shape[0]
+
+            if ix < end:
+                tower = towers[k]['towers'][ix - start, :, :]
+                block_tower = [Object.from_vector(tower[bx, :]) for bx in range(tower.shape[0])]
+                label = towers[k]['labels'][ix-start]
+                break
+            start = end
+
+        w = World(block_tower)
+        env = Environment([w], vis_sim=False, vis_frames=True)
+        env.step(vis_frames=True)
+
+        view_matrix = p.computeViewMatrixFromYawPitchRoll(distance=0.3,
+                                                            yaw=45,
+                                                            pitch=-10,
+                                                            roll=0,
+                                                            upAxisIndex=2,
+                                                            cameraTargetPosition=(0., 0., 0.25))
+        aspect = 100. / 190.
+        nearPlane = 0.01
+        farPlane = 10
+        fov = 90
+        projection_matrix = p.computeProjectionMatrixFOV(fov, aspect, nearPlane, farPlane)
+        image_data = p.getCameraImage(200, 380, shadow=1,  viewMatrix=view_matrix, projectionMatrix=projection_matrix)
+        w, h, im = image_data[:3]
+        np_im = np.array(im, dtype=np.uint8).reshape(h, w, 4)[:, :, 0:3]
+        #plt.imshow(np.array(np_im))
+        plt.imsave(logger.get_figure_path('tower_%d_%d.png' % (tx, label)), np_im)
+        env.disconnect()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -822,20 +960,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 65
+    logger.args.max_acquisitions = 100
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
     #get_acquisition_scores_over_time(logger)
     #plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
-    #get_dataset_statistics(logger)
-    # accs = get_validation_accuracy(logger,
-    #                               'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
+    # get_dataset_statistics(logger)
     # # accs = get_validation_accuracy(logger,
-    # #                               'learning/data/unstable_val.pkl')
+    # #                               'learning/data/random_blocks_(x1000.0)_constructable_val.pkl')
+    # accs = get_validation_accuracy(logger,
+    #                               'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
+    # # # # accs = get_validation_accuracy(logger,
+    # # # #                               'learning/data/unstable_val.pkl')
     
-    # plot_val_accuracy(logger)
+    #plot_val_accuracy(logger)
     # #analyze_collected_2block_towers(logger)
     # print(accs)
 
@@ -854,7 +994,9 @@ if __name__ == '__main__':
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     #plot_tallest_tower_regret(logger)
     #plot_constructability_over_time(logger)
-
-    get_stability_composition(logger, tx=65)
-    validate_by_stability_type(logger, tx=65)
+    validate(logger, 100)
+    get_stability_composition(logger, tx=85)
+    validate_by_stability_type(logger, tx=85)
     #get_percent_stable(logger)
+
+    #save_collected_tower_images(logger)

@@ -40,7 +40,7 @@ def sample_random_tower(blocks, ret_rotated=False):
     # get the x and y dimensions of each block (after the rotation)
     dims_xy = np.array([rb.dimensions for rb in rotated_blocks])[:,:2]
     # figure out how far each block can be moved w/ losing contact w/ the block below
-    max_displacements_xy = (dims_xy[1:] + dims_xy[:1])/2.
+    max_displacements_xy = (dims_xy[1:] + dims_xy[:-1])/2.
     # sample unscaled noise (clip bceause random normal can exceed -1, 1)
     noise_xy = np.clip(0.5*np.random.randn(num_blocks-1, 2), -0.95, 0.95)
     # and scale the noise by the max allowed displacement
@@ -212,6 +212,11 @@ def main(args, vis_tower=False):
     # generate the finite set of blocks
     if use_block_set:
         block_set = [Object.random(f'obj_{i}') for i in range(block_set_size)]
+
+    # use_block_set = True
+    # with open('learning/data/block_set_10.pkl', 'rb') as handle:
+    #     block_set = pickle.load(handle)
+
     # create a vector of stability labels where half are unstable and half are stable
     stability_labels = np.zeros(num_towers, dtype=int)
     stability_labels[num_towers // 2:] = 1
@@ -242,7 +247,7 @@ def main(args, vis_tower=False):
                     # generate new blocks from scratch. Save the block names if using blocks
                     # from the block set
                     if use_block_set:
-                        blocks = sample_with_replacement(block_set, k=num_blocks)
+                        blocks = np.random.choice(block_set, num_blocks, replace=False)
                     else:
                         blocks = [Object.random(f'obj_{ix}') for ix in range(num_blocks)]
 
