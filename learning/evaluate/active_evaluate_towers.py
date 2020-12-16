@@ -656,7 +656,7 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def tallest_tower_regret_evaluation(logger, n_towers=10, block_set=''):
+def tallest_tower_regret_evaluation(logger, n_towers=50, block_set=''):
     def tower_height(tower):
         """
         :param tower: A vectorized version of the tower.
@@ -665,7 +665,7 @@ def tallest_tower_regret_evaluation(logger, n_towers=10, block_set=''):
 
     return evaluate_planner(logger, n_towers, tower_height, block_set, fname='height_regret_blocks.pkl')
 
-def longest_overhang_evaluation(logger, n_towers=10, block_set=''):
+def longest_overhang_evaluation(logger, n_towers=50, block_set=''):
     def horizontal_overhang(tower):
         return (tower[-1, 7] + tower[-1, 4]/2.) - (tower[0, 7] + tower[0, 4]/2.)
     
@@ -699,11 +699,6 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
     tp = TowerPlanner(stability_mode='contains')
     ep = EnsemblePlanner(n_samples=50000)
 
-    tower_keys = ['5block']
-    tower_sizes = [5]
-    # tower_keys = ['8block']
-    # tower_sizes = [8]
-
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
 
@@ -713,9 +708,15 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
 
 
     
+<<<<<<< HEAD
     for tx in range(85, 901, 10):#logger.args.max_acquisitions):
+=======
+    for tx in range(0, 101, 10):#logger.args.max_acquisitions):
+>>>>>>> 71a3f78612f62eb1478142b1fb0b555a5d2b2539
         print(tx)
         ensemble = logger.get_ensemble(tx)
+        if torch.cuda.is_available():
+            ensemble = ensemble.cuda()
 
         for k, size in zip(tower_keys, tower_sizes):
             print(k)
@@ -780,8 +781,8 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
             
             regrets[k].append(curr_regrets)
             print(num_failures, num_pw_failures)
-        # with open(logger.get_figure_path(fname), 'wb') as handle:
-        #     pickle.dump(regrets, handle)
+        with open(logger.get_figure_path(fname), 'wb') as handle:
+            pickle.dump(regrets, handle)
 
 def plot_tallest_tower_regret(logger):
     with open(logger.get_figure_path('height_regret_blocks.pkl'), 'rb') as handle:
@@ -982,14 +983,14 @@ if __name__ == '__main__':
     #analyze_acquisition_value_with_sampling_size(logger)
     #plot_acquisition_value_with_sampling_size(logger)
 
-    analyze_acquisition_histogram(logger)
+    #analyze_acquisition_histogram(logger)
     #single_2block_tower_analysis(logger)
     #inspect_2block_towers(logger)
 
     #check_validation_robustness()
 
     #min_contact_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
-    #tallest_tower_regret_evaluation(logger)
+    tallest_tower_regret_evaluation(logger)
     #longest_overhang_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     #plot_tallest_tower_regret(logger)
@@ -1000,3 +1001,4 @@ if __name__ == '__main__':
     #get_percent_stable(logger)
 
     #save_collected_tower_images(logger)
+

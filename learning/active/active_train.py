@@ -27,8 +27,8 @@ def split_data(data, n_val):
         train_mask = np.ones(data[k]['towers'].shape[0], dtype=bool)
         train_mask[tower_ixs] = False
 
-        val_data[k]['towers'] = data[k]['towers'][~train_mask,...]
-        val_data[k]['labels'] = data[k]['labels'][~train_mask,...]
+        val_data[k]['towers'] = val_data[k]['towers'][~train_mask,...]
+        val_data[k]['labels'] = val_data[k]['labels'][~train_mask,...]
         
         data[k]['towers'] = data[k]['towers'][train_mask,...]
         data[k]['labels'] = data[k]['labels'][train_mask,...]
@@ -70,7 +70,7 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
                                                    data_subset_fn=data_subset_fn,
                                                    data_label_fn=data_label_fn,
                                                    data_pred_fn=data_pred_fn)
-        logger.save_acquisition_data(new_data, all_samples, tx)
+        logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
 
         # Add to dataset.
         if val_dataloader is None:

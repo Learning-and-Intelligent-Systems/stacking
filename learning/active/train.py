@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from sklearn.metrics import f1_score
 from torch.nn import functional as F
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -13,9 +14,10 @@ from learning.active.toy_data import ToyDataset, ToyDataGenerator
 from learning.active.utils import ExperimentLogger
 
 
-def evaluate(loader, model):
+def evaluate(loader, model, val_metric='f1'):
     acc = []
     losses = []
+    f1s = []
     for x, y in loader:
         if torch.cuda.is_available():
             x = x.cuda()
@@ -27,8 +29,15 @@ def evaluate(loader, model):
         accuracy = ((pred>0.5) == y).float().mean()
         acc.append(accuracy.item())
         losses.append(loss.item())
+        with torch.no_grad():
+            f1s.append(f1_score(y.cpu().numpy(), pred.cpu().numpy() > 0.5))
+    if val_metric == 'loss':
+        score = np.mean(losses)
+    else:
+        score = -np.mean(f1s)
 
-    return np.mean(losses)
+
+    return score
 
 
 def train(dataloader, val_dataloader, model, n_epochs=20):
@@ -51,7 +60,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
                 x = x.cuda()
                 y = y.cuda()
             optimizer.zero_grad()
-
+            
             pred = model.forward(x).squeeze()
             loss = F.binary_cross_entropy(pred, y)
             loss.backward()
