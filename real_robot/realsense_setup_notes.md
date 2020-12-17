@@ -20,5 +20,5 @@ cmake ../ -DBUILD_PYTHON_BINDINGS=bool:true
 make -j4  # this took a while
 sudo make install
 cd wrappers/python
-cp *.so <virtualenvdir>/lib/python3.7/site-packages/. 
+cp *.so <virtualenvdir>/lib/python3.7/site-packages/.
 ```

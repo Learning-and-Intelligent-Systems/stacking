@@ -27,7 +27,7 @@ def generate_texture(block_id, block_dimensions):
         marker_size = int(marker_size_cm * ppcm)
         marker_image = np.zeros((marker_size, marker_size), dtype=np.uint8)
         marker_image = cv2.aruco.drawMarker(dictionary, marker_id, marker_size, marker_image, 1)
-        
+
         # and insert the marker into an image for the side
         side_image = np.ones(face_dimensions*ppcm, dtype=np.uint8) * 255
         ul_corner_idx = (face_dimensions*ppcm - marker_size) // 2
