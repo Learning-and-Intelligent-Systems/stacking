@@ -64,16 +64,24 @@ class PandaAgent:
     def execute(self):
         pb_robot.aabb.set_client(self._execution_client_id)
         pb_robot.body.set_client(self._execution_client_id)
+        pb_robot.collisions.set_client(self._execution_client_id)
+        pb_robot.geometry.set_client(self._execution_client_id)
+        pb_robot.grasp.set_client(self._execution_client_id)
         pb_robot.joint.set_client(self._execution_client_id)
         pb_robot.link.set_client(self._execution_client_id)
+        pb_robot.planning.set_client(self._execution_client_id)
         pb_robot.utils.set_client(self._execution_client_id)
         pb_robot.viz.set_client(self._execution_client_id)
 
     def plan(self):
         pb_robot.aabb.set_client(self._planning_client_id)
         pb_robot.body.set_client(self._planning_client_id)
+        pb_robot.collisions.set_client(self._planning_client_id)
+        pb_robot.geometry.set_client(self._planning_client_id)
+        pb_robot.grasp.set_client(self._planning_client_id)
         pb_robot.joint.set_client(self._planning_client_id)
         pb_robot.link.set_client(self._planning_client_id)
+        pb_robot.planning.set_client(self._planning_client_id)
         pb_robot.utils.set_client(self._planning_client_id)
         pb_robot.viz.set_client(self._planning_client_id)
 
