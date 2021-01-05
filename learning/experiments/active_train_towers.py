@@ -4,7 +4,7 @@ import pickle
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
-from learning.domains.towers.active_utils import sample_unlabeled_data, get_predictions, get_labels, get_subset, PoolSampler
+from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, get_predictions, get_labels, get_subset, PoolSampler
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.bottomup_net import BottomUpNet
@@ -77,6 +77,11 @@ def run_active_towers(args):
         val_towers_dict = get_labels(val_towers_dict)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
+    if args.sampler == 'sequential':
+        if block_set is None:
+            raise NotImplementedError()
+        data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
+
     print(len(dataset), len(val_dataset)) 
     sampler = TowerSampler(dataset=dataset,
                            batch_size=args.batch_size,
@@ -120,6 +125,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')
+    parser.add_argument('--sampler', choices=['random', 'sequential'], default='random', help='Choose how the unlabeled pool will be generated. Sequential assumes every tower has a stable base.')
     parser.add_argument('--pool-fname', type=str, default='')  
     parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      
     args = parser.parse_args()

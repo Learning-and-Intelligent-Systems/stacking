@@ -22,6 +22,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
     :param max_blocks
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
+    print('Generating data sequentially...')
     keys = ['2block', '3block', '4block', '5block']
 
     # initialize a dictionary of lists to store the generated data
@@ -97,7 +98,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
         # Add block to tower.
         new_tower = base_tower + [rot_block]
 
-        if True:
+        if False:
             w = World(new_tower)
             env = Environment([w], vis_sim=True, vis_frames=True)
             for tx in range(240):
@@ -107,17 +108,13 @@ def sample_sequential_data(block_set, dataset, n_samples):
         # Save that tower in the sampled_towers dict
         n_blocks = len(new_tower)
         sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(new_tower))
-        # if block_set is not None:
-        #     print(block.name)
-        #     block_ids = [int(block.name.strip('obj_')) for block in base_tower]
-        #     sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
     
     # convert all the sampled towers to numpy arrays
     for k in keys:
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
+        if sampled_towers[k]['towers'].shape[0] == 0:
+            sampled_towers[k]['towers'] = sampled_towers[k]['towers'].reshape((0, int(k[0]), 17))
         sampled_towers[k]['labels'] = np.zeros((sampled_towers[k]['towers'].shape[0],))
-        # if block_set is not None:
-        #     sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
 
     return sampled_towers
 
@@ -337,4 +334,4 @@ if __name__ == '__main__':
         dataset = pickle.load(handle)
 
     data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
-    unlabeled = data_sampler_fn(100)
+    unlabeled = data_sampler_fn(10000)
