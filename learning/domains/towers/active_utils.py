@@ -1,12 +1,14 @@
 import numpy as np
 import pickle
+import time
 import torch
 
+from copy import deepcopy
 from torch.utils.data import DataLoader
 
-from block_utils import Object, get_rotated_block
-from learning.domains.towers.generate_tower_training_data import sample_random_tower, vectorize
-from learning.domains.towers.tower_data import TowerDataset, TowerSampler
+from block_utils import World, Environment, Object, Quaternion, Pose, get_rotated_block, ZERO_POS
+from learning.domains.towers.generate_tower_training_data import sample_random_tower, vectorize, QUATERNIONS
+from learning.domains.towers.tower_data import TowerDataset, TowerSampler, unprocess
 from tower_planner import TowerPlanner
 
 
@@ -30,40 +32,92 @@ def sample_sequential_data(block_set, dataset, n_samples):
         if block_set is not None:
             sampled_towers[k]['block_ids'] = []
 
-    # Gather list of all stable towers.
+    # Gather list of all stable towers. Towers should be of blocks that are rotated in "Block" format.
     stable_towers = []
-    # TODO: Get all single block stable towers.
+    # Get all single block stable towers.
     for block in block_set:
-        pass
+        for orn in QUATERNIONS:
+            new_block = deepcopy(block)
+            new_block.pose = Pose(ZERO_POS, orn)
+            rot_block = get_rotated_block(new_block)
+            rot_block.pose = Pose((0., 0., rot_block.dimensions.z/2.), (0, 0, 0, 1))
+            stable_towers.append([rot_block])
 
-    # TODO: Get all stable towers from the dataset.
+    # Get all stable towers from the dataset.
+    for k in keys[:3]:
+        print(k)
+        tower_tensors = unprocess(dataset.tower_tensors[k].cpu().numpy().copy())
+        tower_labels = dataset.tower_labels[k]
+        for tower_vec, tower_label in zip(tower_tensors, tower_labels):
+            if tower_label == 1:
+                block_tower = [Object.from_vector(tower_vec[bx, :]) for bx in range(tower_vec.shape[0])]
+                stable_towers.append(block_tower)
 
+    block_lookup = {}
+    for block in block_set:
+        block_lookup[block.mass] = block
 
-
-    # TODO: Sample random towers by randomly choosing a stable base then trying to add a block.
+    # Sample random towers by randomly choosing a stable base then trying to add a block.
     for ix in range(n_samples):
-        # TODO: Choose a stable base.
-        base_tower = np.random.choice(stable_towers)
+        # Choose a stable base.
+        tower_ix = np.random.choice(np.arange(0, len(stable_towers)))
+        base_tower = stable_towers[tower_ix]
+
+        # Choose a block that's not already in the tower.
+        remaining_blocks = {}
+        for k in block_lookup:
+            used = False
+            for block in base_tower:
+                if np.abs(k - block.mass) < 0.001:
+                    used = True
+            if not used:
+                remaining_blocks[k] = block_lookup[k]
+        assert(len(remaining_blocks) == len(block_set) - len(base_tower))
+
+        new_block = deepcopy(np.random.choice(list(remaining_blocks.values())))
         
-        # TODO: Choose a block that's not already in the tower.
+        # Choose an orientation.
+        orn = QUATERNIONS[np.random.choice(np.arange(0, len(QUATERNIONS)))]
+        new_block.pose = Pose(ZERO_POS, orn)
+        rot_block = get_rotated_block(new_block)
+        
+        # Sample a displacement.
+        base_dims = np.array(base_tower[-1].dimensions)[:2]
+        new_dims = np.array(rot_block.dimensions)[:2]
+        max_displacements_xy = (base_dims+new_dims)/2.
+        noise_xy = np.clip(0.5*np.random.randn(2), -0.95, 0.95)
+        rel_xy = max_displacements_xy*noise_xy
 
-        # TODO: Sample the block placement and create a new tower.
+        # Calculate the new pose.
+        base_pos = np.array(base_tower[-1].pose.pos)[:2]
+        pos_xy = base_pos + rel_xy
+        pos_z = np.sum([b.dimensions.z for b in base_tower]) + rot_block.dimensions.z/2.
+        rot_block.pose = Pose((pos_xy[0], pos_xy[1], pos_z), (0, 0, 0, 1))
+        
+        # Add block to tower.
+        new_tower = base_tower + [rot_block]
 
-        # sample a new tower
-        tower = sample_random_tower(blocks)
-        rotated_tower = [get_rotated_block(b) for b in tower]
-        # and save that tower in the sampled_towers dict
-        sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(rotated_tower))
-        if block_set is not None:
-            block_ids = [int(block.name.strip('obj_')) for block in rotated_tower]
-            sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
+        if True:
+            w = World(new_tower)
+            env = Environment([w], vis_sim=True, vis_frames=True)
+            for tx in range(240):
+                env.step(vis_frames=True)
+                time.sleep(1/240.)
+            env.disconnect()
+        # Save that tower in the sampled_towers dict
+        n_blocks = len(new_tower)
+        sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(new_tower))
+        # if block_set is not None:
+        #     print(block.name)
+        #     block_ids = [int(block.name.strip('obj_')) for block in base_tower]
+        #     sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
     
     # convert all the sampled towers to numpy arrays
     for k in keys:
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
         sampled_towers[k]['labels'] = np.zeros((sampled_towers[k]['towers'].shape[0],))
-        if block_set is not None:
-            sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
+        # if block_set is not None:
+        #     sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
 
     return sampled_towers
 
