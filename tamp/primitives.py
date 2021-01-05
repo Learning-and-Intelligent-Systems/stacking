@@ -107,7 +107,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
             if (q_grasp is None) or not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
                 continue
             
-            path = robot.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
+            path = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
             if path is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
@@ -134,7 +134,7 @@ def assign_fluent_state(fluents):
 def get_free_motion_gen(robot, fixed=[]):
     def fn(conf1, conf2, fluents=[]):
         obstacles = fixed + assign_fluent_state(fluents)
-        path = robot.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
+        path = robot.arm.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
 
         if path is None:
             if DEBUG_FAILURE: input('Free motion failed')
@@ -147,7 +147,7 @@ def get_free_motion_gen(robot, fixed=[]):
 def get_holding_motion_gen(robot, fixed=[]):
     def fn(conf1, conf2, body, grasp, fluents=[]):
         obstacles = fixed + assign_fluent_state(fluents)
-        path = robot.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
+        path = robot.arm.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
 
         if path is None:
             if DEBUG_FAILURE: input('Holding motion failed')

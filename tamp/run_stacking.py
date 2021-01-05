@@ -240,7 +240,7 @@ if __name__ == '__main__':
     else:
         saved_world.restore()
         input("Execute?")
-        misc.ExecuteActions(robot.arm, plan)
+        misc.ExecuteActions(plan)
 
     input('Finish?')
     pb_robot.utils.disconnect()

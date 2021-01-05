@@ -369,9 +369,9 @@ class PandaAgent:
         else:
             saved_world.restore()
             self.execute()
-            ExecuteActions(self.execution_robot.arm, plan, pause=True, wait=False)
+            ExecuteActions(plan, pause=True, wait=False)
             self.plan()
-            ExecuteActions(self.robot.arm, plan, pause=False, wait=False)
+            ExecuteActions(plan, pause=False, wait=False)
             return True
 
     def _get_regrasp_skeleton(self, max_replacements=2):

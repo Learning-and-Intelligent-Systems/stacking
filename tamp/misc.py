@@ -35,7 +35,8 @@ def get_fixed(robot, movable):
     fixed = [body for body in rigid if body.id not in movable_ids]
     return fixed
 
-def ExecuteActions(manip, plan, pause=True, wait=True):
+def ExecuteActions(plan, real=False, pause=True, wait=True):
+    print("Execute in Simulation")
     for name, args in plan:
         # pb_robot.viz.remove_all_debug()
         # bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
@@ -49,6 +50,28 @@ def ExecuteActions(manip, plan, pause=True, wait=True):
                 input("Next?")
             elif pause:
                 time.sleep(0.5)
+    
+    ''' UNCOMMENT TO EXECUTE ON REAL ROBOT
+    if real:
+        from franka_interface import ArmInterface
+        import rospy
+        try:
+            rospy.init_node("path_execution")
+            arm = ArmInterface()
+        except:
+            print("Unable to connect to real robot. Exiting")
+            return
+        arm.hand.open()
+        arm.move_to_neutral()
+
+        print("Executing on real robot")
+        raw_input("start?")
+        for name, args in plan:
+            executionItems = args[-1]
+            for e in executionItems:
+                e.execute(realRobot=arm)
+                raw_input("Next?")
+    '''
 
 def ComputePrePose(og_pose, directionVector, relation=None):
     backup = numpy.eye(4)
