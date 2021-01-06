@@ -46,7 +46,8 @@ def sample_sequential_data(block_set, dataset, n_samples):
 
     # Get all stable towers from the dataset.
     for k in keys[:3]:
-        print(k)
+        if dataset is None:
+            break
         tower_tensors = unprocess(dataset.tower_tensors[k].cpu().numpy().copy())
         tower_labels = dataset.tower_labels[k]
         for tower_vec, tower_label in zip(tower_tensors, tower_labels):

@@ -78,6 +78,14 @@ def run_active_towers(args):
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
     if args.sampler == 'sequential':
+        towers_dict = sample_sequential_data(block_set, None, 40)
+        towers_dict = get_labels(towers_dict)
+        dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
+
+        val_towers_dict = sample_sequential_data(block_set, None, 40)
+        val_towers_dict = get_labels(val_towers_dict)
+        val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
+        
         if block_set is None:
             raise NotImplementedError()
         data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
