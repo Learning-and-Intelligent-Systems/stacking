@@ -17,24 +17,27 @@ from learning.active.utils import ExperimentLogger
 def evaluate(loader, model, val_metric='f1'):
     acc = []
     losses = []
-    f1s = []
+    
+    preds = []
+    labels = []
     for x, y in loader:
         if torch.cuda.is_available():
             x = x.cuda()
             y = y.cuda()
-
         pred = model.forward(x).squeeze()
+        if len(pred.shape) == 0: pred = pred.unsqueeze(-1)
         loss = F.binary_cross_entropy(pred, y)
-
+     
+        with torch.no_grad():
+            preds += (pred > 0.5).cpu().float().numpy().tolist()
+            labels += y.cpu().numpy().tolist()
         accuracy = ((pred>0.5) == y).float().mean()
         acc.append(accuracy.item())
         losses.append(loss.item())
-        with torch.no_grad():
-            f1s.append(f1_score(y.cpu().numpy(), pred.cpu().numpy() > 0.5))
     if val_metric == 'loss':
         score = np.mean(losses)
     else:
-        score = -np.mean(f1s)
+        score = -f1_score(labels, preds)
 
 
     return score
