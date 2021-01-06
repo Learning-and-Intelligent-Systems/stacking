@@ -64,7 +64,6 @@ class TowerDataset(Dataset):
         for key in self.tower_keys:
             towers = torch.Tensor(augmented_towers[key]['towers'])
             labels = torch.Tensor(augmented_towers[key]['labels'])
-
             self.tower_tensors[key] = preprocess(towers)
             self.tower_labels[key] = labels
         

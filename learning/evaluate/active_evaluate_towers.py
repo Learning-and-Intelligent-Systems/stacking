@@ -38,8 +38,8 @@ def get_validation_accuracy(logger, fname):
         for k in tower_keys:
             end = start + val_towers[k]['towers'].shape[0]
             acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
-
-            f1 = recall_score(val_towers[k]['labels'], preds[start:end] > 0.5)
+            f1 = f1_score(val_towers[k]['labels'], preds[start:end] > 0.5)
+            print('Acc:', tx, k, acc)
             accs[k].append(acc)
             mask = (preds[start:end] > 0.9) | (preds[start:end] < 0.1)
             #print(mask)
@@ -63,15 +63,16 @@ def plot_val_accuracy(logger):
 
     ref_acc = {'2block': .955, '3block': .925, '4block': .912, '5block': .913}
     
+    plt.clf()
     fig, axes = plt.subplots(4, figsize=(10, 20))
     for ix, ax in enumerate(axes):
         k = tower_keys[ix]
-        max_x = 400 + 10*len(accs[k])
-        xs = np.arange(400, max_x, 10)
+        max_x = 40 + 10*len(accs[k])
+        xs = np.arange(40, max_x, 10)
 
         ax.plot(xs, accs[k], label=k)
-        ax.plot([400, 4500], [ref_acc[k]]*2)
-        ax.axvline(x=4375)
+        #ax.plot([400, 4500], [ref_acc[k]]*2)
+        #ax.axvline(x=4375)
         ax.set_xlabel('Number of Towers')
         ax.set_ylabel('Val Accuracy')
         ax.legend()
@@ -246,7 +247,7 @@ def analyze_acquisition_histogram(logger):
 
     overall_data = {}
     
-    for n_samples in [50000]:
+    for n_samples in [1000000]:
         with open('learning/data/block_set_10.pkl', 'rb') as handle:
             block_set = pickle.load(handle)
         unlabeled_data = [sample_unlabeled_data(n_samples, block_set) for _ in range(n_repeats)]
@@ -255,7 +256,7 @@ def analyze_acquisition_histogram(logger):
         #     for k in tower_keys:
         #         unlabeled[k]['towers'] = add_placement_noise(unlabeled[k]['towers'])
         
-        for tx in range(100, 101, 1):
+        for tx in range(245, 250, 1):
             print(tx)
             ensemble = logger.get_ensemble(tx)
             it_scores = {k: [] for k in tower_keys}
@@ -285,7 +286,7 @@ def analyze_acquisition_histogram(logger):
 
                     # Print information about how many non-informative towers are wrong.
                     #low_indices = np.argsort(bald_scores[start:end])[:]
-                    low_indices = (bald_scores[start:end] > 0.1).nonzero()[0]
+                    low_indices = (bald_scores[start:end] > 0.4).nonzero()[0]
 
                     masses = unlabeled[k]['towers'][low_indices, :, 0]
                     block_sets = set([tuple(masses[ix, :].tolist()) for ix in range(masses.shape[0])])
@@ -298,8 +299,8 @@ def analyze_acquisition_histogram(logger):
                     acc = ((ps.mean(1) > 0.5) == ls).mean()
                     
                     print(acc)
-                    for lx in range(0, low_indices.shape[0]):
-                        print(ls[-lx], ps[-lx,:].mean(), ps[-lx,:], bs[-lx])
+                    # for lx in range(0, low_indices.shape[0]):
+                    #     print(ls[-lx], ps[-lx,:].mean(), ps[-lx,:], bs[-lx])
 
                     # Print information about top scoring towers.
                     # print(k) 
@@ -323,7 +324,7 @@ def analyze_acquisition_histogram(logger):
                     axes[kx].hist(bald_scores[start:end][pruned_indices], bins=50)
                     #axes[kx].hist(preds.mean(1)[start:end], bins=50)
                     start = end
-                    axes[kx].set_xlim(0, 0.5)
+                    axes[kx].set_xlim(0, 0.7)
        
                 plt.show()
 
@@ -665,13 +666,13 @@ def tallest_tower_regret_evaluation(logger, n_towers=50, block_set=''):
 
     return evaluate_planner(logger, n_towers, tower_height, block_set, fname='height_regret_blocks.pkl')
 
-def longest_overhang_evaluation(logger, n_towers=50, block_set=''):
+def longest_overhang_evaluation(logger, n_towers=10, block_set=''):
     def horizontal_overhang(tower):
         return (tower[-1, 7] + tower[-1, 4]/2.) - (tower[0, 7] + tower[0, 4]/2.)
     
     return evaluate_planner(logger, n_towers, horizontal_overhang, block_set, fname='longest_overhang.pkl')
     
-def min_contact_regret_evaluation(logger, n_towers=50, block_set=''):
+def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
     def contact_area(tower):
         """
         :param tower: A vectorized version of the tower.
@@ -696,8 +697,11 @@ def min_contact_regret_evaluation(logger, n_towers=50, block_set=''):
 def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
     tower_keys = ['2block', '3block', '4block', '5block']
     tower_sizes = [2, 3, 4, 5]
+
+    tower_keys = ['5block']
+    tower_sizes = [5]
     tp = TowerPlanner(stability_mode='contains')
-    ep = EnsemblePlanner(n_samples=50000)
+    ep = EnsemblePlanner(n_samples=10000)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
@@ -707,12 +711,8 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
             all_blocks = pickle.load(handle)
 
 
-    
-<<<<<<< HEAD
-    for tx in range(85, 901, 10):#logger.args.max_acquisitions):
-=======
-    for tx in range(0, 101, 10):#logger.args.max_acquisitions):
->>>>>>> 71a3f78612f62eb1478142b1fb0b555a5d2b2539
+
+    for tx in range(0, 201, 10):#logger.args.max_acquisitions):
         print(tx)
         ensemble = logger.get_ensemble(tx)
         if torch.cuda.is_available():
@@ -955,34 +955,49 @@ def save_collected_tower_images(logger):
         plt.imsave(logger.get_figure_path('tower_%d_%d.png' % (tx, label)), np_im)
         env.disconnect()
 
+def check_redundancy(logger):
+    for tx in range(0, logger.args.max_acquisitions):
+        towers, _ = logger.load_acquisition_data(tx)
+
+        # Check acquire indices to see if we already have that tower.
+        
+        for k in ['2block']:#towers.keys():
+            print(tx, k)
+            block_orders = set()
+            pruned_indices = []
+            for ix in range(0, towers[k]['towers'].shape[0]):
+                masses = tuple(towers[k]['towers'][ix, :, 0].tolist())
+                if masses not in block_orders:
+                    pruned_indices.append(ix)
+                    block_orders.add(masses)
+            print(towers[k]['towers'].shape[0], len(pruned_indices))
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path', type=str, required=True)
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 100
+    logger.args.max_acquisitions = 125
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
     #get_acquisition_scores_over_time(logger)
     #plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
-    # get_dataset_statistics(logger)
-    # # accs = get_validation_accuracy(logger,
-    # #                               'learning/data/random_blocks_(x1000.0)_constructable_val.pkl')
-    # accs = get_validation_accuracy(logger,
-    #                               'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
-    # # # # accs = get_validation_accuracy(logger,
-    # # # #                               'learning/data/unstable_val.pkl')
-    
-    #plot_val_accuracy(logger)
+    get_dataset_statistics(logger)
+    # # # accs = get_validation_accuracy(logger,
+    # # #                               'learning/data/random_blocks_(x1000.0)_constructable_val.pkl')
+    accs = get_validation_accuracy(logger,
+                                  'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
+    plot_val_accuracy(logger)
     # #analyze_collected_2block_towers(logger)
     # print(accs)
 
     #analyze_acquisition_value_with_sampling_size(logger)
     #plot_acquisition_value_with_sampling_size(logger)
 
+    #check_redundancy(logger)
     #analyze_acquisition_histogram(logger)
     #single_2block_tower_analysis(logger)
     #inspect_2block_towers(logger)
@@ -995,10 +1010,12 @@ if __name__ == '__main__':
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     #plot_tallest_tower_regret(logger)
     #plot_constructability_over_time(logger)
-    validate(logger, 100)
-    get_stability_composition(logger, tx=85)
-    validate_by_stability_type(logger, tx=85)
+    validate(logger, 125)
+    #get_stability_composition(logger, tx=245)
+    #validate_by_stability_type(logger, tx=85)
     #get_percent_stable(logger)
 
     #save_collected_tower_images(logger)
+
+
 
