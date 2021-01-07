@@ -4,27 +4,24 @@ import pickle
 import sys
 
 from planning.tree import Tree
-from planning.problems import Tallest, Overhang, Deconstruct, NodeValue
+from planning.problems import Tallest, Overhang, Deconstruct
 from block_utils import Object
 from learning.active.utils import ActiveExperimentLogger
 
 def plan(timeout, blocks, problem, model):
-    tree = Tree(init_value = NodeValue([], blocks))
+    tree = Tree(blocks)
     for t in range(timeout):
-        next_node_id = tree.get_next_node()
-        next_node_value = tree.nodes[next_node_id].value
+        parent_node_id = tree.get_exp_best_node_expand()
+        #print(t, len(tree.nodes[parent_node_id]['tower']), tree.nodes[parent_node_id]['value'])
         sys.stdout.write("Search progress: %i   \r" % (t) )
         sys.stdout.flush()
-        new_values, all_rewards, terms = problem.sample_actions(next_node_value, model)
-        for i, value in enumerate(new_values):
-            if len(value.tower) == 5:
-                print(all_rewards['reward'][i])
-        for i, (new_value, term) in enumerate(zip(new_values, terms)):
-            rewards = all_rewards['exp_reward'][i], \
-                        all_rewards['reward'][i], \
-                        all_rewards['ground_truth'][i],
-            tree.expand(new_value, *rewards, next_node_id, term)
+        new_nodes = problem.sample_actions(parent_node_id, tree.nodes[parent_node_id], model)
+        for node in new_nodes:
+            tree.expand(node)
     return tree
+
+def plan_mcts(timeout, blocks, problem, model):
+    pass
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -6,7 +6,7 @@ import torch
 
 from block_utils import ZERO_POS, Pose
 from planning.utils import make_tower_dataset, random_placement
-from planning.tree import NodeValue
+from planning.tree import Node
 from tower_planner import TowerPlanner
 
 class Problem:
@@ -25,36 +25,50 @@ class Tallest(Problem):
         self.max_height = max_height
         self.tp = TowerPlanner(stability_mode='contains')
         
-    def sample_actions(self, node_value, model):
-        new_values = []
-        eval_towers = []
-        if len(node_value.tower) == 0:
+    def sample_actions(self, parent_node_id, parent_node, model):
+        new_towers = []
+        new_blocks_remaining = []
+        if len(parent_node['tower']) == 0:
             # first action: place each possible block at (0,0)
-            for block in node_value.blocks_remaining:
+            for block in parent_node['blocks_remaining']:
                 block.pose = Pose(ZERO_POS, block.pose.orn)
-                new_blocks_remaining = copy(node_value.blocks_remaining)
-                new_blocks_remaining.remove(block)
-                new_values.append(NodeValue([block], new_blocks_remaining))
-                eval_towers.append([block])
+                blocks_remaining = copy(parent_node['blocks_remaining'])
+                blocks_remaining.remove(block)
+                new_towers.append([block])
+                new_blocks_remaining.append(blocks_remaining)
         else:
             # randomly sample a placement of a random block
-            for block in node_value.blocks_remaining:
-                new_blocks_remaining = copy(node_value.blocks_remaining)
-                new_blocks_remaining.remove(block)
+            for block in parent_node['blocks_remaining']:
+                blocks_remaining = copy(parent_node['blocks_remaining'])
+                blocks_remaining.remove(block)
                 for _ in range(self.samples_per_block):
-                    new_tower = random_placement(block, node_value.tower)
-                    new_values.append(NodeValue(new_tower, new_blocks_remaining))
-                    eval_towers.append(new_tower)
+                    tower = random_placement(block, parent_node['tower'])
+                    new_towers.append(tower)
+                    new_blocks_remaining.append(blocks_remaining)
                     
-        all_rewards = self.reward_fn(eval_towers, model)
+        all_rewards = self.reward_fn(new_towers, model)
 
-        terms = [False]*len(eval_towers)
-        for i, tower in enumerate(eval_towers):
+        terms = [False]*len(new_towers)
+        for i, tower in enumerate(new_towers):
             # rewards of 0 are unstable --> terminal nodes
             # once max height is reached --> terminal nodes
             if all_rewards['exp_reward'][i] == 0 or len(tower) == self.max_height:
-                terms[i] = [True]
-        return new_values, all_rewards, terms
+                terms[i] = True
+                
+        new_nodes = []
+        for i, (tower, blocks_remaining, term) in enumerate(zip(new_towers, new_blocks_remaining, terms)):
+            new_node =  {'parent': parent_node_id, 
+                                'children': [],
+                                'term': term,
+                                'leaf': True,
+                                'value': all_rewards['exp_reward'][i], 
+                                'count': 0,
+                                'tower': tower,
+                                'blocks_remaining': blocks_remaining,
+                                'tower_height': all_rewards['reward'][i],
+                                'ground_truth': all_rewards['ground_truth'][i]}
+            new_nodes.append(new_node)
+        return new_nodes
 
     def reward_fn(self, towers, model):
         all_rewards = {'exp_reward': [], 'reward': [], 'ground_truth': []}
