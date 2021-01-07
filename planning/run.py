@@ -1,6 +1,7 @@
 import argparse
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 
 from learning.active.utils import ActiveExperimentLogger
 from block_utils import Object
@@ -54,8 +55,6 @@ if __name__ == '__main__':
     if args.block_set_fname is not '':
         with open(args.block_set_fname, 'rb') as f:
             block_set = pickle.load(f)
-    else:
-        block_set = [Object.random(f'obj_{ix}') for ix in range(args.n_blocks)]
 
     logger = ActiveExperimentLogger(args.exp_path)
 
@@ -76,6 +75,9 @@ if __name__ == '__main__':
             
             for t in range(0, args.n_towers):
                 print('Tower number', t+1, '/', args.n_towers)
+                # generate new block set for each tower search
+                if args.block_set_fname is '':
+                    block_set = [Object.random(f'obj_{ix}') for ix in range(args.n_blocks)]
                 search_tree = sequential_planner(args.timeout, block_set, problem, ensemble)
                 for i, (k, size) in enumerate(zip(tower_keys, tower_sizes)):
                     print('Finding best tower size: ', size)
@@ -90,12 +92,12 @@ if __name__ == '__main__':
 
                         if not problem.tp.tower_is_constructable(best_tower):
                             reward = 0
-                        
+                        regret = (gt_reward - reward)/gt_reward
                     except:
                         print('No tall towers of height ', size, 'found')
-                        reward = 0
-                    # Compare heights and calculate regret.
-                    regret = (gt_reward - reward)/gt_reward
+                        regret = 1
+                
+                    # Compare heights and calculate regret.    
                     regrets[k].append(regret)
             with open(logger.get_figure_path('sequential_planner_tallest_tower_regret.pkl'), 'wb') as handle:
                 pickle.dump(regrets, handle)
