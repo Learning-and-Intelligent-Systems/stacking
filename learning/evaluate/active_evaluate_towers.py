@@ -587,14 +587,14 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def tallest_tower_regret_evaluation(logger, n_towers=50, block_set=''):
+def tallest_tower_regret_evaluation(logger, max_acquisitions, fname, n_towers, block_set):
     def tower_height(tower):
         """
         :param tower: A vectorized version of the tower.
         """
         return np.sum(tower[:, 6])
 
-    return evaluate_planner(logger, n_towers, tower_height, block_set, fname='height_regret_blocks.pkl')
+    return evaluate_planner(logger, n_towers, tower_height, block_set, max_acquisitions, fname)
 
 def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
     def contact_area(tower):
@@ -621,7 +621,7 @@ def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
 
     return evaluate_planner(logger, n_towers, contact_area, block_set, fname='contact_regret.pkl')
 
-def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
+def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fname):
     tower_keys = ['2block', '3block', '4block', '5block']
     tower_sizes = [2, 3, 4, 5]
     tp = TowerPlanner(stability_mode='contains')
@@ -630,25 +630,15 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
 
-    if len(block_set) > 0:
-        with open(block_set, 'rb') as handle:
-            all_blocks = pickle.load(handle)
-
-    for tx in range(0, 101, 10):#logger.args.max_acquisitions):
-        print(tx)
+    for tx in range(0, max_acquisitions, 10):#logger.args.max_acquisitions):
+        print('Acquisition step:', tx)
         ensemble = logger.get_ensemble(tx)
 
         for k, size in zip(tower_keys, tower_sizes):
-            print(k)
+            print('Tower size', k)
             curr_regrets = []
-            for _ in range(0, n_towers):
-                if len(block_set) > 0:
-                    blocks = np.random.choice(all_blocks, size, replace=False)
-                    blocks = copy.deepcopy(blocks)
-                else:
-                    blocks = [Object.random() for _ in range(size)]
-                    #blocks = [Object.adversarial() for _ in range(size)]
-
+            for t in range(0, n_towers):
+                print('Tower number', t)
                 tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn)
 
                 #print(reward, max_reward)
@@ -678,8 +668,8 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
         with open(logger.get_figure_path(fname), 'wb') as handle:
             pickle.dump(regrets, handle)
 
-def plot_tallest_tower_regret(logger):
-    with open(logger.get_figure_path('height_regret_blocks.pkl'), 'rb') as handle:
+def plot_tallest_tower_regret(logger, fname):
+    with open(logger.get_figure_path(fname), 'rb') as handle:
         regrets = pickle.load(handle)
 
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -690,7 +680,7 @@ def plot_tallest_tower_regret(logger):
     lower025 = {k: [] for k in tower_keys}
     for k in tower_keys:
         rs = regrets[k]
-        print(rs)
+        #print(rs)
         for tx in range(len(rs)):
             median[k].append(np.median(rs[tx]))
             lower025[k].append(np.quantile(rs[tx], 0.05))
@@ -709,7 +699,8 @@ def plot_tallest_tower_regret(logger):
         axes[kx].set_ylabel('Regret (Normalized)')
         axes[kx].set_xlabel('Number of training towers')
         axes[kx].legend()
-    plt.savefig(logger.get_figure_path('height_regret_blocks.png'))
+    plt_fname = fname[:-4]+'.png'
+    plt.savefig(logger.get_figure_path(plt_fname))
 
 
 
@@ -727,7 +718,7 @@ if __name__ == '__main__':
     #get_acquisition_scores_over_time(logger)
     #plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
-    get_dataset_statistics(logger)
+    #get_dataset_statistics(logger)
     # accs = get_validation_accuracy(logger,
     #                               'learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl')
     # # accs = get_validation_accuracy(logger,
@@ -748,6 +739,6 @@ if __name__ == '__main__':
 
     #min_contact_regret_evaluation(logger)
     #tallest_tower_regret_evaluation(logger)
-    #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
+    tallest_tower_regret_evaluation(logger)#, block_set='learning/data/block_set_1000.pkl')
     #plot_tallest_tower_regret(logger)
     #plot_constructability_over_time(logger)

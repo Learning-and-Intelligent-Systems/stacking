@@ -22,9 +22,9 @@ class EnsemblePlanner:
         return tower_vectors
 
     def plan(self, blocks, ensemble, reward_fn):
-        n = len(blocks)
-        max_height = 0
-        max_tower = []
+        #n = len(blocks)
+        #max_height = 0
+        #max_tower = []
 
         # Step (1): Build dataset of potential towers. 
         tower_vectors = self.generate_candidate_towers(blocks)
