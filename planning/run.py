@@ -72,7 +72,7 @@ if __name__ == '__main__':
             ensemble = logger.get_ensemble(tx)
 
             problem = Tallest(max_height)
-            
+            tx_regrets = []
             for t in range(0, args.n_towers):
                 print('Tower number', t+1, '/', args.n_towers)
                 # generate new block set for each tower search
@@ -98,7 +98,8 @@ if __name__ == '__main__':
                         regret = 1
                 
                     # Compare heights and calculate regret.    
-                    regrets[k].append(regret)
+                    tx_regrets.append(regret)
+                regrets[k].append(tx_regrets)
             with open(logger.get_figure_path('sequential_planner_tallest_tower_regret.pkl'), 'wb') as handle:
                 pickle.dump(regrets, handle)
 
