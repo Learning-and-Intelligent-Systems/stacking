@@ -80,7 +80,7 @@ class EnsemblePlanner:
         for ix, (p, tower) in enumerate(zip(p_stables, towers)):
             reward = reward_fn(tower)
             exp_reward = p*reward
-            if exp_reward >= max_exp_reward and p > 0.5:
+            if exp_reward >= max_exp_reward:# and p > 0.5:
                 if exp_reward > max_exp_reward or (exp_reward == max_exp_reward and p > max_stable):
                     max_tower = tower_vectors[ix]
                     max_reward = reward

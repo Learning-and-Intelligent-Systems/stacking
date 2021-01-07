@@ -805,7 +805,7 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
             pickle.dump(regrets, handle)
 
 def plot_tallest_tower_regret(logger):
-    with open(logger.get_figure_path('height_regret_blocks.pkl'), 'rb') as handle:
+    with open(logger.get_figure_path('longest_overhang.pkl'), 'rb') as handle:
         regrets = pickle.load(handle)
 
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -835,7 +835,7 @@ def plot_tallest_tower_regret(logger):
         axes[kx].set_ylabel('Regret (Normalized)')
         axes[kx].set_xlabel('Number of training towers')
         axes[kx].legend()
-    plt.savefig(logger.get_figure_path('height_regret_blocks.png'))
+    plt.savefig(logger.get_figure_path('longest_overhang.png'))
 
 
 def get_stability_composition(logger, tx):
@@ -1017,7 +1017,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 240
+    logger.args.max_acquisitions = 300
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
@@ -1031,7 +1031,7 @@ if __name__ == '__main__':
     #inspect_validation_set('learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
 
     # accs = get_validation_accuracy(logger,
-    #                               'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
+    #                                'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
     # plot_val_accuracy(logger)
 
     # #analyze_collected_2block_towers(logger)
@@ -1048,8 +1048,8 @@ if __name__ == '__main__':
     #check_validation_robustness()
 
     #min_contact_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
-    tallest_tower_regret_evaluation(logger)
-    #longest_overhang_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
+    #tallest_tower_regret_evaluation(logger)
+    longest_overhang_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     #plot_tallest_tower_regret(logger)
     #plot_constructability_over_time(logger)
