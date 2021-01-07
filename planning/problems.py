@@ -7,6 +7,7 @@ import torch
 from block_utils import ZERO_POS, Pose
 from planning.utils import make_tower_dataset, random_placement
 from planning.tree import NodeValue
+from tower_planner import TowerPlanner
 
 class Problem:
     def __init__(self):
@@ -15,13 +16,14 @@ class Problem:
     def sample_actions(self, node_value, model):
         pass
         
-    def cost_fn(self, towers, model):
+    def reward_fn(self, towers, model):
         pass
         
 class Tallest(Problem):
-    def __init__(self):
+    def __init__(self, max_height):
         self.samples_per_block = 5
-        self.max_height = 5
+        self.max_height = max_height
+        self.tp = TowerPlanner(stability_mode='contains')
         
     def sample_actions(self, node_value, model):
         new_values = []
@@ -44,18 +46,24 @@ class Tallest(Problem):
                     new_values.append(NodeValue(new_tower, new_blocks_remaining))
                     eval_towers.append(new_tower)
                     
-        costs = self.cost_fn(eval_towers, model)
-        if len(eval_towers[0]) == self.max_height:
-            leaves = [True]*len(eval_towers)
-        else:
-            leaves = [False]*len(eval_towers)
-        return new_values, costs, leaves
+        all_rewards = self.reward_fn(eval_towers, model)
 
-    def cost_fn(self, towers, model):
+        terms = [False]*len(eval_towers)
+        for i, tower in enumerate(eval_towers):
+            # rewards of 0 are unstable --> terminal nodes
+            # once max height is reached --> terminal nodes
+            if all_rewards['exp_reward'][i] == 0 or len(tower) == self.max_height:
+                terms[i] = [True]
+        return new_values, all_rewards, terms
+
+    def reward_fn(self, towers, model):
+        all_rewards = {'exp_reward': [], 'reward': [], 'ground_truth': []}
         if len(towers[0]) == 1:
-            # only single block towers, always stable, but use 0 so all 
-            # equally likely to get selected
-            costs = np.zeros((len(towers)))
+            # only single block towers, always stable
+            reward = [tower[0].dimensions[2] for tower in towers]
+            all_rewards['exp_reward'] = reward
+            all_rewards['reward'] = reward
+            all_rewards['ground_truth'] = reward
         else:
             tower_loader = make_tower_dataset(towers)
             # this assumes there is only one batch
@@ -63,14 +71,22 @@ class Tallest(Problem):
                 with torch.no_grad():
                     preds = model.forward(tensor)
             p_stables = preds.mean(dim=1) # average ensemble output
-            costs = []
+            
+            exp_rewards = []
+            rewards = []
+            ground_truths = []
             for ix, (p, tower) in enumerate(zip(p_stables, towers)):
-                if p > 0.5: # TODO: stable?
-                    tower_height = np.sum([block.dimensions[2] for block in tower])
-                    costs += [float(p*tower_height)]
+                tower_height = np.sum([block.dimensions[2] for block in tower])
+                rewards += [tower_height]
+                if p > 0.5: # stable
+                    exp_rewards += [float(p*tower_height)]
                 else:
-                    costs += [0]
-        return costs
+                    exp_rewards += [0]
+                ground_truths += [self.tp.tower_is_constructable(tower)*tower_height]
+            all_rewards['exp_reward'] = exp_rewards
+            all_rewards['reward'] = rewards
+            all_rewards['ground_truth'] = ground_truths
+        return all_rewards
 
 class Overhang(Problem):
     def __init__(self):
@@ -79,7 +95,7 @@ class Overhang(Problem):
     def sample_actions(self, node_value, model):
         pass
         
-    def cost_fn(self, towers, model):
+    def reward_fn(self, towers, model):
         pass
             
 class Deconstruct(Problem):
@@ -89,5 +105,5 @@ class Deconstruct(Problem):
     def sample_actions(self, node_value, model):
         pass
         
-    def cost_fn(self, towers, model):
+    def reward_fn(self, towers, model):
         pass

@@ -1,6 +1,7 @@
 from collections import namedtuple
 import argparse
 import pickle
+import sys
 
 from planning.tree import Tree
 from planning.problems import Tallest, Overhang, Deconstruct, NodeValue
@@ -10,13 +11,20 @@ from learning.active.utils import ActiveExperimentLogger
 def plan(timeout, blocks, problem, model):
     tree = Tree(init_value = NodeValue([], blocks))
     for t in range(timeout):
-        
-        best_node, best_node_value = tree.get_best_node()
-        print(t, len(best_node_value.tower), tree.nodes[best_node].cost)
-        new_values, costs, leaves = problem.sample_actions(best_node_value, model)
-        for new_value, cost, leaf in zip(new_values, costs, leaves):
-            tree.expand(new_value, cost, best_node, leaf)
-    return tree.get_best_node(expand=False)
+        next_node_id = tree.get_next_node()
+        next_node_value = tree.nodes[next_node_id].value
+        sys.stdout.write("Search progress: %i   \r" % (t) )
+        sys.stdout.flush()
+        new_values, all_rewards, terms = problem.sample_actions(next_node_value, model)
+        for i, value in enumerate(new_values):
+            if len(value.tower) == 5:
+                print(all_rewards['reward'][i])
+        for i, (new_value, term) in enumerate(zip(new_values, terms)):
+            rewards = all_rewards['exp_reward'][i], \
+                        all_rewards['reward'][i], \
+                        all_rewards['ground_truth'][i],
+            tree.expand(new_value, *rewards, next_node_id, term)
+    return tree
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
