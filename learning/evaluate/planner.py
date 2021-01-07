@@ -9,10 +9,11 @@ from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from tower_planner import TowerPlanner
 
 class EnsemblePlanner:
-    def __init__(self, n_samples=5000):
+    def __init__(self, logger, n_samples=5000):
         self.tower_keys = ['2block', '3block', '4block', '5block']
         self.n_samples = n_samples
         self.tp = TowerPlanner(stability_mode='contains')
+        self.logger = logger
 
     def generate_candidate_towers(self, blocks):
         tower_vectors = []
@@ -54,12 +55,23 @@ class EnsemblePlanner:
         tower_loader = DataLoader(dataset=tower_dataset,
                                   batch_sampler=tower_sampler)
 
-        for tensor, _ in tower_loader:
-            if torch.cuda.is_available():
-                tensor = tensor.cuda()
-            with torch.no_grad():
-                preds.append(ensemble.forward(tensor))
-
+        if hasattr(self.logger.args, 'sampler') and self.logger.args.sampler == 'sequential':
+            for tensor, _ in tower_loader:
+                sub_tower_preds = []
+                for n_blocks in range(2, tensor.shape[1]+1):
+                    if torch.cuda.is_available():
+                        tensor = tensor.cuda()
+                    with torch.no_grad():
+                        sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
+                sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
+                preds.append(sub_tower_preds.prod(dim=0))
+        else:
+            for tensor, _ in tower_loader:
+                if torch.cuda.is_available():
+                    tensor = tensor.cuda()
+                with torch.no_grad():
+                    preds.append(ensemble.forward(tensor))
+        
         p_stables = torch.cat(preds, dim=0).mean(dim=1)
 
         # Step (3): Find the tallest tower of a given height.

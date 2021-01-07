@@ -163,6 +163,37 @@ def sample_unlabeled_data(n_samples, block_set=None):
 
     return sampled_towers
 
+def get_sequential_predictions(dataset, ensemble):
+    """
+    Make a separate prediction for each of the sub-towers in a tower.
+    Return stable only if all sub-towers are stable. This is for the
+    model that assumes the base of each tower is stable.
+    """
+    preds = []
+    # Create TowerDataset object.
+    tower_dataset = TowerDataset(dataset, augment=False)
+    tower_sampler = TowerSampler(dataset=tower_dataset,
+                                 batch_size=64,
+                                 shuffle=False)
+    tower_loader = DataLoader(dataset=tower_dataset,
+                              batch_sampler=tower_sampler)
+
+    # Iterate through dataset, getting predictions for each.
+    for tensor, _ in tower_loader:
+        sub_tower_preds = []
+        #print(tensor.shape)
+        for n_blocks in range(2, tensor.shape[1]+1):
+            if torch.cuda.is_available():
+                tensor = tensor.cuda()
+            with torch.no_grad():
+                sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
+        sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
+        #print('SubTowerPreds:', sub_tower_preds.shape)
+        #preds.append(sub_tower_preds[-1,:,:])
+        #preds.append(sub_tower_preds.prod(dim=0))
+        preds.append((sub_tower_preds > 0.5).all(dim=0).float())
+        #print(preds[-1].shape)
+    return torch.cat(preds, dim=0)
 
 def get_predictions(dataset, ensemble):
     """
