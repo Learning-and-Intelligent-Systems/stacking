@@ -24,7 +24,7 @@ class TowerLSTM(nn.Module):
                                nn.Linear(n_hidden, 1))
         self.n_in, self.n_hidden = n_in, n_hidden
 
-    def forward(self, towers, k):
+    def forward(self, towers):
         """
         :param towers: (N, K, n_in) tensor describing the tower.
         :param k: Number of times to iterate the graph update.
@@ -34,6 +34,6 @@ class TowerLSTM(nn.Module):
         x, _ = self.lstm(x)
 
         x = torch.sigmoid(self.O(x.reshape(-1, self.n_hidden)).view(N, K))
-        return x.prod(dim=1)
+        return x.prod(dim=1).unsqueeze(-1)
 
         

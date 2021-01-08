@@ -5,11 +5,11 @@ from copy import deepcopy
 
 from agents.teleport_agent import TeleportAgent
 from block_utils import Object, get_rotated_block
-from learning.active.hypotheses import get_all_hypotheses
+from learning.active.finite.hypotheses import get_all_hypotheses
 from learning.generate_tower_training_data import sample_random_tower
 from tower_planner import TowerPlanner
 
-REPEATS = 100
+REPEATS = 10
 MAX_N = 100
 NUM_BLOCKS = 5
 
@@ -86,7 +86,7 @@ def active(strategy, vis=False):
     return nx
 
 def get_statistics():
-    strategies = ['random', 'entropy', 'shrink']
+    strategies = ['random', 'entropy']
     n_examples = {}
     for s in strategies:
         n_examples[s] = []
@@ -110,6 +110,5 @@ def example_entropy():
     active('entropy', vis=True)
 
 if __name__ == '__main__':
-    #get_statistics()
+    get_statistics()
     #example_entropy()
-    example_shrink()

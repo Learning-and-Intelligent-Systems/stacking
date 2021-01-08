@@ -7,8 +7,9 @@ import torch
 from matplotlib.animation import FuncAnimation, writers
 from torch.utils.data import DataLoader
 
-from learning.active.toy_data import ToyDataset
-from learning.active.utils import ActiveExperimentLogger, get_predictions
+from learning.domains.toy2d.active_utils import get_predictions
+from learning.domains.toy2d.toy_data import ToyDataset
+from learning.active.utils import ActiveExperimentLogger
 
 
 def get_ensemble_predictions(logger, resolution=0.02, eps=1e-5):
@@ -68,7 +69,7 @@ def create_animation(logger, data, acquired_points, preds_info):
 
         # Draw predictions
         contour = ax2.pcolormesh(x1s.numpy(), x2s.numpy(), preds[0].numpy())
-        ax3.pcolormesh(x1s.numpy(), x2s.numpy(), balds[0].numpy())
+        ax3.pcolormesh(x1s.numpy(), x2s.numpy(), balds[0].numpy(), vmax=0.7)
         
         # Plot the data.
         ax1.scatter(data[0].xs[:, 0], data[0].xs[:, 1], s=4, c=data[0].ys)
@@ -88,9 +89,9 @@ def create_animation(logger, data, acquired_points, preds_info):
         b = balds[frame_ix]
         print(p.shape, b.shape)
         contour = ax2.pcolormesh(x1s.numpy(), x2s.numpy(), p.numpy())
-        ax3.pcolormesh(x1s.numpy(), x2s.numpy(), b.numpy())
+        ax3.pcolormesh(x1s.numpy(), x2s.numpy(), b.numpy(), vmax=0.7)
 
-        ax1.scatter(acquired_points[frame_ix][:,0], acquired_points[frame_ix][:,1])
+        ax1.scatter(acquired_points[frame_ix][0][:,0], acquired_points[frame_ix][0][:,1])
         ax1.scatter(data[frame_ix].xs[:, 0], data[frame_ix].xs[:, 1], s=4, c=data[frame_ix].ys)
         return contour,
 
@@ -148,8 +149,8 @@ if __name__ == '__main__':
 
     logger = ActiveExperimentLogger(args.exp_path)
     logger.args.max_acquisitions = 200
-    make_validation_curves()
-    #get_validation_accuracy(logger, 'learning/active/val_dataset.pkl')
+    #make_validation_curves()
+    get_validation_accuracy(logger, 'learning/evaluate/val_dataset.pkl')
 
     data, acquired_points = get_datasets_and_acquisitions(logger)
     pred_info = get_ensemble_predictions(logger)

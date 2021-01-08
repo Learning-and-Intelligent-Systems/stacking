@@ -1,76 +1,81 @@
 import argparse
+import copy
 import numpy as np
 
-from torch.utils.data import DataLoader
-
 from learning.active.acquire import acquire_datapoints
-from learning.active.mlp import MLP
-from learning.active.toy_data import ToyDataset, ToyDataGenerator
 from learning.active.train import train
 from learning.active.utils import ActiveExperimentLogger
 
 
-def add_to_dataset(dataset, new_xs, new_ys):
-    """ Create a new dataset by adding the new points to the current data.
-    :param dataset: The existing ToyDataset object.
-    :param new_xs: (n_acquire, 2) 
-    :param new_ys: (n_acquire,)
-    :return: A new ToyDataset instance with all datapoints.
+def split_data(data, n_val):
     """
-    xs = np.concatenate([dataset.xs, new_xs], axis=0)
-    ys = np.concatenate([dataset.ys, new_ys], axis=0)
-    return ToyDataset(xs, ys)
+    Choose n_val of the chosen data points to add to the validation set.
+    Return 2 tower_dict structures.
+    """
+    val_data = copy.deepcopy(data)
+    
+    total = np.sum([data[k]['towers'].shape[0] for k in data.keys()])
+    val_ixs = np.random.choice(np.arange(0, total), 2, replace=False)
 
-def active_train(args):
+    start = 0
+    for k in data.keys():
+        end = start + data[k]['towers'].shape[0]
+        
+        tower_ixs = val_ixs[np.logical_and(val_ixs >= start,
+                                           val_ixs < end)] - start
+
+        train_mask = np.ones(data[k]['towers'].shape[0], dtype=bool)
+        train_mask[tower_ixs] = False
+
+        val_data[k]['towers'] = val_data[k]['towers'][~train_mask,...]
+        val_data[k]['labels'] = val_data[k]['labels'][~train_mask,...]
+        
+        data[k]['towers'] = data[k]['towers'][train_mask,...]
+        data[k]['labels'] = data[k]['labels'][train_mask,...]
+        start = end
+    return data, val_data
+
+
+def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn, logger, args):
     """ Main training function 
+    :param ensemble: learning.models.Ensemble object to be trained.
+    :param dataset: Object containing the data to iterate over. Can be added to.
+    :param val_dataset: 
+    :param dataloader: The dataloader linked to the given dataset.
+    :param val_dataloader:
+    :param data_sampler_fn:
+    :param data_label_fn:
+    :param data_pred_fn:
+    :param data_subset_fn:
+    :param logger: Object used to keep track of training artifacts.
     :param args: Commandline arguments such as the number of acquisition points.
-    :return: Ensembles. The fully trained ensembles.
+    :return: The fully trained ensemble.
     """
-    logger = ActiveExperimentLogger.setup_experiment_directory(args)
-
-    # Initilize dataset.
-    gen = ToyDataGenerator()
-    xs, ys = gen.generate_uniform_dataset(N=args.n_train_init)
-    dataset = ToyDataset(xs, ys)
-
     for tx in range(args.max_acquisitions):
         logger.save_dataset(dataset, tx)
 
         # Initialize and train models.
-        loader = DataLoader(dataset,
-                            batch_size=args.batch_size,
-                            shuffle=True) 
-        
-        ensemble = [MLP(args.n_hidden, args.dropout) for _ in range(args.n_models)]
-        for model in ensemble:
-            train(loader, loader, model, args.n_epochs)
+        ensemble.reset()
+        for model in ensemble.models:
+            train(dataloader, val_dataloader, model, args.n_epochs)
         
         logger.save_ensemble(ensemble, tx)
 
         # Collect new samples.
-        new_xs, new_ys, all_samples = acquire_datapoints(ensemble, args.n_samples, args.n_acquire, args.strategy)
-        logger.save_acquisition_data(new_xs, new_ys, all_samples, tx)
+        new_data, all_samples = acquire_datapoints(ensemble=ensemble, 
+                                                   n_samples=args.n_samples, 
+                                                   n_acquire=args.n_acquire, 
+                                                   strategy=args.strategy,
+                                                   data_sampler_fn=data_sampler_fn,
+                                                   data_subset_fn=data_subset_fn,
+                                                   data_label_fn=data_label_fn,
+                                                   data_pred_fn=data_pred_fn)
+        logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
 
         # Add to dataset.
-        dataset = add_to_dataset(dataset, new_xs, new_ys)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--max-acquisitions', 
-                        type=int, 
-                        default=200,
-                        help='Number of iterations to run the main active learning loop for.')
-    parser.add_argument('--batch-size', type=int, default=16)
-    parser.add_argument('--n-models', type=int, default=5, help='Number of models in the ensemble.')
-    parser.add_argument('--n-hidden', type=int, default=128)
-    parser.add_argument('--dropout', type=float, default=0.)
-    parser.add_argument('--n-epochs', type=int, default=500)
-    parser.add_argument('--n-train-init', type=int, default=100)
-    parser.add_argument('--n-samples', type=int, default=500)
-    parser.add_argument('--n-acquire', type=int, default=10)
-    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
-    parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')    
-    args = parser.parse_args()
-
-    active_train(args)
+        if val_dataloader is None:
+            dataset.add_to_dataset(new_data)
+        else:
+            train_data, val_data = split_data(new_data, n_val=2)
+            dataset.add_to_dataset(train_data)
+            val_dataset.add_to_dataset(val_data)

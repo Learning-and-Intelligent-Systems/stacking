@@ -91,11 +91,15 @@ class Object:
     
     @staticmethod
     def from_vector(vblock):
+        if len(vblock) <= 14:
+            color = [1,0,0]
+        else:
+            color = vblock[14:17].tolist()
         block = Object('from_vec', 
                        dimensions=Dimensions(*vblock[4:7].tolist()), 
                        mass=vblock[0], 
                        com=Position(*vblock[1:4].tolist()), 
-                       color=Color(*vblock[14:17].tolist()))
+                       color=Color(*color))
         pose = Pose(Position(*vblock[7:10].tolist()),
                     Quaternion(*vblock[10:14].tolist()))
         block.set_pose(pose)
@@ -118,6 +122,20 @@ class Object:
         mass = np.random.uniform(0.1, 1.0)
         # center of mass lies within the middle 0.9 of the block along each axis
         com = Position(*((np.random.rand(3) - 0.5) * 0.9 * dims))
+        # pick a random color
+        color = Color(*np.random.rand(3))
+        # and add the new block to the list
+        return Object(name, dims, mass, com, color)
+
+    @staticmethod
+    def adversarial(name=None):
+        # blocks range in size from 0.05 to 0.15
+        dims = Dimensions(*(np.random.rand(3) * 0.1 + 0.05))
+        mass = np.random.uniform(0.1, 1.0)
+        # center of mass lies outside the middle 0.5 of the block along each axis
+        pct = np.random.uniform(0.45, 0.5, size=3)*np.random.choice([-1., 1.])
+
+        com = Position(*(pct * 0.9 * dims))
         # pick a random color
         color = Color(*np.random.rand(3))
         # and add the new block to the list
@@ -444,6 +462,7 @@ def group_blocks(bottom, top):
 
     return new_block
 
+ROTS = {}
 def get_rotated_block(block):
     """ Take a block which is rotated by an element of the rotation group of a
     cube, and produce a new block with no rotation, but with changed COM and
@@ -461,7 +480,11 @@ def get_rotated_block(block):
     new_pose = Pose(block.pose.pos, Quaternion(0,0,0,1))
     new_block.set_pose(new_pose)
     # get the original block's rotation
-    r = R.from_quat(block.pose.orn)
+    if block.pose.orn in ROTS:
+        r = ROTS[block.pose.orn]
+    else:
+        r = R.from_quat(block.pose.orn)
+        ROTS[block.pose.orn] = r
     vs = np.array([block.com, block.dimensions])
     vs_rot = r.apply(vs)
     # rotate the old center of mass
@@ -476,6 +499,34 @@ def get_rotated_block(block):
     new_block.rotation = block.pose.orn
 
     return new_block
+
+def all_rotations():
+    return [
+        R.from_euler('zyx', [0., 0., 0.]),
+        R.from_euler('zyx', [np.pi/2., 0., 0.]),
+        R.from_euler('zyx', [np.pi, 0., 0.]),
+        R.from_euler('zyx', [3*np.pi/2., 0., 0.]),
+        R.from_euler('zyx', [0., np.pi, 0.]),
+        R.from_euler('zyx', [np.pi/2., np.pi, 0.]),
+        R.from_euler('zyx', [np.pi, np.pi, 0.]),
+        R.from_euler('zyx', [3*np.pi/2., np.pi, 0.]),
+        R.from_euler('zyx', [0., np.pi/2., 0.]),
+        R.from_euler('zyx', [np.pi/2., np.pi/2., 0.]),
+        R.from_euler('zyx', [np.pi, np.pi/2., 0.]),
+        R.from_euler('zyx', [3*np.pi/2., np.pi/2., 0.]),
+        R.from_euler('zyx', [0., 3*np.pi/2., 0.]),
+        R.from_euler('zyx', [np.pi/2., 3*np.pi/2., 0.]),
+        R.from_euler('zyx', [np.pi, 3*np.pi/2., 0.]),
+        R.from_euler('zyx', [3*np.pi/2., 3*np.pi/2., 0.]),
+        R.from_euler('zyx', [0., 0, 3*np.pi/2.]),
+        R.from_euler('zyx', [np.pi/2., 0, 3*np.pi/2.]),
+        R.from_euler('zyx', [np.pi, 0, 3*np.pi/2.]),
+        R.from_euler('zyx', [3*np.pi/2., 0, 3*np.pi/2.]),
+        R.from_euler('zyx', [0., 0, np.pi/2.]),
+        R.from_euler('zyx', [np.pi/2., 0, np.pi/2.]),
+        R.from_euler('zyx', [np.pi, 0, np.pi/2.]),
+        R.from_euler('zyx', [3*np.pi/2., 0, np.pi/2.]),
+    ]
 
 def rotation_group():
     V = np.eye(3) * np.pi/2

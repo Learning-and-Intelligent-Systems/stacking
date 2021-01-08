@@ -3,7 +3,7 @@
 Izzy Brand, 2020
 """
 from agents.teleport_agent import TeleportAgent
-from block_utils import World, Environment, Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block
+from block_utils import World, Environment, Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block, all_rotations
 from tower_planner import TowerPlanner
 from pybullet_utils import transformation
 import argparse
@@ -17,22 +17,30 @@ import matplotlib.pyplot as plt
 def vectorize(tower):
     return [b.vectorize() for b in tower]
 
-def sample_random_tower(blocks):
+ROTATIONS = list(rotation_group())
+ROTATIONS = list(all_rotations())
+QUATERNIONS = [Quaternion(*o.as_quat()) for o in ROTATIONS]
+ROTATED_BLOCKS = {}
+def sample_random_tower(blocks, ret_rotated=False):
     num_blocks = len(blocks)
     # pick random orientations for the blocks
-    orns = sample_with_replacement(list(rotation_group()), k=num_blocks)
-    orns = [Quaternion(*orn.as_quat()) for orn in orns]
+    orns = sample_with_replacement(QUATERNIONS, k=num_blocks)
+    #orns = [Quaternion(*orn.as_quat()) for orn in orns]
     # apply the rotations to each block
     rotated_blocks = []
     for orn, block in zip(orns, blocks):
         block.pose = Pose(ZERO_POS, orn)
-        rotated_blocks.append(get_rotated_block(block))
+        if block not in ROTATED_BLOCKS:
+            ROTATED_BLOCKS[block] = {}
+        if orn not in ROTATED_BLOCKS[block]:
+            ROTATED_BLOCKS[block][orn] = get_rotated_block(block)
+        rotated_blocks.append(ROTATED_BLOCKS[block][orn])
 
     # pick random positions for each block
     # get the x and y dimensions of each block (after the rotation)
     dims_xy = np.array([rb.dimensions for rb in rotated_blocks])[:,:2]
     # figure out how far each block can be moved w/ losing contact w/ the block below
-    max_displacements_xy = (dims_xy[1:] + dims_xy[:1])/2.
+    max_displacements_xy = (dims_xy[1:] + dims_xy[:-1])/2.
     # sample unscaled noise (clip bceause random normal can exceed -1, 1)
     noise_xy = np.clip(0.5*np.random.randn(num_blocks-1, 2), -0.95, 0.95)
     # and scale the noise by the max allowed displacement
@@ -50,12 +58,15 @@ def sample_random_tower(blocks):
 
     # apply the positions to each block
     pos_xyz = np.hstack([pos_xy, pos_z[:,None]])
-    for pos, orn, block in zip(pos_xyz, orns, blocks):
+    for pos, orn, block, rblock in zip(pos_xyz, orns, blocks, rotated_blocks):
         block.pose = Pose(pos, orn)
+        rblock.pose = Pose(pos, (0,0,0,1))
 
+    if ret_rotated:
+        return blocks, rotated_blocks
     return blocks
 
-def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
+def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
     """ Build a tower with the specified stability properties.
     :param blocks: if this is a list of blocks, use those blocks. if int, generate that many new blocks
     :param stable: Overall tower stability.
@@ -82,10 +93,16 @@ def build_tower(blocks, stable=True, pairwise_stable=True, cog_stable=True, vis=
         # if the tower is stable, visualize it for debugging
         rotated_tower = [get_rotated_block(b) for b in tower]
         # save the tower if it's stable
-        if tp.tower_is_stable(rotated_tower) == stable and \
-           tp.tower_is_constructible(rotated_tower) == pairwise_stable: #and \
-           #tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
-            return rotated_tower
+        if not stable is None:
+            if tp.tower_is_stable(rotated_tower) == stable and \
+            tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
+            tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
+                return rotated_tower
+        elif not constructable is None:
+            if tp.tower_is_constructable(rotated_tower) == constructable and \
+            tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
+            tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
+                return rotated_tower
 
     return None
 
@@ -185,7 +202,7 @@ def main(args, vis_tower=False):
     }
 
     # specify the number of towers to generate
-    num_towers_per_cat = 5000
+    num_towers_per_cat = 250
     num_towers = num_towers_per_cat * 4 * 2
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
@@ -195,6 +212,11 @@ def main(args, vis_tower=False):
     # generate the finite set of blocks
     if use_block_set:
         block_set = [Object.random(f'obj_{i}') for i in range(block_set_size)]
+
+    # use_block_set = True
+    # with open('learning/data/block_set_10.pkl', 'rb') as handle:
+    #     block_set = pickle.load(handle)
+
     # create a vector of stability labels where half are unstable and half are stable
     stability_labels = np.zeros(num_towers, dtype=int)
     stability_labels[num_towers // 2:] = 1
@@ -210,6 +232,8 @@ def main(args, vis_tower=False):
                 # PW Stability is the same as global stability for two blocks.
                 if num_blocks == 2 and pw_stable != stable:
                     continue
+                elif (args.criteria == 'constructable') and pw_stable != stable:
+                    continue
 
                 count = 0
                 while count < num_towers_per_cat:
@@ -223,15 +247,23 @@ def main(args, vis_tower=False):
                     # generate new blocks from scratch. Save the block names if using blocks
                     # from the block set
                     if use_block_set:
-                        blocks = sample_with_replacement(block_set, k=num_blocks)
+                        blocks = np.random.choice(block_set, num_blocks, replace=False)
                     else:
                         blocks = [Object.random(f'obj_{ix}') for ix in range(num_blocks)]
 
                     # generate a random tower
-                    tower = build_tower(blocks, 
-                                        stable=stable, 
-                                        pairwise_stable=pw_stable, 
-                                        cog_stable=cog_stable)
+                    if args.criteria == 'stable':
+                        tower = build_tower(blocks, 
+                                            stable=stable, 
+                                            pairwise_stable=pw_stable, 
+                                            cog_stable=cog_stable)
+                    elif args.criteria == 'constructable':
+                        tower = build_tower(blocks, 
+                                            constructable=stable, 
+                                            pairwise_stable=pw_stable, 
+                                            cog_stable=cog_stable)
+                    else:
+                        raise NotImplementedError()
                     
                     if tower is None:
                         continue
@@ -256,7 +288,7 @@ def main(args, vis_tower=False):
                     # append the tower to the list
                     vectorized_towers.append(vectorize(tower))
                     block_names.append([b.name for b in blocks])
-        if num_blocks == 2:
+        if num_blocks == 2 or args.criteria == 'constructable':
             stability_labels = np.zeros(num_towers//2, dtype=int)
             stability_labels[num_towers // 4:] = 1
         else:
@@ -273,6 +305,8 @@ def main(args, vis_tower=False):
         dataset[f'{num_blocks}block'] = data
 
     # save the generate data
+    if args.criteria == 'constructable':
+        num_towers /= 2
     filename = get_filename(num_towers, use_block_set, block_set_size, args.suffix)
     print('Saving to', filename)
     with open(filename, 'wb') as f:
@@ -285,6 +319,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-blocks', type=int, required=True)
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--save-images', action='store_true')
+    parser.add_argument('--criteria', default='constructable', choices=['stable', 'constructible'])
     args = parser.parse_args()
 
     main(args, vis_tower=False)
