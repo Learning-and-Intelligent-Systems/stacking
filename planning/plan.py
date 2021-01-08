@@ -101,20 +101,57 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path)
     ensemble = logger.get_ensemble(tx)
     
-    tallest_tower, highest_exp_height, highest_value, tree = \
-        plan_mcts(args.timeout, block_set, problem, ensemble, c=np.sqrt(2))
-    
-    import matplotlib.pyplot as plt
-    
-    fig, ax = plt.subplots(3)
-    
-    xs = list(range(len(tallest_tower)))
-    ax[0].plot(xs, tallest_tower, label='tallest tower')
-    ax[1].plot(xs, highest_exp_height, label='highest expected height')
-    ax[2].plot(xs, highest_value, label='highest node value')
-    
-    ax[0].legend()
-    ax[1].legend()
-    ax[2].legend()
-    
-    plt.show()
+    c_vals = [10 ** np.linspace(0,10)]
+    for c in c_vals:
+        runs = 10
+        all_tallest_towers = np.zeros((args.timeout+1, runs))
+        all_highest_exp_heights = np.zeros((args.timeout+1, runs))
+        all_highest_values = np.zeros((args.timeout+1, runs))
+        for run in range(runs):
+            tallest_tower, highest_exp_height, highest_value, tree = \
+                plan_mcts(args.timeout, block_set, problem, ensemble, c=c)
+                
+            all_tallest_towers[:,run] = tallest_tower
+            all_highest_exp_heights[:,run] = highest_exp_height
+            all_highest_values[:,run] = highest_value
+            
+        median_tt = np.median(all_tallest_towers, axis=1)
+        median_hev = np.median(all_highest_exp_heights, axis=1)
+        median_hv = np.median(all_highest_values, axis=1)
+        
+        q25_tt = np.quantile(all_tallest_towers, 0.25, axis=1)
+        q75_tt = np.quantile(all_tallest_towers, 0.75, axis=1)
+        
+        q25_hev = np.quantile(all_highest_exp_heights, 0.25, axis=1)
+        q75_hev = np.quantile(all_highest_exp_heights, 0.75, axis=1)
+        
+        q25_hv = np.quantile(all_highest_values, 0.25, axis=1)
+        q75_hv = np.quantile(all_highest_values, 0.75, axis=1)
+        
+        import matplotlib.pyplot as plt
+        
+        fig, ax = plt.subplots(3)
+        
+        xs = list(range(len(tallest_tower)))
+        ax[0].plot(xs, median_tt, label='tallest tower')
+        ax[0].fill_between(xs, q25_tt, q75_tt, alpha=0.2)
+        
+        ax[1].plot(xs, median_hev, label='highest expected height')
+        ax[1].fill_between(xs, q25_hev, q75_hev, alpha=0.2)
+        
+        ax[2].plot(xs, median_hv, label='highest node value')
+        ax[2].fill_between(xs, q25_hv, q75_hv, alpha=0.2)
+        
+        ax[0].legend()
+        ax[1].legend()
+        ax[2].legend()
+        
+        ax[0].set_ylim(0.0, 5.1)
+        ax[1].set_ylim(0.0, 0.6)
+        ax[2].set_ylim(0.0, 0.6)
+        
+        ax[0].set_title('c='+str(c))
+        
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
+        plt.savefig('mcts_test_'+str(timestamp))
