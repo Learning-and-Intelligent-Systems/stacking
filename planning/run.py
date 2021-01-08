@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from learning.active.utils import ActiveExperimentLogger
 from block_utils import Object
-from planning.plan import plan as sequential_planner
+from planning.plan import plan_mcts as sequential_planner
 from planning.problems import Tallest
 from learning.evaluate.active_evaluate_towers import tallest_tower_regret_evaluation as total_planner
 from learning.evaluate.active_evaluate_towers import plot_tallest_tower_regret
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         # Store regret for towers of each size.
         regrets = {k: [] for k in tower_keys}
 
-        for tx in range(0, args.max_acquisitions, 10):
+        for tx in [99]:#range(0, args.max_acquisitions, 10):
             print('Acquisition step:', tx)
             ensemble = logger.get_ensemble(tx)
 

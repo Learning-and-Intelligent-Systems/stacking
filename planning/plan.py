@@ -2,6 +2,7 @@ from collections import namedtuple
 import argparse
 import pickle
 import sys
+import numpy as np
 
 from planning.tree import Tree
 from planning.problems import Tallest, Overhang, Deconstruct
@@ -15,13 +16,42 @@ def plan(timeout, blocks, problem, model):
         #print(t, len(tree.nodes[parent_node_id]['tower']), tree.nodes[parent_node_id]['value'])
         sys.stdout.write("Search progress: %i   \r" % (t) )
         sys.stdout.flush()
-        new_nodes = problem.sample_actions(parent_node_id, tree.nodes[parent_node_id], model)
+        new_nodes = problem.sample_actions(tree.nodes[parent_node_id], model)
         for node in new_nodes:
-            tree.expand(node)
+            tree.expand(parent_node_id, node)
     return tree
 
-def plan_mcts(timeout, blocks, problem, model):
-    pass
+def plan_mcts(timeout, blocks, problem, model, c=np.sqrt(2)):
+    tree = Tree(blocks)
+    tallest_tower = [0]
+    highest_exp_height = [0]
+    highest_value = [0]
+    for t in range(timeout):
+        #sys.stdout.write("Search progress: %i   \r" % (t) )
+        #sys.stdout.flush()
+        parent_node_id = tree.traverse(c)
+        print(t, len(tree.nodes[parent_node_id]['tower']), tree.nodes[parent_node_id]['value'])
+        new_node = problem.sample_action(tree.nodes[parent_node_id], model, discrete=True)
+        
+        new_node_id = tree.expand(parent_node_id, new_node)
+        rollout_value = tree.rollout(new_node_id, problem, model)
+        tree.backpropagate(new_node_id, rollout_value)
+        
+        if len(new_node['tower'])>tallest_tower[-1]:
+            tallest_tower.append(len(new_node['tower']))
+        else:
+            tallest_tower.append(tallest_tower[-1])
+            
+        if new_node['exp_reward'] > highest_exp_height[-1]:
+            highest_exp_height.append(new_node['exp_reward'])
+        else:
+            highest_exp_height.append(highest_exp_height[-1])
+            
+        if new_node['value'] > highest_value[-1]:
+            highest_value.append(new_node['value'])
+        else:
+            highest_value.append(highest_value[-1])
+    return tallest_tower, highest_exp_height, highest_value, tree
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -43,6 +73,10 @@ if __name__ == '__main__':
     parser.add_argument('--debug',
                         action='store_true',
                         help='set to run in debug mode')
+    parser.add_argument('--max-height',
+                        type=int,
+                        default=5,
+                        help='number of blocks in desired tower')
     args = parser.parse_args()
     
     if args.debug:
@@ -58,7 +92,7 @@ if __name__ == '__main__':
         block_set = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
         
     if args.problem == 'tallest':
-        problem = Tallest()
+        problem = Tallest(args.max_height)
     elif args.problem == 'overhang':
         problem = Overhang()
     elif args.problem == 'deconstruct':
@@ -67,4 +101,20 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path)
     ensemble = logger.get_ensemble(tx)
     
-    plan(args.timeout, block_set, problem, ensemble)
+    tallest_tower, highest_exp_height, highest_value, tree = \
+        plan_mcts(args.timeout, block_set, problem, ensemble, c=np.sqrt(2))
+    
+    import matplotlib.pyplot as plt
+    
+    fig, ax = plt.subplots(3)
+    
+    xs = list(range(len(tallest_tower)))
+    ax[0].plot(xs, tallest_tower, label='tallest tower')
+    ax[1].plot(xs, highest_exp_height, label='highest expected height')
+    ax[2].plot(xs, highest_value, label='highest node value')
+    
+    ax[0].legend()
+    ax[1].legend()
+    ax[2].legend()
+    
+    plt.show()

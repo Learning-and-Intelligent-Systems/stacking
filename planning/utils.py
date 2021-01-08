@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from block_utils import all_rotations, get_rotated_block, Quaternion, Pose, ZERO_POS
 
-def random_placement(block, tower):
+def random_placement(block, tower, discrete=False):
     all_quaternions = [Quaternion(*o.as_quat()) for o in list(all_rotations())]
     random_orn = choices(all_quaternions, k=1)[0]
     block.pose = Pose(ZERO_POS, random_orn)
@@ -17,11 +17,17 @@ def random_placement(block, tower):
     # pick random positions for each block
     # figure out how far the block can be moved w/o losing contact w/ the block below
     if len(tower) > 0:
-        max_displacement_xy = np.add(tower[-1].dimensions[:2], block.dimensions[:2])/2.
-        # randomly sample a displacement
-        rel_xy = uniform(max_displacement_xy, -max_displacement_xy)
-        # and get the actual positions of the new block
-        pos_xy = np.add(tower[-1].pose.pos[:2], rel_xy)
+        # place blocks COM above COM of block below
+        if discrete:
+            pos_com_xy = np.add(tower[-1].pose.pos[:2], tower[-1].com[:2])
+            pos_xy = np.subtract(pos_com_xy, block.com[:2])
+        # randomly place block on top of block below
+        else:
+            max_displacement_xy = np.add(tower[-1].dimensions[:2], block.dimensions[:2])/2.
+            # randomly sample a displacement
+            rel_xy = uniform(max_displacement_xy, -max_displacement_xy)
+            # and get the actual positions of the new block
+            pos_xy = np.add(tower[-1].pose.pos[:2], rel_xy)
         # calculate the height of the block
         pos_z = tower[-1].pose.pos[2] + block.dimensions[2]
     else:
