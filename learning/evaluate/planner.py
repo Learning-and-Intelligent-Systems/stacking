@@ -17,7 +17,7 @@ class EnsemblePlanner:
     def generate_candidate_towers(self, blocks):
         tower_vectors = []
         for _ in range(0, self.n_samples):
-            tower, rotated_tower = sample_random_tower(blocks, ret_rotated=True)
+            tower, rotated_tower = sample_random_tower(blocks, ret_rotated=True, discrete=False)
             tower_vectors.append([b.vectorize() for b in rotated_tower])
         return tower_vectors
 
