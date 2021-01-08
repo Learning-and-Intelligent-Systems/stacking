@@ -21,18 +21,18 @@ def plan(timeout, blocks, problem, model):
             tree.expand(parent_node_id, node)
     return tree
 
-def plan_mcts(timeout, blocks, problem, model, c=np.sqrt(2)):
+def plan_mcts(timeout, blocks, problem, model, c=5):
     tree = Tree(blocks)
     tallest_tower = [0]
     highest_exp_height = [0]
     highest_value = [0]
     for t in range(timeout):
-        #sys.stdout.write("Search progress: %i   \r" % (t) )
-        #sys.stdout.flush()
+        sys.stdout.write("Search progress: %i   \r" % (t) )
+        sys.stdout.flush()
         parent_node_id = tree.traverse(c)
-        print(t, len(tree.nodes[parent_node_id]['tower']), tree.nodes[parent_node_id]['value'])
-        new_node = problem.sample_action(tree.nodes[parent_node_id], model, discrete=True)
         
+        new_node = problem.sample_action(tree.nodes[parent_node_id], model, discrete=True)
+        #print(t, len(new_node['tower']), new_node['exp_reward'])
         new_node_id = tree.expand(parent_node_id, new_node)
         rollout_value = tree.rollout(new_node_id, problem, model)
         tree.backpropagate(new_node_id, rollout_value)
@@ -51,7 +51,7 @@ def plan_mcts(timeout, blocks, problem, model, c=np.sqrt(2)):
             highest_value.append(new_node['value'])
         else:
             highest_value.append(highest_value[-1])
-    return tallest_tower, highest_exp_height, highest_value, tree
+    return tree
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

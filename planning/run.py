@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 from learning.active.utils import ActiveExperimentLogger
 from block_utils import Object
+#from planning.plan import plan as sequential_planner
 from planning.plan import plan_mcts as sequential_planner
 from planning.problems import Tallest
 from learning.evaluate.active_evaluate_towers import tallest_tower_regret_evaluation as total_planner
@@ -67,12 +68,12 @@ if __name__ == '__main__':
         # Store regret for towers of each size.
         regrets = {k: [] for k in tower_keys}
 
-        for tx in [99]:#range(0, args.max_acquisitions, 10):
+        for tx in range(0, args.max_acquisitions, 10):
             print('Acquisition step:', tx)
             ensemble = logger.get_ensemble(tx)
 
             problem = Tallest(max_height)
-            tx_regrets = []
+            tx_regrets = {k: [] for k in tower_keys}
             for t in range(0, args.n_towers):
                 print('Tower number', t+1, '/', args.n_towers)
                 # generate new block set for each tower search
@@ -81,25 +82,23 @@ if __name__ == '__main__':
                 search_tree = sequential_planner(args.timeout, block_set, problem, ensemble)
                 for i, (k, size) in enumerate(zip(tower_keys, tower_sizes)):
                     print('Finding best tower size: ', size)
-                    # NOTE: may crash here if --timeout is low because doesn't sample a 
-                    # stable tower of the right height
-                    try:
-                        exp_best_node_id = search_tree.get_exp_best_node(size)
-                        best_tower = search_tree.nodes[exp_best_node_id].value.tower
-                        reward = search_tree.nodes[exp_best_node_id].reward
+                    exp_best_node_id = search_tree.get_exp_best_node(size)
+                    if exp_best_node_id is not None:
+                        best_tower = search_tree.nodes[exp_best_node_id]['tower']
+                        reward = search_tree.nodes[exp_best_node_id]['tower_height']
                         gt_best_node_id = search_tree.get_ground_truth_best_node(size)
-                        gt_reward = search_tree.nodes[gt_best_node_id].ground_truth
+                        gt_reward = search_tree.nodes[gt_best_node_id]['ground_truth']
 
                         if not problem.tp.tower_is_constructable(best_tower):
                             reward = 0
                         regret = (gt_reward - reward)/gt_reward
-                    except:
-                        print('No tall towers of height ', size, 'found')
+                    else:
+                        print('None found.')
                         regret = 1
+                    tx_regrets[k].append(regret)
+            for k in tower_keys:
+                regrets[k].append(tx_regrets[k])
                 
-                    # Compare heights and calculate regret.    
-                    tx_regrets.append(regret)
-                regrets[k].append(tx_regrets)
             with open(logger.get_figure_path('sequential_planner_tallest_tower_regret.pkl'), 'wb') as handle:
                 pickle.dump(regrets, handle)
 
