@@ -805,7 +805,7 @@ def evaluate_planner(logger, n_towers, reward_fn, block_set='', fname=''):
             pickle.dump(regrets, handle)
 
 def plot_tallest_tower_regret(logger):
-    with open(logger.get_figure_path('longest_overhang.pkl'), 'rb') as handle:
+    with open(logger.get_figure_path('contact_regret.pkl'), 'rb') as handle:
         regrets = pickle.load(handle)
 
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -835,7 +835,7 @@ def plot_tallest_tower_regret(logger):
         axes[kx].set_ylabel('Regret (Normalized)')
         axes[kx].set_xlabel('Number of training towers')
         axes[kx].legend()
-    plt.savefig(logger.get_figure_path('longest_overhang.png'))
+    plt.savefig(logger.get_figure_path('contact_regret.png'))
 
 
 def get_stability_composition(logger, tx):
@@ -1049,9 +1049,9 @@ if __name__ == '__main__':
 
     #min_contact_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger)
-    longest_overhang_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
+    #longest_overhang_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
-    #plot_tallest_tower_regret(logger)
+    plot_tallest_tower_regret(logger)
     #plot_constructability_over_time(logger)
     #validate(logger, 125)
     #get_stability_composition(logger, tx=245)
