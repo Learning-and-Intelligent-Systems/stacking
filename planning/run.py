@@ -56,6 +56,8 @@ if __name__ == '__main__':
     if args.block_set_fname is not '':
         with open(args.block_set_fname, 'rb') as f:
             block_set = pickle.load(f)
+    else:
+        block_set = [Object.random(f'obj_{ix}') for ix in range(args.n_blocks)]
 
     logger = ActiveExperimentLogger(args.exp_path)
 
@@ -77,8 +79,6 @@ if __name__ == '__main__':
             for t in range(0, args.n_towers):
                 print('Tower number', t+1, '/', args.n_towers)
                 # generate new block set for each tower search
-                if args.block_set_fname is '':
-                    block_set = [Object.random(f'obj_{ix}') for ix in range(args.n_blocks)]
                 search_tree = sequential_planner(args.timeout, block_set, problem, ensemble)
                 for i, (k, size) in enumerate(zip(tower_keys, tower_sizes)):
                     print('Finding best tower size: ', size)

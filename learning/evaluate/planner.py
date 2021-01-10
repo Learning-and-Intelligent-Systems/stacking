@@ -14,20 +14,21 @@ class EnsemblePlanner:
         self.n_samples = n_samples
         self.tp = TowerPlanner(stability_mode='contains')
 
-    def generate_candidate_towers(self, blocks):
+    def generate_candidate_towers(self, blocks, num_blocks=None):
         tower_vectors = []
         for _ in range(0, self.n_samples):
-            tower, rotated_tower = sample_random_tower(blocks, ret_rotated=True, discrete=False)
+            tower, rotated_tower = sample_random_tower(blocks, num_blocks=num_blocks, \
+                                        ret_rotated=True, discrete=True)
             tower_vectors.append([b.vectorize() for b in rotated_tower])
         return tower_vectors
 
-    def plan(self, blocks, ensemble, reward_fn):
+    def plan(self, blocks, ensemble, reward_fn, num_blocks=None):
         #n = len(blocks)
         #max_height = 0
         #max_tower = []
 
         # Step (1): Build dataset of potential towers. 
-        tower_vectors = self.generate_candidate_towers(blocks)
+        tower_vectors = self.generate_candidate_towers(blocks, num_blocks)
         
         # Since we are only planning for towers of a single size,
         # always use the '2block' key for simplicity. The rest currently

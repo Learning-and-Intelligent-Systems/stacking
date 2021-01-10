@@ -639,7 +639,7 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
             curr_regrets = []
             for t in range(0, n_towers):
                 print('Tower number', t)
-                tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn)
+                tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn, num_blocks=size)
 
                 #print(reward, max_reward)
                 block_tower = [Object.from_vector(tower[bx]) for bx in range(len(tower))]
@@ -661,7 +661,6 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
 
                 # Compare heights and calculate regret.
                 regret = (max_reward - reward)/max_reward
-                print(regret)
                 curr_regrets.append(regret)
             regrets[k].append(curr_regrets)
 
