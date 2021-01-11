@@ -111,7 +111,8 @@ if __name__ == '__main__':
             args.n_towers, block_set, discrete=args.discrete)
 
     ## PLOT RESULTS
+    pre = 'discrete_' if args.discrete else ''
     if args.method in ['sequential', 'both']:
-        plot_tallest_tower_regret(logger, 'sequential_planner_tallest_tower_regret.pkl')
+        plot_tallest_tower_regret(logger, pre+'sequential_planner_tallest_tower_regret.pkl')
     if args.method in ['total', 'both']:
-        plot_tallest_tower_regret(logger, 'total_planner_tallest_tower_regret.pkl')
+        plot_tallest_tower_regret(logger, pre+'total_planner_tallest_tower_regret.pkl')
