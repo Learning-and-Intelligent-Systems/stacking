@@ -1,5 +1,5 @@
-torch==1.1.0
-torchvision==0.3.0
+torch==1.6.0
+torchvision==0.7.0
 git+http://github.com/hauptmech/odio_urdf.git
 git+https://github.com/mike-n-7/tsr.git
 appnope==0.1.0
