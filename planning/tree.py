@@ -36,7 +36,7 @@ class Tree:
     
     # adjust value and increase count
     def backpropagate(self, node_id, value):
-        while not node_id == 0: # while not at root node
+        while node_id is not None: # while not at root node
             old_count = self.nodes[node_id]['count']
             old_value = self.nodes[node_id]['value']
             new_value = (old_count*old_value + value)/(old_count+1)
