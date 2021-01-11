@@ -634,7 +634,7 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
         print('Acquisition step:', tx)
         ensemble = logger.get_ensemble(tx)
 
-        for k, size in zip(tower_keys, tower_sizes):
+        for k, size in [('5block', 5)]:#zip(tower_keys, tower_sizes):
             print('Tower size', k)
             curr_regrets = []
             for t in range(0, n_towers):
@@ -661,6 +661,8 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
 
                 # Compare heights and calculate regret.
                 regret = (max_reward - reward)/max_reward
+                #print(reward, max_reward)
+                #print(regret)
                 curr_regrets.append(regret)
             regrets[k].append(curr_regrets)
 
