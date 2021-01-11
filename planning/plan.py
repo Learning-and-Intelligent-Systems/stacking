@@ -29,37 +29,39 @@ def plan_mcts(timeout, blocks, problem, model, c=5, discrete=True):
     highest_exp_height = [0]
     highest_value = [0]
     tower_stats = np.zeros((5,timeout))
+    
     for t in range(timeout):
+        tower_stats[:,t] = tower_stats[:,t-1]
         sys.stdout.write("Search progress: %i   \r" % (t) )
         sys.stdout.flush()
         parent_node_id = tree.traverse(c)
         
-        new_node = problem.sample_action(tree.nodes[parent_node_id], model, discrete=discrete)
-        #print(t, len(new_node['tower']), new_node['exp_reward'])
-        new_node_id = tree.expand(parent_node_id, new_node)
-        rollout_value = tree.rollout(new_node_id, problem, model)
-        tree.backpropagate(new_node_id, rollout_value)
-        
-        tower_height = len(new_node['tower'])
-        #print(tower_height)
-        index = int(tower_height)
-        tower_stats[:,t] = tower_stats[:,t-1]
-        tower_stats[index-1,t] += 1
-        
-        if len(new_node['tower'])>tallest_tower[-1]:
-            tallest_tower.append(len(new_node['tower']))
-        else:
-            tallest_tower.append(tallest_tower[-1])
+        new_nodes = problem.sample_actions(tree.nodes[parent_node_id], model, discrete=discrete)
+        tallest_tower_t = tallest_tower[-1]
+        highest_exp_height_t = highest_exp_height[-1]
+        highest_value_t = highest_value[-1]
+        for new_node in new_nodes:
+            #print(t, len(new_node['tower']), new_node['exp_reward'])
+            new_node_id = tree.expand(parent_node_id, new_node)
+            rollout_value = tree.rollout(new_node_id, problem, model)
+            tree.backpropagate(new_node_id, rollout_value)
             
-        if new_node['exp_reward'] > highest_exp_height[-1]:
-            highest_exp_height.append(new_node['exp_reward'])
-        else:
-            highest_exp_height.append(highest_exp_height[-1])
-            
-        if new_node['value'] > highest_value[-1]:
-            highest_value.append(new_node['value'])
-        else:
-            highest_value.append(highest_value[-1])
+            tower_height = len(new_node['tower'])
+            #print(tower_height)
+            index = int(tower_height)
+            tower_stats[index-1,t] += 1
+            if len(new_node['tower'])>tallest_tower_t:
+                tallest_tower_t = len(new_node['tower'])
+                
+            if new_node['exp_reward'] > highest_exp_height_t:
+                highest_exp_height_t = new_node['exp_reward']
+                
+            if new_node['value'] > highest_value_t:
+                highest_value_t = new_node['value']
+        tallest_tower.append(tallest_tower_t)
+        highest_exp_height.append(highest_exp_height_t)
+        highest_value.append(highest_value_t)
+
     return tallest_tower, highest_exp_height, highest_value, tree, tower_stats
     
 if __name__ == '__main__':
@@ -110,7 +112,8 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path)
     ensemble = logger.get_ensemble(tx)
     
-    c_vals = 10 ** np.linspace(0,10)
+    c_vals = [0, 0.5, 1, np.sqrt(2)]#10 ** np.linspace(0,10)
+    
     for c in c_vals:
         runs = 1
         all_tallest_towers = np.zeros((args.timeout+1, runs))
@@ -120,9 +123,9 @@ if __name__ == '__main__':
             tallest_tower, highest_exp_height, highest_value, tree, tower_stats = \
                 plan_mcts(args.timeout, block_set, problem, ensemble, c=c)
                 
-            all_tallest_towers[:,run] = tallest_tower
-            all_highest_exp_heights[:,run] = highest_exp_height
-            all_highest_values[:,run] = highest_value
+            #all_tallest_towers[:,run] = tallest_tower
+            #all_highest_exp_heights[:,run] = highest_exp_height
+            #all_highest_values[:,run] = highest_value
             
             plt.figure()
             xs = list(range(tower_stats.shape[1]))
@@ -133,44 +136,44 @@ if __name__ == '__main__':
             plt.title('c= '+str(c))
             plt.legend()
             timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
-            plt.savefig('mcts_test_'+str(timestamp))
+            plt.savefig('mcts_test_hist_'+str(timestamp))
             #plt.show()
-        '''
-        median_tt = np.median(all_tallest_towers, axis=1)
-        median_hev = np.median(all_highest_exp_heights, axis=1)
-        median_hv = np.median(all_highest_values, axis=1)
-        
-        q25_tt = np.quantile(all_tallest_towers, 0.25, axis=1)
-        q75_tt = np.quantile(all_tallest_towers, 0.75, axis=1)
-        
-        q25_hev = np.quantile(all_highest_exp_heights, 0.25, axis=1)
-        q75_hev = np.quantile(all_highest_exp_heights, 0.75, axis=1)
-        
-        q25_hv = np.quantile(all_highest_values, 0.25, axis=1)
-        q75_hv = np.quantile(all_highest_values, 0.75, axis=1)
-        
-        fig, ax = plt.subplots(3)
-        
-        xs = list(range(len(tallest_tower)))
-        ax[0].plot(xs, median_tt, label='tallest tower')
-        ax[0].fill_between(xs, q25_tt, q75_tt, alpha=0.2)
-        
-        ax[1].plot(xs, median_hev, label='highest expected height')
-        ax[1].fill_between(xs, q25_hev, q75_hev, alpha=0.2)
-        
-        ax[2].plot(xs, median_hv, label='highest node value')
-        ax[2].fill_between(xs, q25_hv, q75_hv, alpha=0.2)
-        
-        ax[0].legend()
-        ax[1].legend()
-        ax[2].legend()
-        
-        ax[0].set_ylim(0.0, 5.1)
-        ax[1].set_ylim(0.0, 0.6)
-        ax[2].set_ylim(0.0, 0.6)
-        
-        ax[0].set_title('c='+str(c))
-        
-        timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
-        plt.savefig('mcts_test_'+str(timestamp))
-        '''
+            '''
+            median_tt = np.median(all_tallest_towers, axis=1)
+            median_hev = np.median(all_highest_exp_heights, axis=1)
+            median_hv = np.median(all_highest_values, axis=1)
+            
+            q25_tt = np.quantile(all_tallest_towers, 0.25, axis=1)
+            q75_tt = np.quantile(all_tallest_towers, 0.75, axis=1)
+            
+            q25_hev = np.quantile(all_highest_exp_heights, 0.25, axis=1)
+            q75_hev = np.quantile(all_highest_exp_heights, 0.75, axis=1)
+            
+            q25_hv = np.quantile(all_highest_values, 0.25, axis=1)
+            q75_hv = np.quantile(all_highest_values, 0.75, axis=1)
+            '''
+            fig, ax = plt.subplots(3)
+            
+            xs = list(range(len(tallest_tower)))
+            ax[0].plot(xs, tallest_tower, label='tallest tower')
+            #ax[0].fill_between(xs, q25_tt, q75_tt, alpha=0.2)
+            
+            ax[1].plot(xs, highest_exp_height, label='highest expected height')
+            #ax[1].fill_between(xs, q25_hev, q75_hev, alpha=0.2)
+            
+            ax[2].plot(xs, highest_value, label='highest node value')
+            #ax[2].fill_between(xs, q25_hv, q75_hv, alpha=0.2)
+            
+            ax[0].legend()
+            ax[1].legend()
+            ax[2].legend()
+            
+            ax[0].set_ylim(0.0, 5.1)
+            ax[1].set_ylim(0.0, 0.6)
+            ax[2].set_ylim(0.0, 0.6)
+            
+            ax[0].set_title('c='+str(c))
+            
+            timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
+            plt.savefig('mcts_test_'+str(timestamp))
+            

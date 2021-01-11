@@ -28,13 +28,15 @@ class Tallest(Problem):
         new_towers = []
         new_blocks_remaining = []
         if len(parent_node['tower']) == 0:
-            # first action: place each possible block at (0,0)
+            # first action: place each possible block at (0,0) at a random orientation
             for block in parent_node['blocks_remaining']:
-                block.pose = Pose(ZERO_POS, block.pose.orn)
-                blocks_remaining = copy(parent_node['blocks_remaining'])
-                blocks_remaining.remove(block)
-                new_towers.append([block])
-                new_blocks_remaining.append(blocks_remaining)
+                for _ in range(self.samples_per_block):
+                    tower = random_placement(block, [], discrete=discrete)
+                    tower[0].pose = Pose(ZERO_POS, tower[0].pose.orn)
+                    blocks_remaining = copy(parent_node['blocks_remaining'])
+                    blocks_remaining.remove(block)
+                    new_towers.append(tower)
+                    new_blocks_remaining.append(blocks_remaining)
         else:
             # randomly sample a placement of a random block
             for block in parent_node['blocks_remaining']:
@@ -69,7 +71,7 @@ class Tallest(Problem):
                                 'ground_truth': all_rewards['ground_truth'][i]}
             new_nodes.append(new_node)
         return new_nodes
-        
+    '''
     def sample_action(self, parent_node, model, discrete=False):
         block = np.random.choice(parent_node['blocks_remaining'])
         if len(parent_node['tower']) == 0:
@@ -103,7 +105,7 @@ class Tallest(Problem):
                         'ground_truth': all_rewards['ground_truth'][0]}
     
         return new_node
-
+    '''
     def reward_fn(self, towers, model):
         all_rewards = {'exp_reward': [], 'reward': [], 'ground_truth': []}
         if len(towers[0]) == 1:
