@@ -10,13 +10,14 @@ from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
 
-DEBUG_FAILURE = False 
+DEBUG_FAILURE = True 
 
 def get_grasp_gen(robot):
     # I opt to use TSR to define grasp sets but you could replace this
     # with your favorite grasp generator
     def gen(body):
-        grasp_tsr = pb_robot.tsrs.panda_box.grasp(body)
+        # Note, add_slanted_grasps should be True when we're using the platform.
+        grasp_tsr = pb_robot.tsrs.panda_box.grasp(body, add_slanted_grasps=False)
         grasps = []
         # Only use a top grasp (2, 4) and side grasps (7).
         for top_grasp_ix in range(len(grasp_tsr)):#[2, 4, 7, 6, 0, 1]: 
