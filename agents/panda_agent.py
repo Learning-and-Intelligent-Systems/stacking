@@ -20,13 +20,15 @@ from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise, teleport=False):
+    def __init__(self, blocks, noise, use_platform, teleport=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a 
         platform which can be used in experimentation.
         :param teleport: Debugging parameter used to skip planning while moving
                          blocks around this world.
+        :param use_platform: Boolean stating whether to include the platform to
+                             push blocks off of or not.
         """
         # TODO: Check that having this as client 0 is okay when interacting 
         # with everything else.
@@ -37,7 +39,7 @@ class PandaAgent:
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
         self.belief_blocks = blocks
-        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame = setup_panda_world(self.robot, blocks)
+        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame = setup_panda_world(self.robot, blocks, use_platform=use_platform)
         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg, self.frame], self.pddl_blocks)
         poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
@@ -47,7 +49,7 @@ class PandaAgent:
         pb_robot.utils.set_default_camera()
         self.execution_robot = pb_robot.panda.Panda()
         self.execution_robot.arm.hand.Open()
-        setup_panda_world(self.execution_robot, blocks, poses)
+        setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
         self.plan()
         self.noise = noise
@@ -128,6 +130,7 @@ class PandaAgent:
         :param vis_sim: Ununsed.
         :return: (action, T, end_pose) End pose should be TODO: what frame?
         """
+        assert(self.platform_table is not None)
         real_block = self.belief_blocks[block_ix]
         pddl_block = self.pddl_blocks[block_ix]
 

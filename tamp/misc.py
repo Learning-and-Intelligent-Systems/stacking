@@ -93,7 +93,7 @@ def create_pb_robot_urdf(obj, fname):
     pb_path = os.path.join(pb_urdf_folder, fname)
     return pb_path
 
-def setup_panda_world(robot, blocks, poses=None):
+def setup_panda_world(robot, blocks, poses=None, use_platform=True):
     # Adjust robot position such that measurements match real robot reference frame
     robot_pose = numpy.eye(4)
     robot_pose[2, 3] -= 0.1
@@ -145,20 +145,23 @@ def setup_panda_world(robot, blocks, poses=None):
             block.set_base_link_pose(pose)
 
     # Setup platform.
-    platform, leg = Object.platform()
-    pb_platform_fname = create_pb_robot_urdf(platform, 'platform.urdf')
-    pb_leg_fname = create_pb_robot_urdf(leg, 'leg.urdf')
-    pddl_platform = pb_robot.body.createBody(pb_platform_fname)
-    pddl_leg = pb_robot.body.createBody(pb_leg_fname)
+    if use_platform:
+        platform, leg = Object.platform()
+        pb_platform_fname = create_pb_robot_urdf(platform, 'platform.urdf')
+        pb_leg_fname = create_pb_robot_urdf(leg, 'leg.urdf')
+        pddl_platform = pb_robot.body.createBody(pb_platform_fname)
+        pddl_leg = pb_robot.body.createBody(pb_leg_fname)
 
-    rotation = pb_robot.geometry.Euler(yaw=numpy.pi/2)
-    pddl_platform.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_platform.get_base_link_pose()))
-    pddl_leg.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_leg.get_base_link_pose()))
-    
-    table_z = pddl_table.get_base_link_pose()[0][2]
-    pddl_leg.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z/2])
-    pddl_platform.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z + platform.dimensions.z/2.])
-
+        rotation = pb_robot.geometry.Euler(yaw=numpy.pi/2)
+        pddl_platform.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_platform.get_base_link_pose()))
+        pddl_leg.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_leg.get_base_link_pose()))
+        
+        table_z = pddl_table.get_base_link_pose()[0][2]
+        pddl_leg.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z/2])
+        pddl_platform.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z + platform.dimensions.z/2.])
+    else:
+        pddl_platform = None
+        pddl_leg = None
 
     return pddl_blocks, pddl_platform, pddl_leg, pddl_table, pddl_frame
 
