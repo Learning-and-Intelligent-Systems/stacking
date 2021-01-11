@@ -587,14 +587,14 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def tallest_tower_regret_evaluation(logger, max_acquisitions, fname, n_towers, block_set):
+def tallest_tower_regret_evaluation(logger, max_acquisitions, fname, n_towers, block_set, discrete=discrete):
     def tower_height(tower):
         """
         :param tower: A vectorized version of the tower.
         """
         return np.sum(tower[:, 6])
 
-    return evaluate_planner(logger, n_towers, tower_height, block_set, max_acquisitions, fname)
+    return evaluate_planner(logger, n_towers, tower_height, block_set, max_acquisitions, fname, discrete)
 
 def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
     def contact_area(tower):
@@ -621,7 +621,7 @@ def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
 
     return evaluate_planner(logger, n_towers, contact_area, block_set, fname='contact_regret.pkl')
 
-def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fname):
+def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fname, discrete):
     tower_keys = ['2block', '3block', '4block', '5block']
     tower_sizes = [2, 3, 4, 5]
     tp = TowerPlanner(stability_mode='contains')
@@ -639,7 +639,7 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
             curr_regrets = []
             for t in range(0, n_towers):
                 print('Tower number', t)
-                tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn, num_blocks=size)
+                tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn, num_blocks=size, discrete=discrete)
 
                 #print(reward, max_reward)
                 block_tower = [Object.from_vector(tower[bx]) for bx in range(len(tower))]
