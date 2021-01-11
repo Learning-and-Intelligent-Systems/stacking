@@ -111,11 +111,17 @@ def setup_panda_world(robot, blocks, poses=None):
         pddl_block = pb_robot.body.createBody(pb_block_fname)
         pddl_blocks.append(pddl_block)
     
-    floor_path = 'tamp/models/short_floor.urdf'
-    shutil.copyfile(floor_path, 'pb_robot/models/short_floor.urdf')
-    table_file = os.path.join('models', 'short_floor.urdf')
+    floor_path = 'tamp/models/panda_table.urdf'
+    shutil.copyfile(floor_path, 'pb_robot/models/panda_table.urdf')
+    table_file = os.path.join('models', 'panda_table.urdf')
     pddl_table = pb_robot.body.createBody(table_file)
     pddl_table.set_point([0.2, 0, -0.11])
+
+    frame_path = 'tamp/models/panda_frame.urdf'
+    shutil.copyfile(frame_path, 'pb_robot/models/panda_frame.urdf')
+    frame_file = os.path.join('models', 'panda_frame.urdf')
+    pddl_frame = pb_robot.body.createBody(frame_file)
+    pddl_frame.set_point([0.2 + 0.762 - 0.0127, 0 + 0.6096 - 0.0127, -0.11])
 
     # Set the initial positions randomly on table.
     if poses is None:
