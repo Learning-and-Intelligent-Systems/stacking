@@ -37,8 +37,8 @@ class PandaAgent:
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
         self.belief_blocks = blocks
-        self.pddl_blocks, self.platform_table, self.platform_leg, self.table = setup_panda_world(self.robot, blocks)
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
+        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame = setup_panda_world(self.robot, blocks)
+        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg, self.frame], self.pddl_blocks)
         poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
 
@@ -92,7 +92,7 @@ class PandaAgent:
         up" an experiment by moving blocks away from the platform after an 
         experiment.
         """
-        fixed = [self.table, self.platform_table, self.platform_leg]
+        fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
         conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
         init = [('CanMove',),
                 ('Conf', conf),

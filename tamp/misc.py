@@ -160,7 +160,7 @@ def setup_panda_world(robot, blocks, poses=None):
     pddl_platform.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z + platform.dimensions.z/2.])
 
 
-    return pddl_blocks, pddl_platform, pddl_leg, pddl_table
+    return pddl_blocks, pddl_platform, pddl_leg, pddl_table, pddl_frame
 
 
 def get_pddlstream_info(robot, fixed, movable):
