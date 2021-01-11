@@ -101,6 +101,9 @@ class PandaAgent:
                 ('AtConf', conf),
                 ('HandEmpty',)]
 
+        self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
+        init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
+
         for body in self.pddl_blocks:
             print(type(body), body)
             pose = pb_robot.vobj.BodyPose(body, body.get_base_link_pose())
@@ -108,11 +111,8 @@ class PandaAgent:
                     ('Pose', body, pose),
                     ('AtPose', body, pose),
                     ('Block', body),
-                    ('On', body, self.table)]
-
-
-        self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
-        init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
+                    ('On', body, self.table),
+                    ('Supported', body, pose, self.table, self.table_pose)]
 
         if not self.platform_table is None:
             self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
