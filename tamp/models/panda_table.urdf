@@ -1,0 +1,152 @@
+<?xml version="1.0"?>
+<robot name="flat_terrain">
+  <link name="base_link">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.05" rpy="0 0 0" />
+      <geometry>
+        <box size="1.524 1.2192 0.1" />
+      </geometry>
+      <material name="desert sand">
+        <color rgba="0.9297 0.7930 0.6758 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.05" rpy="0 0 0" />
+      <geometry>
+        <box size="1.524 1.2192 0.1" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="vertical_support_1">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.0254 0.0254 1.2192" />
+      </geometry>
+      <material name="desert sand">
+        <color rgba="0.9297 0.7930 0.6758 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.0254 0.0254 1.2192" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="vertical_support_2">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.0254 0.0254 1.2192" />
+      </geometry>
+      <material name="desert sand">
+        <color rgba="0.9297 0.7930 0.6758 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.0254 0.0254 1.2192" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="vertical_support_3">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.0254 0.0254 1.2192" />
+      </geometry>
+      <material name="desert sand">
+        <color rgba="0.9297 0.7930 0.6758 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.0254 0.0254 1.2192" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="vertical_support_4">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.0254 0.0254 1.2192" />
+      </geometry>
+      <material name="desert sand">
+        <color rgba="0.9297 0.7930 0.6758 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.0254 0.0254 1.2192" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="vertical_1_base_fixed" type="fixed">
+    <origin xyz="0.7493 0.5969 0.0" rpy="0 0 0" /> <!-- Length of base/2 - length of support/2 = 1.524/2 - 0.0254/2  -->
+    <parent link="base_link" />
+    <child link="vertical_support_1" />
+  </joint>
+
+  <joint name="vertical_2_base_fixed" type="fixed">
+    <origin xyz="0.7493 -0.5969 0.0" rpy="0 0 0" /> <!-- Length of base/2 - length of support/2 = 1.524/2 - 0.0254/2  -->
+    <parent link="base_link" />
+    <child link="vertical_support_2" />
+  </joint>
+
+  <joint name="vertical_3_base_fixed" type="fixed">
+    <origin xyz="-0.7493 0.5969 0.0" rpy="0 0 0" /> <!-- Length of base/2 - length of support/2 = 1.524/2 - 0.0254/2  -->
+    <parent link="base_link" />
+    <child link="vertical_support_3" />
+  </joint>
+
+  <joint name="vertical_4_base_fixed" type="fixed">
+    <origin xyz="-0.7493 -0.5969 0.0" rpy="0 0 0" /> <!-- Length of base/2 - length of support/2 = 1.524/2 - 0.0254/2  -->
+    <parent link="base_link" />
+    <child link="vertical_support_4" />
+  </joint>
+</robot>
