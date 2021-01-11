@@ -587,7 +587,7 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def tallest_tower_regret_evaluation(logger, max_acquisitions, fname, n_towers, block_set, discrete=discrete):
+def tallest_tower_regret_evaluation(logger, max_acquisitions, fname, n_towers, block_set, discrete=False):
     def tower_height(tower):
         """
         :param tower: A vectorized version of the tower.
