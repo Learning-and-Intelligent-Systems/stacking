@@ -63,7 +63,8 @@ if __name__ == '__main__':
         block_set = [Object.random(f'obj_{ix}') for ix in range(args.n_blocks)]
 
     logger = ActiveExperimentLogger(args.exp_path)
-
+    pre = 'discrete_' if args.discrete else ''
+    
     ## RUN SEQUENTIAL PLANNER
     if args.method == 'sequential' or args.method == 'both':
         tower_keys = ['2block', '3block', '4block', '5block']
@@ -102,16 +103,16 @@ if __name__ == '__main__':
             for k in tower_keys:
                 regrets[k].append(tx_regrets[k])
                 
-            with open(logger.get_figure_path('sequential_planner_tallest_tower_regret.pkl'), 'wb') as handle:
+            with open(logger.get_figure_path(pre+'sequential_planner_tallest_tower_regret.pkl'), 'wb') as handle:
                 pickle.dump(regrets, handle)
 
+    
     ## RUN RANDOM PLANNER
     if args.method == 'total' or args.method == 'both':
-        total_planner(logger, args.max_acquisitions, 'total_planner_tallest_tower_regret.pkl', \
+        total_planner(logger, args.max_acquisitions, pre+'total_planner_tallest_tower_regret.pkl', \
             args.n_towers, block_set, discrete=args.discrete)
 
     ## PLOT RESULTS
-    pre = 'discrete_' if args.discrete else ''
     if args.method in ['sequential', 'both']:
         plot_tallest_tower_regret(logger, pre+'sequential_planner_tallest_tower_regret.pkl')
     if args.method in ['total', 'both']:
