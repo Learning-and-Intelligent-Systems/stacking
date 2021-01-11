@@ -3,6 +3,8 @@ import argparse
 import pickle
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
 
 from planning.tree import Tree
 from planning.problems import Tallest, Overhang, Deconstruct
@@ -21,21 +23,28 @@ def plan(timeout, blocks, problem, model):
             tree.expand(parent_node_id, node)
     return tree
 
-def plan_mcts(timeout, blocks, problem, model, c=5):
+def plan_mcts(timeout, blocks, problem, model, c=5, discrete=True):
     tree = Tree(blocks)
     tallest_tower = [0]
     highest_exp_height = [0]
     highest_value = [0]
+    tower_stats = np.zeros((5,timeout))
     for t in range(timeout):
         sys.stdout.write("Search progress: %i   \r" % (t) )
         sys.stdout.flush()
         parent_node_id = tree.traverse(c)
         
-        new_node = problem.sample_action(tree.nodes[parent_node_id], model, discrete=True)
+        new_node = problem.sample_action(tree.nodes[parent_node_id], model, discrete=discrete)
         #print(t, len(new_node['tower']), new_node['exp_reward'])
         new_node_id = tree.expand(parent_node_id, new_node)
         rollout_value = tree.rollout(new_node_id, problem, model)
         tree.backpropagate(new_node_id, rollout_value)
+        
+        tower_height = len(new_node['tower'])
+        #print(tower_height)
+        index = int(tower_height)
+        tower_stats[:,t] = tower_stats[:,t-1]
+        tower_stats[index-1,t] += 1
         
         if len(new_node['tower'])>tallest_tower[-1]:
             tallest_tower.append(len(new_node['tower']))
@@ -51,7 +60,7 @@ def plan_mcts(timeout, blocks, problem, model, c=5):
             highest_value.append(new_node['value'])
         else:
             highest_value.append(highest_value[-1])
-    return tree
+    return tallest_tower, highest_exp_height, highest_value, tree, tower_stats
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -101,20 +110,32 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path)
     ensemble = logger.get_ensemble(tx)
     
-    c_vals = [10 ** np.linspace(0,10)]
+    c_vals = 10 ** np.linspace(0,10)
     for c in c_vals:
-        runs = 10
+        runs = 1
         all_tallest_towers = np.zeros((args.timeout+1, runs))
         all_highest_exp_heights = np.zeros((args.timeout+1, runs))
         all_highest_values = np.zeros((args.timeout+1, runs))
         for run in range(runs):
-            tallest_tower, highest_exp_height, highest_value, tree = \
+            tallest_tower, highest_exp_height, highest_value, tree, tower_stats = \
                 plan_mcts(args.timeout, block_set, problem, ensemble, c=c)
                 
             all_tallest_towers[:,run] = tallest_tower
             all_highest_exp_heights[:,run] = highest_exp_height
             all_highest_values[:,run] = highest_value
             
+            plt.figure()
+            xs = list(range(tower_stats.shape[1]))
+            keys = ['2block', '3block', '4block', '5block']
+            plt.bar(xs, tower_stats[0,:], label='1block')
+            for i, key in enumerate(keys):
+                plt.bar(xs, tower_stats[i+1,:], bottom=np.sum(tower_stats[:i+1,:], axis=0), label=key)
+            plt.title('c= '+str(c))
+            plt.legend()
+            timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
+            plt.savefig('mcts_test_'+str(timestamp))
+            #plt.show()
+        '''
         median_tt = np.median(all_tallest_towers, axis=1)
         median_hev = np.median(all_highest_exp_heights, axis=1)
         median_hv = np.median(all_highest_values, axis=1)
@@ -127,8 +148,6 @@ if __name__ == '__main__':
         
         q25_hv = np.quantile(all_highest_values, 0.25, axis=1)
         q75_hv = np.quantile(all_highest_values, 0.75, axis=1)
-        
-        import matplotlib.pyplot as plt
         
         fig, ax = plt.subplots(3)
         
@@ -152,6 +171,6 @@ if __name__ == '__main__':
         
         ax[0].set_title('c='+str(c))
         
-        from datetime import datetime
         timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
         plt.savefig('mcts_test_'+str(timestamp))
+        '''
