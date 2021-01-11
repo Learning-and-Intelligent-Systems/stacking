@@ -171,6 +171,7 @@ def get_pddlstream_info(robot, fixed, movable):
     stream_pddl = read('tamp/stream_stacking.pddl') 
     constant_map = {}
     
+    fixed = [f for f in fixed if f is not None]
     stream_map = {
         'sample-pose-table': from_gen_fn(primitives.get_stable_gen_table(fixed)),
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),

@@ -114,10 +114,11 @@ class PandaAgent:
         self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
         init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
 
-        self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
-        init += [('Pose', self.platform_table, self.platform_pose), ('AtPose', self.platform_table, self.platform_pose)]
-
-        init += [('Table', self.table), ('Block', self.platform_table)]
+        if not self.platform_table is None:
+            self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
+            init += [('Pose', self.platform_table, self.platform_pose), ('AtPose', self.platform_table, self.platform_pose)]
+            init += [('Block', self.platform_table)]
+        init += [('Table', self.table)]
         return init
 
     def simulate_action(self, action, block_ix, T=50, vis_sim=False, vis_placement=False):
@@ -225,7 +226,7 @@ class PandaAgent:
         self.plan()
         block.set_base_link_pose(pose)
 
-    def simulate_tower(self, tower, vis, T, save_tower=False, solve_joint=False):
+    def simulate_tower(self, tower, vis, T, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
         """
         :param tower: list of belief blocks that are rotated to have no 
                       orientation in the tower. These are in the order of 
@@ -254,7 +255,7 @@ class PandaAgent:
         base_block = pddl_block_lookup[tower[0]]
         base_pos = base_block.get_base_link_pose()[0]
         table_z = self.table_pose.pose[0][2] #+ 1e-5
-        base_pos = (0., 0.5, 0.)
+        base_pos = (base_xy[0], base_xy[1], 0.)
         base_pose = ((base_pos[0], base_pos[1], table_z + tower[0].pose.pos.z), tower[0].rotation)
 
         base_pose = pb_robot.vobj.BodyPose(pddl_block, base_pose)
@@ -305,7 +306,7 @@ class PandaAgent:
             goal = tuple(['and'] + goal_terms)
             self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
 
-        self.step_simulation(T, vis_frames=True)
+        self.step_simulation(T, vis_frames=False)
 
 
         # TODO: Reset Environment. Need to handle conditions where the blocks are still a stable tower.
@@ -329,10 +330,10 @@ class PandaAgent:
         for _ in range(T):
             p.stepSimulation(physicsClientId=self._execution_client_id)
             p.stepSimulation(physicsClientId=self._planning_client_id)
-            time.sleep(1/240.)
+            time.sleep(1/2400.)
 
             if vis_frames:
-                length, lifeTime = 0.1, 0
+                length, lifeTime = 0.1, 0.1
                 for pddl_block in self.pddl_blocks:
                     pos, quat = pddl_block.get_pose()
                     new_x = transformation([length, 0.0, 0.0], pos, quat)

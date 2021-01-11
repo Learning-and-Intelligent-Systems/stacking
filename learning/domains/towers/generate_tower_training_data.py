@@ -3,7 +3,7 @@
 Izzy Brand, 2020
 """
 from agents.teleport_agent import TeleportAgent
-from block_utils import World, Environment, Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block, all_rotations
+from block_utils import World, Environment, Object, Position, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block, all_rotations
 from tower_planner import TowerPlanner
 from pybullet_utils import transformation
 import argparse
@@ -59,11 +59,13 @@ def sample_random_tower(blocks, ret_rotated=False):
     # apply the positions to each block
     pos_xyz = np.hstack([pos_xy, pos_z[:,None]])
     for pos, orn, block, rblock in zip(pos_xyz, orns, blocks, rotated_blocks):
-        block.pose = Pose(pos, orn)
+        block.pose = Pose(Position(*pos), orn)
+        block.rotation = orn
         rblock.pose = Pose(pos, (0,0,0,1))
 
     if ret_rotated:
         return blocks, rotated_blocks
+
     return blocks
 
 def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
