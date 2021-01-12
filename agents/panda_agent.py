@@ -239,6 +239,7 @@ class PandaAgent:
             print('CoM:', block.com)
             print('-----')
 
+        moved_blocks = set()
         original_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
         init = self._get_initial_pddl_state()
@@ -270,6 +271,7 @@ class PandaAgent:
                 self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
             else:
                 self.teleport_block(base_block, base_pose.pose)
+        moved_blocks.add(base_block)
 
         poses = [base_pose]
         # TODO: Calculate each blocks pose relative to the block beneath.
@@ -292,6 +294,7 @@ class PandaAgent:
             init += [('RelPose', top_pddl, bottom_pddl, rel_tform)]
             goal_terms.append(('On', top_pddl, bottom_pddl))
 
+            moved_blocks.add(top_pddl)
             if not solve_joint:
                 if not self.teleport:
                     goal = tuple(['and'] + goal_terms)
@@ -310,7 +313,7 @@ class PandaAgent:
                 if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
                     print('Unstable!')
                     break
-
+            
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
             self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
@@ -327,6 +330,8 @@ class PandaAgent:
 
         for ix in block_ixs:
             b, pose = self.pddl_blocks[ix], original_poses[ix]
+            if b not in moved_blocks: continue
+            
             goal_pose = pb_robot.vobj.BodyPose(b, pose)
 
             init = self._get_initial_pddl_state()
