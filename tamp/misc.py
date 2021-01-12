@@ -76,7 +76,10 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
 def ComputePrePose(og_pose, directionVector, relation=None):
     backup = numpy.eye(4)
     backup[0:3, 3] = directionVector
-    prepose = numpy.dot(og_pose, backup)
+    # This computes the relative pose (directionVector is in the gripper frame, -z it outwards)
+    # prepose = numpy.dot(og_pose, backup)
+    # This interprets the directionVector as being in the global z direction.
+    prepose = numpy.dot(backup, og_pose)
     if relation is not None:
         prepose = numpy.dot(prepose, relation)
     return prepose

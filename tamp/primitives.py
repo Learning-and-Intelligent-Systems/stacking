@@ -10,7 +10,7 @@ from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
 
-DEBUG_FAILURE = True 
+DEBUG_FAILURE = False 
 
 def get_grasp_gen(robot):
     # I opt to use TSR to define grasp sets but you could replace this
@@ -85,7 +85,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
-        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125])
+        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.125]) # Was -0.125
 
         if False:
             length, lifeTime = 0.2, 0.0

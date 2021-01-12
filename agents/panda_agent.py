@@ -307,20 +307,15 @@ class PandaAgent:
                 self.step_simulation(T, vis_frames=False)
                 # TODO: Check if the tower was stable, stop construction if not.
                 end_pose = top_pddl.get_point()
-                print(desired_pose, end_pose)
-                input()
                 if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
                     print('Unstable!')
                     break
-                
-                
 
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
             self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
 
         self.step_simulation(T, vis_frames=False)
-
 
         # TODO: Reset Environment. Need to handle conditions where the blocks are still a stable tower.
         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg, self.frame], self.pddl_blocks)
