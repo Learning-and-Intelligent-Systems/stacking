@@ -639,6 +639,7 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
             curr_regrets = []
             for t in range(0, n_towers):
                 print('Tower number', t)
+                blocks = copy.deepcopy(blocks)
                 tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn, num_blocks=size, discrete=discrete)
 
                 #print(reward, max_reward)

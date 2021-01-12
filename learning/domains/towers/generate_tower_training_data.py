@@ -26,7 +26,6 @@ def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=Fal
     else:
         # select blocks in this tower
         blocks = np.random.choice(blocks, num_blocks, replace=False)
-    blocks = deepcopy(blocks)
     
     # pick random orientations for the blocks
     orns = sample_with_replacement(QUATERNIONS, k=num_blocks)
