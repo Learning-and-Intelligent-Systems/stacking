@@ -20,7 +20,7 @@ from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise, use_platform, teleport=False):
+    def __init__(self, blocks, noise, use_platform, block_init_xy_poses=None, teleport=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a 
@@ -55,7 +55,7 @@ class PandaAgent:
         pb_robot.utils.set_default_camera()
         self.execution_robot = pb_robot.panda.Panda()
         self.execution_robot.arm.hand.Open()
-        setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
+        setup_panda_world(self.execution_robot, blocks, block_init_xy_poses, use_platform=use_platform)
 
         self.plan()
         self.noise = noise
@@ -241,7 +241,7 @@ class PandaAgent:
         self.plan()
         block.set_base_link_pose(pose)
 
-    def simulate_tower(self, tower, vis, T, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
+    def simulate_tower(self, tower, vis, T, real=False, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
         """
         :param tower: list of belief blocks that are rotated to have no 
                       orientation in the tower. These are in the order of 
@@ -288,7 +288,7 @@ class PandaAgent:
         if not solve_joint:
             if not self.teleport:
                 goal = tuple(['and'] + goal_terms)
-                self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+                self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
             else:
                 self.teleport_block(base_block, base_pose.pose)
         moved_blocks.add(base_block)
@@ -318,7 +318,7 @@ class PandaAgent:
             if not solve_joint:
                 if not self.teleport:
                     goal = tuple(['and'] + goal_terms)
-                    self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+                    self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
                 else:
                     get_pose = tamp.primitives.get_stable_gen_block()
                     pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -336,7 +336,7 @@ class PandaAgent:
             
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
 
         self.step_simulation(T, vis_frames=False)
 
@@ -366,7 +366,7 @@ class PandaAgent:
             goal_terms.append(('On', b, self.table))
 
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
 
     def step_simulation(self, T, vis_frames=False):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
@@ -407,7 +407,7 @@ class PandaAgent:
 
         return end_pose
 
-    def _solve_and_execute_pddl(self, init, goal, max_time=INF, search_sample_ratio=0.):
+    def _solve_and_execute_pddl(self, init, goal, real=False, max_time=INF, search_sample_ratio=0.):
         self._add_text('Planning block placement')
         self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
@@ -425,9 +425,9 @@ class PandaAgent:
         else:
             saved_world.restore()
             self.execute()
-            ExecuteActions(plan, pause=True, wait=False)
+            ExecuteActions(plan, real=real, pause=True, wait=False)
             self.plan()
-            ExecuteActions(plan, pause=False, wait=False)
+            ExecuteActions(plan, real=real, pause=False, wait=False)
             return True
 
     def _get_regrasp_skeleton(self, max_replacements=2):

@@ -6,7 +6,7 @@ import time
 
 import tamp.primitives as primitives
 
-from block_utils import object_to_urdf, Object
+from block_utils import object_to_urdf, Object, Pose, Position
 from pddlstream.language.generator import from_gen_fn, from_list_fn, from_fn, from_test , BoundedGenerator
 from pddlstream.utils import read
 
@@ -36,7 +36,7 @@ def get_fixed(robot, movable):
     return fixed
 
 def ExecuteActions(plan, real=False, pause=True, wait=True):
-    print("Execute in Simulation")
+    input("Execute in Simulation?")
     for name, args in plan:
         # pb_robot.viz.remove_all_debug()
         # bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
@@ -51,10 +51,15 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
             elif pause:
                 time.sleep(0.5)
     
-    ''' UNCOMMENT TO EXECUTE ON REAL ROBOT
     if real:
-        from franka_interface import ArmInterface
-        import rospy
+        input("Execute on Robot?")
+        try:
+            from franka_interface import ArmInterface
+            import rospy
+        except:
+            print("Do not have rospy and franka_interface installed.")
+            return
+            
         try:
             rospy.init_node("path_execution")
             arm = ArmInterface()
@@ -71,7 +76,6 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
             for e in executionItems:
                 e.execute(realRobot=arm)
                 raw_input("Next?")
-    '''
 
 def ComputePrePose(og_pose, directionVector, approach_frame, relation=None):
     backup = numpy.eye(4)
@@ -102,7 +106,7 @@ def create_pb_robot_urdf(obj, fname):
     pb_path = os.path.join(pb_urdf_folder, fname)
     return pb_path
 
-def setup_panda_world(robot, blocks, poses=None, use_platform=True):
+def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
     # Adjust robot position such that measurements match real robot reference frame
     robot_pose = numpy.eye(4)
     robot_pose[2, 3] -= 0.1
@@ -133,7 +137,7 @@ def setup_panda_world(robot, blocks, poses=None, use_platform=True):
     pddl_frame.set_point([0.2 + 0.762 - 0.0127, 0 + 0.6096 - 0.0127, -0.11])
 
     # Set the initial positions randomly on table.
-    if poses is None:
+    if xy_poses is None:
         for ix, block in enumerate(pddl_blocks):
             while True:
                 z = pb_robot.placements.stable_z(block, pddl_table)
@@ -150,8 +154,13 @@ def setup_panda_world(robot, blocks, poses=None, use_platform=True):
                     continue
                 break
     else:
-        for block, pose in zip(pddl_blocks, poses):
-            block.set_base_link_pose(pose)
+        for i, (block, xy_pose) in enumerate(zip(pddl_blocks, xy_poses)):
+            full_pose = Pose(Position(xy_pose.pos.x, 
+                                    xy_pose.pos.y, 
+                                    pb_robot.placements.stable_z(block, pddl_table)),
+                            xy_pose.orn)
+            block.set_base_link_pose(full_pose)
+            
 
     # Setup platform.
     if use_platform:
