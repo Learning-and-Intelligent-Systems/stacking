@@ -257,11 +257,6 @@ class PandaAgent:
         moved_blocks = set()
         original_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
-        self.pddl_info = get_pddlstream_info(self.robot, 
-                                             self.fixed, 
-                                             self.pddl_blocks,
-                                             add_slanted_grasps=False,
-                                             approach_frame='global')
         init = self._get_initial_pddl_state()
         goal_terms = []
 
@@ -285,6 +280,11 @@ class PandaAgent:
         goal_terms.append(('AtPose', base_block, base_pose)) 
         goal_terms.append(('On', base_block, self.table))
 
+        self.pddl_info = get_pddlstream_info(self.robot, 
+                                             self.fixed + [b for b in self.pddl_blocks if b != base_block], 
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='global')
         if not solve_joint:
             if not self.teleport:
                 goal = tuple(['and'] + goal_terms)
@@ -311,6 +311,11 @@ class PandaAgent:
                 init = self._get_initial_pddl_state()
                 goal_terms = []
 
+            self.pddl_info = get_pddlstream_info(self.robot, 
+                                                 self.fixed + [b for b in self.pddl_blocks if b != top_block], 
+                                                 self.pddl_blocks,
+                                                 add_slanted_grasps=False,
+                                                 approach_frame='global')
             init += [('RelPose', top_pddl, bottom_pddl, rel_tform)]
             goal_terms.append(('On', top_pddl, bottom_pddl))
 
@@ -341,12 +346,6 @@ class PandaAgent:
         self.step_simulation(T, vis_frames=False)
 
         # Reset Environment. Need to handle conditions where the blocks are still a stable tower.
-        self.pddl_info = get_pddlstream_info(self.robot, 
-                                             self.fixed, 
-                                             self.pddl_blocks,
-                                             add_slanted_grasps=False,
-                                             approach_frame='global')
-        
         # As a heuristic for which block to reset first, do it in order of their z-values.
         current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
         block_ixs = range(len(self.pddl_blocks))
@@ -357,6 +356,12 @@ class PandaAgent:
             if b not in moved_blocks: continue
 
             goal_pose = pb_robot.vobj.BodyPose(b, pose)
+
+            self.pddl_info = get_pddlstream_info(self.robot, 
+                                                 self.fixed + [obj for obj in self.pddl_blocks if obj != b], 
+                                                 self.pddl_blocks,
+                                                 add_slanted_grasps=False,
+                                                 approach_frame='global')
 
             init = self._get_initial_pddl_state()
             init += [('Pose', b, goal_pose),
@@ -371,9 +376,18 @@ class PandaAgent:
     def step_simulation(self, T, vis_frames=False):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
         p.setGravity(0, 0, -10, physicsClientId=self._planning_client_id)
+        
+        q = self.robot.get_joint_positions()
+
         for _ in range(T):
             p.stepSimulation(physicsClientId=self._execution_client_id)
             p.stepSimulation(physicsClientId=self._planning_client_id)
+            
+            self.execute()
+            self.execution_robot.set_joint_positions(self.robot.joints, q)
+            self.plan()
+            self.robot.set_joint_positions(self.robot.joints, q)
+            
             time.sleep(1/2400.)
 
             if vis_frames:

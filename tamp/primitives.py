@@ -10,7 +10,7 @@ from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
 
-DEBUG_FAILURE = False 
+DEBUG_FAILURE = True 
 
 def get_grasp_gen(robot, add_slanted_grasps):
     # I opt to use TSR to define grasp sets but you could replace this
@@ -88,7 +88,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
         if approach_frame == 'gripper':
             approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
         elif approach_frame == 'global':
-            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.125], approach_frame) # Was -0.125
+            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.05], approach_frame) # Was -0.125
         else:
             raise NotImplementedError()
 
@@ -103,6 +103,13 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
             p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime, physicsClientId=1)
             p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
             p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
+
+        # Check if grasp is vertical relative to object. Fail if so (approach would go through object).
+        grasp_frame = pb_robot.geometry.pose_from_tform(grasp_worldF)
+        grasp_euler = pb_robot.geometry.euler_from_quat(grasp_frame[1])
+        # TODO: Verify that the y-axis of the gripper frame is along the plane of the hand.
+        if numpy.abs(grasp_euler[0] - 1.57) < 0.1:
+            return None
 
         for _ in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)

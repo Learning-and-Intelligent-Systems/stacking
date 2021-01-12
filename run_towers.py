@@ -30,7 +30,7 @@ def main(args):
         agent.simulate_tower(tower,
                              base_xy=(0.5, -0.3), 
                              vis=True, 
-                             T=1000, 
+                             T=2500, 
                              save_tower=args.save_tower)
 
 
