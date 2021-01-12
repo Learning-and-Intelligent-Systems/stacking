@@ -39,7 +39,7 @@ class PandaAgent:
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
         self.belief_blocks = blocks
-        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame = setup_panda_world(self.robot, blocks, use_platform=use_platform)
+        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame = setup_panda_world(self.robot, blocks, block_init_xy_poses, use_platform=use_platform)
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame]
 
         self.pddl_info = get_pddlstream_info(self.robot, 
@@ -48,14 +48,14 @@ class PandaAgent:
                                              add_slanted_grasps=False,
                                              approach_frame='global')
         poses = [b.get_base_link_pose() for b in self.pddl_blocks]
-
+        poses = [Pose(Position(*p[0]), Quaternion(*p[1])) for p in poses]
 
         self._execution_client_id = pb_robot.utils.connect(use_gui=True)
         self.execute()
         pb_robot.utils.set_default_camera()
         self.execution_robot = pb_robot.panda.Panda()
         self.execution_robot.arm.hand.Open()
-        setup_panda_world(self.execution_robot, blocks, block_init_xy_poses, use_platform=use_platform)
+        setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
         self.plan()
         self.noise = noise
@@ -427,7 +427,7 @@ class PandaAgent:
             self.execute()
             ExecuteActions(plan, real=real, pause=True, wait=False)
             self.plan()
-            ExecuteActions(plan, real=real, pause=False, wait=False)
+            ExecuteActions(plan, real=False, pause=False, wait=False)
             return True
 
     def _get_regrasp_skeleton(self, max_replacements=2):
