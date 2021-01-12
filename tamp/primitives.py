@@ -12,12 +12,12 @@ from scipy.spatial.transform import Rotation as R
 
 DEBUG_FAILURE = False 
 
-def get_grasp_gen(robot):
+def get_grasp_gen(robot, add_slanted_grasps):
     # I opt to use TSR to define grasp sets but you could replace this
     # with your favorite grasp generator
     def gen(body):
         # Note, add_slanted_grasps should be True when we're using the platform.
-        grasp_tsr = pb_robot.tsrs.panda_box.grasp(body, add_slanted_grasps=False)
+        grasp_tsr = pb_robot.tsrs.panda_box.grasp(body, add_slanted_grasps=add_slanted_grasps)
         grasps = []
         # Only use a top grasp (2, 4) and side grasps (7).
         for top_grasp_ix in range(len(grasp_tsr)):#[2, 4, 7, 6, 0, 1]: 
@@ -80,12 +80,17 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=2):
+def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
-        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.125]) # Was -0.125
+        if approach_frame == 'gripper':
+            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
+        elif approach_frame == 'global':
+            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.125], approach_frame) # Was -0.125
+        else:
+            raise NotImplementedError()
 
         if False:
             length, lifeTime = 0.2, 0.0

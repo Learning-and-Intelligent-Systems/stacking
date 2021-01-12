@@ -73,13 +73,19 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
                 raw_input("Next?")
     '''
 
-def ComputePrePose(og_pose, directionVector, relation=None):
+def ComputePrePose(og_pose, directionVector, approach_frame, relation=None):
     backup = numpy.eye(4)
     backup[0:3, 3] = directionVector
-    # This computes the relative pose (directionVector is in the gripper frame, -z it outwards)
-    # prepose = numpy.dot(og_pose, backup)
-    # This interprets the directionVector as being in the global z direction.
-    prepose = numpy.dot(backup, og_pose)
+
+    if approach_frame == 'gripper':
+        # This computes the relative pose (directionVector is in the gripper frame, -z it outwards)
+        prepose = numpy.dot(og_pose, backup)
+    elif approach_frame == 'global':
+        # This interprets the directionVector as being in the global z direction.
+        prepose = numpy.dot(backup, og_pose)
+    else: 
+        raise NotImplementedError()
+    
     if relation is not None:
         prepose = numpy.dot(prepose, relation)
     return prepose
@@ -169,7 +175,7 @@ def setup_panda_world(robot, blocks, poses=None, use_platform=True):
     return pddl_blocks, pddl_platform, pddl_leg, pddl_table, pddl_frame
 
 
-def get_pddlstream_info(robot, fixed, movable):
+def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_frame):
     domain_pddl = read('tamp/domain_stacking.pddl') 
     stream_pddl = read('tamp/stream_stacking.pddl') 
     constant_map = {}
@@ -178,8 +184,8 @@ def get_pddlstream_info(robot, fixed, movable):
     stream_map = {
         'sample-pose-table': from_gen_fn(primitives.get_stable_gen_table(fixed)),
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
-        'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot)),
-        'inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed)), 
+        'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot, add_slanted_grasps)),
+        'inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame=approach_frame)), 
         'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
         'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
     }

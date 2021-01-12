@@ -40,7 +40,13 @@ class PandaAgent:
         self.robot.arm.hand.Open()
         self.belief_blocks = blocks
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame = setup_panda_world(self.robot, blocks, use_platform=use_platform)
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg, self.frame], self.pddl_blocks)
+        self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame]
+
+        self.pddl_info = get_pddlstream_info(self.robot, 
+                                             self.fixed, 
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='global')
         poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
 
@@ -139,6 +145,11 @@ class PandaAgent:
 
         # Set up the PDDLStream problem for the placing the given block on the
         # platform with the specified action.
+        self.pddl_info = get_pddlstream_info(self.robot, 
+                                             self.fixed, 
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='gripper')
         init = self._get_initial_pddl_state()
 
         #  Figure out the correct transformation matrix based on the action.
@@ -197,7 +208,11 @@ class PandaAgent:
         # Put block back in original position.
 
         # TODO: Check if block is on the table or platform to start. 
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg, self.frame], self.pddl_blocks)
+        self.pddl_info = get_pddlstream_info(self.robot, 
+                                             self.fixed, 
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=True,
+                                             approach_frame='gripper')
 
         init = self._get_initial_pddl_state()
         goal_pose = pb_robot.vobj.BodyPose(pddl_block, original_pose)
@@ -242,6 +257,11 @@ class PandaAgent:
         moved_blocks = set()
         original_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
+        self.pddl_info = get_pddlstream_info(self.robot, 
+                                             self.fixed, 
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='global')
         init = self._get_initial_pddl_state()
         goal_terms = []
 
@@ -321,7 +341,11 @@ class PandaAgent:
         self.step_simulation(T, vis_frames=False)
 
         # Reset Environment. Need to handle conditions where the blocks are still a stable tower.
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg, self.frame], self.pddl_blocks)
+        self.pddl_info = get_pddlstream_info(self.robot, 
+                                             self.fixed, 
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='global')
         
         # As a heuristic for which block to reset first, do it in order of their z-values.
         current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
@@ -331,7 +355,7 @@ class PandaAgent:
         for ix in block_ixs:
             b, pose = self.pddl_blocks[ix], original_poses[ix]
             if b not in moved_blocks: continue
-            
+
             goal_pose = pb_robot.vobj.BodyPose(b, pose)
 
             init = self._get_initial_pddl_state()
