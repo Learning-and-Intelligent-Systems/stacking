@@ -23,9 +23,9 @@ ROTATED_BLOCKS = {}
 def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=False):
     if num_blocks is None:
         num_blocks = len(blocks)
-    else:
-        # select blocks in this tower
-        blocks = np.random.choice(blocks, num_blocks, replace=False)
+
+    # select blocks in this tower
+    blocks = np.random.choice(blocks, num_blocks, replace=False)
     
     # pick random orientations for the blocks
     orns = sample_with_replacement(QUATERNIONS, k=num_blocks)
