@@ -630,11 +630,11 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
 
-    for tx in range(0, max_acquisitions, 10):#logger.args.max_acquisitions):
+    for tx in [0,50,100]:#range(0, max_acquisitions, 10):#logger.args.max_acquisitions):
         print('Acquisition step:', tx)
         ensemble = logger.get_ensemble(tx)
 
-        for k, size in [('5block', 5)]:#zip(tower_keys, tower_sizes):
+        for k, size in zip(tower_keys, tower_sizes):
             print('Tower size', k)
             curr_regrets = []
             for t in range(0, n_towers):

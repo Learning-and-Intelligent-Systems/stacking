@@ -74,7 +74,7 @@ if __name__ == '__main__':
         # Store regret for towers of each size.
         regrets = {k: [] for k in tower_keys}
 
-        for tx in range(0, args.max_acquisitions, 10):
+        for tx in [0, 50, 100]:#range(0, args.max_acquisitions, 10):
             print('Acquisition step:', tx)
             ensemble = logger.get_ensemble(tx)
 
