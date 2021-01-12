@@ -317,9 +317,16 @@ class PandaAgent:
 
         self.step_simulation(T, vis_frames=False)
 
-        # TODO: Reset Environment. Need to handle conditions where the blocks are still a stable tower.
+        # Reset Environment. Need to handle conditions where the blocks are still a stable tower.
         self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg, self.frame], self.pddl_blocks)
-        for b, pose in zip(self.pddl_blocks, original_poses):
+        
+        # As a heuristic for which block to reset first, do it in order of their z-values.
+        current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+        block_ixs = range(len(self.pddl_blocks))
+        block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
+
+        for ix in block_ixs:
+            b, pose = self.pddl_blocks[ix], original_poses[ix]
             goal_pose = pb_robot.vobj.BodyPose(b, pose)
 
             init = self._get_initial_pddl_state()
