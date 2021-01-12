@@ -83,7 +83,7 @@ if __name__ == '__main__':
             for t in range(0, args.n_towers):
                 print('Tower number', t+1, '/', args.n_towers)
                 # generate new block set for each tower search
-                search_tree = sequential_planner(args.timeout, block_set, problem, ensemble, discrete=args.discrete)
+                search_tree, _, _, _, _ = sequential_planner(args.timeout, block_set, problem, ensemble, discrete=args.discrete)
                 for i, (k, size) in enumerate(zip(tower_keys, tower_sizes)):
                     print('Finding best tower size: ', size)
                     exp_best_node_id = search_tree.get_exp_best_node(size)

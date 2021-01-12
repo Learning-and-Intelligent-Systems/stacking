@@ -62,7 +62,7 @@ def plan_mcts(timeout, blocks, problem, model, c=np.sqrt(2), discrete=True):
         highest_exp_height.append(highest_exp_height_t)
         highest_value.append(highest_value_t)
 
-    return tallest_tower, highest_exp_height, highest_value, tree, tower_stats
+    return tree, tallest_tower, highest_exp_height, highest_value, tower_stats
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
