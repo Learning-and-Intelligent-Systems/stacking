@@ -23,7 +23,7 @@ def plan(timeout, blocks, problem, model):
             tree.expand(parent_node_id, node)
     return tree
 
-def plan_mcts(timeout, blocks, problem, model, c=5, discrete=True):
+def plan_mcts(timeout, blocks, problem, model, c=np.sqrt(2), discrete=True):
     tree = Tree(blocks)
     tallest_tower = [0]
     highest_exp_height = [0]
