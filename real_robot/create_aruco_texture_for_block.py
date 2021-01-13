@@ -2,6 +2,7 @@ import cv2
 import json
 import numpy as np
 from PIL import Image
+from rotation_util import *
 
 # Load the predefined dictionary
 dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
@@ -11,12 +12,6 @@ marker_scale = 0.9 # scale of the aruco tag on the face
 
 dpi = ppcm*2.54
 
-def eul2rot(theta):
-    R = [[np.cos(theta[1])*np.cos(theta[2]), np.sin(theta[0])*np.sin(theta[1])*np.cos(theta[2]) - np.sin(theta[2])*np.cos(theta[0]), np.sin(theta[1])*np.cos(theta[0])*np.cos(theta[2]) + np.sin(theta[0])*np.sin(theta[2])],
-        [np.sin(theta[2])*np.cos(theta[1]), np.sin(theta[0])*np.sin(theta[1])*np.sin(theta[2]) + np.cos(theta[0])*np.cos(theta[2]), np.sin(theta[1])*np.sin(theta[2])*np.cos(theta[0]) - np.sin(theta[0])*np.cos(theta[2])],
-        [-np.sin(theta[1]),                 np.sin(theta[0])*np.cos(theta[1]),                                                      np.cos(theta[0])*np.cos(theta[1])]]
-
-    return R
 
 def generate_texture(block_id, block_dimensions):
     images = []
@@ -34,12 +29,12 @@ def generate_texture(block_id, block_dimensions):
                              [0, -d_y/2., 0],
                              [0, 0,  d_z/2.],
                              [0, 0, -d_x/2.]]
-    face_rotations_list = [eul2rot([0, 0, 0]),
-                           eul2rot([0, 0, np.pi]),
-                           eul2rot([0, np.pi, 0]),
-                           eul2rot([0, -np.pi, 0]),
-                           eul2rot([0, 0, np.pi]),
-                           eul2rot([0, 0, -np.pi])]
+    face_rotations_list = [eul_to_rot([0, 0, 0]),
+                           eul_to_rot([0, 0, np.pi]),
+                           eul_to_rot([0, np.pi, 0]),
+                           eul_to_rot([0, -np.pi, 0]),
+                           eul_to_rot([0, 0, np.pi]),
+                           eul_to_rot([0, 0, -np.pi])]
     face_names = ['right', 'left', 'top', 'bottom', 'front', 'back']
     for i in range(6):
         # get the dimensions of the face
