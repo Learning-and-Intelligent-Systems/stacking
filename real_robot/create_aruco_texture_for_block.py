@@ -1,4 +1,5 @@
 import cv2
+import json
 import numpy as np
 from PIL import Image
 
@@ -10,17 +11,42 @@ marker_scale = 0.9 # scale of the aruco tag on the face
 
 dpi = ppcm*2.54
 
+def eul2rot(theta):
+    R = [[np.cos(theta[1])*np.cos(theta[2]), np.sin(theta[0])*np.sin(theta[1])*np.cos(theta[2]) - np.sin(theta[2])*np.cos(theta[0]), np.sin(theta[1])*np.cos(theta[0])*np.cos(theta[2]) + np.sin(theta[0])*np.sin(theta[2])],
+        [np.sin(theta[2])*np.cos(theta[1]), np.sin(theta[0])*np.sin(theta[1])*np.sin(theta[2]) + np.cos(theta[0])*np.cos(theta[2]), np.sin(theta[1])*np.sin(theta[2])*np.cos(theta[0]) - np.sin(theta[0])*np.cos(theta[2])],
+        [-np.sin(theta[1]),                 np.sin(theta[0])*np.cos(theta[1]),                                                      np.cos(theta[0])*np.cos(theta[1])]]
+
+    return R
+
 def generate_texture(block_id, block_dimensions):
     images = []
-    marker_ids = []
-    marker_sizes = []
-    for face in range(6):
+    info = []
+    d_x, d_y, d_z = block_dimensions
+    face_dimensions_list = np.array([[d_y, d_z],
+                                     [d_y, d_z],
+                                     [d_x, d_z],
+                                     [d_x, d_z],
+                                     [d_x, d_y],
+                                     [d_x, d_y]])
+    face_tranlations_list = [[ d_x/2., 0, 0],
+                             [-d_x/2., 0, 0],
+                             [0,  d_y/2., 0],
+                             [0, -d_y/2., 0],
+                             [0, 0,  d_z/2.],
+                             [0, 0, -d_x/2.]]
+    face_rotations_list = [eul2rot([0, 0, 0]),
+                           eul2rot([0, 0, np.pi]),
+                           eul2rot([0, np.pi, 0]),
+                           eul2rot([0, -np.pi, 0]),
+                           eul2rot([0, 0, np.pi]),
+                           eul2rot([0, 0, -np.pi])]
+    face_names = ['right', 'left', 'top', 'bottom', 'front', 'back']
+    for i in range(6):
         # get the dimensions of the face
-        dimension_indices = np.array([face, face+1]) % 3
-        face_dimensions = block_dimensions[dimension_indices]
+        face_dimensions = face_dimensions_list[i]
 
         # the marker corresponding to this face
-        marker_id = block_id*6 + face
+        marker_id = block_id*6 + i
 
         # Generate the marker
         marker_size_cm = face_dimensions.min() * marker_scale
@@ -40,18 +66,28 @@ def generate_texture(block_id, block_dimensions):
 
         # cv2.imwrite(f'tags/block_{block_id}_face_{face}.png', side_image)
         pil_side_image = Image.fromarray(side_image)
-        pil_side_image.save(f'tags/block_{block_id}_face_{face}.png', format='PNG', dpi=(dpi, dpi))
+        pil_side_image.save(f'tags/block_{block_id}_face_{i}.png', format='PNG', dpi=(dpi, dpi))
         # cv2.imshow('display', side_image)
         # cv2.waitKey(500)
 
         images.append(side_image)
-        marker_ids.append(marker_id)
-        marker_sizes.append(marker_size_cm)
+        face_info = {
+                    'name': face_names[i],
+                    'marker_id': marker_id,
+                    'marker_size_cm': marker_size_cm,
+                    'translation_cog_to_marker': face_tranlations_list[i],
+                    'rotation_cog_to_marker': face_rotations_list[i]
+                    }
 
-    return images, marker_ids, marker_sizes
+        info.append(face_info)
+
+    return images, info
 
 
 if __name__ == '__main__':
-    block_dimensions = np.array([6,6,10])
+    block_dimensions = np.array([6,10,6])
     block_id = 4
-    images, marker_ids, marker_sizes = generate_texture(block_id, block_dimensions)
+    images, info = generate_texture(block_id, block_dimensions)
+    with open(f'tags/block_{block_id}_info.json', 'w') as f:
+        json.dump(info, f)
+
