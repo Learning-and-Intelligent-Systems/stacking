@@ -1,10 +1,26 @@
-# Installing librealsense
+# Aruco Vision Pipeline
 
-## On Linux
+We will use OpenCVs Aruco tags to localize the blocks with the Intel RealSenseD435 RGBD camera. All six sides of each object have a unique aruco tag.
+
+## Creating Tags for an object
+
+`python create_aruco_block.py`
+
+## Calibrating tags for an object
+
+`python calibrate_aruco_block.py`
+
+## Localizing calibrated objects
+
+`python aruco_block_pose_est.py`
+
+## Installing librealsense
+
+#### On Linux
 
 See the [librealsense github](https://github.com/IntelRealSense/librealsense)
 
-## On Mac
+#### On Mac
 
 I found [this page](https://github.com/IntelRealSense/librealsense/issues/5275) to be useful
 
