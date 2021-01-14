@@ -22,7 +22,13 @@ Print out the resulting tags, cut along the black borders, and apply the block w
 
 ## Calibrating tags for an object
 
+One we've printed the tags and applied them to your object, we need to find the pose of each tag in the object frame. Here is a simple interactive calibration script to do so:
+
 `python calibrate_aruco_block.py`
+
+The script will provide usage instructions, but I'll explain what it does for clarity: We first identify which block is being calibrated by which tag is observed in the camera. Only one tag can be visible for this step.
+
+Next, for each of the six faces of the block, we instruct the user to hold the block in a certain axis aligned orientation (ie. right side toward camera, top up). We detect the single tag that is visible to the camera, and associate that tag id to the face we know to be closest to the camera (in this case the right face). Now we want the pose of that tag in the object frame. We don't know the true object pose, but we know how we instructed the user to hold the object. Because the user can't be holding the object perfectly aligned, we snap the observed tag rotation to the nearest axis. The translation from the object center to the tag is infered using the known block dimensions. The tag ids and resulting object-frame tag poses are saved in the `tags/block_[num]_info.pkl` file.
 
 ## Localizing calibrated objects
 

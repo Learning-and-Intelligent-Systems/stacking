@@ -17,7 +17,7 @@ marker_scale = 0.9 # scale of the aruco tag on the face
 dpi = ppcm*2.54
 
 def generate_texture(block_id, block_dimensions):
-    info = {'block_id': block_id, 'dimensions': block_dimensions}
+    info = {'block_id': block_id, 'dimensions': np.array(block_dimensions)}
     d_x, d_y, d_z = block_dimensions
     face_dimensions_list = np.array([[d_y, d_z],
                                      [d_y, d_z],
