@@ -55,19 +55,18 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
         input("Execute on Robot?")
         try:
             from franka_interface import ArmInterface
-            import rospy
         except:
             print("Do not have rospy and franka_interface installed.")
             return
             
         try:
-            rospy.init_node("path_execution")
             arm = ArmInterface()
         except:
             print("Unable to connect to real robot. Exiting")
             return
-        arm.hand.open()
-        arm.move_to_neutral()
+        
+        #arm.hand.open()
+        #arm.move_to_neutral()
 
         print("Executing on real robot")
         raw_input("start?")
