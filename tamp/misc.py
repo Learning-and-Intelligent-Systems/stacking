@@ -28,7 +28,7 @@ def getDirectory():
     return objects_path
 
 def get_fixed(robot, movable):
-    '''Given the robot and movable objects, return all other 
+    '''Given the robot and movable objects, return all other
     objects in the scene, which are then by definition, the fixed objects'''
     rigid = [body for body in pb_robot.utils.get_bodies() if body.id != robot.id]
     movable_ids = [m.id for m in movable]
@@ -50,7 +50,7 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
                 input("Next?")
             elif pause:
                 time.sleep(0.5)
-    
+
     if real:
         input("Execute on Robot?")
         try:
@@ -58,23 +58,20 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
         except:
             print("Do not have rospy and franka_interface installed.")
             return
-            
+
         try:
             arm = ArmInterface()
         except:
             print("Unable to connect to real robot. Exiting")
             return
-        
-        #arm.hand.open()
-        #arm.move_to_neutral()
 
         print("Executing on real robot")
-        raw_input("start?")
+        input("start?")
         for name, args in plan:
             executionItems = args[-1]
             for e in executionItems:
                 e.execute(realRobot=arm)
-                raw_input("Next?")
+                input("Next?")
 
 def ComputePrePose(og_pose, directionVector, approach_frame, relation=None):
     backup = numpy.eye(4)
@@ -86,9 +83,9 @@ def ComputePrePose(og_pose, directionVector, approach_frame, relation=None):
     elif approach_frame == 'global':
         # This interprets the directionVector as being in the global z direction.
         prepose = numpy.dot(backup, og_pose)
-    else: 
+    else:
         raise NotImplementedError()
-    
+
     if relation is not None:
         prepose = numpy.dot(prepose, relation)
     return prepose
@@ -122,7 +119,7 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
         pb_block_fname = create_pb_robot_urdf(block, block.name + '.urdf')
         pddl_block = pb_robot.body.createBody(pb_block_fname)
         pddl_blocks.append(pddl_block)
-    
+
     floor_path = 'tamp/models/panda_table.urdf'
     shutil.copyfile(floor_path, 'pb_robot/models/panda_table.urdf')
     table_file = os.path.join('models', 'panda_table.urdf')
@@ -154,12 +151,12 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
                 break
     else:
         for i, (block, xy_pose) in enumerate(zip(pddl_blocks, xy_poses)):
-            full_pose = Pose(Position(xy_pose.pos.x, 
-                                    xy_pose.pos.y, 
+            full_pose = Pose(Position(xy_pose.pos.x,
+                                    xy_pose.pos.y,
                                     pb_robot.placements.stable_z(block, pddl_table)),
                             xy_pose.orn)
             block.set_base_link_pose(full_pose)
-            
+
 
     # Setup platform.
     if use_platform:
@@ -172,7 +169,7 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
         rotation = pb_robot.geometry.Euler(yaw=numpy.pi/2)
         pddl_platform.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_platform.get_base_link_pose()))
         pddl_leg.set_base_link_pose(pb_robot.geometry.multiply(pb_robot.geometry.Pose(euler=rotation), pddl_leg.get_base_link_pose()))
-        
+
         table_z = pddl_table.get_base_link_pose()[0][2]
         pddl_leg.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z/2])
         pddl_platform.set_base_link_point([0.7, -0.4, table_z + leg.dimensions.z + platform.dimensions.z/2.])
@@ -184,16 +181,16 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
 
 
 def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_frame):
-    domain_pddl = read('tamp/domain_stacking.pddl') 
-    stream_pddl = read('tamp/stream_stacking.pddl') 
+    domain_pddl = read('tamp/domain_stacking.pddl')
+    stream_pddl = read('tamp/stream_stacking.pddl')
     constant_map = {}
-    
+
     fixed = [f for f in fixed if f is not None]
     stream_map = {
         'sample-pose-table': from_gen_fn(primitives.get_stable_gen_table(fixed)),
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
         'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot, add_slanted_grasps)),
-        'inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame=approach_frame)), 
+        'inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame=approach_frame)),
         'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
         'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
     }
