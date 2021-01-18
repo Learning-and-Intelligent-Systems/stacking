@@ -39,8 +39,8 @@ class PandaAgent:
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
         self.belief_blocks = blocks
-        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame = setup_panda_world(self.robot, blocks, block_init_xy_poses, use_platform=use_platform)
-        self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame]
+        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = setup_panda_world(self.robot, blocks, block_init_xy_poses, use_platform=use_platform)
+        self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
 
         self.pddl_info = get_pddlstream_info(self.robot, 
                                              self.fixed, 
