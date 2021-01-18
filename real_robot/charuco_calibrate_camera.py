@@ -7,13 +7,15 @@ import numpy as np
 import cv2
 from cv2 import aruco
 
-
+# i got these numbers by measuring the printed out board with a ruler.
+# they are important for calibration
 square_len_cm = 25.5/7.
 marker_len_cm = square_len_cm * 0.8
+
 # create the aruco board
 aruco_dict = aruco.Dictionary_get(aruco.DICT_6X6_250)
 board = aruco.CharucoBoard_create(7, 5, square_len_cm, marker_len_cm, aruco_dict)
-imboard = board.draw((2000,3000))
+imboard = board.draw((3000,2000))
 cv2.imwrite('charuco_board.png', imboard)
 
 # Configure depth and color streams

@@ -79,7 +79,7 @@ def get_block_poses_in_camera_frame(ids, corners, info, color_image=None):
         block_id = tag_id // 6
         try:
             marker_info = info[block_id][tag_id]
-            print(f'Detected {tag_id}, the {marker_info["name"]} face of block {block_id}')
+            # print(f'Detected {tag_id}, the {marker_info["name"]} face of block {block_id}')
         except KeyError:
             print('Failed to find the block info for {block_id}. Skipping.')
             continue
@@ -161,6 +161,8 @@ def main():
                 block_id_to_block_pose = combine_block_poses(tag_id_to_block_pose)
                 for block_id in block_id_to_block_pose.keys():
                     X_CO = block_id_to_block_pose[block_id]
+                    R_CO, T_CO = pose_matrix_to_Rt(X_CO)
+                    print(f'{block_id} at {T_CO}')
                     dimensions = info[block_id]['dimensions']
                     draw_block(X_CO, dimensions, color_image)
 
