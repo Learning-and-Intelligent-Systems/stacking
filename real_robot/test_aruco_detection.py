@@ -1,3 +1,7 @@
+""" Massachusetts Institute of Technology
+
+Izzybrand, 2020
+"""
 import pyrealsense2 as rs
 import numpy as np
 import cv2

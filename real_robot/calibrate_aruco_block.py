@@ -37,38 +37,38 @@ aruco_params =  aruco.DetectorParameters_create()
 # camera, but in the object frame
 face_infos = [
     {
-        'face_toward_camera': 'FRONT',
-        'face_up': 'TOP',
+        'face_toward_camera': 'FRONT -Y',
+        'face_up': 'TOP +Z',
         'R_CO': eul_to_rot([np.pi/2, 0, 0]),
         't_OT_dimensions_coeff': np.array([0, -1., 0])
     },
     {
-        'face_toward_camera': 'BACK',
-        'face_up': 'TOP',
+        'face_toward_camera': 'BACK +Y',
+        'face_up': 'TOP +Z',
         'R_CO': eul_to_rot([-np.pi/2, 0, np.pi]),
         't_OT_dimensions_coeff': np.array([0, 1., 0])
     },
     {
-        'face_toward_camera': 'RIGHT',
-        'face_up': 'TOP',
+        'face_toward_camera': 'RIGHT +X',
+        'face_up': 'TOP +Z',
         'R_CO': eul_to_rot([np.pi/2, np.pi/2, 0]),
         't_OT_dimensions_coeff': np.array([1., 0, 0])
     },
     {
-        'face_toward_camera': 'LEFT',
-        'face_up': 'TOP',
+        'face_toward_camera': 'LEFT -X',
+        'face_up': 'TOP +Z',
         'R_CO': eul_to_rot([np.pi/2, -np.pi/2, 0]),
         't_OT_dimensions_coeff': np.array([-1., 0, 0])
     },
     {
-        'face_toward_camera': 'TOP',
-        'face_up': 'FRONT',
+        'face_toward_camera': 'TOP +Z',
+        'face_up': 'FRONT -Y',
         'R_CO': eul_to_rot([0,np.pi, 0]),
         't_OT_dimensions_coeff': np.array([0, 0, 1.])
     },
     {
-        'face_toward_camera': 'BOTTOM',
-        'face_up': 'FRONT',
+        'face_toward_camera': 'BOTTOM -Z',
+        'face_up': 'FRONT -Y',
         'R_CO': eul_to_rot([0,0, 0]),
         't_OT_dimensions_coeff': np.array([0, 0, -1.])
     }
