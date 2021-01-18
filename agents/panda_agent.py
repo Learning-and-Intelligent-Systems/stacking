@@ -77,6 +77,7 @@ class PandaAgent:
         pb_robot.grasp.set_client(self._execution_client_id)
         pb_robot.joint.set_client(self._execution_client_id)
         pb_robot.link.set_client(self._execution_client_id)
+        pb_robot.panda.set_client(self._execution_client_id)
         pb_robot.planning.set_client(self._execution_client_id)
         pb_robot.utils.set_client(self._execution_client_id)
         pb_robot.viz.set_client(self._execution_client_id)
@@ -89,6 +90,7 @@ class PandaAgent:
         pb_robot.grasp.set_client(self._planning_client_id)
         pb_robot.joint.set_client(self._planning_client_id)
         pb_robot.link.set_client(self._planning_client_id)
+        pb_robot.panda.set_client(self._planning_client_id)
         pb_robot.planning.set_client(self._planning_client_id)
         pb_robot.utils.set_client(self._planning_client_id)
         pb_robot.viz.set_client(self._planning_client_id)
@@ -270,7 +272,7 @@ class PandaAgent:
 
         # TODO: Set base block to be rotated in its current position.
         base_block = pddl_block_lookup[tower[0]]
-        base_pos = (base_xy[0], base_xy[1], base_block.get_base_link_pose()[0][2])
+        base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
         base_pose = (base_pos, tower[0].rotation)
 
         base_pose = pb_robot.vobj.BodyPose(pddl_block, base_pose)
