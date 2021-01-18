@@ -7,19 +7,7 @@ import numpy as np
 import cv2
 from cv2 import aruco
 
-
-# here are some calibration parameters for Realsense D435 that I found online
-# in the future we will need to calibrate the cameras with a grid
-resolution_x = 640
-resolution_y = 360
-fx = 322.282
-fy = 322.282
-cx = resolution_x/2
-cy = resolution_y/2
-mtx = np.array([[fx,  0, cx],
-                [ 0, fy, cy],
-                [ 0,  0,  1]])
-dist = np.zeros(5) # no distortion
+from cal import mtx, dist
 
 # Configure depth and color streams
 pipeline = rs.pipeline()
@@ -48,7 +36,6 @@ try:
         color_image = np.asarray(color_frame.get_data())
         # convert to grayscale
         gray = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-        aruco_dict = aruco.Dictionary_get(aruco.DICT_6X6_250)
         # detect aruco markers
         corners, ids, rejectedImgPoints = aruco.detectMarkers(
             gray, aruco_dict, parameters=aruco_params)
