@@ -105,7 +105,6 @@ def create_pb_robot_urdf(obj, fname):
 def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
     # Adjust robot position such that measurements match real robot reference frame
     robot_pose = numpy.eye(4)
-    robot_pose[2, 3] -= 0.11
     robot.set_transform(robot_pose)
 
     pddl_blocks = []
@@ -125,19 +124,19 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
     shutil.copyfile(floor_path, 'pb_robot/models/panda_table.urdf')
     table_file = os.path.join('models', 'panda_table.urdf')
     pddl_table = pb_robot.body.createBody(table_file)
-    pddl_table.set_point([table_x_offset, 0, -0.11])
+    pddl_table.set_point([table_x_offset, 0, 0])
 
     frame_path = 'tamp/models/panda_frame.urdf'
     shutil.copyfile(frame_path, 'pb_robot/models/panda_frame.urdf')
     frame_file = os.path.join('models', 'panda_frame.urdf')
     pddl_frame = pb_robot.body.createBody(frame_file)
-    pddl_frame.set_point([table_x_offset + 0.762 - 0.0127, 0 + 0.6096 - 0.0127, -0.11])
-    
+    pddl_frame.set_point([table_x_offset + 0.762 - 0.0127, 0 + 0.6096 - 0.0127, 0])
+
     wall_path = 'tamp/models/walls.urdf'
     shutil.copyfile(wall_path, 'pb_robot/models/walls.urdf')
     wall_file = os.path.join('models', 'walls.urdf')
     pddl_wall = pb_robot.body.createBody(wall_file)
-    pddl_wall.set_point([table_x_offset + 0.762 + 0.005, 0, -0.11])
+    pddl_wall.set_point([table_x_offset + 0.762 + 0.005, 0, 0])
 
     # Set the initial positions randomly on table.
     if xy_poses is None:
