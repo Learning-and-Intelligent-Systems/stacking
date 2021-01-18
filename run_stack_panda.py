@@ -46,4 +46,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
 
+    if args.real:
+        import rospy
+        rospy.init_node('path_execution')
+
     main(args)
