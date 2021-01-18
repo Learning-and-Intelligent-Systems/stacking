@@ -32,7 +32,11 @@ Next, for each of the six faces of the block, we instruct the user to hold the b
 
 ## Localizing calibrated objects
 
+Once you've created and calibrated the tags for your new object. You can localize it using
+
 `python aruco_block_pose_est.py`
+
+This script will detect all the visible tags, use the information saved in the `tags/block_[num]_info.pkl`files to combine tags on the same block, and estimate a pose for each visible block.
 
 ## Installing librealsense
 
