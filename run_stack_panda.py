@@ -11,13 +11,13 @@ from tower_planner import TowerPlanner
 
 def main(args):
     NOISE=0.00005
-        
+
     # define real world block params and initial poses
-    block0 = Object('block0', Dimensions(.04,.04,.1), 1.0, Position(0,0,0), Color(0,0,1))
-    block1 = Object('block1', Dimensions(.04,.04,.1), 1.0, Position(0,0,0), Color(0,1,0))
-    block2 = Object('block2', Dimensions(.04,.04,.1), 1.0, Position(0,0,0), Color(1,0,0))
+    block0 = Object('block0', Dimensions(.0381,.0318,.0635), 1.0, Position(0,0,0), Color(1,0,0))
+    block1 = Object('block1', Dimensions(.0381,.0587,.0635), 1.0, Position(0,0,0), Color(0,0,1))
+    block2 = Object('block2', Dimensions(.0635,.0381,.0746), 1.0, Position(0,0,0), Color(0,1,0))
     blocks = [block0, block1, block2]
-    
+
     block_init_xy_poses = [Pose(Position(0.65,0.3,0), Quaternion(0,0,0,1)),
                         Pose(Position(0.65,0.15,0), Quaternion(0,0,0,1)),
                         Pose(Position(0.65,0.0,0), Quaternion(0,0,0,1))]
@@ -26,18 +26,18 @@ def main(args):
     # for now hard-code a tower, but in the future will be supplied from
     # active data collection or tower found through planning for evaluation
     tower_blocks = copy.copy(blocks)
-    tower_poses = [Pose(Position(0.3,0.25,.05), Quaternion(0,0,0,1)),
-                    Pose(Position(0.3,0.25,.15), Quaternion(0,0,0,1)),
-                    Pose(Position(0.3,0.25,.25), Quaternion(0,0,0,1))]
-    
+    tower_poses = [Pose(Position(0.3,0.25,.0318), Quaternion(0,0,0,1)),
+                    Pose(Position(0.3,0.25,.0953), Quaternion(0,0,0,1)),
+                    Pose(Position(0.3,0.25,.1643), Quaternion(0,0,0,1))]
+
     tower = []
     for block, pose in zip(tower_blocks, tower_poses):
         block.set_pose(pose)
         block = get_rotated_block(block) # NOTE: have to do to set rotations field of block
         tower.append(block)
-        
+
     # and execute the resulting plan.
-    panda.simulate_tower(tower, real=args.real, vis=True, T=2500)
+    panda.simulate_tower(tower, base_xy=(0.3, 0.25), real=args.real, vis=True, T=2500)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
