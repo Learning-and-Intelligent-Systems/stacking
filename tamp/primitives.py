@@ -124,8 +124,10 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
             if path is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
-            command = [pb_robot.vobj.JointSpacePath(robot.arm, path), grasp,
-                       pb_robot.vobj.JointSpacePath(robot.arm, path[::-1])]
+            
+            command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp),
+                       grasp,
+                       pb_robot.vobj.MoveFromTouch(robot.arm, q_approach)]
             return (conf, command)
         return None
     return fn
