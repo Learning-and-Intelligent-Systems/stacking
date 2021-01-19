@@ -70,6 +70,7 @@ class PandaAgent:
         self.plan()
 
     def execute(self):
+        self.state = 'execute'
         pb_robot.aabb.set_client(self._execution_client_id)
         pb_robot.body.set_client(self._execution_client_id)
         pb_robot.collisions.set_client(self._execution_client_id)
@@ -83,6 +84,7 @@ class PandaAgent:
         pb_robot.viz.set_client(self._execution_client_id)
 
     def plan(self):
+        self.state = 'plan'
         pb_robot.aabb.set_client(self._planning_client_id)
         pb_robot.body.set_client(self._planning_client_id)
         pb_robot.collisions.set_client(self._planning_client_id)
@@ -313,7 +315,7 @@ class PandaAgent:
                 goal_terms = []
 
             self.pddl_info = get_pddlstream_info(self.robot,
-                                                 self.fixed + [b for b in self.pddl_blocks if b != top_block],
+                                                 self.fixed + [b for b in self.pddl_blocks if b != top_pddl],
                                                  self.pddl_blocks,
                                                  add_slanted_grasps=False,
                                                  approach_frame='global')
@@ -427,11 +429,13 @@ class PandaAgent:
         self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
 
+        self.plan()
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
                                    success_cost=numpy.inf,
                                    search_sample_ratio=search_sample_ratio,
                                    max_time=max_time)
+
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
