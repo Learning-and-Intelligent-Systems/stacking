@@ -84,8 +84,10 @@ class PandaAgent:
             resp = self._get_block_poses()
             named_poses = resp.poses
         except:
-            print('Service call to get block poses failed.')
-        
+            import sys
+            print('Service call to get block poses failed. Exiting.')
+            sys.exit()
+
         for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
             for named_pose in named_poses:
                 if pddl_block_name in named_pose.name:
