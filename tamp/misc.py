@@ -45,7 +45,10 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
 
         executionItems = args[-1]
         for e in executionItems:
-            e.simulate()
+            if real:
+                e.simulate(timestep=0.25)
+            else:
+                e.simulate(timestep=0.05)
             if wait:
                 input("Next?")
             elif pause:
@@ -61,6 +64,7 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
 
         try:
             arm = ArmInterface()
+            arm.set_joint_position_speed(0.3)
         except:
             print("Unable to connect to real robot. Exiting")
             return
@@ -105,7 +109,6 @@ def create_pb_robot_urdf(obj, fname):
 def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
     # Adjust robot position such that measurements match real robot reference frame
     robot_pose = numpy.eye(4)
-    robot_pose[2, 3] -= 0.1
     robot.set_transform(robot_pose)
 
     pddl_blocks = []
@@ -120,17 +123,24 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
         pddl_block = pb_robot.body.createBody(pb_block_fname)
         pddl_blocks.append(pddl_block)
 
+    table_x_offset = 0.2
     floor_path = 'tamp/models/panda_table.urdf'
     shutil.copyfile(floor_path, 'pb_robot/models/panda_table.urdf')
     table_file = os.path.join('models', 'panda_table.urdf')
     pddl_table = pb_robot.body.createBody(table_file)
-    pddl_table.set_point([0.2, 0, -0.11])
+    pddl_table.set_point([table_x_offset, 0, 0])
 
     frame_path = 'tamp/models/panda_frame.urdf'
     shutil.copyfile(frame_path, 'pb_robot/models/panda_frame.urdf')
     frame_file = os.path.join('models', 'panda_frame.urdf')
     pddl_frame = pb_robot.body.createBody(frame_file)
-    pddl_frame.set_point([0.2 + 0.762 - 0.0127, 0 + 0.6096 - 0.0127, -0.11])
+    pddl_frame.set_point([table_x_offset + 0.762 - 0.0127, 0 + 0.6096 - 0.0127, 0])
+
+    wall_path = 'tamp/models/walls.urdf'
+    shutil.copyfile(wall_path, 'pb_robot/models/walls.urdf')
+    wall_file = os.path.join('models', 'walls.urdf')
+    pddl_wall = pb_robot.body.createBody(wall_file)
+    pddl_wall.set_point([table_x_offset + 0.762 + 0.005, 0, 0])
 
     # Set the initial positions randomly on table.
     if xy_poses is None:
@@ -177,7 +187,7 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
         pddl_platform = None
         pddl_leg = None
 
-    return pddl_blocks, pddl_platform, pddl_leg, pddl_table, pddl_frame
+    return pddl_blocks, pddl_platform, pddl_leg, pddl_table, pddl_frame, pddl_wall
 
 
 def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_frame):

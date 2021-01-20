@@ -44,6 +44,13 @@ This script will detect all the visible tags, use the information saved in the `
 
 See the [librealsense github](https://github.com/IntelRealSense/librealsense)
 
+I was able to install both Pyrealsense2 and OpenCV 4 using
+
+```
+pip install opencv-contrib-python
+pip install pyrealsense2
+```
+
 #### On Mac
 
 I found [this page](https://github.com/IntelRealSense/librealsense/issues/5275) to be useful

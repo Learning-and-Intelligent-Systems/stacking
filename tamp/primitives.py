@@ -124,8 +124,10 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
             if path is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
-            command = [pb_robot.vobj.JointSpacePath(robot.arm, path), grasp,
-                       pb_robot.vobj.JointSpacePath(robot.arm, path[::-1])]
+
+            command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp),
+                       grasp,
+                       pb_robot.vobj.MoveFromTouch(robot.arm, q_approach)]
             return (conf, command)
         return None
     return fn
@@ -160,7 +162,15 @@ def get_free_motion_gen(robot, fixed=[]):
 def get_holding_motion_gen(robot, fixed=[]):
     def fn(conf1, conf2, body, grasp, fluents=[]):
         obstacles = fixed + assign_fluent_state(fluents)
+
+        orig_pose = body.get_base_link_pose()
+        robot.arm.SetJointValues(conf1.configuration)
+        robot.arm.Grab(body, grasp.grasp_objF)
+
         path = robot.arm.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
+
+        robot.arm.Release(body)
+        body.set_base_link_pose(orig_pose)
 
         if path is None:
             if DEBUG_FAILURE: input('Holding motion failed')
