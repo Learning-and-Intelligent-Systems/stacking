@@ -44,10 +44,10 @@ class PandaAgent:
         
         # Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn)
         self.pddl_block_lookup = {}
-        for block in tower:
+        for block in blocks:
             for pddl_block in self.pddl_blocks:
                 if block.name in pddl_block.get_name():
-                    self.pddl_block_lookup[block] = pddl_block
+                    self.pddl_block_lookup[block.name] = pddl_block
                     
         # this will overwrite the poses in self.pddl_blocks (if use_vision == True)
         self.use_vision = use_vision
@@ -84,9 +84,9 @@ class PandaAgent:
         except:
             print('Service call to get block poses failed.')
         
-        for block, pddl_block in self.pddl_block_lookup.items():
+        for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
             for block_name, pose in poses:
-                if block.name in block_name:
+                if pddl_block_name in block_name:
                     pddl_block.set_pose(pose)
 
     def _add_text(self, txt):
@@ -291,11 +291,11 @@ class PandaAgent:
         goal_terms = []
 
         # TODO: Set base block to be rotated in its current position.
-        base_block = pddl_block_lookup[tower[0]]
+        base_block = self.pddl_block_lookup[tower[0].name]
         base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
         base_pose = (base_pos, tower[0].rotation)
 
-        base_pose = pb_robot.vobj.BodyPose(pddl_block, base_pose)
+        base_pose = pb_robot.vobj.BodyPose(base_block, base_pose)
         init += [('Pose', base_block, base_pose),
                  ('Supported', base_block, base_pose, self.table, self.table_pose)]
         goal_terms.append(('AtPose', base_block, base_pose))
@@ -329,8 +329,8 @@ class PandaAgent:
             top_tform = pb_robot.geometry.tform_from_pose(top_pose)
 
             rel_tform = numpy.linalg.inv(bottom_tform)@top_tform
-            top_pddl = pddl_block_lookup[top_block]
-            bottom_pddl = pddl_block_lookup[bottom_block]
+            top_pddl = self.pddl_block_lookup[top_block.name]
+            bottom_pddl = self.pddl_block_lookup[bottom_block.name]
 
             if not solve_joint:
                 init = self._get_initial_pddl_state()
