@@ -346,7 +346,10 @@ class PandaAgent:
             goal = tuple(['and'] + goal_terms)
             self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
 
-        self.step_simulation(T, vis_frames=False)
+        if not real:
+            self.step_simulation(T, vis_frames=False)
+        else:
+            print('Need to reload block positions here.')
 
         # Reset Environment. Need to handle conditions where the blocks are still a stable tower.
         # As a heuristic for which block to reset first, do it in order of their z-values.

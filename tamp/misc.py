@@ -45,7 +45,10 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
 
         executionItems = args[-1]
         for e in executionItems:
-            e.simulate()
+            if real:
+                e.simulate(timestep=0.25)
+            else:
+                e.simulate(timestep=0.05)
             if wait:
                 input("Next?")
             elif pause:
