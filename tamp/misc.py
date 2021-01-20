@@ -61,6 +61,7 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
 
         try:
             arm = ArmInterface()
+            arm.set_joint_position_speed(0.3)
         except:
             print("Unable to connect to real robot. Exiting")
             return
