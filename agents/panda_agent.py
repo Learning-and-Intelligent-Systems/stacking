@@ -53,6 +53,7 @@ class PandaAgent:
         self.use_vision = use_vision
         if self.use_vision:
             import rospy
+            from panda_vision.srv import GetBlockPoses
             rospy.wait_for_service('get_block_poses')
             self._get_block_poses = rospy.ServiceProxy('get_block_poses', GetBlockPoses)
             self._update_block_poses()
@@ -80,14 +81,18 @@ class PandaAgent:
 
     def _update_block_poses(self):
         try:
-            poses = self._get_block_poses()
+            resp = self._get_block_poses()
+            named_poses = resp.poses
         except:
             print('Service call to get block poses failed.')
         
         for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
-            for block_name, pose in poses:
-                if pddl_block_name in block_name:
-                    pddl_block.set_pose(pose)
+            for named_pose in named_poses:
+                if pddl_block_name in named_pose.name:
+                    pose = named_pose.pose.pose
+                    position = (pose.position.x, pose.position.y, pose.position.z)
+                    orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
+                    pddl_block.set_pose((position, orientation))
 
     def _add_text(self, txt):
         self.execute()
