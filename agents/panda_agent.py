@@ -335,7 +335,8 @@ class PandaAgent:
 
                 # Execute the block placement.
                 desired_pose = top_pddl.get_point()
-                self.step_simulation(T, vis_frames=False)
+                if not real:
+                    self.step_simulation(T, vis_frames=False)
                 # TODO: Check if the tower was stable, stop construction if not.
                 end_pose = top_pddl.get_point()
                 if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
