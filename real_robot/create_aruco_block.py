@@ -44,6 +44,17 @@ def generate_texture(block_id, block_dimensions):
         br_corner_idx = (face_dimensions_px - marker_size) // 2 + marker_size
         face_image[ul_corner_idx[0]:br_corner_idx[0], ul_corner_idx[1]:br_corner_idx[1]] = marker_image
 
+        # draw the block_id on the image
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        # org = (10, 10)
+        font_scale = 2
+        thickness = 2
+        text = str(block_id)
+        (x,y), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+        org = (10,10+y)
+        face_image = cv2.putText(face_image, text, org, font,
+                   font_scale, 0, thickness, cv2.LINE_AA, bottomLeftOrigin=False)
+
         # add a 2-pixel border to the image to show where to cut with scissors
         face_image[[0,1,-2,-1]] = 0
         face_image[:,[0,1,-2,-1]] = 0
