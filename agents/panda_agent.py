@@ -20,7 +20,7 @@ from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise, use_platform, block_init_xy_poses=None, teleport=False):
+    def __init__(self, blocks, noise, use_platform, block_init_xy_poses=None, teleport=False, use_vision=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a
@@ -41,7 +41,22 @@ class PandaAgent:
         self.belief_blocks = blocks
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = setup_panda_world(self.robot, blocks, block_init_xy_poses, use_platform=use_platform)
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
-
+        
+        # Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn)
+        self.pddl_block_lookup = {}
+        for block in tower:
+            for pddl_block in self.pddl_blocks:
+                if block.name in pddl_block.get_name():
+                    self.pddl_block_lookup[block] = pddl_block
+                    
+        # this will overwrite the poses in self.pddl_blocks (if use_vision == True)
+        self.use_vision = use_vision
+        if self.use_vision:
+            import rospy
+            rospy.wait_for_service('get_block_poses')
+            self._get_block_poses = rospy.ServiceProxy('get_block_poses', GetBlockPoses)
+            self._update_block_poses()
+            
         self.pddl_info = get_pddlstream_info(self.robot,
                                              self.fixed,
                                              self.pddl_blocks,
@@ -62,6 +77,17 @@ class PandaAgent:
         self.teleport = teleport
 
         self.txt_id = None
+
+    def _update_block_poses(self):
+        try:
+            poses = self._get_block_poses()
+        except:
+            print('Service call to get block poses failed.')
+        
+        for block, pddl_block in self.pddl_block_lookup.items():
+            for block_name, pose in poses:
+                if block.name in block_name:
+                    pddl_block.set_pose(pose)
 
     def _add_text(self, txt):
         self.execute()
@@ -264,14 +290,6 @@ class PandaAgent:
         init = self._get_initial_pddl_state()
         goal_terms = []
 
-        # Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn)
-        pddl_block_lookup = {}
-        for block in tower:
-            for pddl_block in self.pddl_blocks:
-                if block.name in pddl_block.get_name():
-                    pddl_block_lookup[block] = pddl_block
-
-
         # TODO: Set base block to be rotated in its current position.
         base_block = pddl_block_lookup[tower[0]]
         base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
@@ -299,6 +317,10 @@ class PandaAgent:
         poses = [base_pose]
         # TODO: Calculate each blocks pose relative to the block beneath.
         for b_ix in range(1, len(tower)):
+            if self.use_vision:
+                # update poses from vision
+                self._update_block_poses()
+
             bottom_block = tower[b_ix-1]
             bottom_pose = (bottom_block.pose.pos, bottom_block.rotation)
             bottom_tform = pb_robot.geometry.tform_from_pose(bottom_pose)

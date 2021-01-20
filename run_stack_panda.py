@@ -21,7 +21,7 @@ def main(args):
     block_init_xy_poses = [Pose(Position(0.65,0.3,0), Quaternion(0,0,0,1)),
                         Pose(Position(0.65,0.15,0), Quaternion(0,0,0,1)),
                         Pose(Position(0.65,0.0,0), Quaternion(0,0,0,1))]
-    panda = PandaAgent(blocks, NOISE, False, block_init_xy_poses=block_init_xy_poses, teleport=False)
+    panda = PandaAgent(blocks, NOISE, False, block_init_xy_poses=block_init_xy_poses, teleport=False, use_vision=args.use_vision)
 
     # for now hard-code a tower, but in the future will be supplied from
     # active data collection or tower found through planning for evaluation
@@ -41,6 +41,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
     parser.add_argument('--real', action='store_true', help='run on real robot')
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
