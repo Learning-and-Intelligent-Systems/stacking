@@ -80,7 +80,7 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper'):
+def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
@@ -116,28 +116,6 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper'):
             if (q_approach is None) or not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
                 continue
             conf = pb_robot.vobj.BodyConf(robot, q_approach)
-
-            # Get joint path between approach and q_grasp using direct IK to ensure gripper orientation stays contant.
-            #print('Frames:', approach_tform, grasp_worldF)
-            q_mids = []
-            seed = q_approach
-            for z in numpy.linspace(approach_tform[2, 3], grasp_worldF[2, 3], 5, endpoint=False):
-                mid_tform = approach_tform.copy()
-                mid_tform[2, 3] = z
-                q_mid = robot.arm.ComputeIK(mid_tform, seed_q=seed)
-                diff = numpy.linalg.norm(numpy.array(q_mid) - numpy.array(seed))
-                #print('Diff: ', diff)
-                if (q_mid is None) or (diff > 0.2): 
-                    q_mid = None
-                    break
-                
-                q_mids.append(q_mid)
-                seed = q_mid
-            
-            if q_mid is None:
-                #print('Failed:', diff)
-                continue
-
             q_grasp = robot.arm.ComputeIK(grasp_worldF, seed_q=q_approach)
             if (q_grasp is None) or not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
                 continue
@@ -147,8 +125,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper'):
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
 
-            command = [pb_robot.vobj.JointSpacePath(robot.arm, [q_approach] + q_mids, speed=0.05),
-                       pb_robot.vobj.MoveToTouch(robot.arm, q_mids[-1], q_grasp),
+            command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp),
                        grasp,
                        pb_robot.vobj.MoveFromTouch(robot.arm, q_approach)]
             return (conf, command)
