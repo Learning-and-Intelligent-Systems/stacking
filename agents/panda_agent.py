@@ -94,7 +94,10 @@ class PandaAgent:
                     pose = named_pose.pose.pose
                     position = (pose.position.x, pose.position.y, pose.position.z)
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
-                    pddl_block.set_pose((position, orientation))
+                    self.execute()
+                    pddl_block.set_base_link_pose((position, orientation))
+                    self.plan()
+                    pddl_block.set_base_link_pose((position, orientation))
 
     def _add_text(self, txt):
         self.execute()
