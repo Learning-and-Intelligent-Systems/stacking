@@ -5,7 +5,8 @@ import torch
 
 from torch.utils.data import DataLoader
 
-from learning.active.mlp import MLP
+from learning.models.ensemble import Ensemble
+from learning.models.mlp_dropout import MLP
 
 
 class ExperimentLogger:
@@ -23,6 +24,8 @@ class ExperimentLogger:
         and parameters relating to an experiment.
         """
         root = 'learning/active/experiments'
+        if not os.path.exists(root): os.makedirs(root)
+
         exp_name = args.exp_name if len(args.exp_name) > 0 else 'exp'
         ts = time.strftime('%Y%m%d-%H%M%S')
         exp_dir = '%s-%s' % (exp_name, ts)
@@ -78,7 +81,9 @@ class ActiveExperimentLogger:
         Setup the directory structure to store models, figures, datasets
         and parameters relating to an experiment.
         """
-        root = 'learning/active/experiments'
+        root = 'learning/experiments/logs'
+        if not os.path.exists(root): os.makedirs(root)
+
         exp_name = args.exp_name if len(args.exp_name) > 0 else 'exp'
         ts = time.strftime('%Y%m%d-%H%M%S')
         exp_dir = '%s-%s' % (exp_name, ts)
@@ -109,28 +114,48 @@ class ActiveExperimentLogger:
     def get_figure_path(self, fname):
         return os.path.join(self.exp_path, 'figures', fname)
 
-    def load_model(self, path):
-        model = MLP(n_hidden=self.args.n_hidden, dropout=self.args.dropout)
-        model.load_state_dict(torch.load(path, map_location='cpu'))
-        return model
-
     def get_ensemble(self, tx):
-        ensemble = []
-        for mx in range(0, self.args.n_models):
-            path = os.path.join(self.exp_path, 'models', str(tx), 'net_%d.pt' % mx)
-            ensemble.append(self.load_model(path))
+        """ Load an ensemble from the logging structure.
+        :param tx: The active learning iteration of which ensemble to load.
+        :return: learning.models.Ensemble object.
+        """
+        # Load metadata and initialize ensemble.
+        path = os.path.join(self.exp_path, 'models', 'metadata.pkl')
+        with open(path, 'rb') as handle:
+            metadata = pickle.load(handle)
+        ensemble = Ensemble(base_model=metadata['base_model'],
+                            base_args=metadata['base_args'],
+                            n_models=metadata['n_models'])
+
+        # Load ensemble weights.
+        path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
+        ensemble.load_state_dict(torch.load(path, map_location='cpu'))
         return ensemble
 
     def save_ensemble(self, ensemble, tx):
-        os.mkdir(os.path.join(self.exp_path, 'models', str(tx)))
-        for mx, model in enumerate(ensemble):
-            path = os.path.join(self.exp_path, 'models', str(tx), 'net_%d.pt' % mx)
-            torch.save(model.state_dict(), os.path.join(path))
+        """ Save an ensemble within the logging directory. The weights
+        will be saved to <exp_name>/models/ensemble_<tx>.pt. Model metadata that
+        is needed to initialize the Ensemble class while loading is 
+        save to <exp_name>/models/metadata.pkl.
 
-    def save_acquisition_data(self, new_xs, new_ys, samples, tx):
+        :ensemble: A learning.model.Ensemble object.
+        :tx: The active learning timestep these models represent.
+        """
+        # Save ensemble metadata.
+        metadata = {'base_model': ensemble.base_model,
+                    'base_args': ensemble.base_args,
+                    'n_models': ensemble.n_models}
+        path = os.path.join(self.exp_path, 'models', 'metadata.pkl')
+        with open(path, 'wb') as handle:
+            pickle.dump(metadata, handle)
+
+        # Save ensemble weights.
+        path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
+        torch.save(ensemble.state_dict(), os.path.join(path))
+
+    def save_acquisition_data(self, new_data, samples, tx):
         data = {
-            'acquired_xs': new_xs,
-            'acquired_ys': new_ys,
+            'acquired_data': new_data,
             'samples': samples
         }
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
@@ -141,28 +166,4 @@ class ActiveExperimentLogger:
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
         with open(path, 'rb') as handle:
             data = pickle.load(handle)
-        return data['acquired_xs'], data['acquired_ys'], data['samples']
-
-
-
-def get_predictions(dataset, models):
-    """
-    :param dataset: A ToyDataset object with N examples.
-    :param models: A list of K models on which to get predictions.
-    :return: A (NxK) array with classification probabilities for each model.
-    """
-    loader = DataLoader(dataset, shuffle=False, batch_size=32)
-
-    model_predictions = []
-    for model in models:
-        preds = []
-        for tensor, _ in loader:
-            if torch.cuda.is_available():
-                tensor = tensor.cuda()
-            with torch.no_grad():
-                preds.append(model.forward(tensor))
-            
-        preds = torch.cat(preds, dim=0)
-        model_predictions.append(preds)
-
-    return torch.cat(model_predictions, dim=1)
+        return data['acquired_data'], data['samples']

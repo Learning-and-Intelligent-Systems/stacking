@@ -6,11 +6,11 @@ The robot functionality comes from [rachelholladay/pb_robot](https://github.com/
 
 ## Installation
 
-Everything should be run with Python3.7.
+Dependencies: python3, git
 
 1. Install [pb_robot](https://github.com/mike-n-7/pb_robot) using the instructions below, not the ones in the repo's README
     1. Install pb_robot dependencies
-        1. ```pip3 install numpy pybullet recordclass catkin_pkg IPython networkx scipy```
+        1. ```pip3 install numpy pybullet recordclass catkin_pkg IPython networkx scipy numpy-quaternion```
         2. ```pip3 install git+https://github.com/mike-n-7/tsr.git```
     2. Clone pb_robot
     3. Compile the IKFast library for the panda

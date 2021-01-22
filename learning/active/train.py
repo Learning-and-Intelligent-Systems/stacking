@@ -1,8 +1,10 @@
 import argparse
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from sklearn.metrics import f1_score
 from torch.nn import functional as F
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -12,30 +14,47 @@ from learning.active.toy_data import ToyDataset, ToyDataGenerator
 from learning.active.utils import ExperimentLogger
 
 
-def evaluate(loader, model):
+def evaluate(loader, model, val_metric='f1'):
     acc = []
+    losses = []
+    
+    preds = []
+    labels = []
     for x, y in loader:
         if torch.cuda.is_available():
             x = x.cuda()
             y = y.cuda()
-        # TODO: When doing validation on dropout, average models.
-        model.sample_dropout_masks()
         pred = model.forward(x).squeeze()
-
+        if len(pred.shape) == 0: pred = pred.unsqueeze(-1)
+        loss = F.binary_cross_entropy(pred, y)
+     
+        with torch.no_grad():
+            preds += (pred > 0.5).cpu().float().numpy().tolist()
+            labels += y.cpu().numpy().tolist()
         accuracy = ((pred>0.5) == y).float().mean()
         acc.append(accuracy.item())
+        losses.append(loss.item())
+    if val_metric == 'loss':
+        score = np.mean(losses)
+    else:
+        score = -f1_score(labels, preds)
 
-    return np.mean(acc)
+
+    return score
 
 
 def train(dataloader, val_dataloader, model, n_epochs=20):
+    """
+    :param val_dataloader: If a validation set is given, will return the model
+    with the lowest validation loss.
+    """
     optimizer = Adam(model.parameters(), lr=1e-3)
-    best_acc = 0.
-    best_model = None
-
     if torch.cuda.is_available():
         model.cuda()
 
+    best_loss = 1000
+    best_weights = None
+    it = 0
     for ex in range(n_epochs):
         print('Epoch', ex)
         acc = []
@@ -44,8 +63,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
                 x = x.cuda()
                 y = y.cuda()
             optimizer.zero_grad()
-
-            model.sample_dropout_masks()
+            
             pred = model.forward(x).squeeze()
             loss = F.binary_cross_entropy(pred, y)
             loss.backward()
@@ -55,14 +73,16 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             accuracy = ((pred>0.5) == y).float().mean()
             acc.append(accuracy.item())
 
-        val_acc = evaluate(val_dataloader, model)
-        if val_acc > best_acc:
-            print('Saved')
-            best_model = MLP(model.n_hidden, model.dropout)
-            best_model.load_state_dict(model.state_dict())
-            best_acc = val_acc
-
-        print(np.mean(acc))
+            it += 1
+        if val_dataloader is not None:
+            val_loss = evaluate(val_dataloader, model)
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_weights = copy.deepcopy(model.state_dict())
+                print('Saved')    
+            print(np.mean(acc), val_loss, loss)
+    if val_dataloader is not None:
+        model.load_state_dict(best_weights)
     return model
 
 if __name__ == '__main__':

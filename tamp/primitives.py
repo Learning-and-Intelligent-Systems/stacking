@@ -10,13 +10,14 @@ from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
 
-DEBUG_FAILURE = False 
+DEBUG_FAILURE = True 
 
-def get_grasp_gen(robot):
+def get_grasp_gen(robot, add_slanted_grasps):
     # I opt to use TSR to define grasp sets but you could replace this
     # with your favorite grasp generator
     def gen(body):
-        grasp_tsr = pb_robot.tsrs.panda_box.grasp(body)
+        # Note, add_slanted_grasps should be True when we're using the platform.
+        grasp_tsr = pb_robot.tsrs.panda_box.grasp(body, add_slanted_grasps=add_slanted_grasps)
         grasps = []
         # Only use a top grasp (2, 4) and side grasps (7).
         for top_grasp_ix in range(len(grasp_tsr)):#[2, 4, 7, 6, 0, 1]: 
@@ -79,12 +80,17 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=2):
+def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
-        approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125])
+        if approach_frame == 'gripper':
+            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
+        elif approach_frame == 'global':
+            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.05], approach_frame) # Was -0.125
+        else:
+            raise NotImplementedError()
 
         if False:
             length, lifeTime = 0.2, 0.0
@@ -98,6 +104,13 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
             p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
             p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
 
+        # Check if grasp is vertical relative to object. Fail if so (approach would go through object).
+        grasp_frame = pb_robot.geometry.pose_from_tform(grasp_worldF)
+        grasp_euler = pb_robot.geometry.euler_from_quat(grasp_frame[1])
+        # TODO: Verify that the y-axis of the gripper frame is along the plane of the hand.
+        if numpy.abs(grasp_euler[0] - 1.57) < 0.1:
+            return None
+
         for _ in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)
             if (q_approach is None) or not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
@@ -107,12 +120,14 @@ def get_ik_fn(robot, fixed=[], num_attempts=2):
             if (q_grasp is None) or not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
                 continue
             
-            path = robot.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
+            path = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
             if path is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
-            command = [pb_robot.vobj.JointSpacePath(robot.arm, path), grasp,
-                       pb_robot.vobj.JointSpacePath(robot.arm, path[::-1])]
+
+            command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp),
+                       grasp,
+                       pb_robot.vobj.MoveFromTouch(robot.arm, q_approach)]
             return (conf, command)
         return None
     return fn
@@ -134,7 +149,7 @@ def assign_fluent_state(fluents):
 def get_free_motion_gen(robot, fixed=[]):
     def fn(conf1, conf2, fluents=[]):
         obstacles = fixed + assign_fluent_state(fluents)
-        path = robot.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
+        path = robot.arm.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
 
         if path is None:
             if DEBUG_FAILURE: input('Free motion failed')
@@ -147,7 +162,15 @@ def get_free_motion_gen(robot, fixed=[]):
 def get_holding_motion_gen(robot, fixed=[]):
     def fn(conf1, conf2, body, grasp, fluents=[]):
         obstacles = fixed + assign_fluent_state(fluents)
-        path = robot.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
+
+        orig_pose = body.get_base_link_pose()
+        robot.arm.SetJointValues(conf1.configuration)
+        robot.arm.Grab(body, grasp.grasp_objF)
+
+        path = robot.arm.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
+
+        robot.arm.Release(body)
+        body.set_base_link_pose(orig_pose)
 
         if path is None:
             if DEBUG_FAILURE: input('Holding motion failed')

@@ -1,0 +1,118 @@
+<?xml version="1.0"?>
+<robot name="walls">
+  <link name="front_wall">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.01 1.2192 1.2192" />
+      </geometry>
+      <material name="desert sand">
+        <color rgba="0.375 0.375 0.375 0.25" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.01 1.2192 1.2192" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="right_wall">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="1.524 0.01 1.2192" />
+      </geometry>
+      <material name="desert sand" />
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="1.524 0.01 1.2192" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <link name="left_wall">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0 0.0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="1.524 0.01 1.2192" />
+      </geometry>
+      <material name="desert sand" />
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="1.524 0.01 1.2192" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="back_wall">
+  <contact>
+      <lateral_friction value="1"/>
+  </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".0"/>
+       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.01 1.2192 1.2192" />
+      </geometry>
+      <material name="desert sand" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.6096" rpy="0 0 0" />
+      <geometry>
+        <box size="0.01 1.2192 1.2192" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <!-- Everything is in reference to the first vertical support. It is infront and left of the robot (from the robot perspective). -->
+  <joint name="right_front" type="fixed">
+    <origin xyz="-0.767 -0.6146 0.0" rpy="0 0 0" /> 
+    <parent link="front_wall" />
+    <child link="right_wall" />
+  </joint>
+
+  <joint name="back_front" type="fixed">
+    <origin xyz="-1.534 0.0 0.0" rpy="0 0 0" /> 
+    <parent link="front_wall" />
+    <child link="back_wall" />
+  </joint>
+  
+  <joint name="left_front" type="fixed">
+    <origin xyz="-0.767 0.6146 0.0" rpy="0 0 0" /> 
+    <parent link="front_wall" />
+    <child link="left_wall" />
+  </joint>
+</robot>

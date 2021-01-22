@@ -10,7 +10,7 @@ import tamp.primitives
 from actions import PlaceAction, make_platform_world
 from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
                         Quaternion, get_rotated_block, Pose, add_noise, \
-                        Environment, Position 
+                        Environment, Position
 from pddlstream.algorithms.constraints import PlanConstraints, WILD
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.language.stream import StreamInfo
@@ -20,15 +20,17 @@ from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise, teleport=False):
+    def __init__(self, blocks, noise, use_platform, block_init_xy_poses=None, teleport=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
-        The Panda world should in include the given blocks as well as a 
+        The Panda world should in include the given blocks as well as a
         platform which can be used in experimentation.
         :param teleport: Debugging parameter used to skip planning while moving
                          blocks around this world.
+        :param use_platform: Boolean stating whether to include the platform to
+                             push blocks off of or not.
         """
-        # TODO: Check that having this as client 0 is okay when interacting 
+        # TODO: Check that having this as client 0 is okay when interacting
         # with everything else.
         self._planning_client_id = pb_robot.utils.connect(use_gui=False)
         self.plan()
@@ -37,17 +39,23 @@ class PandaAgent:
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
         self.belief_blocks = blocks
-        self.pddl_blocks, self.platform_table, self.platform_leg, self.table = setup_panda_world(self.robot, blocks)
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
-        poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = setup_panda_world(self.robot, blocks, block_init_xy_poses, use_platform=use_platform)
+        self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
 
+        self.pddl_info = get_pddlstream_info(self.robot,
+                                             self.fixed,
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='global')
+        poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+        poses = [Pose(Position(*p[0]), Quaternion(*p[1])) for p in poses]
 
         self._execution_client_id = pb_robot.utils.connect(use_gui=True)
         self.execute()
         pb_robot.utils.set_default_camera()
         self.execution_robot = pb_robot.panda.Panda()
         self.execution_robot.arm.hand.Open()
-        setup_panda_world(self.execution_robot, blocks, poses)
+        setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
         self.plan()
         self.noise = noise
@@ -62,18 +70,30 @@ class PandaAgent:
         self.plan()
 
     def execute(self):
+        self.state = 'execute'
         pb_robot.aabb.set_client(self._execution_client_id)
         pb_robot.body.set_client(self._execution_client_id)
+        pb_robot.collisions.set_client(self._execution_client_id)
+        pb_robot.geometry.set_client(self._execution_client_id)
+        pb_robot.grasp.set_client(self._execution_client_id)
         pb_robot.joint.set_client(self._execution_client_id)
         pb_robot.link.set_client(self._execution_client_id)
+        pb_robot.panda.set_client(self._execution_client_id)
+        pb_robot.planning.set_client(self._execution_client_id)
         pb_robot.utils.set_client(self._execution_client_id)
         pb_robot.viz.set_client(self._execution_client_id)
 
     def plan(self):
+        self.state = 'plan'
         pb_robot.aabb.set_client(self._planning_client_id)
         pb_robot.body.set_client(self._planning_client_id)
+        pb_robot.collisions.set_client(self._planning_client_id)
+        pb_robot.geometry.set_client(self._planning_client_id)
+        pb_robot.grasp.set_client(self._planning_client_id)
         pb_robot.joint.set_client(self._planning_client_id)
         pb_robot.link.set_client(self._planning_client_id)
+        pb_robot.panda.set_client(self._planning_client_id)
+        pb_robot.planning.set_client(self._planning_client_id)
         pb_robot.utils.set_client(self._planning_client_id)
         pb_robot.viz.set_client(self._planning_client_id)
 
@@ -81,15 +101,18 @@ class PandaAgent:
         """
         Get the PDDL representation of the world between experiments. This
         method assumes that all blocks are on the table. We will always "clean
-        up" an experiment by moving blocks away from the platform after an 
+        up" an experiment by moving blocks away from the platform after an
         experiment.
         """
-        fixed = [self.table, self.platform_table, self.platform_leg]
+        fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
         conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
         init = [('CanMove',),
                 ('Conf', conf),
                 ('AtConf', conf),
                 ('HandEmpty',)]
+
+        self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
+        init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
 
         for body in self.pddl_blocks:
             print(type(body), body)
@@ -98,21 +121,19 @@ class PandaAgent:
                     ('Pose', body, pose),
                     ('AtPose', body, pose),
                     ('Block', body),
-                    ('On', body, self.table)]
+                    ('On', body, self.table),
+                    ('Supported', body, pose, self.table, self.table_pose)]
 
-
-        self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
-        init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
-
-        self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
-        init += [('Pose', self.platform_table, self.platform_pose), ('AtPose', self.platform_table, self.platform_pose)]
-
-        init += [('Table', self.table), ('Block', self.platform_table)]
+        if not self.platform_table is None:
+            self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
+            init += [('Pose', self.platform_table, self.platform_pose), ('AtPose', self.platform_table, self.platform_pose)]
+            init += [('Block', self.platform_table)]
+        init += [('Table', self.table)]
         return init
 
     def simulate_action(self, action, block_ix, T=50, vis_sim=False, vis_placement=False):
         """
-        Perform the given action to with the given block. An observation 
+        Perform the given action to with the given block. An observation
         should be returned in the reference frame of the platform.
         :param action: Place action which describes the relative pose of the block to the platform surface.
         :param real_block: Belief representation of the block to perform the action on.
@@ -120,6 +141,7 @@ class PandaAgent:
         :param vis_sim: Ununsed.
         :return: (action, T, end_pose) End pose should be TODO: what frame?
         """
+        assert(self.platform_table is not None)
         real_block = self.belief_blocks[block_ix]
         pddl_block = self.pddl_blocks[block_ix]
 
@@ -127,12 +149,17 @@ class PandaAgent:
 
         # Set up the PDDLStream problem for the placing the given block on the
         # platform with the specified action.
+        self.pddl_info = get_pddlstream_info(self.robot,
+                                             self.fixed,
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='gripper')
         init = self._get_initial_pddl_state()
 
         #  Figure out the correct transformation matrix based on the action.
         real_block.set_pose(Pose(ZERO_POS, Quaternion(*action.rot.as_quat())))
         rotated_block = get_rotated_block(real_block)
-        
+
         x = action.pos[0]
         y = action.pos[1]
         z = self.platform_table.get_dimensions()[2]/2. + rotated_block.dimensions[2]/2 #+ 1e-5
@@ -147,7 +174,7 @@ class PandaAgent:
             surface_tform = pb_robot.geometry.tform_from_pose(self.platform_table.get_base_link_pose())
             body_tform = surface_tform@tform
             length, lifeTime = 0.2, 0.0
-            
+
             pos, quat = pb_robot.geometry.pose_from_tform(body_tform)
             new_x = transformation([length, 0.0, 0.0], pos, quat)
             new_y = transformation([0.0, length, 0.0], pos, quat)
@@ -156,7 +183,7 @@ class PandaAgent:
             p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime)
             p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime)
             p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime)
-        
+
         init += [('RelPose', pddl_block, self.platform_table, tform)]
         goal = ('On', pddl_block, self.platform_table)
 
@@ -168,15 +195,15 @@ class PandaAgent:
             self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000)
         else:
             goal_pose_fn = tamp.primitives.get_stable_gen_block()
-            goal_pose = goal_pose_fn(pddl_block, 
-                                     self.platform_table, 
+            goal_pose = goal_pose_fn(pddl_block,
+                                     self.platform_table,
                                      self.platform_pose,
                                      tform)[0].pose
             self.teleport_block(pddl_block, goal_pose)
 
-        # Execture the action. 
+        # Execture the action.
         # TODO: Check gravity compensation in the arm.
-        
+
         self.step_simulation(T)
         end_pose = self._get_observed_pose(pddl_block, action)
         observation = (action, T, end_pose)
@@ -184,16 +211,20 @@ class PandaAgent:
 
         # Put block back in original position.
 
-        # TODO: Check if block is on the table or platform to start. 
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
+        # TODO: Check if block is on the table or platform to start.
+        self.pddl_info = get_pddlstream_info(self.robot,
+                                             self.fixed,
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=True,
+                                             approach_frame='gripper')
 
         init = self._get_initial_pddl_state()
         goal_pose = pb_robot.vobj.BodyPose(pddl_block, original_pose)
         init += [('Pose', pddl_block, goal_pose),
                  ('Supported', pddl_block, goal_pose, self.table, self.table_pose)]
-        goal = ('and', ('AtPose', pddl_block, goal_pose), 
+        goal = ('and', ('AtPose', pddl_block, goal_pose),
                        ('On', pddl_block, self.table))
-        
+
         # Solve the PDDLStream problem.
         print('Init:', init)
         print('Goal:', goal)
@@ -214,10 +245,10 @@ class PandaAgent:
         self.plan()
         block.set_base_link_pose(pose)
 
-    def simulate_tower(self, tower, vis, T, save_tower=False, solve_joint=False):
+    def simulate_tower(self, tower, vis, T, real=False, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
         """
-        :param tower: list of belief blocks that are rotated to have no 
-                      orientation in the tower. These are in the order of 
+        :param tower: list of belief blocks that are rotated to have no
+                      orientation in the tower. These are in the order of
                       the tower starting at the base.
         """
         for block in tower:
@@ -227,6 +258,7 @@ class PandaAgent:
             print('CoM:', block.com)
             print('-----')
 
+        moved_blocks = set()
         original_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
         init = self._get_initial_pddl_state()
@@ -239,25 +271,30 @@ class PandaAgent:
                 if block.name in pddl_block.get_name():
                     pddl_block_lookup[block] = pddl_block
 
+
         # TODO: Set base block to be rotated in its current position.
         base_block = pddl_block_lookup[tower[0]]
-        base_pos = base_block.get_base_link_pose()[0]
-        table_z = self.table_pose.pose[0][2] #+ 1e-5
-        base_pos = (0., 0.5, 0.)
-        base_pose = ((base_pos[0], base_pos[1], table_z + tower[0].pose.pos.z), tower[0].rotation)
+        base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
+        base_pose = (base_pos, tower[0].rotation)
 
         base_pose = pb_robot.vobj.BodyPose(pddl_block, base_pose)
         init += [('Pose', base_block, base_pose),
                  ('Supported', base_block, base_pose, self.table, self.table_pose)]
-        goal_terms.append(('AtPose', base_block, base_pose)) 
+        goal_terms.append(('AtPose', base_block, base_pose))
         goal_terms.append(('On', base_block, self.table))
 
+        self.pddl_info = get_pddlstream_info(self.robot,
+                                             self.fixed + [b for b in self.pddl_blocks if b != base_block],
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='global')
         if not solve_joint:
             if not self.teleport:
                 goal = tuple(['and'] + goal_terms)
-                self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+                self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
             else:
                 self.teleport_block(base_block, base_pose.pose)
+        moved_blocks.add(base_block)
 
         poses = [base_pose]
         # TODO: Calculate each blocks pose relative to the block beneath.
@@ -277,30 +314,61 @@ class PandaAgent:
                 init = self._get_initial_pddl_state()
                 goal_terms = []
 
+            self.pddl_info = get_pddlstream_info(self.robot,
+                                                 self.fixed + [b for b in self.pddl_blocks if b != top_pddl],
+                                                 self.pddl_blocks,
+                                                 add_slanted_grasps=False,
+                                                 approach_frame='global')
             init += [('RelPose', top_pddl, bottom_pddl, rel_tform)]
             goal_terms.append(('On', top_pddl, bottom_pddl))
 
+            moved_blocks.add(top_pddl)
             if not solve_joint:
                 if not self.teleport:
                     goal = tuple(['and'] + goal_terms)
-                    self._solve_and_execute_pddl(init, goal, search_sample_ratio=1000.)
+                    self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
                 else:
                     get_pose = tamp.primitives.get_stable_gen_block()
                     pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
                     poses.append(pose)
                     self.teleport_block(top_pddl, pose.pose)
 
+                # Execute the block placement.
+                desired_pose = top_pddl.get_point()
+                if not real:
+                    self.step_simulation(T, vis_frames=False)
+                # TODO: Check if the tower was stable, stop construction if not.
+                end_pose = top_pddl.get_point()
+                if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
+                    print('Unstable!')
+                    break
+
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
 
-        self.step_simulation(T, vis_frames=True)
+        if not real:
+            self.step_simulation(T, vis_frames=False)
+        else:
+            print('Need to reload block positions here.')
 
+        # Reset Environment. Need to handle conditions where the blocks are still a stable tower.
+        # As a heuristic for which block to reset first, do it in order of their z-values.
+        current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+        block_ixs = range(len(self.pddl_blocks))
+        block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
 
-        # TODO: Reset Environment. Need to handle conditions where the blocks are still a stable tower.
-        self.pddl_info = get_pddlstream_info(self.robot, [self.table, self.platform_table, self.platform_leg], self.pddl_blocks)
-        for b, pose in zip(self.pddl_blocks, original_poses):
+        for ix in block_ixs:
+            b, pose = self.pddl_blocks[ix], original_poses[ix]
+            if b not in moved_blocks: continue
+
             goal_pose = pb_robot.vobj.BodyPose(b, pose)
+
+            self.pddl_info = get_pddlstream_info(self.robot,
+                                                 self.fixed + [obj for obj in self.pddl_blocks if obj != b],
+                                                 self.pddl_blocks,
+                                                 add_slanted_grasps=False,
+                                                 approach_frame='global')
 
             init = self._get_initial_pddl_state()
             init += [('Pose', b, goal_pose),
@@ -310,18 +378,27 @@ class PandaAgent:
             goal_terms.append(('On', b, self.table))
 
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
 
     def step_simulation(self, T, vis_frames=False):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
         p.setGravity(0, 0, -10, physicsClientId=self._planning_client_id)
+
+        q = self.robot.get_joint_positions()
+
         for _ in range(T):
             p.stepSimulation(physicsClientId=self._execution_client_id)
             p.stepSimulation(physicsClientId=self._planning_client_id)
-            time.sleep(1/240.)
+
+            self.execute()
+            self.execution_robot.set_joint_positions(self.robot.joints, q)
+            self.plan()
+            self.robot.set_joint_positions(self.robot.joints, q)
+
+            time.sleep(1/2400.)
 
             if vis_frames:
-                length, lifeTime = 0.1, 0
+                length, lifeTime = 0.1, 0.1
                 for pddl_block in self.pddl_blocks:
                     pos, quat = pddl_block.get_pose()
                     new_x = transformation([length, 0.0, 0.0], pos, quat)
@@ -351,16 +428,18 @@ class PandaAgent:
 
         return end_pose
 
-    def _solve_and_execute_pddl(self, init, goal, max_time=INF, search_sample_ratio=0.):
+    def _solve_and_execute_pddl(self, init, goal, real=False, max_time=INF, search_sample_ratio=0.):
         self._add_text('Planning block placement')
         self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
-        
+
+        self.plan()
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
-        plan, _, _ = solve_focused(pddlstream_problem, 
-                                   success_cost=numpy.inf, 
+        plan, _, _ = solve_focused(pddlstream_problem,
+                                   success_cost=numpy.inf,
                                    search_sample_ratio=search_sample_ratio,
                                    max_time=max_time)
+
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
@@ -369,9 +448,9 @@ class PandaAgent:
         else:
             saved_world.restore()
             self.execute()
-            ExecuteActions(self.execution_robot.arm, plan, pause=True, wait=False)
+            ExecuteActions(plan, real=real, pause=True, wait=False)
             self.plan()
-            ExecuteActions(self.robot.arm, plan, pause=False, wait=False)
+            ExecuteActions(plan, real=False, pause=False, wait=False)
             return True
 
     def _get_regrasp_skeleton(self, max_replacements=2):
@@ -393,5 +472,3 @@ class PandaAgent:
             skeletons.append(s)
         print(skeletons[0])
         return [skeletons[3]]
-
-    

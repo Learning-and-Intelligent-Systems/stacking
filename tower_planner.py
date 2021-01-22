@@ -58,9 +58,27 @@ class TowerPlanner(PlannerBase):
 
         return True # we've verified the whole tower is stable
 
-    def tower_is_constructible(self, blocks):
+    def tower_is_constructable(self, blocks):
         """ Check that each block can be placed on the tower from bottom to top
         without knocking the tower over
+
+        NOTE: This function expects blocks in the tower to have zero rotation
+
+        Arguments:
+            blocks {List(Object)} -- the tower from bottom to top
+
+        Returns:
+            bool -- Whether or not the tower can be built stably
+        """
+        for i in range(1, len(blocks)+1):
+            # check that each pair of blocks is stably individually
+            subtower = blocks[:i]
+            if not self.tower_is_stable(subtower): return False
+
+        return True
+
+    def tower_is_pairwise_stable(self, blocks):
+        """ Check that each pair of blocks is stable wrt the one below it.
 
         NOTE: This function expects blocks in the tower to have zero rotation
 
