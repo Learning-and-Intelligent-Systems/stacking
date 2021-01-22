@@ -22,16 +22,23 @@ def Rt_to_pose_matrix(R, t):
     """ convert a rotation and translation into a pose matrix
     
     Arguments:
-        R {np.ndarray} -- 3x3 rotation matrix
-        t {np.ndarray} -- 3x1 translation vector
+        R {np.ndarray} -- 3x3 rotation matrix Nx4x4 array of rotation matrices
+        t {np.ndarray} -- 3x1 translation vector Nx3 array of translations
     
     Returns:
         np.ndarray -- 4x4 pose matrix
     """
-    P = np.eye(4)
-    P[:3, :3] = R
-    P[:3, 3] = t
-    return P
+    if len(R.shape) == 2:
+        P = np.eye(4)
+        P[:3, :3] = R
+        P[:3, 3] = t
+        return P
+    else:
+        P = np.zeros([R.shape[0], 4, 4])
+        P[:] = np.eye(4)
+        P[:, :3, :3] = R
+        P[:, :3, 3] = t
+        return P
 
 def pose_matrix_to_Rt(P):
     """ Take a 4x4 pose matrix and convert to a 3x3 rotation and 3x1 position
