@@ -51,6 +51,11 @@ if __name__ == '__main__':
     parser.add_argument('--discrete',
                         action='store_true',
                         help='use if you want to ONLY search the space of block orderings and orientations')
+    parser.add_argument('--n-samples',
+                        default=5000,
+                        type=int,
+                        help='number of samples to select from in total planning method')
+    
     args = parser.parse_args()
     
     if args.debug:
@@ -109,8 +114,8 @@ if __name__ == '__main__':
     
     ## RUN RANDOM PLANNER
     if args.method == 'total' or args.method == 'both':
-        total_planner(logger, args.max_acquisitions, pre+'total_planner_tallest_tower_regret.pkl', \
-            args.n_towers, block_set, discrete=args.discrete)
+        total_planner(logger, args.max_acquisitions, pre+'total_planner_tallest_tower_'+str(args.n_samples), \
+            args.n_towers, block_set, args.discrete, args.n_samples)
 
     ## PLOT RESULTS
     if args.method in ['sequential', 'both']:

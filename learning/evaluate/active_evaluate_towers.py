@@ -587,14 +587,14 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def tallest_tower_regret_evaluation(logger, max_acquisitions, fname, n_towers, block_set, discrete=False):
+def tallest_tower_regret_evaluation(logger, max_acquisitions, fname, n_towers, block_set, discrete=False, n_samples=5000):
     def tower_height(tower):
         """
         :param tower: A vectorized version of the tower.
         """
         return np.sum(tower[:, 6])
 
-    return evaluate_planner(logger, n_towers, tower_height, block_set, max_acquisitions, fname, discrete)
+    return evaluate_planner(logger, n_towers, tower_height, block_set, max_acquisitions, fname, discrete, n_samples)
 
 def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
     def contact_area(tower):
@@ -621,16 +621,16 @@ def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
 
     return evaluate_planner(logger, n_towers, contact_area, block_set, fname='contact_regret.pkl')
 
-def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fname, discrete):
+def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fname, discrete, nsamples):
     tower_keys = ['2block', '3block', '4block', '5block']
     tower_sizes = [2, 3, 4, 5]
     tp = TowerPlanner(stability_mode='contains')
-    ep = EnsemblePlanner(n_samples=5000)
+    ep = EnsemblePlanner(n_samples=nsamples)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
 
-    for tx in [0,50,100]:#range(0, max_acquisitions, 10):#logger.args.max_acquisitions):
+    for tx in range(0, max_acquisitions, 10):#logger.args.max_acquisitions):
         print('Acquisition step:', tx)
         ensemble = logger.get_ensemble(tx)
 
