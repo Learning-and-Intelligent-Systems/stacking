@@ -15,18 +15,21 @@ planeId = p.loadURDF("geo/plane.urdf", [0,0,0], planeOrn)
 #hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0.1], flags=p.URDF_USE_SELF_COLLISION)
 
 sleep(3)
-# #tower demo
+#tower demo
 num_blocks=2
 for i in range(num_blocks):
-    if i==num_blocks-1:
-      innerbox=p.loadURDF("geo/block.urdf", [0.05,0.05,0.05+i*0.1], useMaximalCoordinates = True)
-    else:
-      innerbox=p.loadURDF("geo/block.urdf", [0.05,0.05,0.05+i*0.1], useMaximalCoordinates = True)
-    hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0+i*0.1], flags=p.URDF_USE_SELF_COLLISION)
+    # if i==num_blocks-1:
+    #   innerbox=p.loadURDF("geo/block.urdf", [0.05,0.05,0.02+i*0.1], useMaximalCoordinates = True)
+    # else:
+    #   innerbox=p.loadURDF("geo/block.urdf", [0.05,0.05,0.02+i*0.1], useMaximalCoordinates = True)
+    # hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0+i*0.1], flags=p.URDF_USE_SELF_COLLISION)
+    hollow = p.loadSoftBody("geo/10cm_elm_3_solid_symmetric.vtk", basePosition = [0,0,0+i*0.1], mass = 0.1, useNeoHookean = 0, useBendingSprings=0, useMassSpring=1, springElasticStiffness=95, springDampingStiffness=.1, springDampingAllDirections = 1, useSelfCollision = 0, frictionCoeff = 1.1, useFaceContact=1) #50, 0.05 demo
     # if i==2:
     #   innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
     # else:
     #   innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
+
+
 #cool experiment to show rigid v deformable com requirements
 #shows how the com needs to change to maintain stability (no cover around -0.2 m but for deformables u need about -0.5 m)
 # innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5], useMaximalCoordinates = True)
