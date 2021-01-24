@@ -622,27 +622,28 @@ def min_contact_regret_evaluation(logger, n_towers=10, block_set=''):
     return evaluate_planner(logger, n_towers, contact_area, block_set, fname='contact_regret.pkl')
 
 def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fname, discrete, nsamples):
-    tower_keys = ['2block', '3block', '4block', '5block']
     tower_sizes = [2, 3, 4, 5]
+    tower_keys = [str(ts)+'block' for ts in tower_sizes]
     tp = TowerPlanner(stability_mode='contains')
     ep = EnsemblePlanner(n_samples=nsamples)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
+    rewards = {k: [] for k in tower_keys}
 
-    for tx in range(0, max_acquisitions, 10):#logger.args.max_acquisitions):
+    for tx in range(0, max_acquisitions, 10):
         print('Acquisition step:', tx)
         ensemble = logger.get_ensemble(tx)
 
         for k, size in zip(tower_keys, tower_sizes):
             print('Tower size', k)
             curr_regrets = []
+            curr_rewards = []
             for t in range(0, n_towers):
                 print('Tower number', t)
                 blocks = copy.deepcopy(blocks)
                 tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn, num_blocks=size, discrete=discrete)
 
-                #print(reward, max_reward)
                 block_tower = [Object.from_vector(tower[bx]) for bx in range(len(tower))]
                 if not tp.tower_is_constructable(block_tower):
                     reward = 0
@@ -665,10 +666,15 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
                 #print(reward, max_reward)
                 #print(regret)
                 curr_regrets.append(regret)
+                curr_rewards.append(reward)
             regrets[k].append(curr_regrets)
+            rewards[k].append(curr_rewards)
 
-        with open(logger.get_figure_path(fname), 'wb') as handle:
+        with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
             pickle.dump(regrets, handle)
+            
+        with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
+            pickle.dump(rewards, handle)
 
 def plot_tallest_tower_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:
