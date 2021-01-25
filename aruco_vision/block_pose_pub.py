@@ -6,7 +6,7 @@ Izzybrand, 2020
 import rospy
 from std_msgs.msg import String
 
-from block_pose_est impot ArucoBlockVision
+from block_pose_est import BlockPoseEst
 
 
 def main():
@@ -17,7 +17,7 @@ def main():
     def publish_callback(block_id, X_CO):
         pub.publish(f'{block_id} at {X_CO}')
 
-    ArucoBlockVision(publish_callback)
+    BlockPoseEst(publish_callback)
 
 
 if __name__ == '__main__':
