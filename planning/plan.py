@@ -208,7 +208,4 @@ if __name__ == '__main__':
             all_highest_exp_heights[:,ci, ri] = highest_exp_height
             all_highest_values[:,ci, ri] = highest_value
             
-            with open('dump_mcts_run'+str(ri)+'c_'+str(c)+'.pkl', 'wb') as handle:
-                pickle.dump([tallest_tower, highest_exp_height, highest_value, tower_stats], handle)
-
     plot_run_data(logger, all_tallest_towers, all_highest_exp_heights, all_highest_values, c_vals)
