@@ -42,7 +42,7 @@ class ExtrinsicsError(nn.Module):
 
 def train(model, dataset):
     optimizer = optim.Adam(model.parameters(), lr=1e-2)
-    data_loader = DataLoader(dataset=dataset, batch_size=32, shuffle=True)
+    data_loader = DataLoader(dataset=dataset, batch_size=128, shuffle=True)
     loss = 0
     for epoch in range(10):  # loop over the dataset multiple times
 
@@ -123,13 +123,15 @@ if __name__ == '__main__':
 
     best_loss = None
     best_poses = None
-    for i in range(100):
+    num_tries = 5000
+    for i in range(num_tries):
         model.reset()
         loss = train(model, dataset)
 
-        print(f'Loss {i+1}/{100}: {loss}')
+        print(f'Loss {i+1}/{num_tries}: {loss}')
         if best_loss is None or loss < best_loss:
             best_loss = loss
             best_poses = (model.xyz_rpy_BC.detach(), model.xyz_rpy_GO.detach())
+            print(f'New best! {best_loss}')
 
     print(best_loss, best_poses)

@@ -115,64 +115,83 @@ def combine_block_poses(block_poses_in_camera_frame):
 
     return block_poses
 
+
+class ArucoBlockVision:
+    # TODO(izzy): split out this funtionality in a prettier way.
+    # there should be a function to stop/start
+
+    def __init__(self, callback=None, vis=False):
+        info = get_block_info()
+
+        # Configure depth and color streams
+        pipeline = rs.pipeline()
+        config = rs.config()
+        config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
+        # Start streaming
+        pipeline.start(config)
+
+        try:
+            while True:
+                # Wait for a coherent pair of frames: depth and color
+                frames = pipeline.wait_for_frames()
+                # depth_frame = frames.get_depth_frame()
+                color_frame = frames.get_color_frame()
+                if not color_frame:
+                    continue
+
+                # convert image to numpy array
+                color_image = np.asarray(color_frame.get_data())
+                # convert to grayscale
+                gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+                # detect aruco markers
+                corners, ids, rejectedImgPoints = aruco.detectMarkers(
+                    gray_image, aruco_dict, parameters=aruco_params)
+
+                # if we've detected markers, then estimate their pose and draw frames
+                if ids is not None:
+                    # estimate the pose of the blocks (one for each visible tag)
+                    tag_id_to_block_pose = \
+                        get_block_poses_in_camera_frame(ids, corners, info)
+
+                    # draw a block for each detected tag (to show disagreement)
+                    # for tag_id in tag_id_to_block_pose.keys():
+                    #     block_id = tag_id // 6
+                    #     X_CO = tag_id_to_block_pose[tag_id]
+                    #     dimensions = info[block_id]['dimensions']
+                    #     draw_block(X_CO, dimensions, color_image)
+
+                    # combine all the visible tags
+                    block_id_to_block_pose = combine_block_poses(tag_id_to_block_pose)
+                    for block_id in block_id_to_block_pose.keys():
+                        X_CO = block_id_to_block_pose[block_id]
+
+                        # run the supplied callback
+                        if callback is not None:
+                            callback(block, X_CO)
+
+                        # if the visualizer is turned on, draw the block
+                        if vis:
+                            dimensions = info[block_id]['dimensions']
+                            draw_block(X_CO, dimensions, color_image)
+
+                if vis:
+                    cv2.imshow('Aruco Frames', color_image)
+
+                cv2.waitKey(1)
+
+        finally:
+            # Stop streaming
+            pipeline.stop()
+
+
 def main():
-    info = get_block_info()
+    def print_callback(block_id, X_CO):
+        R_CO, T_CO = pose_matrix_to_Rt(X_CO)
+        print(f'{block_id} at {T_CO}')
 
-    # Configure depth and color streams
-    pipeline = rs.pipeline()
-    config = rs.config()
-    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-
-    # Start streaming
-    pipeline.start(config)
-
-    try:
-        while True:
-            # Wait for a coherent pair of frames: depth and color
-            frames = pipeline.wait_for_frames()
-            # depth_frame = frames.get_depth_frame()
-            color_frame = frames.get_color_frame()
-            if not color_frame:
-                continue
-
-            # convert image to numpy array
-            color_image = np.asarray(color_frame.get_data())
-            # convert to grayscale
-            gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-            # detect aruco markers
-            corners, ids, rejectedImgPoints = aruco.detectMarkers(
-                gray_image, aruco_dict, parameters=aruco_params)
-
-            # if we've detected markers, then estimate their pose and draw frames
-            if ids is not None:
-                # estimate the pose of the blocks (one for each visible tag)
-                tag_id_to_block_pose = \
-                    get_block_poses_in_camera_frame(ids, corners, info)
-
-                # draw a block for each detected tag (to show disagreement)
-                # for tag_id in tag_id_to_block_pose.keys():
-                #     block_id = tag_id // 6
-                #     X_CO = tag_id_to_block_pose[tag_id]
-                #     dimensions = info[block_id]['dimensions']
-                #     draw_block(X_CO, dimensions, color_image)
-
-                # combine all the visible tags
-                block_id_to_block_pose = combine_block_poses(tag_id_to_block_pose)
-                for block_id in block_id_to_block_pose.keys():
-                    X_CO = block_id_to_block_pose[block_id]
-                    R_CO, T_CO = pose_matrix_to_Rt(X_CO)
-                    print(f'{block_id} at {T_CO}')
-                    dimensions = info[block_id]['dimensions']
-                    draw_block(X_CO, dimensions, color_image)
-
-
-            cv2.imshow('Aruco Frames', color_image)
-            cv2.waitKey(1)
-
-    finally:
-        # Stop streaming
-        pipeline.stop()
+    ArucoBlockVision(print_callback, vis=True)
 
 
 if __name__ == '__main__':
