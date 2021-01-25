@@ -1,46 +1,34 @@
 #!/usr/bin/env python
 
 import rospy
+from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 
 from panda_vision.srv import GetBlockPoses, GetBlockPosesResponse
 from panda_vision.msg import NamedPose
 
-# this would be hard coded by us, to match the blocks given in run_stack_panda.py
-tag_block_association = {'tagID0':'block0', 'tagID1':'block1', 'tagID2':'block2'}
+# NOTE(izzy): in order to be able to continuously collect frames from the
+# camera and also handle server requests, I've decided to have a publisher
+# node which constantly publishes block poses as they are observed, and
+# the block_pose_server is a subscriber to that node
+
+poses = {}
+
+def block_pose_callback(data):
+    poses[block_id] = pose
 
 def handle_get_block_poses(req):
-    # call vision system...
-    # example of what is returned
-    pose_0 = PoseStamped()
-    pose_0.pose.position = Point(0.65, 0.3, 0)
-    pose_0.pose.orientation = Quaternion(0, 0, 0, 1)
-    
-    pose_1 = PoseStamped()
-    pose_1.pose.position = Point(0.65, 0.15, 0)
-    pose_1.pose.orientation = Quaternion(0, 0, 0, 1)
-    
-    pose_2 = PoseStamped()
-    pose_2.pose.position = Point(0.65, 0.0, 0)
-    pose_2.pose.orientation = Quaternion(0, 0, 0, 1)
-    
-    poses = {'tagID0': pose_0, 
-                'tagID1': pose_1,
-                'tagID2': pose_2}
-    
-    #
-    named_poses = []
-    for tagID, pose in poses.items():
-        block_name = tag_block_association[tagID]
-        named_poses.append(NamedPose(block_name, pose))
+    for block_id, pose in poses.items():
+        block_id
+        named_poses.append(NamedPose(block_id, pose))
     
     return GetBlockPosesResponse(named_poses)
     
-def get_block_poses_server():
-    rospy.init_node('get_block_poses_server')
+def block_pose_server():
+    rospy.init_node('block_pose_server')
     rospy.Service('get_block_poses', GetBlockPoses, handle_get_block_poses)
     print('Get block poses server ready.')
     rospy.spin()
     
 if __name__ == '__main__':
-    get_block_poses_server()
+    block_pose_server()
