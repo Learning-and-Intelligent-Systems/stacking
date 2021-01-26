@@ -15,20 +15,16 @@ most_recent_poses = {}
 
 def block_pose_callback(data):
     global most_recent_poses
-
     most_recent_poses[data.name] = data
 
 def handle_get_block_poses(req):
     global most_recent_poses
-
-    for block_id, pose in most_recent_poses.items():
-        block_id
-        named_poses.append(NamedPose(block_id, pose))
     
-    return GetBlockPosesResponse(named_poses)
+    return GetBlockPosesResponse(most_recent_poses.values())
 
 if __name__ == '__main__':
     rospy.init_node('block_pose_server')
+    rospy.Subscriber('block_pose', NamedPose, block_pose_callback)
     rospy.Service('get_block_poses', GetBlockPoses, handle_get_block_poses)
     print('Get block poses server ready.')
     rospy.spin()

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ Massachusetts Institute of Technology
 
 Izzybrand, 2020
@@ -9,6 +10,23 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from aruco_vision.msg import NamedPose
 from block_pose_est import BlockPoseEst
 from rotation_util import *
+
+
+import numpy as np
+class BlockPoseFake:
+    def __init__(self, callback):
+        self.callback = callback
+
+    def step(self):
+        R = np.eye(3)
+        t = np.random.randn(3)
+        X = Rt_to_pose_matrix(R, t)
+        block_id = np.random.randint(10)
+        self.callback(block_id, X)
+
+    def close(self):
+        pass
+
 
 
 def main():
@@ -29,7 +47,8 @@ def main():
         # and publish the named pose
         pub.publish(NamedPose(str(block_id), p))
 
-    bpe = BlockPoseEst(publish_callback)
+    # bpe = BlockPoseEst(publish_callback)
+    bpe = BlockPoseFake(publish_callback)
 
     while not rospy.is_shutdown():
         bpe.step()
