@@ -18,6 +18,9 @@ def eul_to_rot(theta):
 
     return Rotation.from_euler('xyz', theta).as_matrix()
 
+def rot_to_quat(R):
+    return Rotation.from_matrix(R).as_quat()
+
 def Rt_to_pose_matrix(R, t):
     """ convert a rotation and translation into a pose matrix
     

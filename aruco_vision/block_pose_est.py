@@ -9,6 +9,7 @@ import numpy as np
 import cv2
 from cv2 import aruco
 import os
+import sys
 
 from cal import dist, mtx
 from rotation_util import *
@@ -201,8 +202,14 @@ class BlockPoseEst:
 
         cv2.waitKey(1)
 
+    def close(self):
+        self.pipeline.stop()
+
 
 def main():
+    if len(rs.context().devices):
+        print('Could not find any Realsense Devices.')
+        sys.exit(1)
     print('Listing available realsense devices...')
     for i, device in enumerate(rs.context().devices):
         serial_number = device.get_info(rs.camera_info.serial_number)
