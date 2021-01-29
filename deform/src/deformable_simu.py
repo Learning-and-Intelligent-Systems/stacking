@@ -3,27 +3,33 @@ from time import sleep
 import pybullet_data
 from math import cos, pi, sin
 
+#SETUP
 physicsClient = p.connect(p.GUI)
-
 p.resetSimulation(p.RESET_USE_DEFORMABLE_WORLD)
-
 p.setGravity(0, 0, -10)
-
+p.setPhysicsEngineParameter(sparseSdfVoxelSize=0.25)
 planeOrn = [0,0,0,1]
 planeId = p.loadURDF("geo/plane.urdf", [0,0,0], planeOrn)
-
-#hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0.1], flags=p.URDF_USE_SELF_COLLISION)
+num_blocks=3
+grace_period=5000
 
 sleep(3)
 #tower demo
-num_blocks=2
 for i in range(num_blocks):
+  for j in range(grace_period):
+    p.stepSimulation()
+  hollow = p.loadSoftBody("geo/10cm_elm_20_solid_symmetric.vtk", basePosition = [0,0,0+i*0.1], mass = 0.1, useNeoHookean = 0, useBendingSprings=1, useMassSpring=1, springElasticStiffness=50, springDampingStiffness=0.14, springDampingAllDirections = 1, useSelfCollision = 0, frictionCoeff = 0.9, useFaceContact=1) #50, 0.05 demo
+  #hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0+i*0.1], flags=p.URDF_USE_SELF_COLLISION)
+
+
+for i in range(20000): #ending time
+  p.stepSimulation()
+
     # if i==num_blocks-1:
     #   innerbox=p.loadURDF("geo/block.urdf", [0.05,0.05,0.02+i*0.1], useMaximalCoordinates = True)
     # else:
     #   innerbox=p.loadURDF("geo/block.urdf", [0.05,0.05,0.02+i*0.1], useMaximalCoordinates = True)
     # hollow= p.loadURDF("geo/cover_deform.urdf",[0,0,0+i*0.1], flags=p.URDF_USE_SELF_COLLISION)
-    hollow = p.loadSoftBody("geo/10cm_elm_3_solid_symmetric.vtk", basePosition = [0,0,0+i*0.1], mass = 0.1, useNeoHookean = 0, useBendingSprings=0, useMassSpring=1, springElasticStiffness=95, springDampingStiffness=.1, springDampingAllDirections = 1, useSelfCollision = 0, frictionCoeff = 1.1, useFaceContact=1) #50, 0.05 demo
     # if i==2:
     #   innerbox=p.loadURDF("geo/block.urdf", [0.5,0.5,0.5+i*1], useMaximalCoordinates = True)
     # else:
@@ -74,13 +80,9 @@ for i in range(num_blocks):
 #     while count<8:
 #       p.createSoftBodyAnchor(cover,mesh_verts[count2],body2,vertices[count2])
 
-p.setPhysicsEngineParameter(sparseSdfVoxelSize=0.25)
-p.setRealTimeSimulation(1)
-
-counter=0
-while p.isConnected():
-  p.stepSimulation()
-  #p.setGravity(0, 0, -10)
-  sleep(1./240.)
+# p.setRealTimeSimulation(1)
+# while p.isConnected():
+#   p.stepSimulation()
+#   sleep(1./240.)
 
 
