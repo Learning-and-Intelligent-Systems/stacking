@@ -8,6 +8,11 @@ We will use OpenCVs Aruco tags to localize the blocks with the Intel RealSenseD4
  * Python OpenCV
  * PIL
 
+## Calibrating the Camera
+
+`python calibrate_intinsics.py`
+`python calibrate_extrinsics.py`
+
 ## Creating Tags for an object
 
 Each object has six unique tags; this script generates those tags according to the given `block_id` and saves them in the `tags` folder. Each tag is saved as a PNG image with a black border. When printed on a regular printer at the default scale (set by the script), you can cut out the tag along the border and it will match the dimensions of each face on the block.
@@ -34,7 +39,7 @@ Next, for each of the six faces of the block, we instruct the user to hold the b
 
 Once you've created and calibrated the tags for your new object. You can localize it using
 
-`python aruco_block_pose_est.py`
+`python block_pose_est.py`
 
 This script will detect all the visible tags, use the information saved in the `tags/block_[num]_info.pkl`files to combine tags on the same block, and estimate a pose for each visible block.
 
@@ -69,3 +74,9 @@ sudo make install
 cd wrappers/python
 cp *.so <virtualenvdir>/lib/python3.7/site-packages/.
 ```
+
+#### VMWare Fusion on Mac
+
+Shut down VM.
+
+`vim ~/Library/Preferences/VMware\ Fusion/preferences` and add `vusbcamera.passthrough = "TRUE"` to the bottom of the file.
