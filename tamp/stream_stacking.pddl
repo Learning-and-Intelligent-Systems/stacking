@@ -18,11 +18,17 @@
     :outputs (?g)
     :certified (Grasp ?o ?g)
   ) 
-  (:stream inverse-kinematics
+  (:stream pick-inverse-kinematics
     :inputs (?o ?p ?g)
     :domain (and (Pose ?o ?p) (Grasp ?o ?g))
-    :outputs (?q ?t)
-    :certified (and (Conf ?q) (Kin ?o ?p ?g ?q ?t))
+    :outputs (?q1 ?q2 ?t)
+    :certified (and (Conf ?q2) (Conf ?q1) (PickKin ?o ?p ?g ?q1 ?q2 ?t))
+  )
+  (:stream place-inverse-kinematics
+    :inputs (?o ?p ?g)
+    :domain (and (Pose ?o ?p) (Grasp ?o ?g))
+    :outputs (?q1 ?q2 ?t)
+    :certified (and (Conf ?q1) (Conf ?q2) (PlaceKin ?o ?p ?g ?q1 ?q2 ?t))
   )
   (:stream plan-free-motion
     :inputs (?q1 ?q2)

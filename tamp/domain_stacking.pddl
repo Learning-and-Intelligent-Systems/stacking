@@ -18,7 +18,9 @@
     (Grasp ?o ?g)
     
     ; Kin: Object ?o at Pose ?p can be grasped at Grasp ?g achievable with config ?q and traj ?t
-    (Kin ?o ?p ?g ?q ?t)                
+    ; The trajectories differ for pick and place actions.
+    (PlaceKin ?o ?p ?g ?q1 ?q2 ?t)           
+    (PickKin ?o ?p ?g ?q1 ?q2 ?t)          
     ; FreeMotion: ?t is a traj between configurations ?q1 and ?q2
     (FreeMotion ?q1 ?t ?q2)
     ; HoldingMotion: ?t is a traj between ?q1 and ?q2 while holding object ?o with grasp ?g 
@@ -66,16 +68,18 @@
     
   ; Pick up Block ?o1 at Pose ?p1 from Object (Block or Table) ?o2
   (:action pick
-    :parameters (?o1 ?p1 ?o2 ?g ?q ?t)
-    :precondition (and (Kin ?o1 ?p1 ?g ?q ?t) 
+    :parameters (?o1 ?p1 ?o2 ?g ?q1 ?q2 ?t)
+    :precondition (and (PickKin ?o1 ?p1 ?g ?q1 ?q2 ?t) 
                        (AtPose ?o1 ?p1) 
                        (HandEmpty) 
-                       (AtConf ?q)
+                       (AtConf ?q1)
                        (Movable ?o1) 
                        (not (CanMove)) 
                        (On ?o1 ?o2))
     :effect (and (AtGrasp ?o1 ?g) 
                  (CanMove)
+                 (AtConf ?q2)
+                 (not (AtConf ?q1))
                  (not (AtPose ?o1 ?p1)) 
                  (not (HandEmpty))
                  (not (On ?o1 ?o2)))
@@ -83,10 +87,10 @@
   
   ; Place Block ?o at Pose ?p1 on Object (Block or Table) ?o2 which is at Pose ?p2
   (:action place
-    :parameters (?o1 ?p1 ?o2 ?p2 ?g ?q ?t)
-    :precondition (and (Kin ?o1 ?p1 ?g ?q ?t)
+    :parameters (?o1 ?p1 ?o2 ?p2 ?g ?q1 ?q2 ?t)
+    :precondition (and (PlaceKin ?o1 ?p1 ?g ?q1 ?q2 ?t)
                        (AtGrasp ?o1 ?g) 
-                       (AtConf ?q) 
+                       (AtConf ?q1) 
                        (Supported ?o1 ?p1 ?o2 ?p2) 
                        (AtPose ?o2 ?p2) 
                        (Stackable ?o2) 
@@ -94,6 +98,8 @@
     :effect (and (AtPose ?o1 ?p1) 
                  (HandEmpty) 
                  (CanMove) 
+                 (AtConf ?q2)
+                 (not (AtConf ?q1))
                  (not (AtGrasp ?o1 ?g)) 
                  (On ?o1 ?o2))
   )

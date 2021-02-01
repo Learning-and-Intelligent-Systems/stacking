@@ -291,7 +291,7 @@ class PandaAgent:
         if not solve_joint:
             if not self.teleport:
                 goal = tuple(['and'] + goal_terms)
-                self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
+                self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
             else:
                 self.teleport_block(base_block, base_pose.pose)
         moved_blocks.add(base_block)
@@ -326,7 +326,7 @@ class PandaAgent:
             if not solve_joint:
                 if not self.teleport:
                     goal = tuple(['and'] + goal_terms)
-                    self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
+                    self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
                 else:
                     get_pose = tamp.primitives.get_stable_gen_block()
                     pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -378,7 +378,7 @@ class PandaAgent:
             goal_terms.append(('On', b, self.table))
 
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1000.)
+            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
 
     def step_simulation(self, T, vis_frames=False):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
@@ -436,9 +436,10 @@ class PandaAgent:
         self.plan()
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
-                                   success_cost=numpy.inf,
-                                   search_sample_ratio=search_sample_ratio,
-                                   max_time=max_time)
+                                success_cost=numpy.inf,
+                                max_skeletons=3,
+                                search_sample_ratio=search_sample_ratio,
+                                max_time=60)
 
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.

@@ -10,7 +10,7 @@ from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
 
-DEBUG_FAILURE = True 
+DEBUG_FAILURE = False 
 
 def get_grasp_gen(robot, add_slanted_grasps):
     # I opt to use TSR to define grasp sets but you could replace this
@@ -46,23 +46,38 @@ def get_stable_gen_table(fixed=[]):
         dims = body.get_dimensions()
         if dims[1] > dims[0]:
             all_rotations = [R.from_euler('zyx', [0., 0., numpy.pi/2]),
-                             R.from_euler('zyx', [0., 0., -numpy.pi/2])]
+                             R.from_euler('zyx', [0., 0., -numpy.pi/2]),
+                             R.from_euler('zyx', [numpy.pi, 0., numpy.pi/2]),
+                             R.from_euler('zyx', [numpy.pi, 0., -numpy.pi/2])]
         else:
             all_rotations = [R.from_euler('zyx', [0., -numpy.pi/2, 0.]),
-                             R.from_euler('zyx', [0., numpy.pi/2, 0.])]
+                             R.from_euler('zyx', [0., numpy.pi/2, 0.]),
+                             R.from_euler('zyx', [numpy.pi, -numpy.pi/2, 0.]),
+                             R.from_euler('zyx', [numpy.pi, numpy.pi/2, 0.])]
         
-        while True:
+        poses = []
+        # These are the pre-chosen regrap locations.
+        xys = [(-0.3, -0.3), (-0.3, 0.3)]
+        for x, y in xys:
             for rotation in all_rotations:
-                pose = (ZERO_POS, rotation.as_quat())
-                pose = pb_robot.placements.sample_placement(body, surface, top_pose=pose) 
-                
                 start_pose = body.get_base_link_pose()
+
+                # Get regrasp pose.
+                pose = (ZERO_POS, rotation.as_quat())
+                body.set_base_link_pose(pose)
+                z = pb_robot.placements.stable_z(body, surface)
+                pose = ((x, y, z), rotation.as_quat())
+
+                # Check if regrasp pose is valid.
                 body.set_base_link_pose(pose)
                 if (pose is None) or any(pb_robot.collisions.pairwise_collision(body, b) for b in fixed):
+                    body.set_base_link_pose(start_pose)
                     continue
                 body.set_base_link_pose(start_pose)
+                
                 body_pose = pb_robot.vobj.BodyPose(body, pose)
-                yield (body_pose,)
+                poses.append((body_pose,))
+        return poses
 
     return gen
 
@@ -80,9 +95,8 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
+def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff_frame='global'):
     def fn(body, pose, grasp):
-        print('IK', fixed)
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
@@ -90,6 +104,13 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
             approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
         elif approach_frame == 'global':
             approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.05], approach_frame) # Was -0.125
+        else:
+            raise NotImplementedError()
+
+        if backoff_frame == 'gripper':
+            backoff_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], backoff_frame)
+        elif backoff_frame == 'global':
+            backoff_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.05], backoff_frame) # Was -0.125
         else:
             raise NotImplementedError()
 
@@ -116,20 +137,25 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
             q_approach = robot.arm.ComputeIK(approach_tform)
             if (q_approach is None) or not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
                 continue
-            conf = pb_robot.vobj.BodyConf(robot, q_approach)
+            conf_approach = pb_robot.vobj.BodyConf(robot, q_approach)
             q_grasp = robot.arm.ComputeIK(grasp_worldF, seed_q=q_approach)
             if (q_grasp is None) or not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
                 continue
+            q_backoff = robot.arm.ComputeIK(backoff_tform, seed_q=q_grasp)
+            if (q_backoff is None) or not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles):
+                continue
+            conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
             
-            path = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
-            if path is None:
+            path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
+            path_backoff = robot.arm.snap.PlanToConfiguration(robot.arm, q_grasp, q_backoff, obstacles=obstacles)
+            if path_approach is None or path_backoff is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
 
             command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp),
                        grasp,
-                       pb_robot.vobj.MoveFromTouch(robot.arm, q_approach)]
-            return (conf, command)
+                       pb_robot.vobj.MoveFromTouch(robot.arm, q_backoff)]
+            return (conf_approach, conf_backoff, command)
         return None
     return fn
 

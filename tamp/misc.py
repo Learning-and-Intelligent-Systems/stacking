@@ -197,10 +197,11 @@ def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_fram
 
     fixed = [f for f in fixed if f is not None]
     stream_map = {
-        'sample-pose-table': from_gen_fn(primitives.get_stable_gen_table(fixed)),
+        'sample-pose-table': from_list_fn(primitives.get_stable_gen_table(fixed)),
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
         'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot, add_slanted_grasps)),
-        'inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame=approach_frame)),
+        'pick-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='gripper', backoff_frame='global')),
+        'place-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='global', backoff_frame='global')),
         'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
         'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
     }
