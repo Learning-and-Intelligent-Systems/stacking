@@ -82,6 +82,7 @@ def get_stable_gen_block(fixed=[]):
 
 def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper'):
     def fn(body, pose, grasp):
+        print('IK', fixed)
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
@@ -148,7 +149,12 @@ def assign_fluent_state(fluents):
 
 def get_free_motion_gen(robot, fixed=[]):
     def fn(conf1, conf2, fluents=[]):
-        obstacles = fixed + assign_fluent_state(fluents)
+        obstacles = assign_fluent_state(fluents)
+        fluent_names = [o.get_name() for o in obstacles]
+        for o in fixed:
+            if o.get_name() not in fluent_names:
+                obstacles.append(o)
+                
         path = robot.arm.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
 
         if path is None:
@@ -161,7 +167,11 @@ def get_free_motion_gen(robot, fixed=[]):
 
 def get_holding_motion_gen(robot, fixed=[]):
     def fn(conf1, conf2, body, grasp, fluents=[]):
-        obstacles = fixed + assign_fluent_state(fluents)
+        obstacles = assign_fluent_state(fluents)
+        fluent_names = [o.get_name() for o in obstacles]
+        for o in fixed:
+            if o.get_name() not in fluent_names:
+                obstacles.append(o)
 
         orig_pose = body.get_base_link_pose()
         robot.arm.SetJointValues(conf1.configuration)
