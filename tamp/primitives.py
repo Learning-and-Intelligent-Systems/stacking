@@ -5,7 +5,7 @@ import pybullet as p
 import pb_robot
 import tamp.misc as misc
 
-from block_utils import rotation_group, ZERO_POS
+from block_utils import rotation_group, ZERO_POS, all_rotations
 from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
@@ -39,27 +39,15 @@ def get_stable_gen_table(fixed=[]):
         Generate a random pose (possibly rotated) on a surface. Rotation
         can be specified for debugging.
         """
-        all_rotations = list(rotation_group()) + [R.from_euler('zyx', [0., -numpy.pi/2, 0.])]
-        
         # These poses are useful for regrasping. Poses are more useful for grasping
         # if they are upright.
         dims = body.get_dimensions()
-        if dims[1] > dims[0]:
-            all_rotations = [R.from_euler('zyx', [0., 0., numpy.pi/2]),
-                             R.from_euler('zyx', [0., 0., -numpy.pi/2]),
-                             R.from_euler('zyx', [numpy.pi, 0., numpy.pi/2]),
-                             R.from_euler('zyx', [numpy.pi, 0., -numpy.pi/2])]
-        else:
-            all_rotations = [R.from_euler('zyx', [0., -numpy.pi/2, 0.]),
-                             R.from_euler('zyx', [0., numpy.pi/2, 0.]),
-                             R.from_euler('zyx', [numpy.pi, -numpy.pi/2, 0.]),
-                             R.from_euler('zyx', [numpy.pi, numpy.pi/2, 0.])]
-        
+
+        rotations = all_rotations()
         poses = []
         # These are the pre-chosen regrap locations.
-        xys = [(-0.3, -0.3), (-0.3, 0.3)]
-        for x, y in xys:
-            for rotation in all_rotations:
+        for x, y in [(-0.3, 0.3), (-0.3, -0.3), (0, 0.4)]:
+            for rotation in rotations:
                 start_pose = body.get_base_link_pose()
 
                 # Get regrasp pose.
@@ -74,11 +62,10 @@ def get_stable_gen_table(fixed=[]):
                     body.set_base_link_pose(start_pose)
                     continue
                 body.set_base_link_pose(start_pose)
-                
+
                 body_pose = pb_robot.vobj.BodyPose(body, pose)
                 poses.append((body_pose,))
         return poses
-
     return gen
 
 
@@ -132,7 +119,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
         # TODO: Verify that the y-axis of the gripper frame is along the plane of the hand.
         if numpy.abs(grasp_euler[0] - 1.57) < 0.1:
             return None
-
+        # TODO: Reject poses where the camera is upside down to speed up collision checking.
         for _ in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)
             if (q_approach is None) or not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):

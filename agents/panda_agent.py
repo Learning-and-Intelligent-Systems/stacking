@@ -437,14 +437,15 @@ class PandaAgent:
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
                                 success_cost=numpy.inf,
-                                max_skeletons=3,
+                                max_skeletons=2,
                                 search_sample_ratio=search_sample_ratio,
-                                max_time=60)
+                                max_time=max_time)
+        # TODO: Try planner= argument https://github.com/caelan/pddlstream/blob/stable/pddlstream/algorithms/downward.py 
 
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
-            print("No plan found")
+            input("No plan found. Press enter to continue.")
             return False
         else:
             saved_world.restore()
@@ -454,6 +455,7 @@ class PandaAgent:
             ExecuteActions(plan, real=False, pause=False, wait=False)
             return True
 
+    # TODO: Try this again.
     def _get_regrasp_skeleton(self, max_replacements=2):
         skeleton_tries = [[1, 1, 1, 1],
                           [1, 1, 1, 2],
