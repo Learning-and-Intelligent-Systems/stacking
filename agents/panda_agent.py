@@ -343,6 +343,7 @@ class PandaAgent:
                 if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
                     print('Unstable!')
                     stable = 0.
+                    break
 
         if solve_joint:
             goal = tuple(['and'] + goal_terms)

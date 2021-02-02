@@ -43,7 +43,7 @@ def get_stable_gen_table(fixed=[]):
         # if they are upright.
         dims = body.get_dimensions()
 
-        rotations = all_rotations()
+        rotations = all_rotations()[8:]
         poses = []
         # These are the pre-chosen regrap locations.
         for x, y in [(-0.3, 0.3), (-0.3, -0.3), (0, 0.4)]:
@@ -65,6 +65,7 @@ def get_stable_gen_table(fixed=[]):
 
                 body_pose = pb_robot.vobj.BodyPose(body, pose)
                 poses.append((body_pose,))
+        numpy.random.shuffle(poses)
         return poses
     return gen
 
@@ -90,14 +91,14 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
         if approach_frame == 'gripper':
             approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
         elif approach_frame == 'global':
-            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.05], approach_frame) # Was -0.125
+            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.125], approach_frame) # Was -0.125
         else:
             raise NotImplementedError()
 
         if backoff_frame == 'gripper':
             backoff_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], backoff_frame)
         elif backoff_frame == 'global':
-            backoff_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.05], backoff_frame) # Was -0.125
+            backoff_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.125], backoff_frame) # Was -0.125
         else:
             raise NotImplementedError()
 
@@ -114,16 +115,23 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
             p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
 
         # Check if grasp is vertical relative to object. Fail if so (approach would go through object).
-        grasp_frame = pb_robot.geometry.pose_from_tform(grasp_worldF)
-        grasp_euler = pb_robot.geometry.euler_from_quat(grasp_frame[1])
-        # TODO: Verify that the y-axis of the gripper frame is along the plane of the hand.
-        if numpy.abs(grasp_euler[0] - 1.57) < 0.1:
+        # The y-axis of the gripper is along the plane of the hand. Make sure it isn't vertical.
+        point = numpy.array([[0, 1, 0]]).T
+        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
+        if numpy.abs(numpy.abs(t_point[2]) - 1.) < 0.001:
             return None
+        # The x-axis of the gripper points towards the camera. Make sure is isn't facing down for any grasps.
+        point = numpy.array([[1, 0, 0]]).T
+        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
+        if numpy.abs(t_point[2] + 1.) < 0.001:
+            return None
+
         # TODO: Reject poses where the camera is upside down to speed up collision checking.
         for _ in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)
             if (q_approach is None) or not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
                 continue
+            
             conf_approach = pb_robot.vobj.BodyConf(robot, q_approach)
             q_grasp = robot.arm.ComputeIK(grasp_worldF, seed_q=q_approach)
             if (q_grasp is None) or not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
