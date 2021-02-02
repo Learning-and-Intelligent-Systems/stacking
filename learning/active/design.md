@@ -77,9 +77,11 @@ def choose_acquisition_data(samples, ensemble, n_acquire):
     :return: (n_acquire, 2) - the samples which to label.
     """
 
-def get_labels(samples):
+def get_labels(samples, exec_mode, agent):
     """ Get the labels for the chosen datapoints.
     :param samples: (n_acquire, 2)
+    :param exec_mode: in ['analytical', 'sim', 'real'], how to label data
+    :param agent: PandaAgent or None (if exec_mode == 'analytical')
     :return: (n_acquire,) The labels for the given datapoints.
     """
 

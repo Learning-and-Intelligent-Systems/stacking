@@ -20,7 +20,7 @@ from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise, use_platform, block_init_xy_poses=None, teleport=False):
+    def __init__(self, blocks, noise=0.00005, use_platform=False, block_init_xy_poses=None, teleport=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a
@@ -245,7 +245,7 @@ class PandaAgent:
         self.plan()
         block.set_base_link_pose(pose)
 
-    def simulate_tower(self, tower, vis, T, real=False, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
+    def simulate_tower(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
         """
         :param tower: list of belief blocks that are rotated to have no
                       orientation in the tower. These are in the order of
@@ -271,7 +271,8 @@ class PandaAgent:
                 if block.name in pddl_block.get_name():
                     pddl_block_lookup[block] = pddl_block
 
-
+        stable = 1.
+        
         # TODO: Set base block to be rotated in its current position.
         base_block = pddl_block_lookup[tower[0]]
         base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
@@ -341,7 +342,7 @@ class PandaAgent:
                 end_pose = top_pddl.get_point()
                 if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
                     print('Unstable!')
-                    break
+                    stable = 0.
 
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
@@ -379,6 +380,8 @@ class PandaAgent:
 
             goal = tuple(['and'] + goal_terms)
             self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+            
+        return stable
 
     def step_simulation(self, T, vis_frames=False):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
