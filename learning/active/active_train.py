@@ -36,7 +36,7 @@ def split_data(data, n_val):
     return data, val_data
 
 
-def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn, logger, args):
+def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn, logger, agent, args):
     """ Main training function 
     :param ensemble: learning.models.Ensemble object to be trained.
     :param dataset: Object containing the data to iterate over. Can be added to.
@@ -48,6 +48,7 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
     :param data_pred_fn:
     :param data_subset_fn:
     :param logger: Object used to keep track of training artifacts.
+    :param agent: PandaAgent or None (in args.exec_mode == 'analytical')
     :param args: Commandline arguments such as the number of acquisition points.
     :return: The fully trained ensemble.
     """
@@ -69,7 +70,9 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
                                                    data_sampler_fn=data_sampler_fn,
                                                    data_subset_fn=data_subset_fn,
                                                    data_label_fn=data_label_fn,
-                                                   data_pred_fn=data_pred_fn)
+                                                   data_pred_fn=data_pred_fn,
+                                                   exec_mode=args.exec_mode,
+                                                   agent=agent)
         logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
 
         # Add to dataset.

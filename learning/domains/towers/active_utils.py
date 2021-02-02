@@ -220,10 +220,12 @@ def get_predictions(dataset, ensemble):
     return torch.cat(preds, dim=0)
 
 
-def get_labels(samples):
+def get_labels(samples, exec_mode, agent):
     """ Takes as input a dictionary from the get_subset function. 
     Augment it with stability labels. 
     :param samples:
+    :param exec_mode: str in ['analytical', 'sim', 'real']
+    :param agent: PandaAgent or None (if exec_mode == 'analytical')
     :return:
     """
     tp = TowerPlanner(stability_mode='contains')
@@ -233,11 +235,24 @@ def get_labels(samples):
 
         for ix in range(0, n_towers):
             # Convert tower to Block representation.
-            block_tower = [Object.from_vector(samples[k]['towers'][ix, jx, :]) for jx in range(n_blocks)]
-            #  Use tp to check for stability.
-            if not tp.tower_is_constructable(block_tower):
-                labels[ix] = 0.
-
+            block_tower = []
+            for jx in range(n_blocks): 
+                block = Object.from_vector(samples[k]['towers'][ix, jx, :])
+                block.name = 'obj_'+str(samples[k]['block_ids'][ix, jx])
+                block = get_rotated_block(block)
+                block_tower.append(block)
+            if exec_mode == 'analytical':
+                #  Use tp to check for stability.
+                if not tp.tower_is_constructable(block_tower):
+                    labels[ix] = 0.
+            elif exec_mode == 'sim':
+                # Use simulated robot to check stability
+                vis = True
+                labels[ix] = agent.simulate_tower(block_tower, vis, real=False)
+            elif exec_mode == 'real':
+                # Use real robot to check stability
+                vis = True
+                labels[ix] = agent.simulate_tower(block_tower, vis, real=True)
         samples[k]['labels'] = labels
     return samples
 
