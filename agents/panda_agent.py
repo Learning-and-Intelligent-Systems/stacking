@@ -438,12 +438,19 @@ class PandaAgent:
         saved_world = pb_robot.utils.WorldSaver()
 
         self.plan()
+        start = time.time()
+
+        constraints = PlanConstraints(skeletons=self._get_regrasp_skeleton(),
+                                  exact=True)
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
+                                #constraints=constraints,
                                 success_cost=numpy.inf,
                                 max_skeletons=2,
                                 search_sample_ratio=search_sample_ratio,
                                 max_time=max_time)
+        duration = time.time() - start
+        print('Planning Complete: Time %f seconds' % duration)
         # TODO: Try planner= argument https://github.com/caelan/pddlstream/blob/stable/pddlstream/algorithms/downward.py 
 
         self._add_text('Executing block placement')
@@ -460,22 +467,21 @@ class PandaAgent:
             return True
 
     # TODO: Try this again.
-    def _get_regrasp_skeleton(self, max_replacements=2):
-        skeleton_tries = [[1, 1, 1, 1],
-                          [1, 1, 1, 2],
-                          [1, 1, 2, 2],
-                          [1, 2, 2, 2],
-                          [2, 2, 2, 2]]
-        skeletons = []
-        for attempt in skeleton_tries:
-            s = []
-            for ix in range(len(self.pddl_blocks)):
-                bname = '?b%d' % ix
-                for _ in range(attempt[ix]):
-                    s += [('move_free', [WILD, WILD, WILD])]
-                    s += [('pick', [bname, WILD, WILD, WILD, WILD, WILD])]
-                    s += [('move_holding', [WILD, WILD, bname, WILD, WILD])]
-                    s += [('place', [bname, WILD, WILD, WILD, WILD, WILD, WILD])]
-            skeletons.append(s)
-        print(skeletons[0])
-        return [skeletons[3]]
+    def _get_regrasp_skeleton(self):
+        no_regrasp = []
+        no_regrasp += [('move_free', [WILD, '?q0', WILD])]
+        no_regrasp += [('pick', ['?b0', WILD, WILD, '?g0', '?q0', '?q1', WILD])]
+        no_regrasp += [('move_holding', ['?q1', '?q2', '?b0', '?g0', WILD])]
+        no_regrasp += [('place', ['?b0', WILD, WILD, WILD, '?g0', '?q2', WILD, WILD])]
+
+        regrasp = []
+        regrasp += [('move_free', [WILD, '?rq0', WILD])]
+        regrasp += [('pick', ['?rb0', WILD, WILD, '?rg0', '?rq0', '?rq1', WILD])]
+        regrasp += [('move_holding', ['?rq1', '?rq2', '?rb0', '?rg0', WILD])]
+        regrasp += [('place', ['?rb0', WILD, WILD, WILD, '?rg0', '?rq2', '?rq3', WILD])]
+        regrasp += [('move_free', ['?rq3', '?rq4', WILD])]
+        regrasp += [('pick', ['?rb0', WILD, WILD, '?rg1', '?rq4', '?rq5', WILD])]
+        regrasp += [('move_holding', ['?rq5', '?rq6', '?rb0', '?rg1', WILD])]
+        regrasp += [('place', ['?rb0', WILD, WILD, WILD, '?rg1', '?rq6', WILD, WILD])]
+        
+        return [no_regrasp, regrasp]
