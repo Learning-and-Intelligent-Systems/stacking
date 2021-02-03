@@ -129,16 +129,17 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
         # TODO: Reject poses where the camera is upside down to speed up collision checking.
         for _ in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)
-            if (q_approach is None) or not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
-                continue
-            
+            if (q_approach is None): continue
+            if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles): return None
             conf_approach = pb_robot.vobj.BodyConf(robot, q_approach)
+
             q_grasp = robot.arm.ComputeIK(grasp_worldF, seed_q=q_approach)
-            if (q_grasp is None) or not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
-                continue
+            if (q_grasp is None): continue
+            if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles): return None
+                
             q_backoff = robot.arm.ComputeIK(backoff_tform, seed_q=q_grasp)
-            if (q_backoff is None) or not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles):
-                continue
+            if (q_backoff is None): continue
+            if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles): return None
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
             
             path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
