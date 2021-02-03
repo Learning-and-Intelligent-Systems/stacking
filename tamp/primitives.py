@@ -83,7 +83,7 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff_frame='global'):
+def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global'):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
@@ -127,7 +127,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
             return None
 
         # TODO: Reject poses where the camera is upside down to speed up collision checking.
-        for _ in range(num_attempts):
+        for ax in range(num_attempts):
             q_approach = robot.arm.ComputeIK(approach_tform)
             if (q_approach is None): continue
             if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles): return None

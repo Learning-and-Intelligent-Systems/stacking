@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+import pickle
 
 from actions import plan_action
 from agents.panda_agent import PandaAgent
@@ -13,15 +14,26 @@ def main(args):
     NOISE=0.00005
 
     # define real world block params and initial poses
-    block0 = Object('block0', Dimensions(.0381,.0318,.0635), 1.0, Position(0,0,0), Color(1,0,0))
-    block1 = Object('block1', Dimensions(.0381,.0587,.0635), 1.0, Position(0,0,0), Color(0,0,1))
-    block2 = Object('block2', Dimensions(.0635,.0381,.0746), 1.0, Position(0,0,0), Color(0,1,0))
-    blocks = [block0, block1, block2]
+    #TODO: Load blocks from pickle file.
+    if args.use_vision:
+        with open(args.blocks_file, 'rb') as handle:
+            blocks = pickle.load(handle)
+        block_init_xy_poses = None  # These will be initialized randomly but updated by the vision system.
+    else:
+        block0 = Object('block0', Dimensions(.0381,.0318,.0635), 1.0, Position(0,0,0), Color(1,0,0))
+        block1 = Object('block1', Dimensions(.0381,.0587,.0635), 1.0, Position(0,0,0), Color(0,0,1))
+        block2 = Object('block2', Dimensions(.0635,.0381,.0746), 1.0, Position(0,0,0), Color(0,1,0))
+        blocks = [block0, block1, block2]
 
-    block_init_xy_poses = [Pose(Position(0.65,0.3,0), Quaternion(0,0,0,1)),
-                        Pose(Position(0.65,0.15,0), Quaternion(0,0,0,1)),
-                        Pose(Position(0.65,0.0,0), Quaternion(0,0,0,1))]
-    panda = PandaAgent(blocks, NOISE, False, block_init_xy_poses=block_init_xy_poses, teleport=False)
+        block_init_xy_poses = [Pose(Position(0.65,0.3,0), Quaternion(0,0,0,1)),
+                               Pose(Position(0.65,0.15,0), Quaternion(0,0,0,1)),
+                               Pose(Position(0.65,0.0,0), Quaternion(0,0,0,1))]
+
+    panda = PandaAgent(blocks, NOISE, 
+                       use_platform=False, 
+                       block_init_xy_poses=block_init_xy_poses, 
+                       teleport=False,
+                       use_vision=args.use_vision)
 
     # for now hard-code a tower, but in the future will be supplied from
     # active data collection or tower found through planning for evaluation
@@ -43,6 +55,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--real', action='store_true', help='run on real robot')
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
+    parser.add_argument('--blocks-file', type=str, default='earning/domains/towers/initial_block_set.pkl')
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
 

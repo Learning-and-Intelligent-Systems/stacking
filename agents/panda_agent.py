@@ -20,7 +20,7 @@ from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise=0.00005, use_platform=False, block_init_xy_poses=None, teleport=False):
+    def __init__(self, blocks, noise=0.00005, use_platform=False, block_init_xy_poses=None, teleport=False, use_vision=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a
@@ -30,26 +30,22 @@ class PandaAgent:
         :param use_platform: Boolean stating whether to include the platform to
                              push blocks off of or not.
         """
-        # TODO: Check that having this as client 0 is okay when interacting
-        # with everything else.
+        # Setup PyBullet instance to run in the background and handle planning/collision checking.
         self._planning_client_id = pb_robot.utils.connect(use_gui=False)
         self.plan()
         pb_robot.utils.set_default_camera()
-
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
         self.belief_blocks = blocks
-        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = setup_panda_world(self.robot, blocks, block_init_xy_poses, use_platform=use_platform)
+        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = setup_panda_world(self.robot, 
+                                                                                                                        blocks, 
+                                                                                                                        block_init_xy_poses, 
+                                                                                                                        use_platform=use_platform)
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
 
-        self.pddl_info = get_pddlstream_info(self.robot,
-                                             self.fixed,
-                                             self.pddl_blocks,
-                                             add_slanted_grasps=False,
-                                             approach_frame='global')
+        # Setup PyBullet instance that only visualizes plan execution. State needs to match the planning instance.
         poses = [b.get_base_link_pose() for b in self.pddl_blocks]
         poses = [Pose(Position(*p[0]), Quaternion(*p[1])) for p in poses]
-
         self._execution_client_id = pb_robot.utils.connect(use_gui=True)
         self.execute()
         pb_robot.utils.set_default_camera()
@@ -57,11 +53,32 @@ class PandaAgent:
         self.execution_robot.arm.hand.Open()
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
-        self.plan()
+        # Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn)
+        self.pddl_block_lookup = {}
+        for block in blocks:
+            for pddl_block in self.pddl_blocks:
+                if block.name in pddl_block.get_name():
+                    self.pddl_block_lookup[block.name] = pddl_block
+
+        # Set initial poses of all blocks and setup vision ROS services.
+        self.use_vision = use_vision
+        if self.use_vision:
+            import rospy
+            from panda_vision.srv import GetBlockPosesWorld
+            rospy.wait_for_service('get_block_poses_world')
+            self._get_block_poses_world = rospy.ServiceProxy('get_block_poses_world', GetBlockPosesWorld)
+            self._update_block_poses()
+            
+        self.pddl_info = get_pddlstream_info(self.robot,
+                                             self.fixed,
+                                             self.pddl_blocks,
+                                             add_slanted_grasps=False,
+                                             approach_frame='global')
+                                             
         self.noise = noise
         self.teleport = teleport
-
         self.txt_id = None
+        self.plan()
 
     def _add_text(self, txt):
         self.execute()
@@ -97,6 +114,27 @@ class PandaAgent:
         pb_robot.utils.set_client(self._planning_client_id)
         pb_robot.viz.set_client(self._planning_client_id)
 
+    def _update_block_poses(self):
+        """ Use the global world cameras to update the positions of the blocks """
+        try:
+            resp = self._get_block_poses()
+            named_poses = resp.poses
+        except:
+            import sys
+            print('Service call to get block poses failed. Exiting.')
+            sys.exit()
+
+        for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
+            for named_pose in named_poses:
+                if pddl_block_name in named_pose.name:
+                    pose = named_pose.pose.pose
+                    position = (pose.position.x, pose.position.y, pose.position.z)
+                    orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
+                    self.execute()
+                    pddl_block.set_base_link_pose((position, orientation))
+                    self.plan()
+                    pddl_block.set_base_link_pose((position, orientation))
+
     def _get_initial_pddl_state(self):
         """
         Get the PDDL representation of the world between experiments. This
@@ -104,6 +142,9 @@ class PandaAgent:
         up" an experiment by moving blocks away from the platform after an
         experiment.
         """
+        if self.use_vision:
+            self._update_block_poses()
+
         fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
         conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
         init = [('CanMove',),
@@ -264,21 +305,14 @@ class PandaAgent:
         init = self._get_initial_pddl_state()
         goal_terms = []
 
-        # Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn)
-        pddl_block_lookup = {}
-        for block in tower:
-            for pddl_block in self.pddl_blocks:
-                if block.name in pddl_block.get_name():
-                    pddl_block_lookup[block] = pddl_block
-
         stable = 1.
         
         # TODO: Set base block to be rotated in its current position.
-        base_block = pddl_block_lookup[tower[0]]
+        base_block = self.pddl_block_lookup[tower[0].name]
         base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
         base_pose = (base_pos, tower[0].rotation)
 
-        base_pose = pb_robot.vobj.BodyPose(pddl_block, base_pose)
+        base_pose = pb_robot.vobj.BodyPose(base_block, base_pose)
         init += [('Pose', base_block, base_pose),
                  ('Supported', base_block, base_pose, self.table, self.table_pose)]
         goal_terms.append(('AtPose', base_block, base_pose))
@@ -308,8 +342,8 @@ class PandaAgent:
             top_tform = pb_robot.geometry.tform_from_pose(top_pose)
 
             rel_tform = numpy.linalg.inv(bottom_tform)@top_tform
-            top_pddl = pddl_block_lookup[top_block]
-            bottom_pddl = pddl_block_lookup[bottom_block]
+            top_pddl = self.pddl_block_lookup[top_block.name]
+            bottom_pddl = self.pddl_block_lookup[bottom_block.name]
 
             if not solve_joint:
                 init = self._get_initial_pddl_state()
