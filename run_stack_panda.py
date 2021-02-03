@@ -29,18 +29,23 @@ def main(args):
                                Pose(Position(0.65,0.15,0), Quaternion(0,0,0,1)),
                                Pose(Position(0.65,0.0,0), Quaternion(0,0,0,1))]
 
-    panda = PandaAgent(blocks, NOISE, 
-                       use_platform=False, 
-                       block_init_xy_poses=block_init_xy_poses, 
+    panda = PandaAgent(blocks, NOISE,
+                       use_platform=False,
+                       block_init_xy_poses=block_init_xy_poses,
                        teleport=False,
                        use_vision=args.use_vision)
 
     # for now hard-code a tower, but in the future will be supplied from
     # active data collection or tower found through planning for evaluation
     tower_blocks = copy.copy(blocks)
-    tower_poses = [Pose(Position(0.3,0.25,.0318), Quaternion(0,0,0,1)),
-                    Pose(Position(0.3,0.25,.0953), Quaternion(0,0,0,1)),
-                    Pose(Position(0.3,0.25,.1643), Quaternion(0,0,0,1))]
+    if args.use_vision:
+        tower_poses = [Pose(Position(0.5,-0.25,0.0725), Quaternion(0,0,0,1)),
+                        Pose(Position(0.5,-0.25,0.18), Quaternion(0,0,0,1)),
+                        Pose(Position(0.5,-0.25,0.28), Quaternion(0,0,0,1))]
+    else:
+        tower_poses = [Pose(Position(0.3,0.25,.0318), Quaternion(0,0,0,1)),
+                        Pose(Position(0.3,0.25,.0953), Quaternion(0,0,0,1)),
+                        Pose(Position(0.3,0.25,.1643), Quaternion(0,0,0,1))]
 
     tower = []
     for block, pose in zip(tower_blocks, tower_poses):
@@ -49,14 +54,14 @@ def main(args):
         tower.append(block)
 
     # and execute the resulting plan.
-    panda.simulate_tower(tower, base_xy=(0.3, 0.25), real=args.real, vis=True, T=2500)
+    panda.simulate_tower(tower, base_xy=(0.5, -0.25), real=args.real, vis=True, T=2500)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--real', action='store_true', help='run on real robot')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
-    parser.add_argument('--blocks-file', type=str, default='earning/domains/towers/initial_block_set.pkl')
+    parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/initial_block_set.pkl')
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
 

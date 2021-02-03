@@ -37,9 +37,9 @@ class PandaAgent:
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
         self.belief_blocks = blocks
-        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = setup_panda_world(self.robot, 
-                                                                                                                        blocks, 
-                                                                                                                        block_init_xy_poses, 
+        self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = setup_panda_world(self.robot,
+                                                                                                                        blocks,
+                                                                                                                        block_init_xy_poses,
                                                                                                                         use_platform=use_platform)
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
 
@@ -68,13 +68,13 @@ class PandaAgent:
             rospy.wait_for_service('get_block_poses_world')
             self._get_block_poses_world = rospy.ServiceProxy('get_block_poses_world', GetBlockPosesWorld)
             self._update_block_poses()
-            
+
         self.pddl_info = get_pddlstream_info(self.robot,
                                              self.fixed,
                                              self.pddl_blocks,
                                              add_slanted_grasps=False,
                                              approach_frame='global')
-                                             
+
         self.noise = noise
         self.teleport = teleport
         self.txt_id = None
@@ -117,7 +117,7 @@ class PandaAgent:
     def _update_block_poses(self):
         """ Use the global world cameras to update the positions of the blocks """
         try:
-            resp = self._get_block_poses()
+            resp = self._get_block_poses_world()
             named_poses = resp.poses
         except:
             import sys
@@ -126,14 +126,19 @@ class PandaAgent:
 
         for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
             for named_pose in named_poses:
-                if pddl_block_name in named_pose.name:
+                print(pddl_block_name, named_pose.block_id)
+                if named_pose.block_id in pddl_block_name:
                     pose = named_pose.pose.pose
                     position = (pose.position.x, pose.position.y, pose.position.z)
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
                     self.execute()
                     pddl_block.set_base_link_pose((position, orientation))
+                    stable_z = pb_robot.placements.stable_z(pddl_block, self.table)
+                    position = (pose.position.x, pose.position.y, stable_z)
+                    pddl_block.set_base_link_pose((position, orientation))
                     self.plan()
                     pddl_block.set_base_link_pose((position, orientation))
+                    
 
     def _get_initial_pddl_state(self):
         """
@@ -142,9 +147,6 @@ class PandaAgent:
         up" an experiment by moving blocks away from the platform after an
         experiment.
         """
-        if self.use_vision:
-            self._update_block_poses()
-
         fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
         conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
         init = [('CanMove',),
@@ -298,6 +300,8 @@ class PandaAgent:
             print('Dims:', block.dimensions)
             print('CoM:', block.com)
             print('-----')
+        if self.use_vision:
+            self._update_block_poses()
 
         moved_blocks = set()
         original_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
@@ -306,7 +310,7 @@ class PandaAgent:
         goal_terms = []
 
         stable = 1.
-        
+
         # TODO: Set base block to be rotated in its current position.
         base_block = self.pddl_block_lookup[tower[0].name]
         base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
@@ -385,8 +389,8 @@ class PandaAgent:
 
         if not real:
             self.step_simulation(T, vis_frames=False)
-        else:
-            print('Need to reload block positions here.')
+        if self.use_vision:
+            self._update_block_poses()
 
         # Reset Environment. Need to handle conditions where the blocks are still a stable tower.
         # As a heuristic for which block to reset first, do it in order of their z-values.
@@ -415,7 +419,7 @@ class PandaAgent:
 
             goal = tuple(['and'] + goal_terms)
             self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-            
+
         return stable
 
     def step_simulation(self, T, vis_frames=False):
@@ -485,7 +489,7 @@ class PandaAgent:
                                 max_time=max_time)
         duration = time.time() - start
         print('Planning Complete: Time %f seconds' % duration)
-        # TODO: Try planner= argument https://github.com/caelan/pddlstream/blob/stable/pddlstream/algorithms/downward.py 
+        # TODO: Try planner= argument https://github.com/caelan/pddlstream/blob/stable/pddlstream/algorithms/downward.py
 
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
@@ -517,5 +521,5 @@ class PandaAgent:
         regrasp += [('pick', ['?rb0', WILD, WILD, '?rg1', '?rq4', '?rq5', WILD])]
         regrasp += [('move_holding', ['?rq5', '?rq6', '?rb0', '?rg1', WILD])]
         regrasp += [('place', ['?rb0', WILD, WILD, WILD, '?rg1', '?rq6', WILD, WILD])]
-        
+
         return [no_regrasp, regrasp]
