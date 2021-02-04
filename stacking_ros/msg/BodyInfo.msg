@@ -1,4 +1,4 @@
-# Block Information ROS Message
+# Body Information ROS Message
 
 string name
 float64 mass
