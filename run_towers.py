@@ -17,7 +17,9 @@ def main(args):
 
     # get a bunch of random blocks
     blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
-    agent = PandaAgent(blocks, NOISE, use_platform=False, teleport=False)
+    agent = PandaAgent(blocks, NOISE, 
+        use_platform=False, teleport=False, 
+        use_action_server=args.use_action_server)
 
     for tx in range(0, 10):
         # Build a random tower out of 5 blocks.
@@ -40,6 +42,7 @@ if __name__ == '__main__':
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--num-blocks', type=int, default=4)
     parser.add_argument('--save-tower', action='store_true')
+    parser.add_argument('--use-action-server', action='store_true')
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
 

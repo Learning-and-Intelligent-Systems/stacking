@@ -207,3 +207,18 @@ def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_fram
     }
 
     return domain_pddl, constant_map, stream_pddl, stream_map
+
+def get_pddl_block_lookup(blocks, pddl_blocks):
+    """ Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn) """
+    pddl_block_lookup = {}
+    for block in blocks:
+        for pddl_block in pddl_blocks:
+            if block.name in pddl_block.get_name():
+                pddl_block_lookup[block.name] = pddl_block
+    return pddl_block_lookup
+
+
+def pose_to_ros(body_pose, msg):
+    """ Passes BodyPose object data to ROS message """
+    msg.position.x, msg.position.y, msg.position.z = body_pose.pose[0]
+    msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w = body_pose.pose[1]

@@ -16,11 +16,12 @@ from pddlstream.algorithms.focused import solve_focused
 from pddlstream.language.stream import StreamInfo
 from pddlstream.utils import INF
 from pybullet_utils import transformation
-from tamp.misc import setup_panda_world, get_pddlstream_info, ExecuteActions
+from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
+                      get_pddlstream_info, pose_to_ros, ExecuteActions
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise=0.00005, use_platform=False, block_init_xy_poses=None, teleport=False, use_vision=False):
+    def __init__(self, blocks, noise=0.00005, use_platform=False, block_init_xy_poses=None, teleport=False, use_vision=False, use_action_server=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a
@@ -29,6 +30,12 @@ class PandaAgent:
                          blocks around this world.
         :param use_platform: Boolean stating whether to include the platform to
                              push blocks off of or not.
+        :param use_vision: Boolean stating whether to use vision to detect blocks.
+        :param use_action_server: Boolean stating whether to use the separate
+                                  ROS action server to do planning.
+
+        If you are using the ROS action server, you must start it in a separate terminal:
+            rosrun stacking_ros planning_server.py
         """
         # Setup PyBullet instance to run in the background and handle planning/collision checking.
         self._planning_client_id = pb_robot.utils.connect(use_gui=False)
@@ -42,6 +49,7 @@ class PandaAgent:
                                                                                                                         block_init_xy_poses,
                                                                                                                         use_platform=use_platform)
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
+        self.pddl_block_lookup = get_pddl_block_lookup(blocks, self.pddl_blocks)
 
         # Setup PyBullet instance that only visualizes plan execution. State needs to match the planning instance.
         poses = [b.get_base_link_pose() for b in self.pddl_blocks]
@@ -53,22 +61,32 @@ class PandaAgent:
         self.execution_robot.arm.hand.Open()
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
-        # Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn)
-        self.pddl_block_lookup = {}
-        for block in blocks:
-            for pddl_block in self.pddl_blocks:
-                if block.name in pddl_block.get_name():
-                    self.pddl_block_lookup[block.name] = pddl_block
+        # Set up ROS plumbing if using features that require it
+        self.use_vision = use_vision
+        self.use_action_server = use_action_server
+        if self.use_vision or self.use_action_server:
+            import rospy
+            rospy.init_node("panda_agent")
 
         # Set initial poses of all blocks and setup vision ROS services.
-        self.use_vision = use_vision
         if self.use_vision:
-            import rospy
             from panda_vision.srv import GetBlockPosesWorld
             rospy.wait_for_service('get_block_poses_world')
             self._get_block_poses_world = rospy.ServiceProxy('get_block_poses_world', GetBlockPosesWorld)
             self._update_block_poses()
 
+        # Start ROS action client
+        if self.use_action_server:
+            import actionlib
+            from stacking_ros.msg import TaskPlanAction
+            self.planning_client = actionlib.SimpleActionClient(
+                "/get_plan", TaskPlanAction)
+            print("Waiting for planning action server...")
+            self.planning_client.wait_for_server()
+            print("Done!")
+        else:
+            self.planning_client = None
+        
         self.pddl_info = get_pddlstream_info(self.robot,
                                              self.fixed,
                                              self.pddl_blocks,
@@ -322,15 +340,20 @@ class PandaAgent:
         goal_terms.append(('AtPose', base_block, base_pose))
         goal_terms.append(('On', base_block, self.table))
 
+        fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != base_block]
         self.pddl_info = get_pddlstream_info(self.robot,
-                                             self.fixed + [b for b in self.pddl_blocks if b != base_block],
+                                             fixed_objs,
                                              self.pddl_blocks,
                                              add_slanted_grasps=False,
                                              approach_frame='global')
         if not solve_joint:
             if not self.teleport:
                 goal = tuple(['and'] + goal_terms)
-                self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+                if not self.use_action_server:
+                    self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+                else:
+                    self.execute()
+                    self._request_plan_from_server(init, goal, fixed_objs)
             else:
                 self.teleport_block(base_block, base_pose.pose)
         moved_blocks.add(base_block)
@@ -503,6 +526,58 @@ class PandaAgent:
             self.plan()
             ExecuteActions(plan, real=False, pause=False, wait=False)
             return True
+
+
+    def _request_plan_from_server(self, init, goal, fixed_objs, real=False):
+        print('Requesting block placement plan from server...')
+        # Package up the ROS action goal
+        from stacking_ros.msg import TaskPlanGoal, GoalInfo, BodyInfo
+        ros_goal = TaskPlanGoal()
+        print(init)
+        print(goal)
+        for elem in goal:
+            if isinstance(elem, tuple):
+                info = GoalInfo()
+                info.type = elem[0]
+                if info.type == "AtPose":    # e.g. ("AtPose", block1, pose)
+                    info.target_obj = elem[1].readableName
+                    pose_to_ros(elem[2], info.pose)
+                elif info.type == "On":      # e.g. ("On", block1, block3)
+                    info.target_obj = elem[1].readableName
+                    info.base_obj = elem[2].readableName
+                ros_goal.goal.append(info)
+        init_dict = {}
+        for elem in init:
+            name = elem[0]                
+            # Robot configuration e.g. ("Conf", conf)
+            if name == "Conf":
+                ros_goal.robot_config = elem[1].configuration
+            # Block pose information
+            # Consists of sequence of: Graspable, Pose, AtPose, Block, On, Supported
+            elif name in ["AtPose", "On"]:
+                obj_name = elem[1].readableName
+                if "block" in obj_name:
+                    if name == "AtPose":
+                        init_dict[obj_name] = {"pose": elem[2]}
+                    elif name == "On":
+                        init_dict[obj_name]["base_obj"] = elem[2].readableName
+        for blk_name in init_dict:
+            info = BodyInfo()
+            info.name = blk_name
+            pose_to_ros(init_dict[blk_name]["pose"], info.pose)
+            for fobj in fixed_objs:
+                if fobj is not None and blk_name == fobj.readableName:
+                    info.fixed = True
+            ros_goal.blocks.append(info)
+
+        # Call the planning action server
+        self.planning_client.send_goal(ros_goal)
+        self.planning_client.wait_for_result() # TODO: Blocking for now
+        result = self.planning_client.get_result()
+        print(result)
+
+        abcde # TODO: Want to error here for now while developing
+
 
     # TODO: Try this again.
     def _get_regrasp_skeleton(self):

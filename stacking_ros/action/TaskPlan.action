@@ -1,0 +1,13 @@
+# Task Planning ROS Action
+
+# Goal definition
+float64[] robot_config
+BodyInfo[] blocks
+GoalInfo[] goal
+---
+# Result definition
+bool success
+TaskAction[] plan
+---
+# Feedback
+bool processing
