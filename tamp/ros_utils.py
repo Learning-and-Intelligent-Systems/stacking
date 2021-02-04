@@ -4,7 +4,8 @@ Utilities for ROS serialization and deserialization of task planning entities
 
 import pb_robot
 from stacking_ros.msg import (
-    RobotConfig, TaskAction, TaskPlanResult, TrajInfo)
+    BodyInfo, GoalInfo, RobotConfig, TaskAction, 
+    TaskPlanGoal, TaskPlanResult, TrajInfo)
 from tf.transformations import (
     quaternion_matrix, quaternion_from_matrix, translation_from_matrix)
 
@@ -12,6 +13,53 @@ from tf.transformations import (
 ############
 # X to ROS #
 ############
+def goal_to_ros(init, goal, fixed_objs):
+    """ Convert PDDLStream planning initial conditions and goal specifications to a ROS Action Goal """
+    ros_goal = TaskPlanGoal()
+    # print(init)
+    # print(goal)
+
+    # Convert the PDDL Goal specification
+    for elem in goal:
+        if isinstance(elem, tuple):
+            info = GoalInfo()
+            info.type = elem[0]
+            if info.type == "AtPose":    # e.g. ("AtPose", block1, pose)
+                info.target_obj = elem[1].readableName
+                pose_to_ros(elem[2], info.pose)
+            elif info.type == "On":      # e.g. ("On", block1, block3)
+                info.target_obj = elem[1].readableName
+                info.base_obj = elem[2].readableName
+            ros_goal.goal.append(info)
+    
+    # Convert the PDDL initial conditions (+ fixed objects)
+    init_dict = {}
+    for elem in init:
+        name = elem[0]                
+        # Robot configuration e.g. ("Conf", conf)
+        if name == "Conf":
+            ros_goal.robot_config.angles = elem[1].configuration
+        # Block pose information
+        # Consists of sequence of: Graspable, Pose, AtPose, Block, On, Supported
+        elif name in ["AtPose", "On"]:
+            obj_name = elem[1].readableName
+            if "block" in obj_name:
+                if name == "AtPose":
+                    init_dict[obj_name] = {"pose": elem[2]}
+                elif name == "On":
+                    init_dict[obj_name]["base_obj"] = elem[2].readableName
+    for blk_name in init_dict:
+        info = BodyInfo()
+        info.name = blk_name
+        pose_to_ros(init_dict[blk_name]["pose"], info.pose)
+        for fobj in fixed_objs:
+            if fobj is not None and blk_name == fobj.readableName:
+                info.fixed = True
+        ros_goal.blocks.append(info)
+        
+    return ros_goal
+
+
 def pose_to_ros(body_pose, msg):
     """ Passes BodyPose object data to ROS message """
     msg.position.x, msg.position.y, msg.position.z = body_pose.pose[0]
