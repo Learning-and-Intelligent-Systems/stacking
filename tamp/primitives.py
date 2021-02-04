@@ -10,7 +10,7 @@ from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
 
-DEBUG_FAILURE = False 
+DEBUG_FAILURE = False
 
 def get_grasp_gen(robot, add_slanted_grasps):
     # I opt to use TSR to define grasp sets but you could replace this
@@ -20,7 +20,7 @@ def get_grasp_gen(robot, add_slanted_grasps):
         grasp_tsr = pb_robot.tsrs.panda_box.grasp(body, add_slanted_grasps=add_slanted_grasps)
         grasps = []
         # Only use a top grasp (2, 4) and side grasps (7).
-        for top_grasp_ix in range(len(grasp_tsr)):#[2, 4, 7, 6, 0, 1]: 
+        for top_grasp_ix in range(len(grasp_tsr)):#[2, 4, 7, 6, 0, 1]:
             sampled_tsr = grasp_tsr[top_grasp_ix]
             grasp_worldF = sampled_tsr.sample()
 
@@ -29,7 +29,7 @@ def get_grasp_gen(robot, add_slanted_grasps):
             grasps.append((body_grasp,))
             # yield (body_grasp,)
         return grasps
-        
+
     return gen
 
 
@@ -43,7 +43,7 @@ def get_stable_gen_table(fixed=[]):
         # if they are upright.
         dims = body.get_dimensions()
 
-        rotations = all_rotations()[8:]
+        rotations = all_rotations()#[8:]
         poses = []
         # These are the pre-chosen regrap locations.
         for x, y in [(-0.3, 0.3), (-0.3, -0.3), (0, 0.4)]:
@@ -83,7 +83,7 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global'):
+def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
@@ -104,7 +104,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
 
         if False:
             length, lifeTime = 0.2, 0.0
-            
+
             pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
             new_x = transformation([length, 0.0, 0.0], pos, quat)
             new_y = transformation([0.0, length, 0.0], pos, quat)
@@ -136,19 +136,19 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
             q_grasp = robot.arm.ComputeIK(grasp_worldF, seed_q=q_approach)
             if (q_grasp is None): continue
             if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles): return None
-                
+
             q_backoff = robot.arm.ComputeIK(backoff_tform, seed_q=q_grasp)
             if (q_backoff is None): continue
             if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles): return None
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
-            
+
             path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
             path_backoff = robot.arm.snap.PlanToConfiguration(robot.arm, q_grasp, q_backoff, obstacles=obstacles)
             if path_approach is None or path_backoff is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
 
-            command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp),
+            command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp, grasp, body, use_wrist_camera),
                        grasp,
                        pb_robot.vobj.MoveFromTouch(robot.arm, q_backoff)]
             return (conf_approach, conf_backoff, command)
@@ -176,7 +176,7 @@ def get_free_motion_gen(robot, fixed=[]):
         for o in fixed:
             if o.get_name() not in fluent_names:
                 obstacles.append(o)
-                
+
         path = robot.arm.birrt.PlanToConfiguration(robot.arm, conf1.configuration, conf2.configuration, obstacles=obstacles)
 
         if path is None:
