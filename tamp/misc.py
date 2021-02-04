@@ -77,23 +77,6 @@ def ExecuteActions(plan, real=False, pause=True, wait=True):
                 e.execute(realRobot=arm)
                 input("Next?")
 
-def ComputePrePose(og_pose, directionVector, approach_frame, relation=None):
-    backup = numpy.eye(4)
-    backup[0:3, 3] = directionVector
-
-    if approach_frame == 'gripper':
-        # This computes the relative pose (directionVector is in the gripper frame, -z it outwards)
-        prepose = numpy.dot(og_pose, backup)
-    elif approach_frame == 'global':
-        # This interprets the directionVector as being in the global z direction.
-        prepose = numpy.dot(backup, og_pose)
-    else:
-        raise NotImplementedError()
-
-    if relation is not None:
-        prepose = numpy.dot(prepose, relation)
-    return prepose
-
 def create_pb_robot_urdf(obj, fname):
     full_urdf_folder = 'pb_robot/tmp_urdfs'
     pb_urdf_folder = 'tmp_urdfs'
