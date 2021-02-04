@@ -33,7 +33,9 @@ add_message_files(
   FILES
   BodyInfo.msg
   GoalInfo.msg
+  RobotConfig.msg
   TaskAction.msg
+  TrajInfo.msg
 )
 
 ## Generate services in the 'srv' folder

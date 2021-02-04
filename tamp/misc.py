@@ -200,7 +200,7 @@ def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_fram
         'sample-pose-table': from_list_fn(primitives.get_stable_gen_table(fixed)),
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
         'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot, add_slanted_grasps)),
-        'pick-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='gripper', backoff_frame='global', use_wrist_camera=True)),
+        'pick-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False)),
         'place-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='global', backoff_frame='global', use_wrist_camera=False)),
         'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
         'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
@@ -216,9 +216,3 @@ def get_pddl_block_lookup(blocks, pddl_blocks):
             if block.name in pddl_block.get_name():
                 pddl_block_lookup[block.name] = pddl_block
     return pddl_block_lookup
-
-
-def pose_to_ros(body_pose, msg):
-    """ Passes BodyPose object data to ROS message """
-    msg.position.x, msg.position.y, msg.position.z = body_pose.pose[0]
-    msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w = body_pose.pose[1]

@@ -17,7 +17,8 @@ from pddlstream.language.stream import StreamInfo
 from pddlstream.utils import INF
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
-                      get_pddlstream_info, pose_to_ros, ExecuteActions
+                      get_pddlstream_info, ExecuteActions
+from tamp.ros_utils import pose_to_ros, ros_to_task_plan
 
 
 class PandaAgent:
@@ -37,6 +38,9 @@ class PandaAgent:
         If you are using the ROS action server, you must start it in a separate terminal:
             rosrun stacking_ros planning_server.py
         """
+        self.use_vision = use_vision
+        self.use_action_server = use_action_server
+
         # Setup PyBullet instance to run in the background and handle planning/collision checking.
         self._planning_client_id = pb_robot.utils.connect(use_gui=False)
         self.plan()
@@ -62,8 +66,6 @@ class PandaAgent:
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
         # Set up ROS plumbing if using features that require it
-        self.use_vision = use_vision
-        self.use_action_server = use_action_server
         if self.use_vision or self.use_action_server:
             import rospy
             rospy.init_node("panda_agent")
@@ -119,6 +121,8 @@ class PandaAgent:
         pb_robot.viz.set_client(self._execution_client_id)
 
     def plan(self):
+        if self.use_action_server:
+            return
         self.state = 'plan'
         pb_robot.aabb.set_client(self._planning_client_id)
         pb_robot.body.set_client(self._planning_client_id)
@@ -154,8 +158,9 @@ class PandaAgent:
                     stable_z = pb_robot.placements.stable_z(pddl_block, self.table)
                     position = (pose.position.x, pose.position.y, stable_z)
                     pddl_block.set_base_link_pose((position, orientation))
-                    self.plan()
-                    pddl_block.set_base_link_pose((position, orientation))
+                    if not self.use_action_server:
+                        self.plan()
+                        pddl_block.set_base_link_pose((position, orientation))
                     
 
     def _get_initial_pddl_state(self):
@@ -352,8 +357,15 @@ class PandaAgent:
                 if not self.use_action_server:
                     self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
                 else:
+                    has_plan = False
+                    while not has_plan:
+                        plan = self._request_plan_from_server(init, goal, fixed_objs)
+                        if len(plan) > 0:
+                            has_plan = True
+                        else:
+                            time.sleep(1)
                     self.execute()
-                    self._request_plan_from_server(init, goal, fixed_objs)
+                    ExecuteActions(plan, real=real, pause=True, wait=False)
             else:
                 self.teleport_block(base_block, base_pose.pose)
         moved_blocks.add(base_block)
@@ -551,7 +563,7 @@ class PandaAgent:
             name = elem[0]                
             # Robot configuration e.g. ("Conf", conf)
             if name == "Conf":
-                ros_goal.robot_config = elem[1].configuration
+                ros_goal.robot_config.angles = elem[1].configuration
             # Block pose information
             # Consists of sequence of: Graspable, Pose, AtPose, Block, On, Supported
             elif name in ["AtPose", "On"]:
@@ -576,7 +588,9 @@ class PandaAgent:
         result = self.planning_client.get_result()
         print(result)
 
-        abcde # TODO: Want to error here for now while developing
+        # Unpack the ROS message
+        plan = ros_to_task_plan(result, self.execution_robot, self.pddl_block_lookup)
+        return plan
 
 
     # TODO: Try this again.

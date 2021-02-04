@@ -8,8 +8,9 @@ import rospy
 import actionlib
 import pb_robot
 import numpy as np
-from stacking_ros.msg import TaskPlanAction, TaskPlanResult
-from tamp.misc import setup_panda_world, get_pddl_block_lookup, get_pddlstream_info
+from stacking_ros.msg import TaskPlanAction, TaskPlanResult, TaskAction
+from tamp.misc import get_pddl_block_lookup, get_pddlstream_info, setup_panda_world
+from tamp.ros_utils import task_plan_to_ros
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.utils import INF
 
@@ -109,7 +110,7 @@ class PlanningServer():
                 fixed_objs.append(blk)
 
         # Unpack initial robot configuration
-        conf = pb_robot.vobj.BodyConf(self.robot, ros_goal.robot_config)
+        conf = pb_robot.vobj.BodyConf(self.robot, ros_goal.robot_config.angles)
 
         # Create the initial PDDL state
         pddl_init = self.get_initial_pddl_state(conf=conf)
@@ -144,13 +145,9 @@ class PlanningServer():
         return pddl_init, tuple(pddl_goal), fixed_objs
 
 
-    def pack_result(self, plan, result):
-        """ Packs task plan information into a TaskPlanResult ROS message """
-        #TODO
-        return
-
 
     def find_plan(self, ros_goal):
+        """ Main PDDLStream planning function """
         print("Planning...")
         self.plan()
         self.robot.arm.hand.Open()
@@ -181,10 +178,8 @@ class PlanningServer():
         print(f"\nFINAL PLAN\n{plan}\n")
 
         # Package and return the result
-        result = TaskPlanResult()
-        result.success = (plan is not None)
-        if result.success:
-            self.pack_result(plan, result)
+        result = task_plan_to_ros(plan)
+        print(result)
         self.planning_service.set_succeeded(result, text="Planning complete")
 
 
