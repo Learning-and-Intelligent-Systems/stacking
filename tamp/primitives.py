@@ -125,6 +125,11 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
         t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
         if numpy.abs(t_point[2] + 1.) < 0.001:
             return None
+        # The z-axis of the gripper should not be facing up (never a good grasp).
+        point = numpy.array([[0, 0, 1]]).T
+        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
+        if numpy.abs(t_point[2] - 1.) < 0.001:
+            return None
 
         # TODO: Reject poses where the camera is upside down to speed up collision checking.
         for ax in range(num_attempts):
