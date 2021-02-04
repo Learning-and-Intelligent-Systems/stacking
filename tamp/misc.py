@@ -191,6 +191,7 @@ def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_fram
 
     return domain_pddl, constant_map, stream_pddl, stream_map
 
+
 def get_pddl_block_lookup(blocks, pddl_blocks):
     """ Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn) """
     pddl_block_lookup = {}

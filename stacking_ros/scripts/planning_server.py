@@ -23,6 +23,7 @@ class PlanningServer():
         self.plan()
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
+        self.saved_world = pb_robot.utils.WorldSaver()
 
         # Initialize the world
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = \
@@ -153,7 +154,6 @@ class PlanningServer():
         self.robot.arm.hand.Open()
 
         init, goal, fixed_objs = self.unpack_goal(ros_goal)
-        saved_world = pb_robot.utils.WorldSaver()
         print(f"\nINITIAL CONDITIONS\n{init}\n")
         print(f"\nGOAL SPECIFICATION\n{goal}\n")
 
@@ -173,7 +173,7 @@ class PlanningServer():
                                 search_sample_ratio=1.,
                                 max_time=INF)
         duration = time.time() - start
-        saved_world.restore()
+        self.saved_world.restore()
         print('Planning Complete: Time %f seconds' % duration)
         print(f"\nFINAL PLAN\n{plan}\n")
 
@@ -181,7 +181,6 @@ class PlanningServer():
         result = task_plan_to_ros(plan)
         print(result)
         self.planning_service.set_succeeded(result, text="Planning complete")
-
 
 
 if __name__=="__main__":

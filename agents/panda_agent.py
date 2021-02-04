@@ -18,7 +18,6 @@ from pddlstream.utils import INF
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
                       get_pddlstream_info, ExecuteActions
-from tamp.ros_utils import pose_to_ros, ros_to_task_plan
 
 
 class PandaAgent:
@@ -80,7 +79,14 @@ class PandaAgent:
         # Start ROS action client
         if self.use_action_server:
             import actionlib
-            from stacking_ros.msg import TaskPlanAction
+            from stacking_ros.msg import (
+                TaskPlanAction, TaskPlanGoal, GoalInfo, BodyInfo)
+            self.TaskPlanGoal = TaskPlanGoal
+            self.GoalInfo = GoalInfo
+            self.BodyInfo = BodyInfo
+            from tamp.ros_utils import pose_to_ros, ros_to_task_plan
+            self.pose_to_ros = pose_to_ros
+            self.ros_to_task_plan = ros_to_task_plan
             self.planning_client = actionlib.SimpleActionClient(
                 "/get_plan", TaskPlanAction)
             print("Waiting for planning action server...")
@@ -543,17 +549,16 @@ class PandaAgent:
     def _request_plan_from_server(self, init, goal, fixed_objs, real=False):
         print('Requesting block placement plan from server...')
         # Package up the ROS action goal
-        from stacking_ros.msg import TaskPlanGoal, GoalInfo, BodyInfo
-        ros_goal = TaskPlanGoal()
+        ros_goal = self.TaskPlanGoal()
         print(init)
         print(goal)
         for elem in goal:
             if isinstance(elem, tuple):
-                info = GoalInfo()
+                info = self.GoalInfo()
                 info.type = elem[0]
                 if info.type == "AtPose":    # e.g. ("AtPose", block1, pose)
                     info.target_obj = elem[1].readableName
-                    pose_to_ros(elem[2], info.pose)
+                    self.pose_to_ros(elem[2], info.pose)
                 elif info.type == "On":      # e.g. ("On", block1, block3)
                     info.target_obj = elem[1].readableName
                     info.base_obj = elem[2].readableName
@@ -574,9 +579,9 @@ class PandaAgent:
                     elif name == "On":
                         init_dict[obj_name]["base_obj"] = elem[2].readableName
         for blk_name in init_dict:
-            info = BodyInfo()
+            info = self.BodyInfo()
             info.name = blk_name
-            pose_to_ros(init_dict[blk_name]["pose"], info.pose)
+            self.pose_to_ros(init_dict[blk_name]["pose"], info.pose)
             for fobj in fixed_objs:
                 if fobj is not None and blk_name == fobj.readableName:
                     info.fixed = True
@@ -589,7 +594,7 @@ class PandaAgent:
         print(result)
 
         # Unpack the ROS message
-        plan = ros_to_task_plan(result, self.execution_robot, self.pddl_block_lookup)
+        plan = self.ros_to_task_plan(result, self.execution_robot, self.pddl_block_lookup)
         return plan
 
 

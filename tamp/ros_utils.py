@@ -171,6 +171,9 @@ def ros_to_task_plan(msg, robot, pddl_block_lookup):
         elif name == "place":
             args = (0,0,0,0,0,0,0,
                 ros_to_traj(ros_act, robot, pddl_block_lookup))
+        # TODO: Note we are padding the action tuples with zeros since executing
+        # each action only really requires the final argument. In future, we 
+        # should be more thorough about passing back *all* the information.
 
         act = (name, args)
         plan.append(act)
