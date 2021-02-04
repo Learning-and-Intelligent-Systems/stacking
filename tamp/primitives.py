@@ -3,7 +3,7 @@ import random
 import pybullet as p
 
 import pb_robot
-import tamp.misc as misc
+from pb_robot.tsrs.panda_box import ComputePrePose
 
 from block_utils import rotation_group, ZERO_POS, all_rotations
 from pybullet_utils import transformation
@@ -89,16 +89,16 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
         if approach_frame == 'gripper':
-            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
+            approach_tform = ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
         elif approach_frame == 'global':
-            approach_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.125], approach_frame) # Was -0.125
+            approach_tform = ComputePrePose(grasp_worldF, [0, 0, 0.125], approach_frame) # Was -0.125
         else:
             raise NotImplementedError()
 
         if backoff_frame == 'gripper':
-            backoff_tform = misc.ComputePrePose(grasp_worldF, [0, 0, -0.125], backoff_frame)
+            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, -0.125], backoff_frame)
         elif backoff_frame == 'global':
-            backoff_tform = misc.ComputePrePose(grasp_worldF, [0, 0, 0.125], backoff_frame) # Was -0.125
+            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, 0.125], backoff_frame) # Was -0.125
         else:
             raise NotImplementedError()
 
