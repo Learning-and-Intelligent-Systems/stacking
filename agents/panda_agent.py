@@ -17,7 +17,7 @@ from pddlstream.language.stream import StreamInfo
 from pddlstream.utils import INF
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
-                      get_pddlstream_info, ExecuteActions
+                      get_pddlstream_info, print_planning_problem, ExecuteActions
 
 
 class PandaAgent:
@@ -359,14 +359,15 @@ class PandaAgent:
                 if not self.use_action_server:
                     self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
                 else:
+                    self.execute()
                     has_plan = False
                     while not has_plan:
-                        plan = self._request_plan_from_server(init, goal, fixed_objs)
+                        plan = self._request_plan_from_server(
+                            init, goal, fixed_objs, reset=True)
                         if len(plan) > 0:
                             has_plan = True
                         else:
                             time.sleep(1)
-                    self.execute()
                     ExecuteActions(plan, real=real, pause=True, wait=False)
             else:
                 self.teleport_block(base_block, base_pose.pose)
@@ -390,8 +391,9 @@ class PandaAgent:
                 init = self._get_initial_pddl_state()
                 goal_terms = []
 
+            fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != top_pddl]
             self.pddl_info = get_pddlstream_info(self.robot,
-                                                 self.fixed + [b for b in self.pddl_blocks if b != top_pddl],
+                                                 fixed_objs,
                                                  self.pddl_blocks,
                                                  add_slanted_grasps=False,
                                                  approach_frame='global')
@@ -402,7 +404,19 @@ class PandaAgent:
             if not solve_joint:
                 if not self.teleport:
                     goal = tuple(['and'] + goal_terms)
-                    self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+                    if not self.use_action_server:
+                        self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+                    else:
+                        has_plan = False
+                        while not has_plan:
+                            self.execute()
+                            plan = self._request_plan_from_server(
+                                init, goal, fixed_objs, reset=False)
+                            if len(plan) > 0:
+                                has_plan = True
+                            else:
+                                time.sleep(1)
+                        ExecuteActions(plan, real=real, pause=True, wait=False)
                 else:
                     get_pose = tamp.primitives.get_stable_gen_block()
                     pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -422,8 +436,19 @@ class PandaAgent:
 
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-
+            if not self.use_action_server:
+                self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+            else:
+                self.execute()
+                has_plan = False
+                while not has_plan:
+                    plan = self._request_plan_from_server(
+                        init, goal, fixed_objs, reset=True)
+                    if len(plan) > 0:
+                        has_plan = True
+                    else:
+                        time.sleep(1)
+                ExecuteActions(plan, real=real, pause=True, wait=False)
         if not real:
             self.step_simulation(T, vis_frames=False)
         if self.use_vision:
@@ -455,8 +480,20 @@ class PandaAgent:
             goal_terms.append(('On', b, self.table))
 
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-
+            if not self.use_action_server:
+                self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+            else:
+                self.execute()
+                has_plan = False
+                while not has_plan:
+                    plan = self._request_plan_from_server(
+                        init, goal, fixed_objs, reset=True)
+                    if len(plan) > 0:
+                        has_plan = True
+                    else:
+                        time.sleep(1)
+                ExecuteActions(plan, real=real, pause=True, wait=False)
+                
         return stable
 
     def step_simulation(self, T, vis_frames=False):
@@ -542,16 +579,18 @@ class PandaAgent:
             return True
 
 
-    def _request_plan_from_server(self, init, goal, fixed_objs, real=False):
+    def _request_plan_from_server(self, init, goal, fixed_objs, reset=True, real=False):
         print('Requesting block placement plan from server...')
         # Package up the ROS action goal
         ros_goal = self.goal_to_ros(init, goal, fixed_objs)
-
+        ros_goal.reset = reset
+        print_planning_problem(init, goal, fixed_objs)
+        
         # Call the planning action server
         self.planning_client.send_goal(ros_goal)
         self.planning_client.wait_for_result() # TODO: Blocking for now
         result = self.planning_client.get_result()
-        print(result)
+        # print(result)
 
         # Unpack the ROS message
         plan = self.ros_to_task_plan(result, self.execution_robot, self.pddl_block_lookup)

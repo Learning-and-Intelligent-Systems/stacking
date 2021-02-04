@@ -6,11 +6,13 @@ ROS Action Server for PDDLStream Planning
 import time
 import rospy
 import actionlib
+import argparse
 import pb_robot
 import numpy as np
 from stacking_ros.msg import TaskPlanAction, TaskPlanResult, TaskAction
-from tamp.misc import get_pddl_block_lookup, get_pddlstream_info, setup_panda_world
-from tamp.ros_utils import task_plan_to_ros
+from tamp.misc import (get_pddl_block_lookup, get_pddlstream_info, 
+    print_planning_problem, setup_panda_world, ExecuteActions)
+from tamp.ros_utils import ros_to_pose, ros_to_transform, task_plan_to_ros
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.utils import INF
 
@@ -23,7 +25,6 @@ class PlanningServer():
         self.plan()
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
-        self.saved_world = pb_robot.utils.WorldSaver()
 
         # Initialize the world
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = \
@@ -98,51 +99,74 @@ class PlanningServer():
         Convert TaskPlanGoal ROS message to PDDLStream compliant 
         initial conditions and goal specification
         """
+        pddl_goal = ["and",]
         fixed_objs = [f for f in self.fixed]
-        
+
         # Unpack block initial poses
         for elem in ros_goal.blocks:
-            blk = self.pddl_block_lookup[elem.name]
-            pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
-            orn = [elem.pose.orientation.x, elem.pose.orientation.y, 
-                   elem.pose.orientation.z, elem.pose.orientation.w]
-            blk.set_base_link_pose((pos, orn))
-            if elem.fixed:
-                fixed_objs.append(blk)
+            if not elem.is_rel_pose:
+                blk = self.pddl_block_lookup[elem.name]
+                pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
+                orn = [elem.pose.orientation.x, elem.pose.orientation.y, 
+                    elem.pose.orientation.z, elem.pose.orientation.w]
+                blk.set_base_link_pose((pos, orn))
+                if elem.fixed:
+                    fixed_objs.append(blk)
 
         # Unpack initial robot configuration
         conf = pb_robot.vobj.BodyConf(self.robot, ros_goal.robot_config.angles)
 
         # Create the initial PDDL state
-        pddl_init = self.get_initial_pddl_state(conf=conf)
+        pddl_init = self.get_initial_pddl_state()
 
-        # Extend the initial state with information about the goal
-        additional_init = []
-        for elem in ros_goal.goal:
-            if elem.type == "AtPose":
-                pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
-                orn = [elem.pose.orientation.x, elem.pose.orientation.y, 
-                       elem.pose.orientation.z, elem.pose.orientation.w]
-                goal_blk_pose = pb_robot.vobj.BodyPose(blk, (pos, orn))
-                additional_init.extend([
-                    ("Pose", blk, goal_blk_pose),
-                    ("Supported", blk, goal_blk_pose, self.table, self.table_pose)
-                ])
-        pddl_init.extend(additional_init)
+        # Reset case -- start PDDL initial specifications from scratch
+        if ros_goal.reset:
+            # Finally unpack the goal information
+            additional_init = []
+            for elem in ros_goal.goal:
+                blk = self.pddl_block_lookup[elem.target_obj]
+                # Add to the goal specification
+                if elem.type == "AtPose":
+                    blk_pose = ros_to_pose(elem.pose, blk)
+                    pddl_goal.append((elem.type, blk, blk_pose))
+                elif elem.type == "On":
+                    try:
+                        base = self.pddl_block_lookup[elem.base_obj]
+                    except:
+                        base = self.table
+                    pddl_goal.append((elem.type, blk, base))
 
-        # Finally unpack the goal specification
-        pddl_goal = ["and",]
-        for elem in ros_goal.goal:
-            blk = self.pddl_block_lookup[elem.target_obj]
-            if elem.type == "AtPose":
-                pddl_goal.append((elem.type, blk, goal_blk_pose))
-            elif elem.type == "On":
-                try:
-                    base = self.pddl_block_lookup[elem.base_obj]
-                except:
-                    base = self.table
-                pddl_goal.append((elem.type, blk, base))
-        
+                # Add to the initial condition
+                if ros_goal.reset:
+                    pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
+                    orn = [elem.pose.orientation.x, elem.pose.orientation.y, 
+                        elem.pose.orientation.z, elem.pose.orientation.w]
+                    additional_init.extend([
+                        ("Pose", blk, blk_pose),
+                        ("Supported", blk, blk_pose, self.table, self.table_pose)
+                    ])
+            pddl_init.extend(additional_init)
+
+        # No reset case -- simply add the extra init and goal terms
+        else:
+            for elem in ros_goal.blocks:
+                blk = self.pddl_block_lookup[elem.name]
+                if elem.fixed:
+                    fixed_objs.append(blk)
+                if elem.is_rel_pose:
+                    try:
+                        base = self.pddl_block_lookup[elem.base_obj]
+                    except:
+                        base = self.table
+                    tform = ros_to_transform(elem.pose)
+                    pddl_init.append(("RelPose", blk, base, tform))
+
+            for elem in ros_goal.goal:
+                blk = self.pddl_block_lookup[elem.target_obj]
+                base_blk = self.pddl_block_lookup[elem.base_obj]
+                if elem.type == "On":
+                    pddl_goal.append((elem.type, blk, base_blk))
+
         return pddl_init, tuple(pddl_goal), fixed_objs
 
 
@@ -153,37 +177,47 @@ class PlanningServer():
         self.plan()
         self.robot.arm.hand.Open()
 
+        # Get the initial conditions and goal specification
         init, goal, fixed_objs = self.unpack_goal(ros_goal)
-        print(f"\nINITIAL CONDITIONS\n{init}\n")
-        print(f"\nGOAL SPECIFICATION\n{goal}\n")
+        print_planning_problem(init, goal, fixed_objs)
+        saved_world = pb_robot.utils.WorldSaver()
 
         # Get PDDLStream planning information
-        self.pddl_info = get_pddlstream_info(self.robot,
-                                             fixed_objs,
-                                             self.pddl_blocks,
-                                             add_slanted_grasps=False,
-                                             approach_frame='global')
+        pddl_info = get_pddlstream_info(self.robot,
+                                        fixed_objs,
+                                        self.pddl_blocks,
+                                        add_slanted_grasps=False,
+                                        approach_frame='global')
 
         # Run PDDLStream focused solver
         start = time.time()
-        pddlstream_problem = tuple([*self.pddl_info, init, goal])
+        pddlstream_problem = tuple([*pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
-                                success_cost=INF,
+                                success_cost=np.inf,
                                 max_skeletons=2,
                                 search_sample_ratio=1.,
                                 max_time=INF)
         duration = time.time() - start
-        self.saved_world.restore()
+        saved_world.restore()
         print('Planning Complete: Time %f seconds' % duration)
         print(f"\nFINAL PLAN\n{plan}\n")
 
         # Package and return the result
         result = task_plan_to_ros(plan)
-        print(result)
+        # print(result)
         self.planning_service.set_succeeded(result, text="Planning complete")
+
+        # Update the planning domain
+        if result.success:
+            self.plan()
+            ExecuteActions(plan, real=False, pause=True, wait=False, prompt=False)
 
 
 if __name__=="__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--num-blocks', type=int, default=4)
+    args = parser.parse_args()
+
     from block_utils import get_adversarial_blocks
-    blocks = get_adversarial_blocks(num_blocks=4)
+    blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
     s = PlanningServer(blocks)
