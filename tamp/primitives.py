@@ -46,7 +46,7 @@ def get_stable_gen_table(fixed=[]):
         rotations = all_rotations()#[8:]
         poses = []
         # These are the pre-chosen regrap locations.
-        for x, y in [(-0.3, 0.3), (-0.3, -0.3), (0, 0.4)]:
+        for x, y in [(-0.4, 0.4), (-0.4, -0.4), (0, 0.4)]:
             for rotation in rotations:
                 start_pose = body.get_base_link_pose()
 
@@ -83,7 +83,7 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
+def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
@@ -137,9 +137,13 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
             if (q_grasp is None): continue
             if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles): return None
 
-            q_backoff = robot.arm.ComputeIK(backoff_tform, seed_q=q_grasp)
-            if (q_backoff is None): continue
-            if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles): return None
+            # Only recompute the backoff if it's different from the approach.
+            if approach_frame == backoff_frame:
+                q_backoff = q_approach
+            else:
+                q_backoff = robot.arm.ComputeIK(backoff_tform, seed_q=q_grasp)
+                if (q_backoff is None): continue
+                if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles): return None
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
 
             path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
