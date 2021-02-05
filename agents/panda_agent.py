@@ -67,7 +67,7 @@ class PandaAgent:
         # Set up ROS plumbing if using features that require it
         if self.use_vision or self.use_action_server:
             import rospy
-            rospy.init_node("panda_agent")
+            #rospy.init_node("panda_agent")
 
         # Set initial poses of all blocks and setup vision ROS services.
         if self.use_vision:
@@ -95,7 +95,7 @@ class PandaAgent:
             print("Done!")
         else:
             self.planning_client = None
-        
+
         self.pddl_info = get_pddlstream_info(self.robot,
                                              self.fixed,
                                              self.pddl_blocks,
@@ -162,13 +162,41 @@ class PandaAgent:
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
                     self.execute()
                     pddl_block.set_base_link_pose((position, orientation))
-                    stable_z = pb_robot.placements.stable_z(pddl_block, self.table)
-                    position = (pose.position.x, pose.position.y, stable_z)
-                    pddl_block.set_base_link_pose((position, orientation))
                     if not self.use_action_server:
                         self.plan()
                         pddl_block.set_base_link_pose((position, orientation))
-                    
+
+        # After loading from vision, objects may be in collision. Resolve this.
+        for _, pddl_block in self.pddl_block_lookup.items():
+            if pb_robot.collisions.body_collision(pddl_block, self.table):
+                print('Collision with table and block:', pddl_block.readableName)
+                position, orientation = pddl_block.get_base_link_pose()
+                stable_z = pb_robot.placements.stable_z(pddl_block, self.table)
+                position = (position[0], position[1], stable_z)
+                self.execute()
+                pddl_block.set_base_link_pose((position, orientation))
+                self.plan()
+                pddl_block.set_base_link_pose((position, orientation))
+
+        # Resolve from low to high blocks.
+        current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+        block_ixs = range(len(self.pddl_blocks))
+        block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=False)
+        for ix in range(len(block_ixs)):
+            bottom_block = self.pddl_blocks[block_ixs[ix]]
+            for jx in range(ix+1, len(block_ixs)):
+                top_block = self.pddl_blocks[block_ixs[jx]]
+
+                if pb_robot.collisions.body_collision(bottom_block, top_block):
+                    print('Collision with bottom %s and top %s:' % (bottom_block.readableName, top_block.readableName))
+                    position, orientation = top_block.get_base_link_pose()
+                    stable_z = pb_robot.placements.stable_z(top_block, bottom_block)
+                    position = (position[0], position[1], stable_z)
+                    self.execute()
+                    top_block.set_base_link_pose((position, orientation))
+                    self.plan()
+                    top_block.set_base_link_pose((position, orientation))
+
 
     def _get_initial_pddl_state(self):
         """
@@ -587,6 +615,7 @@ class PandaAgent:
         if not real:
             self.step_simulation(T, vis_frames=False)
         if self.use_vision:
+            input('Update block poses after tower?')
             self._update_block_poses()
 
         # Reset Environment. Need to handle conditions where the blocks are still a stable tower.
