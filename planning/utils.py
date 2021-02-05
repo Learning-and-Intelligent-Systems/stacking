@@ -9,8 +9,9 @@ from torch.utils.data import DataLoader
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from block_utils import all_rotations, get_rotated_block, Quaternion, Pose, ZERO_POS
 
+all_quaternions = [Quaternion(*o.as_quat()) for o in list(all_rotations())]
+
 def random_placement(block, tower, discrete=False):
-    all_quaternions = [Quaternion(*o.as_quat()) for o in list(all_rotations())]
     random_orn = choices(all_quaternions, k=1)[0]
     block.pose = Pose(ZERO_POS, random_orn)
     block = get_rotated_block(block)

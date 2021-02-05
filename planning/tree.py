@@ -29,7 +29,7 @@ class Tree:
     def rollout(self, node_id, problem, model):
         node = self.nodes[node_id]
         if not node['term']:
-            # TODO: should make a seprate function that just returns one action
+            # TODO: should make a separate function that just returns one action
             new_nodes = problem.sample_actions(self.nodes[node_id], model)
             node = np.random.choice(new_nodes)
         return node['exp_reward']

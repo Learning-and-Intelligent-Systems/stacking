@@ -54,6 +54,10 @@ if __name__ == '__main__':
                         default=5000,
                         type=int,
                         help='number of samples to select from in total planning method')
+    parser.add_argument('--max-height',
+                        default=5,
+                        type=int,
+                        help='number of blocks in goal tower')
     
     args = parser.parse_args()
     
@@ -73,7 +77,7 @@ if __name__ == '__main__':
     if args.method == 'sequential' or args.method == 'both':
         tower_sizes = [2, 3, 4, 5]
         tower_keys = [str(ts)+'block' for ts in tower_sizes]
-        max_height = 5 # number of blocks in final tower to search for 
+        max_height = args.max_height
         
         # Store regret for towers of each size.
         regrets = {k: [] for k in tower_keys}
@@ -81,7 +85,7 @@ if __name__ == '__main__':
         num_nodes = {k: [] for k in tower_keys}
         trees = []
         node_values = []
-
+        
         for tx in range(0, args.max_acquisitions, 10):
             print('Acquisition step:', tx)
             ensemble = logger.get_ensemble(tx)
