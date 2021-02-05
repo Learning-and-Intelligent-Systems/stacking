@@ -21,19 +21,27 @@ def main(args):
         use_platform=False, teleport=False, 
         use_action_server=args.use_action_server)
 
-    for tx in range(0, 10):
-        # Build a random tower out of 5 blocks.
+    for tx in range(0, args.num_towers):
+        # Build a random tower out of blocks.
         n_blocks = np.random.randint(2, args.num_blocks + 1)
         tower_blocks = np.random.choice(blocks, n_blocks, replace=False)
 
         tower = sample_random_tower(tower_blocks)
 
         # and execute the resulting plan.
-        agent.simulate_tower(tower,
-                             base_xy=(0.5, -0.3), 
-                             vis=True, 
-                             T=2500, 
-                             save_tower=args.save_tower)
+        print(f"Starting tower {tx}")
+        if args.use_action_server:
+            agent.simulate_tower_parallel(tower, 
+                                          base_xy=(0.5, -0.3), 
+                                          vis=True, 
+                                          T=2500)
+        else:
+            agent.simulate_tower(tower,
+                                base_xy=(0.5, -0.3), 
+                                vis=True, 
+                                T=2500, 
+                                save_tower=args.save_tower)
+        print(f"Finished tower {tx}")
 
 
 if __name__ == '__main__':
@@ -41,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--num-blocks', type=int, default=4)
+    parser.add_argument('--num-towers', type=int, default=10)
     parser.add_argument('--save-tower', action='store_true')
     parser.add_argument('--use-action-server', action='store_true')
     args = parser.parse_args()

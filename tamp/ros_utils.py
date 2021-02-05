@@ -73,8 +73,13 @@ def goal_to_ros(init, goal, fixed_objs):
 
 def pose_to_ros(body_pose, msg):
     """ Passes BodyPose object data to ROS message """
-    msg.position.x, msg.position.y, msg.position.z = body_pose.pose[0]
-    msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w = body_pose.pose[1]
+    pose_tuple_to_ros(body_pose.pose, msg)
+
+
+def pose_tuple_to_ros(pose, msg):
+    """ Passes (position, orientation) object data to ROS message """
+    msg.position.x, msg.position.y, msg.position.z = pose[0]
+    msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w = pose[1]
 
 
 def transform_to_ros(T, msg):
@@ -124,11 +129,10 @@ def traj_to_ros(traj_list, msg):
 
 
 def task_plan_to_ros(plan):
-    """ Packs task plan information into a TaskPlanResult ROS message """
-    result = TaskPlanResult()
-    result.success = (plan is not None)
-    if not result.success:
-        return result
+    """ Packs task plan information into a list of TaskAction ROS messages """
+    ros_actions = []
+    if plan is None:
+        return ros_actions
 
     for action in plan:
         act_type, act_args = action
@@ -161,8 +165,8 @@ def task_plan_to_ros(plan):
         ros_act.q2.angles = q2.configuration
         traj_to_ros(traj, ros_act.trajectories)
 
-        result.plan.append(ros_act)
-    return result
+        ros_actions.append(ros_act)
+    return ros_actions
 
 
 ############
@@ -176,9 +180,17 @@ def ros_to_pose(msg, body):
 
 
 def ros_to_transform(msg):
-    """ Extracts a pose from a ROS message """
+    """ Extracts a transformation matrix from a ROS message """
     p = [msg.position.x, msg.position.y, msg.position.z]
     q = [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
+    T = quaternion_matrix(q)
+    T[0:3,-1] = p
+    return T
+
+
+def pose_to_transform(pose):
+    """ Converts a (position, orientation) tuple to a transformation matrix """
+    p, q = pose
     T = quaternion_matrix(q)
     T[0:3,-1] = p
     return T
@@ -250,6 +262,5 @@ def ros_to_task_plan(msg, robot, pddl_block_lookup):
 
         act = (name, args)
         plan.append(act)
-        print(act)
     
     return plan
