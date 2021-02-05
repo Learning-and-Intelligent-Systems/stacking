@@ -80,8 +80,8 @@ def choose_acquisition_data(samples, ensemble, n_acquire):
 def get_labels(samples, exec_mode, agent):
     """ Get the labels for the chosen datapoints.
     :param samples: (n_acquire, 2)
-    :param exec_mode: in ['analytical', 'sim', 'real'], how to label data
-    :param agent: PandaAgent or None (if exec_mode == 'analytical')
+    :param exec_mode: in ['simple-model', 'noisy-model', 'sim', 'real'], how to label data
+    :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
     :return: (n_acquire,) The labels for the given datapoints.
     """
 

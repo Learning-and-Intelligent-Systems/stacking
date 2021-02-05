@@ -54,8 +54,8 @@ def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn
     :param data_label_fn:
     :param data_pred_fn:
     :param data_subset_fn:
-    :param exec_mode: in ['analytical', 'sim', 'real']. Method for labeling data
-    :param agent: PandaAgent or None (if exec_mode == 'analytical')
+    :param exec_mode: in ['simple-model', 'noisy-model', 'sim', 'real']. Method for labeling data
+    :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
     :return: (n_acquire, 2), (n_acquire,) - x,y tuples of the new datapoints.
     """
     unlabeled_pool = data_sampler_fn(n_samples)

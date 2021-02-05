@@ -105,6 +105,11 @@ class PandaAgent:
         self.teleport = teleport
         self.txt_id = None
         self.plan()
+        
+        self.initial_world = pb_robot.utils.WorldSaver()
+        
+    def reset(self):
+        self.initial_world.restore()
 
     def _add_text(self, txt):
         self.execute()
@@ -361,7 +366,8 @@ class PandaAgent:
             if not self.teleport:
                 goal = tuple(['and'] + goal_terms)
                 if not self.use_action_server:
-                    self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+                    plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                    if not plan_found: return False, None
                 else:
                     has_plan = False
                     while not has_plan:
@@ -406,7 +412,8 @@ class PandaAgent:
             if not solve_joint:
                 if not self.teleport:
                     goal = tuple(['and'] + goal_terms)
-                    self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+                    plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                    if not plan_found: return False, None
                 else:
                     get_pose = tamp.primitives.get_stable_gen_block()
                     pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -426,7 +433,8 @@ class PandaAgent:
 
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+            plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+            if not plan_found: return False, None
 
         if not real:
             self.step_simulation(T, vis_frames=False)
@@ -459,9 +467,10 @@ class PandaAgent:
             goal_terms.append(('On', b, self.table))
 
             goal = tuple(['and'] + goal_terms)
-            self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-
-        return stable
+            plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+            if not plan_found: return False, None
+            
+        return True, stable
 
     def step_simulation(self, T, vis_frames=False):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
@@ -535,7 +544,7 @@ class PandaAgent:
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
-            input("No plan found. Press enter to continue.")
+            print("Planning failed.")
             return False
         else:
             saved_world.restore()

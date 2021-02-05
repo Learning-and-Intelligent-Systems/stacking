@@ -48,7 +48,7 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
     :param data_pred_fn:
     :param data_subset_fn:
     :param logger: Object used to keep track of training artifacts.
-    :param agent: PandaAgent or None (in args.exec_mode == 'analytical')
+    :param agent: PandaAgent or None (if args.exec_mode == 'simple-model' or 'noisy-model')
     :param args: Commandline arguments such as the number of acquisition points.
     :return: The fully trained ensemble.
     """

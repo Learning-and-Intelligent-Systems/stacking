@@ -220,12 +220,12 @@ def get_predictions(dataset, ensemble):
     return torch.cat(preds, dim=0)
 
 
-def get_labels(samples, exec_mode, agent):
+def get_labels(samples, exec_mode, agent, xy_noise=0.003):
     """ Takes as input a dictionary from the get_subset function. 
     Augment it with stability labels. 
     :param samples:
-    :param exec_mode: str in ['analytical', 'sim', 'real']
-    :param agent: PandaAgent or None (if exec_mode == 'analytical')
+    :param exec_mode: str in ['simple-model', 'noisy-model', 'sim', 'real']
+    :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
     :return:
     """
     tp = TowerPlanner(stability_mode='contains')
@@ -234,25 +234,30 @@ def get_labels(samples, exec_mode, agent):
         labels = np.ones((n_towers,))
 
         for ix in range(0, n_towers):
-            # Convert tower to Block representation.
+            # Add noise to blocks and convert tower to Block representation.
             block_tower = []
             for jx in range(n_blocks): 
-                block = Object.from_vector(samples[k]['towers'][ix, jx, :])
+                vec_block = samples[k]['towers'][ix, jx, :]
+                if exec_mode == 'noisy-model':
+                    vec_block[7:9] += np.random.randn(2)*xy_noise
+                block = Object.from_vector(vec_block)
                 block.name = 'obj_'+str(samples[k]['block_ids'][ix, jx])
                 block = get_rotated_block(block)
                 block_tower.append(block)
-            if exec_mode == 'analytical':
-                #  Use tp to check for stability.
+            #  Use tp to check for stability.
+            if exec_mode == 'simple-model' or exec_mode == 'noisy_model':
                 if not tp.tower_is_constructable(block_tower):
                     labels[ix] = 0.
-            elif exec_mode == 'sim':
-                # Use simulated robot to check stability
+            else:
                 vis = True
-                labels[ix] = agent.simulate_tower(block_tower, vis, real=False)
-            elif exec_mode == 'real':
-                # Use real robot to check stability
-                vis = True
-                labels[ix] = agent.simulate_tower(block_tower, vis, real=True)
+                success = False
+                real = exec_mode == 'real'
+                # if planning fails, reset and try again
+                while not success:
+                    success, label = agent.simulate_tower(block_tower, vis, real=real)
+                    if not success:
+                        agent = agent.reset()
+                labels[ix] = label
         samples[k]['labels'] = labels
     return samples
 

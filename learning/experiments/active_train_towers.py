@@ -26,11 +26,9 @@ def run_active_towers(args):
     else:
         raise NotImplementedError() 
     
-    if args.exec_mode == 'analytical':
+    if args.exec_mode == 'simple-model' or args.exec_mode == 'noisy-model':
         agent = None
-    elif args.exec_mode == 'sim':
-        agent = PandaAgent(block_set)
-    elif args.exec_mode == 'real':
+    elif args.exec_mode == 'sim' or args.exec_mode == 'real':
         agent = PandaAgent(block_set)
     
     # Initialize ensemble. 
@@ -147,7 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-epochs', type=int, default=50)
     parser.add_argument('--init-data-fname', type=str, default='')
     parser.add_argument('--block-set-fname', type=str, default='', help='File containing a list of AT LEAST 5 blocks (block_utils.Object) where the block.name is formatted obj_#')
-    parser.add_argument('--n-train-init', type=int, default=100)
+    parser.add_argument('--n-train-init', type=int, default=100) # NOTE: I don't think this is being used anywhere?
     parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
@@ -155,7 +153,11 @@ if __name__ == '__main__':
     parser.add_argument('--sampler', choices=['random', 'sequential'], default='random', help='Choose how the unlabeled pool will be generated. Sequential assumes every tower has a stable base.')
     parser.add_argument('--pool-fname', type=str, default='')  
     parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      
-    parser.add_argument('--exec-mode', default='analytical', choices=['analytical', 'sim', 'real'])
+    # simple-model: does not perturb the blocks, uses TowerPlanner to check constructability
+    # noisy-model: perturbs the blocks, uses TowerPlanner to check constructability
+    # sim: uses pyBullet with no noise
+    # real: uses the real robot
+    parser.add_argument('--exec-mode', default='noisy-model', choices=['perfect-model', 'noisy-model', 'sim', 'real'])
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
