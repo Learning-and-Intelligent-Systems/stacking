@@ -1,0 +1,10 @@
+# ROS Service for setting the initial state for Planning
+
+# REQUEST: Block initial and goal information
+BodyInfo[] init_state
+BodyInfo[] goal_state
+
+---
+
+# RESPONSE: Simple confirmation
+std_msgs/Empty response
