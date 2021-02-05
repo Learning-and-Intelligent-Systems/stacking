@@ -1,6 +1,7 @@
 # Task Planning ROS Action
 
 # Goal definition
+bool reset
 stacking_ros/RobotConfig robot_config
 BodyInfo[] blocks
 GoalInfo[] goal

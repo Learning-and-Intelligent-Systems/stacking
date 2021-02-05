@@ -35,8 +35,9 @@ def get_fixed(robot, movable):
     fixed = [body for body in rigid if body.id not in movable_ids]
     return fixed
 
-def ExecuteActions(plan, real=False, pause=True, wait=True):
-    input("Execute in Simulation?")
+def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True):
+    if prompt:
+        input("Execute in Simulation?")
     for name, args in plan:
         # pb_robot.viz.remove_all_debug()
         # bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
@@ -200,3 +201,31 @@ def get_pddl_block_lookup(blocks, pddl_blocks):
             if block.name in pddl_block.get_name():
                 pddl_block_lookup[block.name] = pddl_block
     return pddl_block_lookup
+
+
+def print_planning_problem(init, goal, fixed_objs):
+    """ Printing function to debug PDDL planning problems """
+    print("\n===FIXED OBJECTS===")
+    print(fixed_objs)
+
+    print("\n===INITIAL CONDITIONS===")
+    for elem in init:
+        print_elem = [e for e in elem]
+        for i, item in enumerate(print_elem):
+            if isinstance(item, pb_robot.vobj.BodyPose):
+                pose_list = item.pose[0] + item.pose[1]
+                print_elem[i] = "Pose: " + \
+                    " ".join("%.2f" % p for p in pose_list)
+        print(print_elem)
+
+    print("\n===GOAL CONDITIONS===")
+    for elem in goal[1:]:
+        print_elem = [e for e in elem]
+        for i, item in enumerate(print_elem):
+            if isinstance(item, pb_robot.vobj.BodyPose):
+                pose_list = item.pose[0] + item.pose[1]
+                print_elem[i] = "Pose: " + \
+                    " ".join("%.2f" % p for p in pose_list)
+        print(print_elem)
+
+    print("\n")
