@@ -78,6 +78,7 @@ class PandaAgent:
 
         # Start ROS action client
         if self.use_action_server:
+            rospy.init_node("panda_agent")
             import actionlib
             from stacking_ros.msg import TaskPlanAction
             from stacking_ros.srv import GetPlan, SetPlanningState
