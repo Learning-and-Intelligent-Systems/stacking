@@ -10,6 +10,7 @@ from block_utils import Object, Dimensions, Position, Color, get_adversarial_blo
 from learning.domains.towers.generate_tower_training_data import sample_random_tower
 from particle_belief import ParticleBelief
 from tower_planner import TowerPlanner
+import pb_robot
 
 
 def main(args):
@@ -36,11 +37,13 @@ def main(args):
                                           vis=True, 
                                           T=2500)
         else:
-            agent.simulate_tower(tower,
+            success, stable = agent.simulate_tower(tower,
                                 base_xy=(0.5, -0.3), 
                                 vis=True, 
                                 T=2500, 
                                 save_tower=args.save_tower)
+            if not success:
+                print('Planner failed.')
         print(f"Finished tower {tx}")
 
 

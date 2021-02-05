@@ -107,11 +107,6 @@ class PandaAgent:
         self.teleport = teleport
         self.txt_id = None
         self.plan()
-        
-        self.initial_world = pb_robot.utils.WorldSaver()
-        
-    def reset(self):
-        self.initial_world.restore()
 
     def _add_text(self, txt):
         self.execute()

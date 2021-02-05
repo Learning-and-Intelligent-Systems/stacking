@@ -128,6 +128,7 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
 
     # Set the initial positions randomly on table.
     if xy_poses is None:
+        print('Placing blocks randomly...')
         for ix, block in enumerate(pddl_blocks):
             while True:
                 z = pb_robot.placements.stable_z(block, pddl_table)

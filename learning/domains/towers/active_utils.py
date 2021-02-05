@@ -256,7 +256,11 @@ def get_labels(samples, exec_mode, agent, xy_noise=0.003):
                 while not success:
                     success, label = agent.simulate_tower(block_tower, vis, real=real)
                     if not success:
-                        agent = agent.reset()
+                        if real:
+                            input('Resolve conflict causing planning to fail, then press \
+                                    enter to try again.')
+                        else: # in sim
+                            input('Should reset sim. Not yet handled. Exit and restart training.')
                 labels[ix] = label
         samples[k]['labels'] = labels
     return samples
