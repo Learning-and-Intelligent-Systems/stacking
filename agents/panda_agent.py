@@ -17,7 +17,7 @@ from pddlstream.language.stream import StreamInfo
 from pddlstream.utils import INF
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
-                      get_pddlstream_info, ExecuteActions
+                      get_pddlstream_info, print_planning_problem, ExecuteActions
 
 
 class PandaAgent:
@@ -67,7 +67,7 @@ class PandaAgent:
         # Set up ROS plumbing if using features that require it
         if self.use_vision or self.use_action_server:
             import rospy
-            rospy.init_node("panda_agent")
+            #rospy.init_node("panda_agent")
 
         # Set initial poses of all blocks and setup vision ROS services.
         if self.use_vision:
@@ -78,23 +78,25 @@ class PandaAgent:
 
         # Start ROS action client
         if self.use_action_server:
+            rospy.init_node("panda_agent")
             import actionlib
-            from stacking_ros.msg import (
-                TaskPlanAction, TaskPlanGoal, GoalInfo, BodyInfo)
-            self.TaskPlanGoal = TaskPlanGoal
-            self.GoalInfo = GoalInfo
-            self.BodyInfo = BodyInfo
-            from tamp.ros_utils import pose_to_ros, ros_to_task_plan
-            self.pose_to_ros = pose_to_ros
+            from stacking_ros.msg import TaskPlanAction
+            from stacking_ros.srv import GetPlan, SetPlanningState
+            from tamp.ros_utils import goal_to_ros, ros_to_task_plan
+            self.goal_to_ros = goal_to_ros
             self.ros_to_task_plan = ros_to_task_plan
+            self.init_state_client = rospy.ServiceProxy(
+                "/reset_planning", SetPlanningState)
+            self.get_plan_client = rospy.ServiceProxy(
+                "/get_latest_plan", GetPlan)
             self.planning_client = actionlib.SimpleActionClient(
                 "/get_plan", TaskPlanAction)
-            print("Waiting for planning action server...")
+            print("Waiting for planning server...")
             self.planning_client.wait_for_server()
             print("Done!")
         else:
             self.planning_client = None
-        
+
         self.pddl_info = get_pddlstream_info(self.robot,
                                              self.fixed,
                                              self.pddl_blocks,
@@ -166,13 +168,41 @@ class PandaAgent:
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
                     self.execute()
                     pddl_block.set_base_link_pose((position, orientation))
-                    stable_z = pb_robot.placements.stable_z(pddl_block, self.table)
-                    position = (pose.position.x, pose.position.y, stable_z)
-                    pddl_block.set_base_link_pose((position, orientation))
                     if not self.use_action_server:
                         self.plan()
                         pddl_block.set_base_link_pose((position, orientation))
-                    
+
+        # After loading from vision, objects may be in collision. Resolve this.
+        for _, pddl_block in self.pddl_block_lookup.items():
+            if pb_robot.collisions.body_collision(pddl_block, self.table):
+                print('Collision with table and block:', pddl_block.readableName)
+                position, orientation = pddl_block.get_base_link_pose()
+                stable_z = pb_robot.placements.stable_z(pddl_block, self.table)
+                position = (position[0], position[1], stable_z)
+                self.execute()
+                pddl_block.set_base_link_pose((position, orientation))
+                self.plan()
+                pddl_block.set_base_link_pose((position, orientation))
+
+        # Resolve from low to high blocks.
+        current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+        block_ixs = range(len(self.pddl_blocks))
+        block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=False)
+        for ix in range(len(block_ixs)):
+            bottom_block = self.pddl_blocks[block_ixs[ix]]
+            for jx in range(ix+1, len(block_ixs)):
+                top_block = self.pddl_blocks[block_ixs[jx]]
+
+                if pb_robot.collisions.body_collision(bottom_block, top_block):
+                    print('Collision with bottom %s and top %s:' % (bottom_block.readableName, top_block.readableName))
+                    position, orientation = top_block.get_base_link_pose()
+                    stable_z = pb_robot.placements.stable_z(top_block, bottom_block)
+                    position = (position[0], position[1], stable_z)
+                    self.execute()
+                    top_block.set_base_link_pose((position, orientation))
+                    self.plan()
+                    top_block.set_base_link_pose((position, orientation))
+
 
     def _get_initial_pddl_state(self):
         """
@@ -322,6 +352,136 @@ class PandaAgent:
         self.plan()
         block.set_base_link_pose(pose)
 
+
+    def simulate_tower_parallel(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5)):
+        """
+        """
+
+        for block in tower:
+            print('Block:', block.name)
+            print('Pose:', block.pose)
+            print('Dims:', block.dimensions)
+            print('CoM:', block.com)
+            print('-----')
+        if self.use_vision:
+            self._update_block_poses()
+
+        self.moved_blocks = set()
+        original_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+
+        # Package up the ROS message
+        from stacking_ros.msg import BodyInfo
+        from stacking_ros.srv import SetPlanningStateRequest
+        from tamp.ros_utils import pose_to_ros, pose_tuple_to_ros, transform_to_ros
+        ros_req = SetPlanningStateRequest()
+        # Initial poses
+        for blk in self.pddl_blocks:
+            ros_block = BodyInfo()
+            ros_block.name = blk.readableName
+            pose_tuple_to_ros(blk.get_base_link_pose(), ros_block.pose)
+            ros_req.init_state.append(ros_block)
+        # Goal poses
+        # TODO: Set base block to be rotated in its current position.
+        base_block = self.pddl_block_lookup[tower[0].name]
+        base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
+        base_pose = (base_pos, tower[0].rotation)
+        base_pose = pb_robot.vobj.BodyPose(base_block, base_pose)
+        base_block_ros = BodyInfo()
+        base_block_ros.name = base_block.readableName
+        pose_to_ros(base_pose, base_block_ros.pose)
+        ros_req.goal_state.append(base_block_ros)
+        # Now loop through the other tower blocks
+        for b_ix in range(1, len(tower)):
+            bottom_block = tower[b_ix-1]
+            bottom_pose = (bottom_block.pose.pos, bottom_block.rotation)
+            bottom_tform = pb_robot.geometry.tform_from_pose(bottom_pose)
+            top_block = tower[b_ix]
+            top_pose = (top_block.pose.pos, top_block.rotation)
+            top_tform = pb_robot.geometry.tform_from_pose(top_pose)
+
+            rel_tform = numpy.linalg.inv(bottom_tform)@top_tform
+            top_pddl = self.pddl_block_lookup[top_block.name]
+            bottom_pddl = self.pddl_block_lookup[bottom_block.name]
+
+            block_ros = BodyInfo()
+            block_ros.name = top_pddl.readableName
+            block_ros.base_obj = bottom_pddl.readableName
+            transform_to_ros(rel_tform, block_ros.pose)
+            block_ros.is_rel_pose = True
+            ros_req.goal_state.append(block_ros)
+
+        success = self.execute_plans_from_server(ros_req, real, T)
+        print(f"Completed tower stack with success: {success}")
+
+        # Instruct a reset plan
+        print("Resetting blocks...")
+        current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+        block_ixs = range(len(self.pddl_blocks))
+        block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
+
+        ros_req = SetPlanningStateRequest()
+        # Initial poses
+        for blk in self.pddl_blocks:
+            ros_block = BodyInfo()
+            ros_block.name = blk.readableName
+            pose_tuple_to_ros(blk.get_base_link_pose(), ros_block.pose)
+            ros_req.init_state.append(ros_block)
+        # Goal poses
+        for ix in block_ixs:
+            blk, pose = self.pddl_blocks[ix], original_poses[ix]
+            if blk in self.moved_blocks:
+                goal_pose = pb_robot.vobj.BodyPose(blk, pose)
+                ros_block = BodyInfo()
+                ros_block.name = blk.readableName
+                pose_to_ros(goal_pose, ros_block.pose)
+                ros_req.goal_state.append(ros_block)
+        
+        success = self.execute_plans_from_server(ros_req, real, T)
+        print(f"Completed tower reset with success: {success}")
+
+
+    def execute_plans_from_server(self, ros_req, real=False, T=2500):
+        """ Executes plans received from planning server """
+        self.init_state_client.call(ros_req)
+
+        success = False
+        num_success = 0
+        planning_active = True
+        while num_success < len(ros_req.goal_state):
+            # Wait for a valid plan
+            plan = []
+            while len(plan) == 0 and planning_active:
+                time.sleep(3)
+                ros_resp = self.get_plan_client.call()
+                planning_active = ros_resp.planning_active
+                plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
+                if not planning_active:
+                    print("Planning ended on server side")
+                    return success
+            print("\nGot plan:")
+            print(plan)
+
+            # Once we have a plan, execute it
+            self.execute()
+            ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False)
+
+            # Check if the plan failed; if so, exit
+            query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
+            self.moved_blocks.add(query_block)
+            desired_pose = query_block.get_point()
+            if not real:
+                self.step_simulation(T, vis_frames=False)
+            end_pose = query_block.get_point()
+            if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
+                print("Unstable after execution!")
+                return success
+            else:
+                num_success += 1
+                if num_success == len(ros_req.goal_state):
+                    success = True
+        return success
+
+
     def simulate_tower(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
         """
         :param tower: list of belief blocks that are rotated to have no
@@ -369,14 +529,15 @@ class PandaAgent:
                     plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
                     if not plan_found: return False, None
                 else:
+                    self.execute()
                     has_plan = False
                     while not has_plan:
-                        plan = self._request_plan_from_server(init, goal, fixed_objs)
+                        plan = self._request_plan_from_server(
+                            init, goal, fixed_objs, reset=True)
                         if len(plan) > 0:
                             has_plan = True
                         else:
                             time.sleep(1)
-                    self.execute()
                     ExecuteActions(plan, real=real, pause=True, wait=False)
             else:
                 self.teleport_block(base_block, base_pose.pose)
@@ -400,8 +561,9 @@ class PandaAgent:
                 init = self._get_initial_pddl_state()
                 goal_terms = []
 
+            fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != top_pddl]
             self.pddl_info = get_pddlstream_info(self.robot,
-                                                 self.fixed + [b for b in self.pddl_blocks if b != top_pddl],
+                                                 fixed_objs,
                                                  self.pddl_blocks,
                                                  add_slanted_grasps=False,
                                                  approach_frame='global')
@@ -412,8 +574,20 @@ class PandaAgent:
             if not solve_joint:
                 if not self.teleport:
                     goal = tuple(['and'] + goal_terms)
-                    plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
-                    if not plan_found: return False, None
+                    if not self.use_action_server:
+                        plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                        if not plan_found: return False, None
+                    else:
+                        has_plan = False
+                        while not has_plan:
+                            self.execute()
+                            plan = self._request_plan_from_server(
+                                init, goal, fixed_objs, reset=False)
+                            if len(plan) > 0:
+                                has_plan = True
+                            else:
+                                time.sleep(1)
+                        ExecuteActions(plan, real=real, pause=True, wait=False)
                 else:
                     get_pose = tamp.primitives.get_stable_gen_block()
                     pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -433,12 +607,24 @@ class PandaAgent:
 
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
-            plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
-            if not plan_found: return False, None
-
+            if not self.use_action_server:
+                plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                if not plan_found: return False, None
+            else:
+                self.execute()
+                has_plan = False
+                while not has_plan:
+                    plan = self._request_plan_from_server(
+                        init, goal, fixed_objs, reset=True)
+                    if len(plan) > 0:
+                        has_plan = True
+                    else:
+                        time.sleep(1)
+                ExecuteActions(plan, real=real, pause=True, wait=False)
         if not real:
             self.step_simulation(T, vis_frames=False)
         if self.use_vision:
+            input('Update block poses after tower?')
             self._update_block_poses()
 
         # Reset Environment. Need to handle conditions where the blocks are still a stable tower.
@@ -452,9 +638,9 @@ class PandaAgent:
             if b not in moved_blocks: continue
 
             goal_pose = pb_robot.vobj.BodyPose(b, pose)
-
+            fixed_objs = self.fixed + [obj for obj in self.pddl_blocks if obj != b]
             self.pddl_info = get_pddlstream_info(self.robot,
-                                                 self.fixed + [obj for obj in self.pddl_blocks if obj != b],
+                                                 fixed_objs,
                                                  self.pddl_blocks,
                                                  add_slanted_grasps=False,
                                                  approach_frame='global')
@@ -467,9 +653,21 @@ class PandaAgent:
             goal_terms.append(('On', b, self.table))
 
             goal = tuple(['and'] + goal_terms)
-            plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
-            if not plan_found: return False, None
-            
+            if not self.use_action_server:
+                plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                if not plan_found: return False, None
+            else:
+                self.execute()
+                has_plan = False
+                while not has_plan:
+                    plan = self._request_plan_from_server(
+                        init, goal, fixed_objs, reset=True)
+                    if len(plan) > 0:
+                        has_plan = True
+                    else:
+                        time.sleep(1)
+                ExecuteActions(plan, real=real, pause=True, wait=False)
+
         return True, stable
 
     def step_simulation(self, T, vis_frames=False):
@@ -555,52 +753,18 @@ class PandaAgent:
             return True
 
 
-    def _request_plan_from_server(self, init, goal, fixed_objs, real=False):
+    def _request_plan_from_server(self, init, goal, fixed_objs, reset=True, real=False):
         print('Requesting block placement plan from server...')
         # Package up the ROS action goal
-        ros_goal = self.TaskPlanGoal()
-        print(init)
-        print(goal)
-        for elem in goal:
-            if isinstance(elem, tuple):
-                info = self.GoalInfo()
-                info.type = elem[0]
-                if info.type == "AtPose":    # e.g. ("AtPose", block1, pose)
-                    info.target_obj = elem[1].readableName
-                    self.pose_to_ros(elem[2], info.pose)
-                elif info.type == "On":      # e.g. ("On", block1, block3)
-                    info.target_obj = elem[1].readableName
-                    info.base_obj = elem[2].readableName
-                ros_goal.goal.append(info)
-        init_dict = {}
-        for elem in init:
-            name = elem[0]                
-            # Robot configuration e.g. ("Conf", conf)
-            if name == "Conf":
-                ros_goal.robot_config.angles = elem[1].configuration
-            # Block pose information
-            # Consists of sequence of: Graspable, Pose, AtPose, Block, On, Supported
-            elif name in ["AtPose", "On"]:
-                obj_name = elem[1].readableName
-                if "block" in obj_name:
-                    if name == "AtPose":
-                        init_dict[obj_name] = {"pose": elem[2]}
-                    elif name == "On":
-                        init_dict[obj_name]["base_obj"] = elem[2].readableName
-        for blk_name in init_dict:
-            info = self.BodyInfo()
-            info.name = blk_name
-            self.pose_to_ros(init_dict[blk_name]["pose"], info.pose)
-            for fobj in fixed_objs:
-                if fobj is not None and blk_name == fobj.readableName:
-                    info.fixed = True
-            ros_goal.blocks.append(info)
-
+        ros_goal = self.goal_to_ros(init, goal, fixed_objs)
+        ros_goal.reset = reset
+        print_planning_problem(init, goal, fixed_objs)
+        
         # Call the planning action server
         self.planning_client.send_goal(ros_goal)
         self.planning_client.wait_for_result() # TODO: Blocking for now
         result = self.planning_client.get_result()
-        print(result)
+        # print(result)
 
         # Unpack the ROS message
         plan = self.ros_to_task_plan(result, self.execution_robot, self.pddl_block_lookup)

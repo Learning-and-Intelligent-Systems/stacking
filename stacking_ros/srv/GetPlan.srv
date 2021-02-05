@@ -1,0 +1,10 @@
+# ROS Service for retrieving a plan
+
+# REQUEST: Simple request
+std_msgs/Empty request
+
+---
+
+# RESPONSE: Vector of actions comprising a plan, and active status flag
+TaskAction[] plan
+bool planning_active

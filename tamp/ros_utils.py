@@ -4,7 +4,8 @@ Utilities for ROS serialization and deserialization of task planning entities
 
 import pb_robot
 from stacking_ros.msg import (
-    RobotConfig, TaskAction, TaskPlanResult, TrajInfo)
+    BodyInfo, GoalInfo, RobotConfig, TaskAction, 
+    TaskPlanGoal, TaskPlanResult, TrajInfo)
 from tf.transformations import (
     quaternion_matrix, quaternion_from_matrix, translation_from_matrix)
 
@@ -12,10 +13,80 @@ from tf.transformations import (
 ############
 # X to ROS #
 ############
+def goal_to_ros(init, goal, fixed_objs):
+    """ Convert PDDLStream planning initial conditions and goal specifications to a ROS Action Goal """
+    ros_goal = TaskPlanGoal()
+    print(init)
+    print(goal)
+
+    # Convert the PDDL Goal specification
+    for elem in goal:
+        if isinstance(elem, tuple):
+            info = GoalInfo()
+            info.type = elem[0]
+            if info.type == "AtPose":    # e.g. ("AtPose", block1, pose)
+                info.target_obj = elem[1].readableName
+                pose_to_ros(elem[2], info.pose)
+            elif info.type == "On":      # e.g. ("On", block1, block3)
+                info.target_obj = elem[1].readableName
+                info.base_obj = elem[2].readableName
+            ros_goal.goal.append(info)
+    
+    # Convert the PDDL initial conditions (+ fixed objects)
+    init_dict = {}
+    init_rel_poses = []
+    for elem in init:
+        name = elem[0]                
+        # Robot configuration e.g. ("Conf", conf)
+        if name == "Conf":
+            ros_goal.robot_config.angles = elem[1].configuration
+        # Block pose information
+        # Consists of sequence of: Graspable, Pose, AtPose, Block, On, Supported
+        elif name in ["AtPose", "On"]:
+            obj_name = elem[1].readableName
+            if "block" in obj_name:
+                if name == "AtPose":
+                    init_dict[obj_name] = {"pose": elem[2]}
+                elif name == "On":
+                    init_dict[obj_name]["base_obj"] = elem[2].readableName
+        # Relative pose information
+        elif name == "RelPose":
+            ros_blk = BodyInfo()
+            ros_blk.is_rel_pose = True
+            ros_blk.name = elem[1].readableName
+            ros_blk.base_obj = elem[2].readableName
+            transform_to_ros(elem[3], ros_blk.pose)
+            init_rel_poses.append(ros_blk)
+            
+    for blk_name in init_dict:
+        info = BodyInfo()
+        info.name = blk_name
+        pose_to_ros(init_dict[blk_name]["pose"], info.pose)
+        for fobj in fixed_objs:
+            if fobj is not None and blk_name == fobj.readableName:
+                info.fixed = True
+        ros_goal.blocks.append(info)
+    ros_goal.blocks.extend(init_rel_poses)
+    print(ros_goal)
+    return ros_goal
+
+
 def pose_to_ros(body_pose, msg):
     """ Passes BodyPose object data to ROS message """
-    msg.position.x, msg.position.y, msg.position.z = body_pose.pose[0]
-    msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w = body_pose.pose[1]
+    pose_tuple_to_ros(body_pose.pose, msg)
+
+
+def pose_tuple_to_ros(pose, msg):
+    """ Passes (position, orientation) object data to ROS message """
+    msg.position.x, msg.position.y, msg.position.z = pose[0]
+    msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w = pose[1]
+
+
+def transform_to_ros(T, msg):
+    """ Passes transformation matrix data to ROS message """
+    msg.position.x, msg.position.y, msg.position.z = translation_from_matrix(T)
+    msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w = \
+        quaternion_from_matrix(T)
 
 
 def grasp_to_ros(grasp, msg):
@@ -58,11 +129,10 @@ def traj_to_ros(traj_list, msg):
 
 
 def task_plan_to_ros(plan):
-    """ Packs task plan information into a TaskPlanResult ROS message """
-    result = TaskPlanResult()
-    result.success = (plan is not None)
-    if not result.success:
-        return result
+    """ Packs task plan information into a list of TaskAction ROS messages """
+    ros_actions = []
+    if plan is None:
+        return ros_actions
 
     for action in plan:
         act_type, act_args = action
@@ -95,17 +165,32 @@ def task_plan_to_ros(plan):
         ros_act.q2.angles = q2.configuration
         traj_to_ros(traj, ros_act.trajectories)
 
-        result.plan.append(ros_act)
-    return result
+        ros_actions.append(ros_act)
+    return ros_actions
 
 
 ############
 # ROS to X #
 ############
-def ros_to_transform(msg):
-    """ Extracts a pose from a ROS message """
+def ros_to_pose(msg, body):
+    """ Creates a BodyPose from a ROS message """
     p = [msg.position.x, msg.position.y, msg.position.z]
     q = [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
+    return pb_robot.vobj.BodyPose(body, (p,q))
+
+
+def ros_to_transform(msg):
+    """ Extracts a transformation matrix from a ROS message """
+    p = [msg.position.x, msg.position.y, msg.position.z]
+    q = [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
+    T = quaternion_matrix(q)
+    T[0:3,-1] = p
+    return T
+
+
+def pose_to_transform(pose):
+    """ Converts a (position, orientation) tuple to a transformation matrix """
+    p, q = pose
     T = quaternion_matrix(q)
     T[0:3,-1] = p
     return T
@@ -177,6 +262,5 @@ def ros_to_task_plan(msg, robot, pddl_block_lookup):
 
         act = (name, args)
         plan.append(act)
-        print(act)
     
     return plan
