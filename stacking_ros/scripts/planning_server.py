@@ -204,15 +204,6 @@ class PlanningServer():
 
         # Get PDDLStream planning information
         pddl_info = get_pddlstream_info(self.robot,
-                            # desired_pose = blk.get_point()
-            # T = 2500
-            # self.step_simulation(T, vis_frames=False)
-            # end_pose = blk.get_point()
-            # if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
-            #     print("Unstable during planning!")
-            #     self.planning_active = False
-            #     return
-            # else:            fixed_objs,
                                         self.pddl_blocks,
                                         add_slanted_grasps=False,
                                         approach_frame='global')
