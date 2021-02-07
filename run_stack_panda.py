@@ -20,9 +20,12 @@ def main(args):
             blocks = pickle.load(handle)
         block_init_xy_poses = None  # These will be initialized randomly but updated by the vision system.
     else:
-        block0 = Object('block0', Dimensions(.0381,.0318,.0635), 1.0, Position(0,0,0), Color(1,0,0))
-        block1 = Object('block1', Dimensions(.0381,.0587,.0635), 1.0, Position(0,0,0), Color(0,0,1))
-        block2 = Object('block2', Dimensions(.0635,.0381,.0746), 1.0, Position(0,0,0), Color(0,1,0))
+        # block0 = Object('block0', Dimensions(.0381,.0318,.0635), 1.0, Position(0,0,0), Color(1,0,0))
+        # block1 = Object('block1', Dimensions(.0381,.0587,.0635), 1.0, Position(0,0,0), Color(0,0,1))
+        # block2 = Object('block2', Dimensions(.0635,.0381,.0746), 1.0, Position(0,0,0), Color(0,1,0))
+        block0 = Object('block0', Dimensions(.0381,.0318,.05), 1.0, Position(0,0,0), Color(1,0,0))
+        block1 = Object('block1', Dimensions(.0381,.0587,.06), 1.0, Position(0,0,0), Color(0,0,1))
+        block2 = Object('block2', Dimensions(.0635,.0381,.05), 1.0, Position(0,0,0), Color(0,1,0))
         blocks = [block0, block1, block2]
 
         block_init_xy_poses = [Pose(Position(0.65,0.3,0), Quaternion(0,0,0,1)),
@@ -34,7 +37,8 @@ def main(args):
                        block_init_xy_poses=block_init_xy_poses,
                        teleport=False,
                        use_vision=args.use_vision,
-                       use_action_server=args.use_action_server)
+                       use_action_server=args.use_action_server,
+                       real=args.real)
 
     # for now hard-code a tower, but in the future will be supplied from
     # active data collection or tower found through planning for evaluation

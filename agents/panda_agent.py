@@ -1,5 +1,6 @@
 import numpy
 import pybullet as p
+import sys
 import time
 
 from copy import deepcopy
@@ -21,7 +22,7 @@ from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise=0.00005, use_platform=False, block_init_xy_poses=None, teleport=False, use_vision=False, use_action_server=False):
+    def __init__(self, blocks, noise=0.00005, use_platform=False, block_init_xy_poses=None, teleport=False, use_vision=False, use_action_server=False, real=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a
@@ -65,34 +66,35 @@ class PandaAgent:
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
         # Set up ROS plumbing if using features that require it
-        if self.use_vision or self.use_action_server:
+        if self.use_vision or self.use_action_server or real:
             import rospy
-            #rospy.init_node("panda_agent")
+            rospy.init_node("panda_agent")
 
         # Set initial poses of all blocks and setup vision ROS services.
         if self.use_vision:
-            from panda_vision.srv import GetBlockPosesWorld
+            from panda_vision.srv import GetBlockPosesWorld, GetBlockPosesWrist
             rospy.wait_for_service('get_block_poses_world')
+            rospy.wait_for_service('get_block_poses_wrist')
             self._get_block_poses_world = rospy.ServiceProxy('get_block_poses_world', GetBlockPosesWorld)
+            self._get_block_poses_wrist = rospy.ServiceProxy('get_block_poses_wrist', GetBlockPosesWrist)
             self._update_block_poses()
 
         # Start ROS action client
         if self.use_action_server:
-            rospy.init_node("panda_agent")
             import actionlib
             from stacking_ros.msg import TaskPlanAction
             from stacking_ros.srv import GetPlan, SetPlanningState
             from tamp.ros_utils import goal_to_ros, ros_to_task_plan
+
+            print("Waiting for planning server...")
+            rospy.wait_for_service('get_latest_plan')
             self.goal_to_ros = goal_to_ros
             self.ros_to_task_plan = ros_to_task_plan
             self.init_state_client = rospy.ServiceProxy(
                 "/reset_planning", SetPlanningState)
             self.get_plan_client = rospy.ServiceProxy(
                 "/get_latest_plan", GetPlan)
-            self.planning_client = actionlib.SimpleActionClient(
-                "/get_plan", TaskPlanAction)
-            print("Waiting for planning server...")
-            self.planning_client.wait_for_server()
+
             print("Done!")
         else:
             self.planning_client = None
@@ -101,7 +103,8 @@ class PandaAgent:
                                              self.fixed,
                                              self.pddl_blocks,
                                              add_slanted_grasps=False,
-                                             approach_frame='global')
+                                             approach_frame='global',
+                                             use_vision=self.use_vision)
 
         self.noise = noise
         self.teleport = teleport
@@ -255,7 +258,8 @@ class PandaAgent:
                                              self.fixed,
                                              self.pddl_blocks,
                                              add_slanted_grasps=False,
-                                             approach_frame='gripper')
+                                             approach_frame='gripper',
+                                             use_vision=self.use_vision)
         init = self._get_initial_pddl_state()
 
         #  Figure out the correct transformation matrix based on the action.
@@ -318,7 +322,8 @@ class PandaAgent:
                                              self.fixed,
                                              self.pddl_blocks,
                                              add_slanted_grasps=True,
-                                             approach_frame='gripper')
+                                             approach_frame='gripper',
+                                             use_vision=self.use_vision)
 
         init = self._get_initial_pddl_state()
         goal_pose = pb_robot.vobj.BodyPose(pddl_block, original_pose)
@@ -408,6 +413,9 @@ class PandaAgent:
         success = self.execute_plans_from_server(ros_req, real, T)
         print(f"Completed tower stack with success: {success}")
 
+        if self.use_vision:
+            self._update_block_poses()
+
         # Instruct a reset plan
         print("Resetting blocks...")
         current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
@@ -430,7 +438,7 @@ class PandaAgent:
                 ros_block.name = blk.readableName
                 pose_to_ros(goal_pose, ros_block.pose)
                 ros_req.goal_state.append(ros_block)
-        
+
         success = self.execute_plans_from_server(ros_req, real, T)
         print(f"Completed tower reset with success: {success}")
 
@@ -466,8 +474,11 @@ class PandaAgent:
             desired_pose = query_block.get_point()
             if not real:
                 self.step_simulation(T, vis_frames=False)
-            end_pose = query_block.get_point()
-            if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
+
+            input('Press enter to stability.')
+            stable = self.check_stability(real, query_block, desired_pose)
+            input('Continue?')
+            if stable == 0.:
                 print("Unstable after execution!")
                 return success
             else:
@@ -516,12 +527,13 @@ class PandaAgent:
                                              fixed_objs,
                                              self.pddl_blocks,
                                              add_slanted_grasps=False,
-                                             approach_frame='global')
+                                             approach_frame='global',
+                                             use_vision=self.use_vision)
         if not solve_joint:
             if not self.teleport:
                 goal = tuple(['and'] + goal_terms)
                 if not self.use_action_server:
-                    plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                    plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
                     if not plan_found: return False, None
                 else:
                     self.execute()
@@ -561,7 +573,8 @@ class PandaAgent:
                                                  fixed_objs,
                                                  self.pddl_blocks,
                                                  add_slanted_grasps=False,
-                                                 approach_frame='global')
+                                                 approach_frame='global',
+                                                 use_vision=self.use_vision)
             init += [('RelPose', top_pddl, bottom_pddl, rel_tform)]
             goal_terms.append(('On', top_pddl, bottom_pddl))
 
@@ -570,7 +583,7 @@ class PandaAgent:
                 if not self.teleport:
                     goal = tuple(['and'] + goal_terms)
                     if not self.use_action_server:
-                        plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                        plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
                         if not plan_found: return False, None
                     else:
                         has_plan = False
@@ -594,16 +607,16 @@ class PandaAgent:
                 if not real:
                     self.step_simulation(T, vis_frames=False)
                 # TODO: Check if the tower was stable, stop construction if not.
-                end_pose = top_pddl.get_point()
-                if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
-                    print('Unstable!')
-                    stable = 0.
+                input('Press enter to stability.')
+                stable = self.check_stability(real, top_pddl, desired_pose)
+                input('Continue?')
+                if stable == 0.:
                     break
 
         if solve_joint:
             goal = tuple(['and'] + goal_terms)
             if not self.use_action_server:
-                plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
                 if not plan_found: return False, None
             else:
                 self.execute()
@@ -638,7 +651,8 @@ class PandaAgent:
                                                  fixed_objs,
                                                  self.pddl_blocks,
                                                  add_slanted_grasps=False,
-                                                 approach_frame='global')
+                                                 approach_frame='global',
+                                                 use_vision=self.use_vision)
 
             init = self._get_initial_pddl_state()
             init += [('Pose', b, goal_pose),
@@ -649,7 +663,7 @@ class PandaAgent:
 
             goal = tuple(['and'] + goal_terms)
             if not self.use_action_server:
-                plan_found = self._solve_and_execute_pddl(init, goal, search_sample_ratio=1.)
+                plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
                 if not plan_found: return False, None
             else:
                 self.execute()
@@ -664,6 +678,39 @@ class PandaAgent:
                 ExecuteActions(plan, real=real, pause=True, wait=False)
 
         return True, stable
+
+    def check_stability(self, real, block_pddl, desired_pose):
+        if self.use_vision:
+            # Get pose of blocks using wrist camera.
+            try:
+                poses = self._get_block_poses_wrist().poses
+            except:
+                print('Service call to get block poses failed during check stability. Exiting.')
+                sys.exit()
+
+            # Check if pose is close to desired_pose.
+            visible = False
+            for named_pose in poses:
+                if named_pose.block_id in block_pddl.readableName:
+                    visible = True
+                    pose = named_pose.pose.pose
+                    position = (pose.position.x, pose.position.y, pose.position.z)
+                    print('Desired Pos:', desired_pose)
+                    print('Detected Pos:', position)
+                    if numpy.linalg.norm(numpy.array(position)-numpy.array(desired_pose)) > 0.05:
+                        return 0.
+
+            # If block isn't visible, return 0.
+            if not visible:
+                return 0.
+
+        else:
+            end_pose = block_pddl.get_base_link_point()
+            if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
+                print('Unstable!')
+                return 0.
+        return 1.
+
 
     def step_simulation(self, T, vis_frames=False):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
@@ -754,7 +801,7 @@ class PandaAgent:
         ros_goal = self.goal_to_ros(init, goal, fixed_objs)
         ros_goal.reset = reset
         print_planning_problem(init, goal, fixed_objs)
-        
+
         # Call the planning action server
         self.planning_client.send_goal(ros_goal)
         self.planning_client.wait_for_result() # TODO: Blocking for now

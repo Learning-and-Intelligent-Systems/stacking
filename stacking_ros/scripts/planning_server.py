@@ -27,7 +27,7 @@ from pddlstream.utils import INF
 
 
 class PlanningServer():
-    def __init__(self, blocks, block_init_xy_poses=None, use_platform=False):
+    def __init__(self, blocks, block_init_xy_poses=None, use_platform=False, use_vision=False):
 
         # Start up a robot simulation for planning
         self._planning_client_id = pb_robot.utils.connect(use_gui=False)
@@ -35,6 +35,8 @@ class PlanningServer():
         pb_robot.utils.set_default_camera()
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
+
+        self.use_vision = use_vision
 
         # Initialize the world
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = \
@@ -56,10 +58,10 @@ class PlanningServer():
             "/get_latest_plan", GetPlan, self.get_latest_plan)
         self.reset_service = rospy.Service(
             "/reset_planning", SetPlanningState, self.reset_planning)
-        self.planning_service = actionlib.SimpleActionServer(
-            "/get_plan", TaskPlanAction,
-            execute_cb=self.find_plan, auto_start=False)
-        self.planning_service.start()
+        # self.planning_service = actionlib.SimpleActionServer(
+        #     "/get_plan", TaskPlanAction,
+        #     execute_cb=self.find_plan, auto_start=False)
+        # self.planning_service.start()
         print("Planning server ready!")
 
 
@@ -274,7 +276,7 @@ class PlanningServer():
                 goal = ("and", ("On", blk, base))
 
             # Plan
-            plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=2)
+            plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=1)
             if plan is not None and not self.cancel_planning:
                 self.simulate_plan(plan)
                 self.plan_buffer.append(plan)
@@ -381,7 +383,8 @@ class PlanningServer():
                                             fixed_objs,
                                             self.pddl_blocks,
                                             add_slanted_grasps=False,
-                                            approach_frame="global")
+                                            approach_frame="global",
+                                            use_vision=self.use_vision)
 
             # Run PDDLStream focused solver
             start = time.time()
@@ -448,8 +451,9 @@ if __name__=="__main__":
     if args.use_vision:
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)
+            blocks = [blocks[0], blocks[2]]
         block_init_xy_poses = None
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
-    s = PlanningServer(blocks)
+    s = PlanningServer(blocks, use_vision=args.use_vision)
     s.planning_loop()
