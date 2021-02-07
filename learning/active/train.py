@@ -56,7 +56,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     best_weights = None
     it = 0
     for ex in range(n_epochs):
-        print('Epoch', ex)
+        #print('Epoch', ex)
         acc = []
         for x, y in dataloader:
             if torch.cuda.is_available():
@@ -79,8 +79,8 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_weights = copy.deepcopy(model.state_dict())
-                print('Saved')    
-            print(np.mean(acc), val_loss, loss)
+                #print('Saved')    
+            #print(np.mean(acc), val_loss, loss)
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
     return model

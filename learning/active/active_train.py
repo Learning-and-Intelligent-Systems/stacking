@@ -1,6 +1,7 @@
 import argparse
 import copy
 import numpy as np
+import time
 
 from learning.active.acquire import acquire_datapoints
 from learning.active.train import train
@@ -29,9 +30,13 @@ def split_data(data, n_val):
 
         val_data[k]['towers'] = val_data[k]['towers'][~train_mask,...]
         val_data[k]['labels'] = val_data[k]['labels'][~train_mask,...]
+        if 'block_ids' in val_data[k]:
+            val_data[k]['block_ids'] = val_data[k]['block_ids'][~train_mask,...]
         
         data[k]['towers'] = data[k]['towers'][train_mask,...]
         data[k]['labels'] = data[k]['labels'][train_mask,...]
+        if 'block_ids' in data[k]:
+            data[k]['block_ids'] = data[k]['block_ids'][train_mask,...]
         start = end
     return data, val_data
 
@@ -53,6 +58,8 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
     :return: The fully trained ensemble.
     """
     for tx in range(args.max_acquisitions):
+        print('Acquisition Step: ', tx)
+        start_time = time.time()
         logger.save_dataset(dataset, tx)
 
         # Initialize and train models.
@@ -82,3 +89,5 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
             train_data, val_data = split_data(new_data, n_val=2)
             dataset.add_to_dataset(train_data)
             val_dataset.add_to_dataset(val_data)
+            
+        print('Time: ' + str((time.time()-start_time)*(1/60)) + ' minutes')
