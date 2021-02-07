@@ -70,7 +70,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
         for k in block_lookup:
             used = False
             for block in base_tower:
-                if np.abs(k - block.mass) < 0.001:
+                if np.abs(k - block.mass) < 0.0001:
                     used = True
             if not used:
                 remaining_blocks[k] = block_lookup[k]
@@ -110,13 +110,19 @@ def sample_sequential_data(block_set, dataset, n_samples):
         n_blocks = len(new_tower)
         sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(new_tower))
     
+        # save block id
+        if block_set is not None:
+            block_ids = [int(block.name.strip('obj_')) for block in new_tower]
+            sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
+    
     # convert all the sampled towers to numpy arrays
     for k in keys:
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
         if sampled_towers[k]['towers'].shape[0] == 0:
             sampled_towers[k]['towers'] = sampled_towers[k]['towers'].reshape((0, int(k[0]), 17))
         sampled_towers[k]['labels'] = np.zeros((sampled_towers[k]['towers'].shape[0],))
-
+        if block_set is not None:
+            sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
     return sampled_towers
 
 def sample_unlabeled_data(n_samples, block_set=None):
