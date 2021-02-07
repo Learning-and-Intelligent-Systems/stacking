@@ -51,6 +51,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     optimizer = Adam(model.parameters(), lr=1e-3)
     if torch.cuda.is_available():
         model.cuda()
+        print('using GPU!!!')
 
     best_loss = 1000
     best_weights = None
