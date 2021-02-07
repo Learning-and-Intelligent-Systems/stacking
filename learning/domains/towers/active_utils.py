@@ -245,7 +245,7 @@ def get_labels(samples, exec_mode, agent, xy_noise=0.003):
                 block = get_rotated_block(block)
                 block_tower.append(block)
             #  Use tp to check for stability.
-            if exec_mode == 'simple-model' or exec_mode == 'noisy_model':
+            if exec_mode == 'simple-model' or exec_mode == 'noisy-model':
                 if not tp.tower_is_constructable(block_tower):
                     labels[ix] = 0.
             else:
