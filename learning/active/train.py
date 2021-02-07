@@ -51,7 +51,6 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     optimizer = Adam(model.parameters(), lr=1e-3)
     if torch.cuda.is_available():
         model.cuda()
-        print('using GPU!!!')
 
     best_loss = 1000
     best_weights = None
@@ -80,7 +79,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_weights = copy.deepcopy(model.state_dict())
-                print('Saved')    
+                #print('Saved')    
             #print(np.mean(acc), val_loss, loss)
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
