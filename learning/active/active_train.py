@@ -1,6 +1,7 @@
 import argparse
 import copy
 import numpy as np
+import time
 
 from learning.active.acquire import acquire_datapoints
 from learning.active.train import train
@@ -53,6 +54,8 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
     :return: The fully trained ensemble.
     """
     for tx in range(args.max_acquisitions):
+        print('Acquisition Step: ', tx)
+        start_time = time.time()
         logger.save_dataset(dataset, tx)
 
         # Initialize and train models.
@@ -82,3 +85,5 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
             train_data, val_data = split_data(new_data, n_val=2)
             dataset.add_to_dataset(train_data)
             val_dataset.add_to_dataset(val_data)
+            
+        print('Time: ' + str((time.time()-start_time)*(1/60)) + ' minutes')
