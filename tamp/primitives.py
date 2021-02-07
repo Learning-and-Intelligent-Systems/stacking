@@ -12,7 +12,7 @@ from scipy.spatial.transform import Rotation as R
 
 DEBUG_FAILURE = False
 
-def get_grasp_gen(robot, add_slanted_grasps):
+def get_grasp_gen(robot, add_slanted_grasps=True):
     # I opt to use TSR to define grasp sets but you could replace this
     # with your favorite grasp generator
     def gen(body):
@@ -88,6 +88,25 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
+
+        # Check if grasp is vertical relative to object. Fail if so (approach would go through object).
+        # The y-axis of the gripper is along the plane of the hand. Make sure it isn't vertical.
+        point = numpy.array([[0, 1, 0]]).T
+        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
+        if numpy.abs(numpy.abs(t_point[2]) - 1.) < 0.001:
+            return None
+        # The x-axis of the gripper points towards the camera. Make sure is isn't facing down for any grasps.
+        point = numpy.array([[1, 0, 0]]).T
+        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
+        if numpy.abs(t_point[2] + 1.) < 0.001:
+            return None
+        # The z-axis of the gripper should not be facing up (never a good grasp).
+        point = numpy.array([[0, 0, 1]]).T
+        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
+        if numpy.abs(t_point[2] - 1.) < 0.001:
+            return None
+
+
         if approach_frame == 'gripper':
             approach_tform = ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
         elif approach_frame == 'global':
@@ -114,22 +133,6 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
             p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
             p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
 
-        # Check if grasp is vertical relative to object. Fail if so (approach would go through object).
-        # The y-axis of the gripper is along the plane of the hand. Make sure it isn't vertical.
-        point = numpy.array([[0, 1, 0]]).T
-        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
-        if numpy.abs(numpy.abs(t_point[2]) - 1.) < 0.001:
-            return None
-        # The x-axis of the gripper points towards the camera. Make sure is isn't facing down for any grasps.
-        point = numpy.array([[1, 0, 0]]).T
-        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
-        if numpy.abs(t_point[2] + 1.) < 0.001:
-            return None
-        # The z-axis of the gripper should not be facing up (never a good grasp).
-        point = numpy.array([[0, 0, 1]]).T
-        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
-        if numpy.abs(t_point[2] - 1.) < 0.001:
-            return None
 
         # TODO: Reject poses where the camera is upside down to speed up collision checking.
         for ax in range(num_attempts):
