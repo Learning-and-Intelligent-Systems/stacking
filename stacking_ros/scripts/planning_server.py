@@ -3,7 +3,7 @@
 ROS Server for PDDLStream Planning
 
 This server holds an action server for requesting a plan synchronously,
-as well as a mode to continue planning towers and pass along plans from a 
+as well as a mode to continue planning towers and pass along plans from a
 buffer upon request from a service client.
 """
 
@@ -13,13 +13,14 @@ import rospy
 import actionlib
 import argparse
 import pb_robot
+import pickle
 import pybullet as pb
 from stacking_ros.msg import TaskPlanAction, TaskPlanResult, TaskAction
 from stacking_ros.srv import (
     GetPlan, GetPlanResponse, SetPlanningState, SetPlanningStateResponse)
-from tamp.misc import (get_pddl_block_lookup, get_pddlstream_info, 
+from tamp.misc import (get_pddl_block_lookup, get_pddlstream_info,
     print_planning_problem, setup_panda_world, ExecuteActions)
-from tamp.ros_utils import (pose_to_transform, ros_to_pose, 
+from tamp.ros_utils import (pose_to_transform, ros_to_pose,
     ros_to_transform, task_plan_to_ros)
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.utils import INF
@@ -29,7 +30,7 @@ class PlanningServer():
     def __init__(self, blocks, block_init_xy_poses=None, use_platform=False):
 
         # Start up a robot simulation for planning
-        self._planning_client_id = pb_robot.utils.connect(use_gui=True)
+        self._planning_client_id = pb_robot.utils.connect(use_gui=False)
         self.plan()
         pb_robot.utils.set_default_camera()
         self.robot = pb_robot.panda.Panda()
@@ -37,7 +38,7 @@ class PlanningServer():
 
         # Initialize the world
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = \
-            setup_panda_world(self.robot, blocks, block_init_xy_poses, use_platform=use_platform) 
+            setup_panda_world(self.robot, blocks, block_init_xy_poses, use_platform=use_platform)
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
         self.pddl_block_lookup = get_pddl_block_lookup(blocks, self.pddl_blocks)
 
@@ -56,7 +57,7 @@ class PlanningServer():
         self.reset_service = rospy.Service(
             "/reset_planning", SetPlanningState, self.reset_planning)
         self.planning_service = actionlib.SimpleActionServer(
-            "/get_plan", TaskPlanAction, 
+            "/get_plan", TaskPlanAction,
             execute_cb=self.find_plan, auto_start=False)
         self.planning_service.start()
         print("Planning server ready!")
@@ -112,10 +113,10 @@ class PlanningServer():
         init += [('Table', self.table)]
         return init
 
-    
+
     def unpack_goal(self, ros_goal):
-        """ 
-        Convert TaskPlanGoal ROS message to PDDLStream compliant 
+        """
+        Convert TaskPlanGoal ROS message to PDDLStream compliant
         initial conditions and goal specification
         """
         pddl_goal = ["and",]
@@ -127,7 +128,7 @@ class PlanningServer():
                 if not elem.is_rel_pose:
                     blk = self.pddl_block_lookup[elem.name]
                     pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
-                    orn = [elem.pose.orientation.x, elem.pose.orientation.y, 
+                    orn = [elem.pose.orientation.x, elem.pose.orientation.y,
                         elem.pose.orientation.z, elem.pose.orientation.w]
                     blk.set_base_link_pose((pos, orn))
                     if elem.fixed:
@@ -159,7 +160,7 @@ class PlanningServer():
                 # Add to the initial condition
                 if ros_goal.reset:
                     pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
-                    orn = [elem.pose.orientation.x, elem.pose.orientation.y, 
+                    orn = [elem.pose.orientation.x, elem.pose.orientation.y,
                         elem.pose.orientation.z, elem.pose.orientation.w]
                     additional_init.extend([
                         ("Pose", blk, blk_pose),
@@ -203,7 +204,6 @@ class PlanningServer():
 
         # Get PDDLStream planning information
         pddl_info = get_pddlstream_info(self.robot,
-                                        fixed_objs,
                                         self.pddl_blocks,
                                         add_slanted_grasps=False,
                                         approach_frame='global')
@@ -237,12 +237,12 @@ class PlanningServer():
     def planning_loop(self):
 
         while not rospy.is_shutdown():
-            
+
             # If no planning has been received, just keep waiting
             if not self.planning_active or (self.planning_active and self.plan_complete):
                 # print("Waiting for client ...")
                 rospy.sleep(1)
-            
+
             # Otherwise, plan until failure or cancellation
             else:
                 self.plan_buffer = []
@@ -277,6 +277,7 @@ class PlanningServer():
             plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=2)
             if plan is not None and not self.cancel_planning:
                 self.simulate_plan(plan)
+                self.plan_buffer.append(plan)
             else:
                 print(f"No plan found to place {blk}")
                 self.goal_block_states = []
@@ -284,16 +285,16 @@ class PlanningServer():
                 return
 
             # Now check stability
-            desired_pose = blk.get_point()
-            T = 2500
-            self.step_simulation(T, vis_frames=False)
-            end_pose = blk.get_point()
-            if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
-                print("Unstable during planning!")
-                self.planning_active = False
-                return
-            else:
-                self.plan_buffer.append(plan)
+            # desired_pose = blk.get_point()
+            # T = 2500
+            # self.step_simulation(T, vis_frames=False)
+            # end_pose = blk.get_point()
+            # if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
+            #     print("Unstable during planning!")
+            #     self.planning_active = False
+            #     return
+            # else:
+
 
         # Set the completion flag if the plan succeeded until the end
         self.plan_complete = True
@@ -313,8 +314,8 @@ class PlanningServer():
 
 
     def reset_planning(self, ros_request):
-        """ 
-        Clears any existing planning buffer and sets the initial 
+        """
+        Clears any existing planning buffer and sets the initial
         block and robot states based on the request information
         """
         self.cancel_planning = True
@@ -326,7 +327,7 @@ class PlanningServer():
         for elem in ros_request.init_state:
             blk = self.pddl_block_lookup[elem.name]
             pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
-            orn = [elem.pose.orientation.x, elem.pose.orientation.y, 
+            orn = [elem.pose.orientation.x, elem.pose.orientation.y,
                 elem.pose.orientation.z, elem.pose.orientation.w]
             self.new_block_states.append((blk, (pos,orn)))
 
@@ -339,7 +340,7 @@ class PlanningServer():
             except:
                 base = self.table
             pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
-            orn = [elem.pose.orientation.x, elem.pose.orientation.y, 
+            orn = [elem.pose.orientation.x, elem.pose.orientation.y,
                 elem.pose.orientation.z, elem.pose.orientation.w]
             self.goal_block_states.append((blk, base, (pos,orn)))
 
@@ -402,7 +403,7 @@ class PlanningServer():
         print(f"\nFINAL PLAN\n{plan}\n")
         return plan
 
-    
+
     def simulate_plan(self, plan):
         """ Simulates an action plan """
         if plan is None:
@@ -439,9 +440,16 @@ class PlanningServer():
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--num-blocks', type=int, default=4)
+    parser.add_argument('--use-vision', default=False, action='store_true')
+    parser.add_argument('--blocks-file', default='/home/honda/catkin_ws/src/stacking/learning/domains/towers/initial_block_set.pkl', type=str)
     args = parser.parse_args()
 
     from block_utils import get_adversarial_blocks
-    blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
-    s = PlanningServer(blocks)    
+    if args.use_vision:
+        with open(args.blocks_file, 'rb') as handle:
+            blocks = pickle.load(handle)
+        block_init_xy_poses = None
+    else:
+        blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+    s = PlanningServer(blocks)
     s.planning_loop()

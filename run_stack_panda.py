@@ -33,7 +33,8 @@ def main(args):
                        use_platform=False,
                        block_init_xy_poses=block_init_xy_poses,
                        teleport=False,
-                       use_vision=args.use_vision)
+                       use_vision=args.use_vision,
+                       use_action_server=args.use_action_server)
 
     # for now hard-code a tower, but in the future will be supplied from
     # active data collection or tower found through planning for evaluation
@@ -54,7 +55,10 @@ def main(args):
         tower.append(block)
 
     # and execute the resulting plan.
-    panda.simulate_tower(tower, base_xy=(0.5, -0.25), real=args.real, vis=True, T=2500)
+    if args.use_action_server:
+        panda.simulate_tower_parallel(tower, base_xy=(0.5, -0.25), real=args.real, vis=True, T=2500)
+    else:
+        panda.simulate_tower(tower, base_xy=(0.5, -0.25), real=args.real, vis=True, T=2500)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -62,11 +66,8 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
     parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/initial_block_set.pkl')
+    parser.add_argument('--use-action-server', action='store_true')
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
-
-    if args.real:
-        import rospy
-        rospy.init_node('path_execution')
 
     main(args)
