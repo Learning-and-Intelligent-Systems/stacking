@@ -63,12 +63,12 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True):
             print("Do not have rospy and franka_interface installed.")
             return
 
-        try:
-            arm = ArmInterface()
-            arm.set_joint_position_speed(0.3)
-        except:
-            print("Unable to connect to real robot. Exiting")
-            return
+        #try:
+        arm = ArmInterface()
+        arm.set_joint_position_speed(0.3)
+        #except:
+        #    print("Unable to connect to real robot. Exiting")
+    #           return
 
         print("Executing on real robot")
         input("start?")
@@ -175,7 +175,7 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
     return pddl_blocks, pddl_platform, pddl_leg, pddl_table, pddl_frame, pddl_wall
 
 
-def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_frame):
+def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_frame, use_vision):
     domain_pddl = read('tamp/domain_stacking.pddl')
     stream_pddl = read('tamp/stream_stacking.pddl')
     constant_map = {}
@@ -185,7 +185,7 @@ def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_fram
         'sample-pose-table': from_list_fn(primitives.get_stable_gen_table(fixed)),
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
         'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot, add_slanted_grasps)),
-        'pick-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='gripper', backoff_frame='global', use_wrist_camera=True)),
+        'pick-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='gripper', backoff_frame='global', use_wrist_camera=use_vision)),
         'place-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='global', backoff_frame='global', use_wrist_camera=False)),
         'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
         'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
