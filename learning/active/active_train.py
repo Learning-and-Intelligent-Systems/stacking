@@ -30,9 +30,13 @@ def split_data(data, n_val):
 
         val_data[k]['towers'] = val_data[k]['towers'][~train_mask,...]
         val_data[k]['labels'] = val_data[k]['labels'][~train_mask,...]
+        if 'block_ids' in val_data[k]:
+            val_data[k]['block_ids'] = val_data[k]['block_ids'][~train_mask,...]
         
         data[k]['towers'] = data[k]['towers'][train_mask,...]
         data[k]['labels'] = data[k]['labels'][train_mask,...]
+        if 'block_ids' in data[k]:
+            data[k]['block_ids'] = data[k]['block_ids'][train_mask,...]
         start = end
     return data, val_data
 

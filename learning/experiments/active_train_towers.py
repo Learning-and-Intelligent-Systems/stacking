@@ -105,7 +105,7 @@ def run_active_towers(args):
             raise NotImplementedError()
         data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
 
-    print(len(dataset), len(val_dataset)) 
+    #print(len(dataset), len(val_dataset)) 
     sampler = TowerSampler(dataset=dataset,
                            batch_size=args.batch_size,
                            shuffle=True,

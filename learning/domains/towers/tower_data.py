@@ -45,6 +45,7 @@ class TowerDataset(Dataset):
                 '2block' : {
                     'towers': np.array (N, 2, D)
                     'labels': np.array (N,)
+                    'block_ids': np.array(N, 2) [this is only used if a block set is given]
                 }
                 '3block' : ...
             }
@@ -54,6 +55,7 @@ class TowerDataset(Dataset):
         self.tower_keys = ['2block', '3block', '4block', '5block']
         self.tower_tensors = {}
         self.tower_labels = {}
+        self.tower_block_ids = {}
 
         # First augment the given towers with rotations. 
         if augment:
@@ -66,6 +68,8 @@ class TowerDataset(Dataset):
             labels = torch.Tensor(augmented_towers[key]['labels'])
             self.tower_tensors[key] = preprocess(towers)
             self.tower_labels[key] = labels
+            if 'block_ids' in tower_dict[key].keys():
+                self.tower_block_ids[key] = augmented_towers[key]['block_ids']
         
         # Same order as 
         self.start_indices = {}
@@ -120,6 +124,13 @@ class TowerDataset(Dataset):
                 
                 self.tower_tensors[k] = torch.cat([self.tower_tensors[k], new_towers], dim=0)
                 self.tower_labels[k] = torch.cat([self.tower_labels[k], new_labels], dim=0)
+            
+                if 'block_ids' in augmented_towers[k].keys():
+                    new_block_ids = augmented_towers[k]['block_ids']
+                    if self.tower_block_ids[k].shape[0] == 0:
+                        self.tower_block_ids[k] = new_block_ids
+                    else:
+                        self.tower_block_ids[k] = np.concatenate([self.tower_block_ids[k], new_block_ids], axis=0)
 
         self.get_indices()
 

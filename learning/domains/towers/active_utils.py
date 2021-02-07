@@ -50,9 +50,14 @@ def sample_sequential_data(block_set, dataset, n_samples):
             break
         tower_tensors = unprocess(dataset.tower_tensors[k].cpu().numpy().copy())
         tower_labels = dataset.tower_labels[k]
-        for tower_vec, tower_label in zip(tower_tensors, tower_labels):
+        for ix, (tower_vec, tower_label) in enumerate(zip(tower_tensors, tower_labels)):
             if tower_label == 1:
-                block_tower = [Object.from_vector(tower_vec[bx, :]) for bx in range(tower_vec.shape[0])]
+                block_tower = []
+                for bx in range(tower_vec.shape[0]):
+                    block = Object.from_vector(tower_vec[bx, :])
+                    if block_set is not None:
+                        block.name = 'obj_'+str(int(dataset.tower_block_ids[k][ix, bx]))
+                    block_tower.append(block)
                 stable_towers.append(block_tower)
 
     block_lookup = {}
@@ -247,7 +252,8 @@ def get_labels(samples, exec_mode, agent, xy_noise=0.003):
                 if exec_mode == 'noisy-model':
                     vec_block[7:9] += np.random.randn(2)*xy_noise
                 block = Object.from_vector(vec_block)
-                block.name = 'obj_'+str(samples[k]['block_ids'][ix, jx])
+                if 'block_ids' in samples[k].keys():
+                    block.name = 'obj_'+str(samples[k]['block_ids'][ix, jx])
                 block = get_rotated_block(block)
                 block_tower.append(block)
             #  Use tp to check for stability.
@@ -279,7 +285,7 @@ def get_subset(samples, indices):
     :param indices: Which indices of the original structure to select.
     """
     keys = ['2block', '3block', '4block', '5block']
-    selected_towers = {k: {'towers': []} for k in keys}
+    selected_towers = {k: {'towers': [], 'block_ids': []} for k in keys}
     
     # Initialize tower ranges.
     start = 0
@@ -288,6 +294,8 @@ def get_subset(samples, indices):
         tower_ixs = indices[np.logical_and(indices >= start,
                                         indices < end)] - start
         selected_towers[k]['towers'] = samples[k]['towers'][tower_ixs,...]
+        if 'block_ids' in selected_towers[k].keys():
+            selected_towers[k]['block_ids'] = samples[k]['block_ids'][tower_ixs,...]
         start = end
 
     return selected_towers
