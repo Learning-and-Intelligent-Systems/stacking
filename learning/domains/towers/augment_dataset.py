@@ -12,11 +12,13 @@ from scipy.spatial.transform import Rotation as R
 def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
     datasets = {}
     for num_blocks in range(2, 6):
-        print('Augmenting %d block towers...' % num_blocks)
+        #print('Augmenting %d block towers...' % num_blocks)
         data = all_data[f'{num_blocks}block']
         # load the tower data
         towers = data['towers'][::K_skip, :]
         labels = data['labels'][::K_skip]
+        if 'block_ids' in data.keys() and data['block_ids'].shape != (0,):
+            block_ids = data['block_ids'][::K_skip, :]
         N, K, D = towers.shape
         # calculate the number of augmented towers that will be created
         N_angles = 4
@@ -27,10 +29,11 @@ def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
         # and create new arrays to store those towers
         augmented_towers = np.zeros((N_towers_to_add, K, D))
         augmented_labels = np.zeros(N_towers_to_add)
+        augmented_block_ids = np.zeros((N_towers_to_add, K))
 
         for ix in range(N):
-            if ix % 1000 == 0:
-                print(ix)
+            #if ix % 1000 == 0:
+                #print(ix)
             original_tower = [Object.from_vector(towers[ix, jx, :]) for jx in range(num_blocks)]
 
             for kx, z_rot in enumerate([0., np.pi/2., np.pi, 3*np.pi/2]):
@@ -48,7 +51,8 @@ def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
                     rot_tower.append(get_rotated_block(rot_block))
                     augmented_towers[tower_multiplier*ix + kx, bx, :] = rot_tower[bx].vectorize()
                 augmented_labels[tower_multiplier*ix + kx] = labels[ix]
-
+                if 'block_ids' in data.keys():
+                    augmented_block_ids[tower_multiplier*ix + kx, :] = block_ids[ix, :]
                 # translate the base block in the tower and add after the rotated blocks
                 # if translate:
                 #     dx, dy = np.random.uniform(-0.2, 0.2, 2)
@@ -82,7 +86,8 @@ def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
                 augmented_towers[start_index+N_angles*1 : start_index+N_angles*2, ...] = rot_towers * mirror_in_x
                 augmented_towers[start_index+N_angles*2 : start_index+N_angles*3, ...] = rot_towers * mirror_in_y
                 augmented_labels[start_index:start_index+N_angles*N_mirror] = labels[ix]
-
+                if 'block_ids' in data.keys():
+                    augmented_block_ids[start_index:start_index+N_angles*N_mirror, :] = block_ids[ix, :]
             if vis_tower:
                 for i in range(tower_multiplier):
                     print('VISUALIZE', ix*tower_multiplier+i, N_towers_to_add)
@@ -96,6 +101,8 @@ def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
 
         datasets[f'{num_blocks}block'] = {'towers': augmented_towers,
                                           'labels': augmented_labels}
+        if 'block_ids' in data.keys():
+            datasets[f'{num_blocks}block']['block_ids'] = augmented_block_ids
 
     return datasets
 
