@@ -76,7 +76,8 @@ RUN python3.7 -m pip install \
   pybullet \
   recordclass \
   rospy-message-converter \
-  scipy
+  scipy \
+  sklearn
 RUN python3.7 -m pip install git+https://github.com/mike-n-7/tsr.git
 
 # Create a Catkin workspace, clone packages, and build using Python 3

@@ -444,14 +444,14 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--num-blocks', type=int, default=4)
     parser.add_argument('--use-vision', default=False, action='store_true')
-    parser.add_argument('--blocks-file', default='/home/honda/catkin_ws/src/stacking/learning/domains/towers/initial_block_set.pkl', type=str)
+    parser.add_argument('--blocks-file', default='', type=str)
     args = parser.parse_args()
 
     from block_utils import get_adversarial_blocks
-    if args.use_vision:
+    if args.use_vision or len(args.blocks_file) > 0:
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)
-            blocks = [blocks[1], blocks[2]]
+            # blocks = [blocks[1], blocks[2]]
         block_init_xy_poses = None
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
