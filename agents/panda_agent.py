@@ -162,6 +162,9 @@ class PandaAgent:
                 print(pddl_block_name, named_pose.block_id)
                 if named_pose.block_id in pddl_block_name:
                     pose = named_pose.pose.pose
+                    # Skip changes the pose of objects in storage.
+                    if pose.position.x < 0.05:
+                        continue
                     position = (pose.position.x, pose.position.y, pose.position.z)
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
                     self.execute()
