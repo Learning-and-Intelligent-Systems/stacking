@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import pybullet as p
 
 from actions import plan_action
 from agents.teleport_agent import TeleportAgent
@@ -29,6 +30,11 @@ def main(args):
         use_platform=False, teleport=False,
         use_action_server=args.use_action_server,
         use_vision=args.use_vision)
+
+    if args.show_frames:
+        agent.step_simulation(T=1, vis_frames=True, lifeTime=0.)
+        input('Start building?')
+        p.removeAllUserDebugItems()
 
     for tx in range(0, args.num_towers):
         # Build a random tower out of blocks.
@@ -69,6 +75,7 @@ if __name__ == '__main__':
     parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
     parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/final_block_set.pkl')
     parser.add_argument('--real', action='store_true', help='run on real robot')
+    parser.add_argument('--show-frames', action='store_true')
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
 

@@ -716,7 +716,7 @@ class PandaAgent:
         return 1.
 
 
-    def step_simulation(self, T, vis_frames=False):
+    def step_simulation(self, T, vis_frames=False, lifeTime=0.1):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
         p.setGravity(0, 0, -10, physicsClientId=self._planning_client_id)
 
@@ -734,7 +734,7 @@ class PandaAgent:
             time.sleep(1/2400.)
 
             if vis_frames:
-                length, lifeTime = 0.1, 0.1
+                length = 0.1
                 for pddl_block in self.pddl_blocks:
                     pos, quat = pddl_block.get_pose()
                     new_x = transformation([length, 0.0, 0.0], pos, quat)
