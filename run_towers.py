@@ -7,7 +7,7 @@ from actions import plan_action
 from agents.teleport_agent import TeleportAgent
 from agents.panda_agent import PandaAgent
 from block_utils import Object, Dimensions, Position, Color, get_adversarial_blocks
-from learning.domains.towers.generate_tower_training_data import sample_random_tower
+from learning.domains.towers.generate_tower_training_data import sample_random_tower, build_tower
 from particle_belief import ParticleBelief
 from tower_planner import TowerPlanner
 import pb_robot
@@ -27,7 +27,7 @@ def main(args):
         n_blocks = np.random.randint(2, args.num_blocks + 1)
         tower_blocks = np.random.choice(blocks, n_blocks, replace=False)
 
-        tower = sample_random_tower(tower_blocks)
+        tower = build_tower(tower_blocks, constructable=True, max_attempts=50000)
 
         # and execute the resulting plan.
         print(f"Starting tower {tx}")
