@@ -1,0 +1,10 @@
+# ROS Service for starting planning for a tower
+
+# REQUEST: Tower information
+BodyInfo[] tower_info
+
+---
+
+# RESPONSE: Labels for active learning
+bool success
+float32 stable

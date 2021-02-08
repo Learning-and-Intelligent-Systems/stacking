@@ -267,10 +267,7 @@ def get_labels(samples, exec_mode, agent, xy_noise=0.003):
                 real = exec_mode == 'real'
                 # if planning fails, reset and try again
                 while not success:
-                    if agent.use_action_server:
-                        success, label = agent.simulate_tower_parallel(block_tower, vis, real=real)
-                    else:
-                        success, label = agent.simulate_tower(block_tower, vis, real=real)
+                    success, label = agent.simulate_tower(block_tower, vis, real=real)
                     if not success:
                         if real:
                             input('Resolve conflict causing planning to fail, then press \

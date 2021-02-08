@@ -22,7 +22,9 @@ from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise=0.00005, use_platform=False, block_init_xy_poses=None, teleport=False, use_vision=False, use_action_server=False, real=False):
+    def __init__(self, blocks, noise=0.00005, block_init_xy_poses=None, 
+                 teleport=False, use_platform=False, use_vision=False, real=False,
+                 use_action_server=False, use_learning_server=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a
@@ -34,12 +36,16 @@ class PandaAgent:
         :param use_vision: Boolean stating whether to use vision to detect blocks.
         :param use_action_server: Boolean stating whether to use the separate
                                   ROS action server to do planning.
+        :param use_learning_server: Boolean stating whether to host a ROS service
+                                    server to drive planning from active learning script.
 
         If you are using the ROS action server, you must start it in a separate terminal:
             rosrun stacking_ros planning_server.py
         """
+        self.real = real
         self.use_vision = use_vision
         self.use_action_server = use_action_server
+        self.use_learning_server = use_learning_server
 
         # Setup PyBullet instance to run in the background and handle planning/collision checking.
         self._planning_client_id = pb_robot.utils.connect(use_gui=False)
@@ -79,22 +85,23 @@ class PandaAgent:
             self._get_block_poses_wrist = rospy.ServiceProxy('get_block_poses_wrist', GetBlockPosesWrist)
             self._update_block_poses()
 
-        # Start ROS action client
+        # Start ROS clients and servers as needed
         if self.use_action_server:
-            import actionlib
-            from stacking_ros.msg import TaskPlanAction
-            from stacking_ros.srv import GetPlan, SetPlanningState
+            from stacking_ros.srv import GetPlan, SetPlanningState, PlanTower
             from tamp.ros_utils import goal_to_ros, ros_to_task_plan
 
             print("Waiting for planning server...")
-            rospy.wait_for_service('get_latest_plan')
+            rospy.wait_for_service("get_latest_plan")
             self.goal_to_ros = goal_to_ros
             self.ros_to_task_plan = ros_to_task_plan
             self.init_state_client = rospy.ServiceProxy(
                 "/reset_planning", SetPlanningState)
             self.get_plan_client = rospy.ServiceProxy(
                 "/get_latest_plan", GetPlan)
-
+            if self.use_learning_server:
+                self.learning_server = rospy.Service(
+                    "/plan_tower", PlanTower, self.plan_and_execute_tower)
+                print("Learning server started!")
             print("Done!")
         else:
             self.planning_client = None
@@ -373,14 +380,10 @@ class PandaAgent:
         # Package up the ROS message
         from stacking_ros.msg import BodyInfo
         from stacking_ros.srv import SetPlanningStateRequest
-        from tamp.ros_utils import pose_to_ros, pose_tuple_to_ros, transform_to_ros
+        from tamp.ros_utils import block_init_to_ros, pose_to_ros, pose_tuple_to_ros, transform_to_ros
         ros_req = SetPlanningStateRequest()
         # Initial poses
-        for blk in self.pddl_blocks:
-            ros_block = BodyInfo()
-            ros_block.name = blk.readableName
-            pose_tuple_to_ros(blk.get_base_link_pose(), ros_block.pose)
-            ros_req.init_state.append(ros_block)
+        ros_req.init_state = block_init_to_ros(self.pddl_blocks)
         # Goal poses
         # TODO: Set base block to be rotated in its current position.
         base_block = self.pddl_block_lookup[tower[0].name]
@@ -411,8 +414,9 @@ class PandaAgent:
             block_ros.is_rel_pose = True
             ros_req.goal_state.append(block_ros)
 
-        success, stable = self.execute_plans_from_server(ros_req, real, T)
-        print(f"Completed tower stack with success: {success}, stable: {stable}")
+        # Execute the stacking plan
+        success, stack_stable = self.execute_plans_from_server(ros_req, real, T)
+        print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
 
         if self.use_vision:
             self._update_block_poses()
@@ -422,15 +426,8 @@ class PandaAgent:
         current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
         block_ixs = range(len(self.pddl_blocks))
         block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
-
         ros_req = SetPlanningStateRequest()
-        # Initial poses
-        for blk in self.pddl_blocks:
-            ros_block = BodyInfo()
-            ros_block.name = blk.readableName
-            pose_tuple_to_ros(blk.get_base_link_pose(), ros_block.pose)
-            ros_req.init_state.append(ros_block)
-        # Goal poses
+        ros_req.init_state = block_init_to_ros(self.pddl_blocks)
         for ix in block_ixs:
             blk, pose = self.pddl_blocks[ix], original_poses[ix]
             if blk in self.moved_blocks:
@@ -440,9 +437,10 @@ class PandaAgent:
                 pose_to_ros(goal_pose, ros_block.pose)
                 ros_req.goal_state.append(ros_block)
 
-        success, stable = self.execute_plans_from_server(ros_req, real, T)
-        print(f"Completed tower reset with success: {success}, stable: {stable}")
-        return success, stable
+        # Execute the reset plan
+        success, reset_stable = self.execute_plans_from_server(ros_req, real, T)
+        print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
+        return success, stack_stable
 
 
     def execute_plans_from_server(self, ros_req, real=False, T=2500):
@@ -473,7 +471,7 @@ class PandaAgent:
             # Check if the plan failed; if so, exit
             query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
             self.moved_blocks.add(query_block)
-            desired_pose = query_block.get_point()
+            desired_pose = query_block.get_base_link_point()
             if not real:
                 self.step_simulation(T, vis_frames=False)
 
@@ -488,6 +486,18 @@ class PandaAgent:
                 if num_success == len(ros_req.goal_state):
                     print("Completed tower!")
                     return True, stable
+
+
+    def plan_and_execute_tower(self, ros_req, base_xy=(0.5, -0.3), real=False):
+        """ Service callback function to plan and execute a tower """
+        from stacking_ros.srv import PlanTowerResponse
+        from tamp.ros_utils import ros_to_tower
+        tower = ros_to_tower(ros_req.tower_info)
+        success, stable = self.simulate_tower_parallel(tower, True, real=real, base_xy=base_xy)
+        resp = PlanTowerResponse()
+        resp.success = success
+        resp.stable = stable
+        return resp
 
 
     def simulate_tower(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
@@ -605,7 +615,7 @@ class PandaAgent:
                     self.teleport_block(top_pddl, pose.pose)
 
                 # Execute the block placement.
-                desired_pose = top_pddl.get_point()
+                desired_pose = top_pddl.get_base_link_point()
                 if not real:
                     self.step_simulation(T, vis_frames=False)
                 # TODO: Check if the tower was stable, stop construction if not.
@@ -837,3 +847,29 @@ class PandaAgent:
         regrasp += [('place', ['?rb0', WILD, WILD, WILD, '?rg1', '?rq6', WILD, WILD])]
 
         return [no_regrasp, regrasp]
+
+
+class PandaClientAgent:
+    """
+    Lightweight client to call a PandaAgent as a service for active learning
+    """
+
+    def __init__(self):
+        import rospy
+        rospy.init_node("panda_client")
+        from stacking_ros.srv import PlanTower
+        print("Waiting for Panda Agent server...")
+        rospy.wait_for_service("/plan_tower")
+        print("Done")
+        self.client = rospy.ServiceProxy(
+            "/plan_tower", PlanTower)
+
+
+    def simulate_tower(self, tower, vis, real=False):
+        """ Call the PandaAgent server """
+        from stacking_ros.srv import PlanTowerRequest
+        from tamp.ros_utils import tower_to_ros, ros_to_tower
+        request = PlanTowerRequest()
+        request.tower_info = tower_to_ros(tower)
+        response = self.client.call(request)
+        return response.success, response.stable
