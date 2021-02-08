@@ -2,8 +2,6 @@ import argparse
 import copy
 import numpy as np
 
-import torch
-
 from learning.active.acquire import acquire_datapoints
 from learning.active.train import train
 from learning.active.utils import ActiveExperimentLogger
@@ -58,16 +56,13 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
 
         # Initialize and train models.
         ensemble.reset()
-        if torch.cuda.is_available():
-            ensemble.cuda()
         for model in ensemble.models:
-            if dataloader.dataset.has_data:
-                train(dataloader, val_dataloader, model, args.n_epochs)
+            train(dataloader, val_dataloader, model, args.n_epochs)
         
         logger.save_ensemble(ensemble, tx)
 
         # Collect new samples.
-        new_data, all_samples = acquire_datapoints(tx, ensemble=ensemble, 
+        new_data, all_samples = acquire_datapoints(ensemble=ensemble, 
                                                    n_samples=args.n_samples, 
                                                    n_acquire=args.n_acquire, 
                                                    strategy=args.strategy,

@@ -11,7 +11,7 @@ from tower_planner import TowerPlanner
 
 
 # TODO: Write a version of this function that does pool based active learning from a given file.
-def sample_unlabeled_data(n_samples, tx=None, block_set=None, tower_heights=['2', '3', '4', '5']):
+def sample_unlabeled_data(n_samples, block_set=None):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
@@ -19,23 +19,8 @@ def sample_unlabeled_data(n_samples, tx=None, block_set=None, tower_heights=['2'
     :param block_set (optional): blocks to use in towers. generate new blocks if None
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
-    '''
-    # uncomment to use a curriculum
-    if tx is None:
-        tower_heights=['2']
-    else:
-        if tx < 25:
-            tower_heights=['2']
-        elif tx < 50:
-            tower_heights=['2', '3']
-        elif tx < 75:
-            tower_heights=['2','3','4']
-        else:
-            tower_heights=['2','3','4','5']
-    '''
-    keys = [th+'block' for th in tower_heights]
-    int_tower_heights = [int(th) for th in tower_heights]
-    
+    keys = ['2block', '3block', '4block', '5block']
+
     # initialize a dictionary of lists to store the generated data
     sampled_towers = {k: {} for k in keys}
     for k in keys:
@@ -46,7 +31,7 @@ def sample_unlabeled_data(n_samples, tx=None, block_set=None, tower_heights=['2'
 
     # sample random towers and add them to the lists in the dictionary
     for ix in range(n_samples):
-        n_blocks = np.random.randint(min(int_tower_heights), max(int_tower_heights)+1)
+        n_blocks = np.random.randint(2, 6)
         # get n_blocks, either from scratch or from the block set
         if block_set is not None: 
             blocks = np.random.choice(block_set, n_blocks, replace=False)
@@ -105,20 +90,17 @@ def get_labels(samples):
     """
     tp = TowerPlanner(stability_mode='contains')
     for k in samples.keys():
-        if len(samples[k]['towers'].shape) > 1:
-            n_towers, n_blocks, _ = samples[k]['towers'].shape
-            labels = np.ones((n_towers,))
+        n_towers, n_blocks, _ = samples[k]['towers'].shape
+        labels = np.ones((n_towers,))
 
-            for ix in range(0, n_towers):
-                # Convert tower to Block representation.
-                block_tower = [Object.from_vector(samples[k]['towers'][ix, jx, :]) for jx in range(n_blocks)]
-                #  Use tp to check for stability.
-                if not tp.tower_is_constructable(block_tower):
-                    labels[ix] = 0.
+        for ix in range(0, n_towers):
+            # Convert tower to Block representation.
+            block_tower = [Object.from_vector(samples[k]['towers'][ix, jx, :]) for jx in range(n_blocks)]
+            #  Use tp to check for stability.
+            if not tp.tower_is_constructable(block_tower):
+                labels[ix] = 0.
 
-            samples[k]['labels'] = labels
-        else:
-            samples[k]['labels'] = np.empty(0)
+        samples[k]['labels'] = labels
     return samples
 
 
@@ -128,7 +110,7 @@ def get_subset(samples, indices):
     :param samples: A tower_dict structure.
     :param indices: Which indices of the original structure to select.
     """
-    keys = list(samples.keys())
+    keys = ['2block', '3block', '4block', '5block']
     selected_towers = {k: {'towers': []} for k in keys}
     
     # Initialize tower ranges.

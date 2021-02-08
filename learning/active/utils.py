@@ -129,9 +129,7 @@ class ActiveExperimentLogger:
 
         # Load ensemble weights.
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
-        ensemble.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
-        if torch.cuda.is_available():
-            ensemble.cuda()
+        ensemble.load_state_dict(torch.load(path, map_location='cpu'))
         return ensemble
 
     def save_ensemble(self, ensemble, tx):
