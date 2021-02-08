@@ -5,13 +5,23 @@ import argparse
 
 from block_utils import Object, Dimensions, Color, Position
 
+# this is used to generate a block_set.pkl file from random block_utils.Object() 
+# blocks using the parameters there
+def random_block_set(args):
+    block_set = [Object.random('obj_'+str(n)) for n in range(args.n_blocks)]
+    pkl_filename = 'block_set_'+str(args.n_blocks)+'.pkl'
+    with open(pkl_filename, 'wb') as f:
+        pickle.dump(block_set, f)
+
 def string_to_list(string):
     string = string.replace('[', '').replace(']','')
     list_string = string.split(' ')
     list_float = [float(s) for s in list_string if s != '']
     return list_float
 
-def main(args):
+# this is used to generate a block_set.pkl file from a .csv file 
+# the .csv files are generated in scripts/generate_block_set.py (for physical block sets)
+def block_set_from_csv(args):
     block_set = []
     with open(args.csv_file) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
@@ -33,7 +43,12 @@ def main(args):
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--csv-file', type=str, required=True)
+    parser.add_argument('--csv-file', type=str)
+    parser.add_argument('--n-blocks', type=int)
+    parser.add_argument('--mode', choices=['csv', 'random'])
     args = parser.parse_args()
 
-    main(args)
+    if args.mode == 'random':
+        random_block_set(args)
+    elif args.mode == 'csv':
+        block_set_from_csv(args)
