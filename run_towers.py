@@ -2,6 +2,7 @@ import pdb
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 from actions import plan_action
 from agents.teleport_agent import TeleportAgent
@@ -17,10 +18,17 @@ def main(args):
     NOISE=0.00005
 
     # get a bunch of random blocks
-    blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
-    agent = PandaAgent(blocks, NOISE, 
-        use_platform=False, teleport=False, 
-        use_action_server=args.use_action_server)
+    #if args.use_vision:
+    with open(args.blocks_file, 'rb') as handle:
+        blocks = pickle.load(handle)
+        blocks = [blocks[1], blocks[2]]
+    # else:
+    #     blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+
+    agent = PandaAgent(blocks, NOISE,
+        use_platform=False, teleport=False,
+        use_action_server=args.use_action_server,
+        use_vision=args.use_vision)
 
     for tx in range(0, args.num_towers):
         # Build a random tower out of blocks.
@@ -32,15 +40,17 @@ def main(args):
         # and execute the resulting plan.
         print(f"Starting tower {tx}")
         if args.use_action_server:
-            agent.simulate_tower_parallel(tower, 
-                                          base_xy=(0.5, -0.3), 
-                                          vis=True, 
+            agent.simulate_tower_parallel(tower,
+                                          real=args.real,
+                                          base_xy=(0.5, -0.3),
+                                          vis=True,
                                           T=2500)
         else:
             success, stable = agent.simulate_tower(tower,
-                                base_xy=(0.5, -0.3), 
-                                vis=True, 
-                                T=2500, 
+                                real=args.real,
+                                base_xy=(0.5, -0.3),
+                                vis=True,
+                                T=2500,
                                 save_tower=args.save_tower)
             if not success:
                 print('Planner failed.')
@@ -55,6 +65,9 @@ if __name__ == '__main__':
     parser.add_argument('--num-towers', type=int, default=10)
     parser.add_argument('--save-tower', action='store_true')
     parser.add_argument('--use-action-server', action='store_true')
+    parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
+    parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/initial_block_set.pkl')
+    parser.add_argument('--real', action='store_true', help='run on real robot')
     args = parser.parse_args()
     if args.debug: pdb.set_trace()
 
