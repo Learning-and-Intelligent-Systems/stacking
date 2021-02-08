@@ -18,12 +18,12 @@ def main(args):
     NOISE=0.00005
 
     # get a bunch of random blocks
-    #if args.use_vision:
-    with open(args.blocks_file, 'rb') as handle:
-        blocks = pickle.load(handle)
-        blocks = [blocks[1], blocks[2]]
-    # else:
-    #     blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+    if args.use_vision:
+        with open(args.blocks_file, 'rb') as handle:
+            blocks = pickle.load(handle)[:10]
+            #blocks = [blocks[1], blocks[2]]
+    else:
+        blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
     agent = PandaAgent(blocks, NOISE,
         use_platform=False, teleport=False,
@@ -35,7 +35,8 @@ def main(args):
         n_blocks = np.random.randint(2, args.num_blocks + 1)
         tower_blocks = np.random.choice(blocks, n_blocks, replace=False)
 
-        tower = build_tower(tower_blocks, constructable=True, max_attempts=50000)
+        tower = sample_random_tower(tower_blocks)
+        #tower = build_tower(tower_blocks, constructable=True, max_attempts=50000)
 
         # and execute the resulting plan.
         print(f"Starting tower {tx}")
@@ -62,11 +63,11 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--num-blocks', type=int, default=4)
-    parser.add_argument('--num-towers', type=int, default=10)
+    parser.add_argument('--num-towers', type=int, default=100)
     parser.add_argument('--save-tower', action='store_true')
     parser.add_argument('--use-action-server', action='store_true')
     parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
-    parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/initial_block_set.pkl')
+    parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/final_block_set.pkl')
     parser.add_argument('--real', action='store_true', help='run on real robot')
     args = parser.parse_args()
     if args.debug: pdb.set_trace()

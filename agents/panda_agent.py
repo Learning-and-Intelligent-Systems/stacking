@@ -442,7 +442,6 @@ class PandaAgent:
         success = self.execute_plans_from_server(ros_req, real, T)
         print(f"Completed tower reset with success: {success}")
 
-
     def execute_plans_from_server(self, ros_req, real=False, T=2500):
         """ Executes plans received from planning server """
         self.init_state_client.call(ros_req)
@@ -549,7 +548,7 @@ class PandaAgent:
             else:
                 self.teleport_block(base_block, base_pose.pose)
         moved_blocks.add(base_block)
-
+        stable = self.check_stability(real, base_block, base_pose.pose[0])
         poses = [base_pose]
         # TODO: Calculate each blocks pose relative to the block beneath.
         for b_ix in range(1, len(tower)):
@@ -603,13 +602,13 @@ class PandaAgent:
                     self.teleport_block(top_pddl, pose.pose)
 
                 # Execute the block placement.
-                desired_pose = top_pddl.get_point()
+                desired_pose = top_pddl.get_base_link_point()
                 if not real:
                     self.step_simulation(T, vis_frames=False)
                 # TODO: Check if the tower was stable, stop construction if not.
-                input('Press enter to stability.')
+                #input('Press enter to stability.')
                 stable = self.check_stability(real, top_pddl, desired_pose)
-                input('Continue?')
+                #input('Continue?')
                 if stable == 0.:
                     break
 
@@ -706,6 +705,8 @@ class PandaAgent:
 
         else:
             end_pose = block_pddl.get_base_link_point()
+            print('Desired Pos:', desired_pose)
+            print('Detected Pos:', end_pose)
             if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
                 print('Unstable!')
                 return 0.
@@ -770,6 +771,7 @@ class PandaAgent:
 
         constraints = PlanConstraints(skeletons=self._get_regrasp_skeleton(),
                                   exact=True)
+
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
                                 #constraints=constraints,
@@ -784,7 +786,7 @@ class PandaAgent:
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
-            print("Planning failed.")
+            input("Planning failed.")
             return False
         else:
             saved_world.restore()
@@ -832,3 +834,5 @@ class PandaAgent:
         regrasp += [('place', ['?rb0', WILD, WILD, WILD, '?rg1', '?rq6', WILD, WILD])]
 
         return [no_regrasp, regrasp]
+        
+            
