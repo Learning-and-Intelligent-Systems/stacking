@@ -169,6 +169,9 @@ class PandaAgent:
                 print(pddl_block_name, named_pose.block_id)
                 if named_pose.block_id in pddl_block_name:
                     pose = named_pose.pose.pose
+                    # Skip changes the pose of objects in storage.
+                    if pose.position.x < 0.05:
+                        continue
                     position = (pose.position.x, pose.position.y, pose.position.z)
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
                     self.execute()
@@ -442,7 +445,6 @@ class PandaAgent:
         print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
         return success, stack_stable
 
-
     def execute_plans_from_server(self, ros_req, real=False, T=2500):
         """ Executes plans received from planning server """
         self.init_state_client.call(ros_req)
@@ -561,7 +563,7 @@ class PandaAgent:
             else:
                 self.teleport_block(base_block, base_pose.pose)
         moved_blocks.add(base_block)
-
+        stable = self.check_stability(real, base_block, base_pose.pose[0])
         poses = [base_pose]
         # TODO: Calculate each blocks pose relative to the block beneath.
         for b_ix in range(1, len(tower)):
@@ -619,9 +621,9 @@ class PandaAgent:
                 if not real:
                     self.step_simulation(T, vis_frames=False)
                 # TODO: Check if the tower was stable, stop construction if not.
-                input('Press enter to stability.')
+                #input('Press enter to stability.')
                 stable = self.check_stability(real, top_pddl, desired_pose)
-                input('Continue?')
+                #input('Continue?')
                 if stable == 0.:
                     break
 
@@ -727,7 +729,7 @@ class PandaAgent:
         return 1.
 
 
-    def step_simulation(self, T, vis_frames=False):
+    def step_simulation(self, T, vis_frames=False, lifeTime=0.1):
         p.setGravity(0, 0, -10, physicsClientId=self._execution_client_id)
         p.setGravity(0, 0, -10, physicsClientId=self._planning_client_id)
 
@@ -745,7 +747,7 @@ class PandaAgent:
             time.sleep(1/2400.)
 
             if vis_frames:
-                length, lifeTime = 0.1, 0.1
+                length = 0.1
                 for pddl_block in self.pddl_blocks:
                     pos, quat = pddl_block.get_pose()
                     new_x = transformation([length, 0.0, 0.0], pos, quat)
@@ -785,6 +787,7 @@ class PandaAgent:
 
         constraints = PlanConstraints(skeletons=self._get_regrasp_skeleton(),
                                   exact=True)
+
         pddlstream_problem = tuple([*self.pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
                                 #constraints=constraints,
@@ -799,7 +802,7 @@ class PandaAgent:
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
-            print("Planning failed.")
+            input("Planning failed.")
             return False
         else:
             saved_world.restore()

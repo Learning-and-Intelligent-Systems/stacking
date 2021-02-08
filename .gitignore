@@ -20,3 +20,4 @@ tower-*
 *.mp4
 *.npy
 scratch/
+paper_results/

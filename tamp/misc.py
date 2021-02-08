@@ -6,7 +6,7 @@ import time
 
 import tamp.primitives as primitives
 
-from block_utils import object_to_urdf, Object, Pose, Position
+from block_utils import object_to_urdf, Object, Pose, Position, all_rotations, Quaternion, get_rotated_block
 from pddlstream.language.generator import from_gen_fn, from_list_fn, from_fn, from_test , BoundedGenerator
 from pddlstream.utils import read
 
@@ -128,27 +128,36 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
 
     # Set the initial positions randomly on table.
     if xy_poses is None:
-        print('Placing blocks randomly...')
+        storage_poses = [(-0.4, -0.4), (-0.25, -0.4), # Left Corner
+                         (-0.45, -0.), (-0.3, -0.),   # Back Center
+                         (-0.4, 0.4), (-0.25, 0.4),   # Right Corner
+                         (-0., -0.5), (0., -0.35),   # Left Side
+                         (-0., 0.5), (0., 0.35)]     # Right Side
+        print('Placing blocks in storage locations...')
         for ix, block in enumerate(pddl_blocks):
-            while True:
-                z = pb_robot.placements.stable_z(block, pddl_table)
-                x = numpy.random.uniform(0.4, 0.7) # 0.4 0.7
-                y = numpy.random.uniform(0.1, 0.4) # 0.1 0.4
-                block.set_base_link_point([x, y, z])
+            x, y = storage_poses[ix]
+            dimensions = numpy.array(block.get_dimensions()).reshape((3, 1))
+            if ix < 6:  # Back storage should have long side along y-axis.
+                for rot in all_rotations():
+                    rot_dims = numpy.abs(rot.as_matrix()@dimensions)[:, 0]
+                    if rot_dims[1] >= rot_dims[0] and rot_dims[1] >= rot_dims[2]:
+                        block.set_base_link_pose(((x, y, 0.), rot.as_quat()))
+                        break
+            else:  # Side storage should have long side along x-axis.
+                for rot in all_rotations():
+                    rot_dims = numpy.abs(rot.as_matrix()@dimensions)[:, 0]
+                    if rot_dims[0] >= rot_dims[1] and rot_dims[0] >= rot_dims[2]:
+                        block.set_base_link_pose(((x, y, 0.), rot.as_quat()))
+                        break
 
-                # Check that there is no collision with already placed blocks.
-                collision = False
-                for jx in range(0, ix):
-                    if pb_robot.collisions.body_collision(block, pddl_blocks[jx], max_distance=0.075):
-                        collision = True
-                if collision:
-                    continue
-                break
+            z = pb_robot.placements.stable_z(block, pddl_table)
+            block.set_base_link_point([x, y, z])
     else:
         for i, (block, xy_pose) in enumerate(zip(pddl_blocks, xy_poses)):
+
             full_pose = Pose(Position(xy_pose.pos.x,
-                                    xy_pose.pos.y,
-                                    pb_robot.placements.stable_z(block, pddl_table)),
+                                     xy_pose.pos.y,
+                                     xy_pose.pos.z),
                             xy_pose.orn)
             block.set_base_link_pose(full_pose)
 
