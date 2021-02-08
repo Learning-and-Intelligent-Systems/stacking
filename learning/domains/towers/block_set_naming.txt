@@ -2,5 +2,8 @@
  3D printed and a few (not sure which ones) where laser cut plywood
  - final_block_set.csv and .pkl are the new block set which increased the minimum
  width to improve the size of the AR tag for vision
- - train_sim_block_set_12.pkl are the blocks used in the paper_results with data
- collected on a noisy analytical model of constructability
+ - eval_sim_block_set_12.csv and .pkl are the blocks we will evaluate with on the
+ real robot
+ - train_sim_block_set_12.pkl are the blocks used to train models in paper results
+ with data collected on a noisy analytical model of constructability
+ - eval_sim_block_set_12.pkl are the blocks used to evaluate models in paper results

@@ -21,8 +21,13 @@ ROTATIONS = list(rotation_group())
 ROTATIONS = list(all_rotations())
 QUATERNIONS = [Quaternion(*o.as_quat()) for o in ROTATIONS]
 ROTATED_BLOCKS = {}
-def sample_random_tower(blocks, ret_rotated=False):
-    num_blocks = len(blocks)
+def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=False):
+    if num_blocks is None:
+        num_blocks = len(blocks)
+
+    # select blocks in this tower
+    blocks = np.random.choice(blocks, num_blocks, replace=False)
+    
     # pick random orientations for the blocks
     orns = sample_with_replacement(QUATERNIONS, k=num_blocks)
     #orns = [Quaternion(*orn.as_quat()) for orn in orns]
@@ -37,18 +42,24 @@ def sample_random_tower(blocks, ret_rotated=False):
         rotated_blocks.append(ROTATED_BLOCKS[block][orn])
 
     # pick random positions for each block
-    # get the x and y dimensions of each block (after the rotation)
-    dims_xy = np.array([rb.dimensions for rb in rotated_blocks])[:,:2]
-    # figure out how far each block can be moved w/ losing contact w/ the block below
-    max_displacements_xy = (dims_xy[1:] + dims_xy[:-1])/2.
-    # sample unscaled noise (clip bceause random normal can exceed -1, 1)
-    noise_xy = np.clip(0.5*np.random.randn(num_blocks-1, 2), -0.95, 0.95)
-    # and scale the noise by the max allowed displacement
-    rel_xy = max_displacements_xy * noise_xy
-    # place the first block at the origin
-    rel_xy = np.vstack([np.zeros([1,2]), rel_xy])
-    # and get the actual positions by cumulative sum of the relative positions
-    pos_xy = np.cumsum(rel_xy, axis=0)
+    if discrete:
+        coms = np.array([rb.com for rb in rotated_blocks])
+        coms_diff = np.subtract(coms[:-1], coms[1:])
+        pos_xy = np.cumsum(coms_diff[:,:2], axis=0)
+        pos_xy = np.vstack([np.zeros([1,2]), pos_xy])
+    else:
+        # get the x and y dimensions of each block (after the rotation)
+        dims_xy = np.array([rb.dimensions for rb in rotated_blocks])[:,:2]
+        # figure out how far each block can be moved w/ losing contact w/ the block below
+        max_displacements_xy = (dims_xy[1:] + dims_xy[:1])/2.
+        # sample unscaled noise (clip bceause random normal can exceed -1, 1)
+        noise_xy = np.clip(0.5*np.random.randn(num_blocks-1, 2), -0.95, 0.95)
+        # and scale the noise by the max allowed displacement
+        rel_xy = max_displacements_xy * noise_xy
+        # place the first block at the origin
+        rel_xy = np.vstack([np.zeros([1,2]), rel_xy])
+        # and get the actual positions by cumulative sum of the relative positions
+        pos_xy = np.cumsum(rel_xy, axis=0)
 
     # calculate the height of each block
     heights = np.array([rb.dimensions.z for rb in rotated_blocks])

@@ -8,7 +8,9 @@ from block_utils import Object, Dimensions, Color, Position
 # this is used to generate a block_set.pkl file from random block_utils.Object() 
 # blocks using the parameters there
 def random_block_set(args):
-    block_set = [Object.random('obj_'+str(n)) for n in range(args.n_blocks)]
+    dim_range = (args.block_min_dim, args.block_max_dim)
+    block_set = [Object.random('obj_'+str(n), dim_range=dim_range) 
+                 for n in range(args.n_blocks)]
     pkl_filename = 'block_set_'+str(args.n_blocks)+'.pkl'
     with open(pkl_filename, 'wb') as f:
         pickle.dump(block_set, f)
@@ -46,6 +48,8 @@ if __name__ == '__main__':
     parser.add_argument('--csv-file', type=str)
     parser.add_argument('--n-blocks', type=int)
     parser.add_argument('--mode', choices=['csv', 'random'])
+    parser.add_argument('--block-min-dim', type=float, default=0.05)
+    parser.add_argument('--block-max-dim', type=float, default=0.15)
     args = parser.parse_args()
 
     if args.mode == 'random':
