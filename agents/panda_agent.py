@@ -355,6 +355,7 @@ class PandaAgent:
 
     def simulate_tower_parallel(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5)):
         """
+        Simulates a tower stacking and unstacking by requesting plans from a separate planning server
         """
 
         for block in tower:
@@ -410,8 +411,8 @@ class PandaAgent:
             block_ros.is_rel_pose = True
             ros_req.goal_state.append(block_ros)
 
-        success = self.execute_plans_from_server(ros_req, real, T)
-        print(f"Completed tower stack with success: {success}")
+        success, stable = self.execute_plans_from_server(ros_req, real, T)
+        print(f"Completed tower stack with success: {success}, stable: {stable}")
 
         if self.use_vision:
             self._update_block_poses()
@@ -439,15 +440,16 @@ class PandaAgent:
                 pose_to_ros(goal_pose, ros_block.pose)
                 ros_req.goal_state.append(ros_block)
 
-        success = self.execute_plans_from_server(ros_req, real, T)
-        print(f"Completed tower reset with success: {success}")
+        success, stable = self.execute_plans_from_server(ros_req, real, T)
+        print(f"Completed tower reset with success: {success}, stable: {stable}")
+        return success, stable
 
 
     def execute_plans_from_server(self, ros_req, real=False, T=2500):
         """ Executes plans received from planning server """
         self.init_state_client.call(ros_req)
 
-        success = False
+        stable = False
         num_success = 0
         planning_active = True
         while num_success < len(ros_req.goal_state):
@@ -460,7 +462,7 @@ class PandaAgent:
                 plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
                 if not planning_active:
                     print("Planning ended on server side")
-                    return success
+                    return False, False
             print("\nGot plan:")
             print(plan)
 
@@ -475,17 +477,17 @@ class PandaAgent:
             if not real:
                 self.step_simulation(T, vis_frames=False)
 
-            input('Press enter to stability.')
+            input('Press enter to check stability.')
             stable = self.check_stability(real, query_block, desired_pose)
             input('Continue?')
             if stable == 0.:
                 print("Unstable after execution!")
-                return success
+                return True, stable
             else:
                 num_success += 1
                 if num_success == len(ros_req.goal_state):
-                    success = True
-        return success
+                    print("Completed tower!")
+                    return True, stable
 
 
     def simulate_tower(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
@@ -706,7 +708,10 @@ class PandaAgent:
 
         else:
             end_pose = block_pddl.get_base_link_point()
-            if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
+            dist = numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose))
+            print(f"Distance is {dist}")
+            print(f"Block dimensions are {block_pddl.get_dimensions()}")
+            if dist > 0.01:
                 print('Unstable!')
                 return 0.
         return 1.

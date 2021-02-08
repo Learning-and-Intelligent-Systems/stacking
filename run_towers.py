@@ -18,12 +18,12 @@ def main(args):
     NOISE=0.00005
 
     # get a bunch of random blocks
-    #if args.use_vision:
-    with open(args.blocks_file, 'rb') as handle:
-        blocks = pickle.load(handle)
-        blocks = [blocks[1], blocks[2]]
-    # else:
-    #     blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+    if args.use_vision:
+        with open(args.blocks_file, 'rb') as handle:
+            blocks = pickle.load(handle)
+            blocks = [blocks[1], blocks[2]]
+    else:
+        blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
     agent = PandaAgent(blocks, NOISE,
         use_platform=False, teleport=False,

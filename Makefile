@@ -16,10 +16,10 @@ DOCKER_VOLUMES = \
 	--volume="$(XAUTH):$(XAUTH)":rw \
 	--volume="$(XSOCK)":$(XSOCK):rw \
 	--volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-	--volume="$(PWD)/stacking:/catkin_ws/src/stacking" \
-	--volume="$(PWD)/devel:/catkin_ws/devel" \
-	--volume="$(PWD)/build:/catkin_ws/build" \
-	--volume="$(PWD)/logs:/catkin_ws/logs"
+	--volume="$(PWD):/catkin_ws/src/stacking" \
+	--volume="$(PWD)/../devel:/catkin_ws/devel" \
+	--volume="$(PWD)/../build:/catkin_ws/build" \
+	--volume="$(PWD)/../logs:/catkin_ws/logs"
 DOCKER_ENV_VARS = \
 	--env="ROS_IP=127.0.0.1" \
 	--env="NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics" \
