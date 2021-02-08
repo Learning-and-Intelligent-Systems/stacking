@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import random
 import pybullet as p
 
@@ -17,18 +17,21 @@ def get_grasp_gen(robot, add_slanted_grasps=True):
     # with your favorite grasp generator
     def gen(body):
         # Note, add_slanted_grasps should be True when we're using the platform.
-        grasp_tsr = pb_robot.tsrs.panda_box.grasp(body, add_slanted_grasps=add_slanted_grasps)
+        grasp_tsr = pb_robot.tsrs.panda_box.grasp(body,
+            add_slanted_grasps=add_slanted_grasps, add_orthogonal_grasps=True)
         grasps = []
-        # Only use a top grasp (2, 4) and side grasps (7).
-        for top_grasp_ix in range(len(grasp_tsr)):#[2, 4, 7, 6, 0, 1]:
-            sampled_tsr = grasp_tsr[top_grasp_ix]
-            grasp_worldF = sampled_tsr.sample()
 
-            grasp_objF = numpy.dot(numpy.linalg.inv(body.get_base_link_transform()), grasp_worldF)
+        for sampled_tsr in grasp_tsr:
+            grasp_worldF = sampled_tsr.sample()
+            grasp_objF = np.dot(np.linalg.inv(body.get_base_link_transform()), grasp_worldF)
             body_grasp = pb_robot.vobj.BodyGrasp(body, grasp_objF, robot.arm)
             grasps.append((body_grasp,))
             # yield (body_grasp,)
         return grasps
+
+    # def gen(body):
+    #     dims = body.get_dimensions()
+
 
     return gen
 
@@ -65,7 +68,7 @@ def get_stable_gen_table(fixed=[]):
 
                 body_pose = pb_robot.vobj.BodyPose(body, pose)
                 poses.append((body_pose,))
-        numpy.random.shuffle(poses)
+        np.random.shuffle(poses)
         return poses
     return gen
 
@@ -87,23 +90,33 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
-        grasp_worldF = numpy.dot(obj_worldF, grasp.grasp_objF)
+        grasp_worldF = np.dot(obj_worldF, grasp.grasp_objF)
+        grasp_worldR = grasp_worldF[:3,:3]
 
-        # Check if grasp is vertical relative to object. Fail if so (approach would go through object).
-        # The y-axis of the gripper is along the plane of the hand. Make sure it isn't vertical.
-        point = numpy.array([[0, 1, 0]]).T
-        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
-        if numpy.abs(numpy.abs(t_point[2]) - 1.) < 0.001:
+        e_x, e_y, e_z = np.eye(3) # basis vectors
+
+        # The x-axis of the gripper points toward the camera
+        # The y-axis of the gripper points along the plane of the hand
+        # The z-axis of the gripper points forward
+
+        is_top_grasp = grasp_worldR[:,2].dot(-e_z) > 0.999
+        is_upside_down_grasp = grasp_worldR[:,2].dot(e_z) > 0.001
+        is_gripper_sideways = np.abs(grasp_worldR[:,1].dot(e_z)) > 0.999
+        is_camera_down = np.abs(grasp_worldR[:,0].dot(-e_z)) > 0.999
+        is_wrist_too_low = grasp_worldF[2,3] < 0.088/2 + 0.005
+
+
+        if is_gripper_sideways:
             return None
-        # The x-axis of the gripper points towards the camera. Make sure is isn't facing down for any grasps.
-        point = numpy.array([[1, 0, 0]]).T
-        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
-        if numpy.abs(t_point[2] + 1.) < 0.001:
+        if is_upside_down_grasp:
             return None
-        # The z-axis of the gripper should not be facing up (never a good grasp).
-        point = numpy.array([[0, 0, 1]]).T
-        t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
-        if numpy.abs(t_point[2] - 1.) < 0.001:
+        if is_camera_down:
+            return None
+
+        # the gripper is too close to the ground. the wrist of the arm is 88mm
+        # in diameter, and it is the widest part of the hand. Include a 5mm
+        # clearance
+        if not is_top_grasp and is_wrist_too_low:
             return None
 
 
@@ -121,29 +134,31 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
         else:
             raise NotImplementedError()
 
-        if False:
-            length, lifeTime = 0.2, 0.0
+        # if False:
+        #     length, lifeTime = 0.2, 0.0
 
-            pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
-            new_x = transformation([length, 0.0, 0.0], pos, quat)
-            new_y = transformation([0.0, length, 0.0], pos, quat)
-            new_z = transformation([0.0, 0.0, length], pos, quat)
+        #     pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
+        #     new_x = transformation([length, 0.0, 0.0], pos, quat)
+        #     new_y = transformation([0.0, length, 0.0], pos, quat)
+        #     new_z = transformation([0.0, 0.0, length], pos, quat)
 
-            p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime, physicsClientId=1)
-            p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
-            p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
+        #     p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime, physicsClientId=1)
+        #     p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
+        #     p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
 
 
-        # TODO: Reject poses where the camera is upside down to speed up collision checking.
         for ax in range(num_attempts):
-            q_approach = robot.arm.ComputeIK(approach_tform)
+            q_grasp = robot.arm.ComputeIK(grasp_worldF)
+            if (q_grasp is None): continue
+            if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
+                return None
+
+            q_approach = robot.arm.ComputeIK(approach_tform, seed_q=q_grasp)
             if (q_approach is None): continue
-            if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles): return None
+            if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
+                return None
             conf_approach = pb_robot.vobj.BodyConf(robot, q_approach)
 
-            q_grasp = robot.arm.ComputeIK(grasp_worldF, seed_q=q_approach)
-            if (q_grasp is None): continue
-            if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles): return None
 
             # Only recompute the backoff if it's different from the approach.
             if approach_frame == backoff_frame:
