@@ -186,7 +186,7 @@ def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_fram
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
         'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot, add_slanted_grasps)),
         'pick-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='gripper', backoff_frame='global', use_wrist_camera=use_vision)),
-        'place-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='global', backoff_frame='global', use_wrist_camera=False)),
+        'place-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='global', backoff_frame='gripper', use_wrist_camera=False)),
         'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
         'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
     }

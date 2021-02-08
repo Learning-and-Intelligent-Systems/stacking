@@ -13,6 +13,7 @@ from scipy.spatial.transform import Rotation as R
 DEBUG_FAILURE = False
 
 def get_grasp_gen(robot, add_slanted_grasps=True):
+    add_slanted_grasps = True
     # I opt to use TSR to define grasp sets but you could replace this
     # with your favorite grasp generator
     def gen(body):
@@ -103,21 +104,21 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
         # The z-axis of the gripper should not be facing up (never a good grasp).
         point = numpy.array([[0, 0, 1]]).T
         t_point = numpy.dot(grasp_worldF[0:3, 0:3], point)
-        if numpy.abs(t_point[2] - 1.) < 0.001:
+        if t_point[2] > 0.:
             return None
 
 
         if approach_frame == 'gripper':
-            approach_tform = ComputePrePose(grasp_worldF, [0, 0, -0.125], approach_frame)
+            approach_tform = ComputePrePose(grasp_worldF, [0, 0, -0.08], approach_frame)
         elif approach_frame == 'global':
-            approach_tform = ComputePrePose(grasp_worldF, [0, 0, 0.125], approach_frame) # Was -0.125
+            approach_tform = ComputePrePose(grasp_worldF, [0, 0, 0.08], approach_frame) # Was -0.125
         else:
             raise NotImplementedError()
 
         if backoff_frame == 'gripper':
-            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, -0.125], backoff_frame)
+            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, -0.08], backoff_frame)
         elif backoff_frame == 'global':
-            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, 0.125], backoff_frame) # Was -0.125
+            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, 0.08], backoff_frame) # Was -0.125
         else:
             raise NotImplementedError()
 

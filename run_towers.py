@@ -18,12 +18,12 @@ def main(args):
     NOISE=0.00005
 
     # get a bunch of random blocks
-    if args.use_vision:
-        with open(args.blocks_file, 'rb') as handle:
-            blocks = pickle.load(handle)
-            blocks = [blocks[0], blocks[2]]
-    else:
-        blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+    #if args.use_vision:
+    with open(args.blocks_file, 'rb') as handle:
+        blocks = pickle.load(handle)
+        blocks = [blocks[1], blocks[2]]
+    # else:
+    #     blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
     agent = PandaAgent(blocks, NOISE,
         use_platform=False, teleport=False,
@@ -42,7 +42,7 @@ def main(args):
         if args.use_action_server:
             agent.simulate_tower_parallel(tower,
                                           real=args.real,
-                                          base_xy=(0.6, -0.3),
+                                          base_xy=(0.5, -0.3),
                                           vis=True,
                                           T=2500)
         else:

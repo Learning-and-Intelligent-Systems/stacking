@@ -233,7 +233,7 @@ class PlanningServer():
         # Update the planning domain
         if result.success:
             self.plan()
-            ExecuteActions(plan, real=False, pause=True, wait=False, prompt=False)
+            ExecuteActions(plan, real=False, pause=False, wait=False, prompt=False)
 
 
     def planning_loop(self):
@@ -451,7 +451,7 @@ if __name__=="__main__":
     if args.use_vision:
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)
-            blocks = [blocks[0], blocks[2]]
+            blocks = [blocks[1], blocks[2]]
         block_init_xy_poses = None
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
