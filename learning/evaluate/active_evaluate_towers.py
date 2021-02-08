@@ -686,22 +686,22 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def tallest_tower_regret_evaluation(logger, max_acquisitions, fname, n_towers, block_set, discrete=False, n_samples=5000):
+def tallest_tower_regret_evaluation(logger, block_set, fname, args):
     def tower_height(tower):
         """
         :param tower: A vectorized version of the tower.
         """
         return np.sum(tower[:, 6])
 
-    return evaluate_planner(logger, n_towers, tower_height, block_set, max_acquisitions, fname, discrete, n_samples)
+    return evaluate_planner(logger, block_set, tower_height, fname, args)
 
-def longest_overhang_evaluation(logger, n_towers=50, block_set=''):
+def longest_overhang_regret_evaluation(logger, block_set, fname, args):
     def horizontal_overhang(tower):
         return (tower[-1, 7] + tower[-1, 4]/2.) - (tower[0, 7] + tower[0, 4]/2.)
     
-    return evaluate_planner(logger, n_towers, horizontal_overhang, block_set, fname='longest_overhang.pkl')
+    return evaluate_planner(logger, block_set, horizontal_overhang, fname, args)
     
-def min_contact_regret_evaluation(logger, n_towers=50, block_set=''):
+def min_contact_regret_evaluation(logger, block_set, fname, args):
     def contact_area(tower):
         """
         :param tower: A vectorized version of the tower.
@@ -721,20 +721,24 @@ def min_contact_regret_evaluation(logger, n_towers=50, block_set=''):
 
         return area
 
-    return evaluate_planner(logger, n_towers, contact_area, block_set, fname='contact_regret.pkl')
+    return evaluate_planner(logger, block_set, contact_area, fname, args)
 
-def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fname, discrete, nsamples):
-    tower_sizes = [2, 3, 4, 5]
+def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
+    tower_sizes = [args.tower_size]
     tower_keys = [str(ts)+'block' for ts in tower_sizes]
     tp = TowerPlanner(stability_mode='contains')
-    ep = EnsemblePlanner(n_samples=nsamples)
-
+    ep = EnsemblePlanner(logger, n_samples=args.n_samples)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
     rewards = {k: [] for k in tower_keys}
 
-    for tx in range(0, max_acquisitions, 10):
+    if args.max_acquisitions is not None: 
+        eval_range = range(0, args.max_acquisitions, 10)
+    elif args.acquisition_step is not None: 
+        eval_range = [args.acquisition_step]
+    
+    for tx in eval_range:
         print('Acquisition step:', tx)
 
         ensemble = logger.get_ensemble(tx)
@@ -743,16 +747,18 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
 
         for k, size in zip(tower_keys, tower_sizes):
             print('Tower size', k)
-            curr_regrets = []
-
             num_failures, num_pw_failures = 0, 0
+            curr_regrets = []
             curr_rewards = []
-            for t in range(0, n_towers):
+            for t in range(0, args.n_towers):
                 print('Tower number', t)
                 blocks = copy.deepcopy(blocks)
-                tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn, num_blocks=size, discrete=discrete)
-
-                block_tower = [Object.from_vector(tower[bx]) for bx in range(len(tower))]
+                tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn, num_blocks=size, discrete=args.discrete)
+                # perturb tower
+                block_tower = []
+                for vec_block in tower:
+                    vec_block[7:9] += np.random.randn(2)*xy_noise 
+                    block_tower.append(Object.from_vector(vec_block))
                 if not tp.tower_is_constructable(block_tower):
                     reward = 0
                     num_failures += 1
@@ -801,11 +807,19 @@ def evaluate_planner(logger, n_towers, reward_fn, blocks, max_acquisitions, fnam
             regrets[k].append(curr_regrets)
             rewards[k].append(curr_rewards)
 
-        with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
-            pickle.dump(regrets, handle)
+        if args.max_acquisitions is not None:
+            with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
+                pickle.dump(regrets, handle)
+                
+            with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
+                pickle.dump(rewards, handle)
             
-        with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
-            pickle.dump(rewards, handle)
+    # if just ran for one acquisition step, output final regret and reward
+    if args.acquisition_step is not None:
+        final_regret = np.median(regrets[k][0][0])
+        final_reward = np.median(rewards[k][0][0])
+        print('Final Regret: ', final_regret)
+        print('Final Reward: ', final_reward)
 
 def plot_tallest_tower_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:
@@ -963,7 +977,7 @@ if __name__ == '__main__':
 
     #min_contact_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger)
-    #longest_overhang_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
+    #longest_overhang_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     plot_tallest_tower_regret(logger)
     #plot_constructability_over_time(logger)
