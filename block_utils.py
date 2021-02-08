@@ -91,11 +91,15 @@ class Object:
     
     @staticmethod
     def from_vector(vblock):
+        if len(vblock) <= 14:
+            color = [1,0,0]
+        else:
+            color = vblock[14:17].tolist()
         block = Object('from_vec', 
                        dimensions=Dimensions(*vblock[4:7].tolist()), 
                        mass=vblock[0], 
                        com=Position(*vblock[1:4].tolist()), 
-                       color=Color(*vblock[14:17].tolist()))
+                       color=Color(*color))
         pose = Pose(Position(*vblock[7:10].tolist()),
                     Quaternion(*vblock[10:14].tolist()))
         block.set_pose(pose)

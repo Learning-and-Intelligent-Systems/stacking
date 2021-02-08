@@ -24,6 +24,13 @@ def preprocess(towers):
 
     return towers.float()
 
+def unprocess(towers):
+    towers[:,:,1:4] *= 0.01 #towers[:,:,4:7]
+    towers[:,:,7:9] *= 0.01 #towers[:,:,4:6]
+    towers[:,:,4:7] = towers[:,:,4:7]*0.01 + 0.1 
+    towers[:,:,0] = (towers[:,:,0] + 0.55)
+    return towers
+
 def add_placement_noise(towers):
     for ix in range(towers.shape[0]):
         for bx in range(towers.shape[1]):
@@ -38,6 +45,7 @@ class TowerDataset(Dataset):
                 '2block' : {
                     'towers': np.array (N, 2, D)
                     'labels': np.array (N,)
+                    'block_ids': np.array(N, 2) [this is only used if a block set is given]
                 }
                 '3block' : ...
             }
@@ -47,6 +55,7 @@ class TowerDataset(Dataset):
         self.tower_keys = ['2block', '3block', '4block', '5block']
         self.tower_tensors = {}
         self.tower_labels = {}
+        self.tower_block_ids = {}
 
         # First augment the given towers with rotations. 
         if augment:
@@ -57,9 +66,10 @@ class TowerDataset(Dataset):
         for key in self.tower_keys:
             towers = torch.Tensor(augmented_towers[key]['towers'])
             labels = torch.Tensor(augmented_towers[key]['labels'])
-
             self.tower_tensors[key] = preprocess(towers)
             self.tower_labels[key] = labels
+            if 'block_ids' in tower_dict[key].keys():
+                self.tower_block_ids[key] = augmented_towers[key]['block_ids']
         
         # Same order as 
         self.start_indices = {}
@@ -108,25 +118,43 @@ class TowerDataset(Dataset):
         for k in self.tower_keys:
             if augmented_towers[k]['towers'].shape[0] > 0:
                 new_towers = torch.Tensor(augmented_towers[k]['towers'])
-                new_towers = add_placement_noise(new_towers)
                 new_towers = preprocess(new_towers)
                 new_labels = torch.Tensor(augmented_towers[k]['labels'])
                 
                 self.tower_tensors[k] = torch.cat([self.tower_tensors[k], new_towers], dim=0)
                 self.tower_labels[k] = torch.cat([self.tower_labels[k], new_labels], dim=0)
+            
+                if 'block_ids' in augmented_towers[k].keys():
+                    new_block_ids = augmented_towers[k]['block_ids']
+                    if self.tower_block_ids[k].shape[0] == 0:
+                        self.tower_block_ids[k] = new_block_ids
+                    else:
+                        self.tower_block_ids[k] = np.concatenate([self.tower_block_ids[k], new_block_ids], axis=0)
 
         self.get_indices()
 
 
 class TowerSampler(Sampler):
-    def __init__(self, dataset, batch_size, shuffle):
+    def __init__(self, dataset, batch_size, shuffle, oversample=False):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.oversample = oversample
 
     def __iter__(self):
         # Build indices for each tower size. 
         indices = self.dataset.get_indices()
+
+        if self.oversample: 
+            for k in self.dataset.tower_keys:
+                # Get the indices that correspond to positive/negative labels.
+                pos_indices = [ix for ix in indices[k] if self.dataset.__getitem__(ix)[1] == 1]
+                neg_indices = [ix for ix in indices[k] if self.dataset.__getitem__(ix)[1] == 0]
+                diff = len(neg_indices) - len(pos_indices)
+                if diff > 0 and len(pos_indices) > 10:
+                    # Oversample the positive cases.
+                    indices[k] = pos_indices + neg_indices + np.random.choice(pos_indices, diff, replace=True).tolist()
+
         if self.shuffle:
             for k in self.dataset.tower_keys:
                 np.random.shuffle(indices[k])
@@ -161,10 +189,13 @@ class TowerSampler(Sampler):
 
 
 if __name__ == '__main__':
-    with open('learning/data/random_blocks_(x40000)_5blocks_all.pkl', 'rb') as handle:
-        towers_dict = pickle.load(handle)
-
-    dataset = TowerDataset(towers_dict, augment=True, K_skip=10000)
+    #with open('learning/data/random_blocks_(x40000)_5blocks_all.pkl', 'rb') as handle:
+    #   towers_dict = pickle.load(handle)
+    #dataset = TowerDataset(towers_dict, augment=True, K_skip=10000)
+    with open('learning/experiments/logs/towers-con-init-random-blocks-10-20201125-123945/datasets/active_50.pkl', 'rb') as handle:
+        dataset = pickle.load(handle)
+    
+    
     print('----- Load dataset from file -----')
     print('Num Towers:', len(dataset))
     print('Indices per category:')
@@ -175,12 +206,15 @@ if __name__ == '__main__':
         print(x.shape)
 
     print('----- Test tower sampler -----')
-    sampler = TowerSampler(dataset, 5, True)
+    sampler = TowerSampler(dataset,10, True, True)
     for batch_ixs in sampler:
         print(batch_ixs)
 
     loader = DataLoader(dataset=dataset,
                         batch_sampler=sampler)
     print(len(loader))
+
+    for x, y in loader:
+        print(y)
 
     

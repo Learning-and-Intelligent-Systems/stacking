@@ -317,7 +317,7 @@ def test_placement_on_platform(agent):
     else:
         saved_world.restore()
         input("Execute?")
-        ExecuteActions(agent.robot.arm, plan)
+        ExecuteActions(plan)
 
 def test_tower_simulation(blocks):
     agent = PandaAgent(blocks, NOISE)

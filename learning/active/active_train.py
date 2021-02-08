@@ -1,6 +1,7 @@
 import argparse
 import copy
 import numpy as np
+import time
 
 from learning.active.acquire import acquire_datapoints
 from learning.active.train import train
@@ -27,16 +28,20 @@ def split_data(data, n_val):
         train_mask = np.ones(data[k]['towers'].shape[0], dtype=bool)
         train_mask[tower_ixs] = False
 
-        val_data[k]['towers'] = data[k]['towers'][~train_mask,...]
-        val_data[k]['labels'] = data[k]['labels'][~train_mask,...]
+        val_data[k]['towers'] = val_data[k]['towers'][~train_mask,...]
+        val_data[k]['labels'] = val_data[k]['labels'][~train_mask,...]
+        if 'block_ids' in val_data[k]:
+            val_data[k]['block_ids'] = val_data[k]['block_ids'][~train_mask,...]
         
         data[k]['towers'] = data[k]['towers'][train_mask,...]
         data[k]['labels'] = data[k]['labels'][train_mask,...]
+        if 'block_ids' in data[k]:
+            data[k]['block_ids'] = data[k]['block_ids'][train_mask,...]
         start = end
     return data, val_data
 
 
-def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn, logger, args):
+def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn, logger, agent, args):
     """ Main training function 
     :param ensemble: learning.models.Ensemble object to be trained.
     :param dataset: Object containing the data to iterate over. Can be added to.
@@ -48,10 +53,13 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
     :param data_pred_fn:
     :param data_subset_fn:
     :param logger: Object used to keep track of training artifacts.
+    :param agent: PandaAgent or None (if args.exec_mode == 'simple-model' or 'noisy-model')
     :param args: Commandline arguments such as the number of acquisition points.
     :return: The fully trained ensemble.
     """
     for tx in range(args.max_acquisitions):
+        print('Acquisition Step: ', tx)
+        start_time = time.time()
         logger.save_dataset(dataset, tx)
 
         # Initialize and train models.
@@ -69,8 +77,10 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
                                                    data_sampler_fn=data_sampler_fn,
                                                    data_subset_fn=data_subset_fn,
                                                    data_label_fn=data_label_fn,
-                                                   data_pred_fn=data_pred_fn)
-        logger.save_acquisition_data(new_data, all_samples, tx)
+                                                   data_pred_fn=data_pred_fn,
+                                                   exec_mode=args.exec_mode,
+                                                   agent=agent)
+        logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
 
         # Add to dataset.
         if val_dataloader is None:
@@ -79,3 +89,5 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
             train_data, val_data = split_data(new_data, n_val=2)
             dataset.add_to_dataset(train_data)
             val_dataset.add_to_dataset(val_data)
+            
+        print('Time: ' + str((time.time()-start_time)*(1/60)) + ' minutes')

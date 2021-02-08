@@ -93,7 +93,7 @@ class FCGN(nn.Module):
         k=1
         # Initialize hidden state for each node.
         #h = self.init.expand(N, K, self.n_hidden)
-        h0 = self.E(towers.view(-1, self.n_in)).view(N, K, self.n_hidden)
+        h0 = self.E(towers.reshape(-1, self.n_in)).reshape(N, K, self.n_hidden)
         h = h0
         for kx in range(k):
             # Calculate edge updates for each node: (N, K, n_hidden) 
@@ -106,3 +106,22 @@ class FCGN(nn.Module):
         x = torch.mean(h, dim=1)
         x = self.O(x).view(N)
         return torch.sigmoid(x).unsqueeze(-1)
+
+
+class ConstructableFCGN(nn.Module):
+    def __init__(self, n_in, n_hidden):
+        """ This network is given input of size (N, K, n_in) where N, K can vary per batch.
+        :param n_in: Number of block-specific parameters.
+        :param n_hidden: Number of hidden units unsed throughout the network.
+        """
+        super(ConstructableFCGN, self).__init__()
+        self.fcgn = FCGN(n_in, n_hidden)
+
+    def forward(self, towers):
+        preds = []
+        for kx in range(2, towers.shape[1]+1):
+            sub_pred = self.fcgn(towers[:, :kx, :])
+            preds.append(sub_pred)
+        preds = torch.cat(preds, dim=1)
+        return preds.prod(dim=1).unsqueeze(-1)
+        

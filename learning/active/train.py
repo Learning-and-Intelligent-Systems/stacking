@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from sklearn.metrics import f1_score
 from torch.nn import functional as F
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -13,22 +14,33 @@ from learning.active.toy_data import ToyDataset, ToyDataGenerator
 from learning.active.utils import ExperimentLogger
 
 
-def evaluate(loader, model):
+def evaluate(loader, model, val_metric='f1'):
     acc = []
     losses = []
+    
+    preds = []
+    labels = []
     for x, y in loader:
         if torch.cuda.is_available():
             x = x.cuda()
             y = y.cuda()
-
         pred = model.forward(x).squeeze()
+        if len(pred.shape) == 0: pred = pred.unsqueeze(-1)
         loss = F.binary_cross_entropy(pred, y)
-
+     
+        with torch.no_grad():
+            preds += (pred > 0.5).cpu().float().numpy().tolist()
+            labels += y.cpu().numpy().tolist()
         accuracy = ((pred>0.5) == y).float().mean()
         acc.append(accuracy.item())
         losses.append(loss.item())
+    if val_metric == 'loss':
+        score = np.mean(losses)
+    else:
+        score = -f1_score(labels, preds)
 
-    return np.mean(losses)
+
+    return score
 
 
 def train(dataloader, val_dataloader, model, n_epochs=20):
@@ -44,14 +56,14 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     best_weights = None
     it = 0
     for ex in range(n_epochs):
-        print('Epoch', ex)
+        #print('Epoch', ex)
         acc = []
         for x, y in dataloader:
             if torch.cuda.is_available():
                 x = x.cuda()
                 y = y.cuda()
             optimizer.zero_grad()
-
+            
             pred = model.forward(x).squeeze()
             loss = F.binary_cross_entropy(pred, y)
             loss.backward()
@@ -67,8 +79,8 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_weights = copy.deepcopy(model.state_dict())
-                print('Saved')    
-            print(np.mean(acc), val_loss, loss)
+                #print('Saved')    
+            #print(np.mean(acc), val_loss, loss)
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
     return model

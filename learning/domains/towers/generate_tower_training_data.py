@@ -3,7 +3,7 @@
 Izzy Brand, 2020
 """
 from agents.teleport_agent import TeleportAgent
-from block_utils import World, Environment, Object, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block
+from block_utils import World, Environment, Object, Position, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block, all_rotations
 from tower_planner import TowerPlanner
 from pybullet_utils import transformation
 import argparse
@@ -18,6 +18,7 @@ def vectorize(tower):
     return [b.vectorize() for b in tower]
 
 ROTATIONS = list(rotation_group())
+ROTATIONS = list(all_rotations())
 QUATERNIONS = [Quaternion(*o.as_quat()) for o in ROTATIONS]
 ROTATED_BLOCKS = {}
 def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=False):
@@ -69,11 +70,13 @@ def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=Fal
     # apply the positions to each block
     pos_xyz = np.hstack([pos_xy, pos_z[:,None]])
     for pos, orn, block, rblock in zip(pos_xyz, orns, blocks, rotated_blocks):
-        block.pose = Pose(pos, orn)
+        block.pose = Pose(Position(*pos), orn)
+        block.rotation = orn
         rblock.pose = Pose(pos, (0,0,0,1))
 
     if ret_rotated:
         return blocks, rotated_blocks
+
     return blocks
 
 def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
@@ -222,6 +225,11 @@ def main(args, vis_tower=False):
     # generate the finite set of blocks
     if use_block_set:
         block_set = [Object.random(f'obj_{i}') for i in range(block_set_size)]
+
+    # use_block_set = True
+    # with open('learning/data/block_set_10.pkl', 'rb') as handle:
+    #     block_set = pickle.load(handle)
+
     # create a vector of stability labels where half are unstable and half are stable
     stability_labels = np.zeros(num_towers, dtype=int)
     stability_labels[num_towers // 2:] = 1
@@ -252,7 +260,7 @@ def main(args, vis_tower=False):
                     # generate new blocks from scratch. Save the block names if using blocks
                     # from the block set
                     if use_block_set:
-                        blocks = sample_with_replacement(block_set, k=num_blocks)
+                        blocks = np.random.choice(block_set, num_blocks, replace=False)
                     else:
                         blocks = [Object.random(f'obj_{ix}') for ix in range(num_blocks)]
 

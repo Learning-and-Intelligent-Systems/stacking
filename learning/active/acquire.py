@@ -44,7 +44,7 @@ def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn
     acquire_indices = np.argsort(scores)[::-1][:n_acquire]
     return data_subset_fn(samples, acquire_indices)
 
-def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn):
+def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn, data_label_fn, data_pred_fn, data_subset_fn, exec_mode, agent):
     """ Get new datapoints given the current ensemble.
     Uses function handlers for domain specific components (e.g., sampling unlabeled data).
     :param n_samples: How many unlabeled samples to generate.
@@ -54,9 +54,11 @@ def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn
     :param data_label_fn:
     :param data_pred_fn:
     :param data_subset_fn:
+    :param exec_mode: in ['simple-model', 'noisy-model', 'sim', 'real']. Method for labeling data
+    :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
     :return: (n_acquire, 2), (n_acquire,) - x,y tuples of the new datapoints.
     """
     unlabeled_pool = data_sampler_fn(n_samples)
     xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
-    new_data = data_label_fn(xs)
+    new_data = data_label_fn(xs, exec_mode, agent)
     return new_data, unlabeled_pool

@@ -15,7 +15,7 @@ def out_of_bounds(l, index):
     except IndexError:
         return 0
 
-def createBlock(**kwargs):
+def createDeformableHollowBlock(file="res_2_cover_6_in.vtk", **kwargs):
     #inertia takes a list with a specfic order but I can change it to a dicitonary if we desire
     deformable_urdf=Deformable(kwargs['name'])
     i=Inertial( Mass(value= kwargs['mass']),
@@ -26,13 +26,20 @@ def createBlock(**kwargs):
                             iyz=out_of_bounds(kwargs['inertia'], 4),
                             izz=out_of_bounds(kwargs['inertia'], 5))
                     )
-    c=Collision_margin(value = kwargs['collision_margin'])
+    c=Collision_margin(value = kwargs['collision_margin']) #should be 0
     r=Repulsion_Stiffness(value = kwargs['repulsion_stiffness'])
     f=Friction(value = kwargs['friction']),
     n=Neohookean(mu=kwargs['mu'], lam = kwargs['lamda'], damping=kwargs['damping']),
-    v=Visual(filename=kwargs['filename'])
+    v=Visual(filename=file)
 
     return Robot(deformable_urdf(i,c,r,f,n,v))
+
+    #for i in range 10000
+    # for some random number #number of blocks
+        # generate deformable with some randomness in lame parameters, save it, load in at proper location
+        # load standard rigid at some offset of proper location
+    #sim tower and if >threshold after some time, collapse : stable
+    #towers<-vector(vector(objs), bool)  where objs is (lame param)
 
 if __name__ == "__main__":
     myRobot = Robot(Deformable(
@@ -49,5 +56,7 @@ if __name__ == "__main__":
             ), name="block")
 
     print(myRobot)
+   
     with open(tmp_dir+'/practice_'+ str(0) + '.urdf', 'w') as handle:
         handle.write(str(myRobot))
+    p.loadURDF(tmp_dir+'/practice_0.urdf',[0,0,0], flags=p.URDF_USE_SELF_COLLISION)

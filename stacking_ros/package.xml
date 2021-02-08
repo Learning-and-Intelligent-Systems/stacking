@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="2">
+
+  <!-- Basic information -->
+  <name>stacking_ros</name>
+  <version>1.0.0</version>
+  <description>Task and Motion Planning Messages for the Robust Robotics Group</description>
+  <maintainer email="scastro@csail.mit.edu">Sebastian Castro</maintainer>
+  <license>MIT</license>
+
+  <!-- Dependencies -->
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>actionlib_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>trajectory_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>actionlib_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+
+</package>
