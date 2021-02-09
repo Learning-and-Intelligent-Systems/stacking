@@ -11,7 +11,7 @@ from learning.models.bottomup_net import BottomUpNet
 from learning.models.gn import FCGN, ConstructableFCGN
 from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
-from agents.panda_agent import PandaAgent
+from agents.panda_agent import PandaAgent, PandaClientAgent
 
 
 def run_active_towers(args):
@@ -29,7 +29,10 @@ def run_active_towers(args):
     if args.exec_mode == 'simple-model' or args.exec_mode == 'noisy-model':
         agent = None
     elif args.exec_mode == 'sim' or args.exec_mode == 'real':
-        agent = PandaAgent(block_set, use_action_server=args.use_action_server)
+        if args.use_panda_server:
+            agent = PandaClientAgent()
+        else:
+            agent = PandaAgent(block_set)
     
     # Initialize ensemble. 
     if args.model == 'fcgn':
@@ -158,7 +161,7 @@ if __name__ == '__main__':
     # sim: uses pyBullet with no noise
     # real: uses the real robot
     parser.add_argument('--exec-mode', default='noisy-model', choices=['perfect-model', 'noisy-model', 'sim', 'real'])
-    parser.add_argument('--use-action-server', action='store_true')
+    parser.add_argument('--use-panda-server', action='store_true')
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 

@@ -42,6 +42,7 @@ add_message_files(
 add_service_files(
   FILES
   GetPlan.srv
+  PlanTower.srv
   SetPlanningState.srv
 )
 

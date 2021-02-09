@@ -99,7 +99,7 @@
   
   <!-- Everything is in reference to the first vertical support. It is infront and left of the robot (from the robot perspective). -->
   <joint name="right_front" type="fixed">
-    <origin xyz="-0.767 -0.6146 0.0" rpy="0 0 0" /> 
+    <origin xyz="-0.767 -0.8146 0.0" rpy="0 0 0" /> 
     <parent link="front_wall" />
     <child link="right_wall" />
   </joint>
@@ -111,7 +111,7 @@
   </joint>
   
   <joint name="left_front" type="fixed">
-    <origin xyz="-0.767 0.6146 0.0" rpy="0 0 0" /> 
+    <origin xyz="-0.767 0.8146 0.0" rpy="0 0 0" /> 
     <parent link="front_wall" />
     <child link="left_wall" />
   </joint>

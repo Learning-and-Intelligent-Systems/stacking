@@ -3,6 +3,8 @@ Utilities for ROS serialization and deserialization of task planning entities
 """
 
 import pb_robot
+import numpy as np
+from block_utils import Object, Pose, Position, Quaternion
 from stacking_ros.msg import (
     BodyInfo, GoalInfo, RobotConfig, TaskAction, 
     TaskPlanGoal, TaskPlanResult, TrajInfo)
@@ -69,6 +71,35 @@ def goal_to_ros(init, goal, fixed_objs):
     ros_goal.blocks.extend(init_rel_poses)
     print(ros_goal)
     return ros_goal
+
+
+def block_init_to_ros(blocks):
+    """ Converts a list of blocks to a set of initial conditions for planning """
+    ros_array = []
+    for blk in blocks:
+        ros_block = BodyInfo()
+        ros_block.name = blk.readableName
+        pose_tuple_to_ros(blk.get_base_link_pose(), ros_block.pose)
+        ros_array.append(ros_block)
+    return ros_array
+
+
+def tower_to_ros(tower):
+    """ Converts a list of blocks (e.g. a tower) to ROS """
+    ros_array = []
+    for idx, block in enumerate(tower):
+        block_ros = BodyInfo()
+        block_ros.name = block.name
+        if idx > 0:
+            block_ros.base_obj = tower[idx-1].name
+        block_ros.mass = block.mass
+        block_ros.com.x, block_ros.com.y, block_ros.com.z = block.com
+        block_ros.dimensions.x, block_ros.dimensions.y, block_ros.dimensions.z = block.dimensions
+        block_ros.color.r, block_ros.color.g, block_ros.color.b = block.color
+        pose = (block.pose.pos, block.rotation)
+        pose_tuple_to_ros(pose, block_ros.pose)
+        ros_array.append(block_ros)
+    return ros_array
 
 
 def pose_to_ros(body_pose, msg):
@@ -174,9 +205,14 @@ def task_plan_to_ros(plan):
 ############
 def ros_to_pose(msg, body):
     """ Creates a BodyPose from a ROS message """
+    return pb_robot.vobj.BodyPose(body, ros_to_pose_tuple(msg))
+
+
+def ros_to_pose_tuple(msg):
+    """ Creates a (position, orientation) tuple from a ROS message """
     p = [msg.position.x, msg.position.y, msg.position.z]
     q = [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
-    return pb_robot.vobj.BodyPose(body, (p,q))
+    return (p,q)
 
 
 def ros_to_transform(msg):
@@ -264,3 +300,26 @@ def ros_to_task_plan(msg, robot, pddl_block_lookup):
         plan.append(act)
     
     return plan
+
+
+def ros_to_tower(msg):
+    """ Converts a list of ROS BodyInfo messages to a tower of Object variables """
+    tower = []
+    for ros_blk in msg:
+        # Unpack the block information
+        name = ros_blk.name
+        dims = (ros_blk.dimensions.x, ros_blk.dimensions.y, ros_blk.dimensions.z)
+        com = (ros_blk.com.x, ros_blk.com.y, ros_blk.com.z)
+        mass = ros_blk.mass
+        color = (ros_blk.color.r, ros_blk.color.g, ros_blk.color.b)
+        blk = Object(name, dims, mass, com, color)
+        
+        # Now create a Pose namedtuple
+        pose = ros_to_pose_tuple(ros_blk.pose)
+        pos = Position(pose[0][0], pose[0][1], pose[0][2])
+        orn = Quaternion(pose[1][0], pose[1][1], pose[1][2], pose[1][3])
+        pose_named = Pose(pos=pos, orn=orn)
+        blk.set_pose(pose_named)
+        blk.rotation = orn
+        tower.append(blk)
+    return tower

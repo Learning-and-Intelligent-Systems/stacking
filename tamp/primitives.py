@@ -47,10 +47,10 @@ def get_stable_gen_table(fixed=[]):
         # if they are upright.
         dims = body.get_dimensions()
 
-        rotations = all_rotations()#[8:]
+        rotations = all_rotations()
         poses = []
         # These are the pre-chosen regrap locations.
-        for x, y in [(-0.4, 0.4), (-0.4, -0.4), (0, 0.4)]:
+        for x, y in [(0.4, 0.4)]:
             for rotation in rotations:
                 start_pose = body.get_base_link_pose()
 
@@ -87,7 +87,7 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
+def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
     def fn(body, pose, grasp):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
@@ -163,7 +163,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=2, approach_frame='gripper', backoff
             if path_approach is None or path_backoff is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
-
+            
             command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp, grasp, body, use_wrist_camera),
                        grasp,
                        pb_robot.vobj.MoveFromTouch(robot.arm, q_backoff)]
