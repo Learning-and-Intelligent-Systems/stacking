@@ -252,10 +252,9 @@ def get_labels(samples, exec_mode, agent, xy_noise=0.003):
                 vec_block = samples[k]['towers'][ix, jx, :]
                 if exec_mode == 'noisy-model':
                     vec_block[7:9] += np.random.randn(2)*xy_noise
-                block = Object.from_vector(vec_block)
+                block = Object.from_vector(vec_block) # block is already rotated
                 if 'block_ids' in samples[k].keys():
                     block.name = 'obj_'+str(samples[k]['block_ids'][ix, jx])
-                block = get_rotated_block(block)
                 block_tower.append(block)
             #  Use tp to check for stability.
             if exec_mode == 'simple-model' or exec_mode == 'noisy-model':
