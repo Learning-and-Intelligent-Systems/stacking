@@ -43,10 +43,12 @@ if __name__ == '__main__':
                         help='number of samples to select from in total planning method')
     parser.add_argument('--tower-sizes',
                         default=[5],
-                        nargs='+'
+                        nargs='+',
                         help='number of blocks in goal tower (can do multiple)')
     
     args = parser.parse_args()
+    
+    args.tower_sizes = [int(ts) for ts in args.tower_sizes]
     
     assert ((args.acquisition_step is None) and (args.max_acquisitions is not None)) \
             or ((args.max_acquisitions is None) and (args.acquisition_step is not None)), \
@@ -61,8 +63,8 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path)
     pre = 'discrete_' if args.discrete else ''
     
+    ts_str = ''.join([str(ts) for ts in args.tower_sizes])
     if args.problem == 'tallest':
-        ts_str = [str(ts) for ts in args.tower_sizes]
         fname = pre+'random_planner_tallest'+ts_str+'_block_towers'
         tallest_tower_regret_evaluation(logger, block_set, fname, args)
     elif args.problem == 'overhang':

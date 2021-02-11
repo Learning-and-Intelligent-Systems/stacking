@@ -71,13 +71,15 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
+    args.tower_sizes = [int(ts) for ts in args.tower_sizes]
+    
     if args.debug:
         import pdb; pdb.set_trace()
  
     logger = ActiveExperimentLogger(args.exp_path)
     fname = 'discrete_' if args.discrete else ''
     
-    ts_str = [str(ts) for ts in args.tower_sizes]
+    ts_str = ''.join([str(ts) for ts in args.tower_sizes])
     if args.problem == 'tallest':
         fname += 'random_planner_tallest_tower_'+ts_str+'_block_towers'
         title = 'Tallest Tower'
