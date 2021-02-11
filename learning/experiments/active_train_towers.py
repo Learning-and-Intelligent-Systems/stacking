@@ -66,7 +66,9 @@ def run_active_towers(args):
         data_sampler_fn = pool_sampler.sample_unlabeled_data
     elif args.block_set_fname is not '':
         data_subset_fn = get_subset
-        with open(args.block_set_fname, 'rb') as f: block_set = pickle.load(f)
+        with open(args.block_set_fname, 'rb') as f: 
+            block_set = pickle.load(f)
+            #block_set = [block_set[1], block_set[2]]
         data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
     else:
         data_subset_fn = get_subset

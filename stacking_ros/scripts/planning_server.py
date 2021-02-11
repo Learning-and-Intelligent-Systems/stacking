@@ -80,7 +80,7 @@ class PlanningServer():
         pb_robot.viz.set_client(self._planning_client_id)
 
 
-    def get_initial_pddl_state(self, conf=None):
+    def get_initial_pddl_state(self):
         """
         Get the PDDL representation of the world between experiments. This
         method assumes that all blocks are on the table. We will always "clean
@@ -88,8 +88,13 @@ class PlanningServer():
         experiment.
         """
         fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
-        if conf is None:
-            conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
+        if self.latest_robot_config is None:
+            robot_config = self.robot.arm.GetJointValues()
+        else:
+            robot_config = [q for q in self.latest_robot_config]
+            self.robot.arm.SetJointValues(robot_config)
+            self.latest_robot_config = None
+        conf = pb_robot.vobj.BodyConf(self.robot, robot_config)
         init = [('CanMove',),
                 ('Conf', conf),
                 ('AtConf', conf),
@@ -345,6 +350,9 @@ class PlanningServer():
             orn = [elem.pose.orientation.x, elem.pose.orientation.y,
                 elem.pose.orientation.z, elem.pose.orientation.w]
             self.goal_block_states.append((blk, base, (pos,orn)))
+
+        # Get the robot configuration
+        self.latest_robot_config = ros_request.robot_config.angles
 
         print("Reset request received!")
         return SetPlanningStateResponse()

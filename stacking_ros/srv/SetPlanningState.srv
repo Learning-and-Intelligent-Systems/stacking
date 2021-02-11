@@ -3,6 +3,7 @@
 # REQUEST: Block initial and goal information
 BodyInfo[] init_state
 BodyInfo[] goal_state
+RobotConfig robot_config
 
 ---
 

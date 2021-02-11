@@ -150,8 +150,8 @@ def sample_unlabeled_data(n_samples, block_set=None):
 
     # sample random towers and add them to the lists in the dictionary
     for ix in range(n_samples):
-        max_blocks = min(6, len(block_set))
-        n_blocks = np.random.randint(2, max_blocks)
+        max_blocks = min(5, len(block_set))
+        n_blocks = np.random.randint(2, max_blocks+1)
         # get n_blocks, either from scratch or from the block set
         if block_set is not None: 
             blocks = np.random.choice(block_set, n_blocks, replace=False)
@@ -267,6 +267,7 @@ def get_labels(samples, exec_mode, agent, xy_noise=0.003):
                 # if planning fails, reset and try again
                 while not success:
                     success, label = agent.simulate_tower(block_tower, vis, real=real)
+                    print(f"Received success: {success}, label: {label}")
                     if not success:
                         if real:
                             input('Resolve conflict causing planning to fail, then press \
