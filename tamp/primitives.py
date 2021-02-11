@@ -12,14 +12,14 @@ from scipy.spatial.transform import Rotation as R
 
 DEBUG_FAILURE = False
 
-def get_grasp_gen(robot, add_slanted_grasps=True):
-    add_slanted_grasps = True
+def get_grasp_gen(robot, add_slanted_grasps=True, add_orthogonal_grasps=True):
+    # add_slanted_grasps = True
     # I opt to use TSR to define grasp sets but you could replace this
     # with your favorite grasp generator
     def gen(body):
         # Note, add_slanted_grasps should be True when we're using the platform.
         grasp_tsr = pb_robot.tsrs.panda_box.grasp(body,
-            add_slanted_grasps=add_slanted_grasps, add_orthogonal_grasps=True)
+            add_slanted_grasps=add_slanted_grasps, add_orthogonal_grasps=add_orthogonal_grasps)
         grasps = []
 
         for sampled_tsr in grasp_tsr:
@@ -88,7 +88,7 @@ def get_stable_gen_block(fixed=[]):
 
 
 def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
-    def fn(body, pose, grasp):
+    def fn(body, pose, grasp, return_grasp_q=False):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = np.dot(obj_worldF, grasp.grasp_objF)
@@ -122,19 +122,18 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
 
 
         if approach_frame == 'gripper':
-            approach_tform = ComputePrePose(grasp_worldF, [0, 0, -0.08], approach_frame)
+            approach_tform = ComputePrePose(grasp_worldF, [0, 0, -0.1], approach_frame)
         elif approach_frame == 'global':
-            approach_tform = ComputePrePose(grasp_worldF, [0, 0, 0.08], approach_frame) # Was -0.125
+            approach_tform = ComputePrePose(grasp_worldF, [0, 0, 0.1], approach_frame) # Was -0.125
         else:
             raise NotImplementedError()
 
         if backoff_frame == 'gripper':
-            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, -0.08], backoff_frame)
+            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, -0.1], backoff_frame)
         elif backoff_frame == 'global':
-            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, 0.08], backoff_frame) # Was -0.125
+            backoff_tform = ComputePrePose(grasp_worldF, [0, 0, 0.1], backoff_frame) # Was -0.125
         else:
             raise NotImplementedError()
-
 
         for ax in range(num_attempts):
             q_grasp = robot.arm.ComputeIK(grasp_worldF)
@@ -155,7 +154,8 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
             else:
                 q_backoff = robot.arm.ComputeIK(backoff_tform, seed_q=q_grasp)
                 if (q_backoff is None): continue
-                if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles): return None
+                if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles):
+                    return None
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
 
             path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
@@ -163,10 +163,13 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
             if path_approach is None or path_backoff is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
-            
+
             command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp, grasp, body, use_wrist_camera),
                        grasp,
                        pb_robot.vobj.MoveFromTouch(robot.arm, q_backoff)]
+
+            if return_grasp_q:
+                return (pb_robot.vobj.BodyConf(robot, q_grasp),)
             return (conf_approach, conf_backoff, command)
         return None
     return fn
