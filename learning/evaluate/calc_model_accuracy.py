@@ -31,7 +31,7 @@ def calc_model_accuracies(logger, dataset, args):
             n_correct = 0
             offset = ti*samples_per_height
             for li, label in enumerate(dataset[key]['labels']):
-                if preds[offset+li] != label[0]: n_correct += 1
+                if preds[offset+li] == label[0]: n_correct += 1
             accuracies[key].append(n_correct/samples_per_height)
         
     return accuracies
@@ -48,7 +48,7 @@ def plot_all_model_accuracies(all_model_accuracies):
         for model_accuracies in all_model_accuracies:
             pi_accuracies = model_accuracies[str(th)+'block']
             axes[pi].plot(xs, pi_accuracies)
-            axes[pi].set_ylim(0, .5)
+            axes[pi].set_ylim(.5, 1.)
             axes[pi].set_ylabel('Constructability Accuracy')
             axes[pi].set_xlabel('Training Towers')
             axes[pi].set_title(str(th)+' Block Tower Constructability Accuracy')
