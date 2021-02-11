@@ -14,8 +14,8 @@ towers_per_acq = 10         # number of towers acquired between each trained mod
 def calc_model_accuracies(logger, dataset, args):
     if args.max_acquisitions is not None: 
         eval_range = range(0, args.max_acquisitions, args.plot_step)
-    elif args.acquisition_step is not None: 
-        eval_range = [args.acquisition_step]
+    elif args.single_acquisition_step is not None: 
+        eval_range = [args.single_acquisition_step]
 
     accuracies = {key: [] for key in dataset.keys()}
     for tx in eval_range:
@@ -90,4 +90,10 @@ if __name__ == '__main__':
         logger = ActiveExperimentLogger(exp_path)
         model_accuracies = calc_model_accuracies(logger, dataset, args)
         all_accuracies.append(model_accuracies)
-    plot_all_model_accuracies(all_accuracies)
+        
+    if args.single_acquisition_step is None:
+        plot_all_model_accuracies(all_accuracies)
+    else:
+        print('Accuracy per model: ')
+        for i, acc in enumerate(all_accuracies):
+            print('    Model '+str(i)+':', acc)
