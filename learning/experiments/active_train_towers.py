@@ -38,7 +38,7 @@ def run_active_towers(args):
     if args.model == 'fcgn':
         base_model = FCGN
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
-    if args.model == 'fcgn-fc':
+    elif args.model == 'fcgn-fc':
         base_model = FCGNFC
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
     elif args.model == 'fcgn-con':
