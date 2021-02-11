@@ -71,6 +71,11 @@ class PandaAgent:
         self.execution_robot.arm.hand.Open()
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
+        # Create an arm interface
+        if real:
+            from franka_interface import ArmInterface
+            self.real_arm = ArmInterface()
+
         # Set up ROS plumbing if using features that require it
         if self.use_vision or self.use_action_server or real:
             import rospy
@@ -387,7 +392,7 @@ class PandaAgent:
         ros_req = SetPlanningStateRequest()
         # Initial poses and robot configuration
         if self.real:
-            raise NotImplementedError("Get joint angles from real robot") # TODO
+            ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
         else:
             ros_req.robot_config.angles = self.robot.arm.GetJointValues()
         ros_req.init_state = block_init_to_ros(self.pddl_blocks)
@@ -436,7 +441,7 @@ class PandaAgent:
         ros_req = SetPlanningStateRequest()
         ros_req.init_state = block_init_to_ros(self.pddl_blocks)
         if self.real:
-            raise NotImplementedError("Get joint angles from real robot") # TODO
+            ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
         else:
             ros_req.robot_config.angles = self.robot.arm.GetJointValues()
         for ix in block_ixs:
