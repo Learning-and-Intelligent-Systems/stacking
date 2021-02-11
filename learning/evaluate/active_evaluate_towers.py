@@ -724,8 +724,7 @@ def min_contact_regret_evaluation(logger, block_set, fname, args):
     return evaluate_planner(logger, block_set, contact_area, fname, args)
 
 def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
-    tower_sizes = [args.tower_size]
-    tower_keys = [str(ts)+'block' for ts in tower_sizes]
+    tower_keys = [str(ts)+'block' for ts in args.tower_sizes]
     tp = TowerPlanner(stability_mode='contains')
     ep = EnsemblePlanner(logger, n_samples=args.n_samples)
 
@@ -745,7 +744,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
         if torch.cuda.is_available():
             ensemble = ensemble.cuda()
 
-        for k, size in zip(tower_keys, tower_sizes):
+        for k, size in zip(tower_keys, args.tower_sizes):
             print('Tower size', k)
             num_failures, num_pw_failures = 0, 0
             curr_regrets = []

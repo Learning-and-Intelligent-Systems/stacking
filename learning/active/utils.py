@@ -112,6 +112,8 @@ class ActiveExperimentLogger:
         return dataset
 
     def get_figure_path(self, fname):
+        if not os.path.exists(os.path.join(self.exp_path, 'figures')): 
+            os.mkdir(os.path.join(self.exp_path, 'figures'))
         return os.path.join(self.exp_path, 'figures', fname)
 
     def get_ensemble(self, tx):

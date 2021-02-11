@@ -55,9 +55,9 @@ if __name__ == '__main__':
     parser.add_argument('--debug',
                         action='store_true',
                         help='set to run in debug mode')
-    parser.add_argument('--tower-size',
-                        default=5,
-                        type=int,
+    parser.add_argument('--tower-sizes',
+                        default=[5],
+                        nargs = '+',
                         help='number of blocks in goal tower')
     parser.add_argument('--discrete',
                         action='store_true',
@@ -77,14 +77,15 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path)
     fname = 'discrete_' if args.discrete else ''
     
+    ts_str = [str(ts) for ts in args.tower_sizes]
     if args.problem == 'tallest':
-        fname += 'random_planner_tallest_tower_'+str(args.tower_size)+'_block_towers'
+        fname += 'random_planner_tallest_tower_'+ts_str+'_block_towers'
         title = 'Tallest Tower'
     elif args.problem == 'overhang':
-        fname += 'random_planner_max_overhang_'+str(args.tower_size)+'_block_towers'
+        fname += 'random_planner_max_overhang_'+ts_str+'_block_towers'
         title = 'Maximum Overhang'
     elif args.problem == 'min-contact':
-        fname += 'random_planner_min_contact_'+str(args.tower_size)+'_block_towers'
+        fname += 'random_planner_min_contact_'+ts_str+'_block_towers'
         title = 'Minimum Contact'
         
     if args.plot_type == 'regret':
