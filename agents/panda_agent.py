@@ -474,8 +474,9 @@ class PandaAgent:
                 # Execute the reset plan
                 success, _, reset_stable = self.execute_plans_from_server(ros_req, real, T, stack=False)
                 print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
-        except:
+        except Exception as e
             print("Planning/execution failed during tower reset.")
+            print(e)
 
         # Return the final planning state
         return success, stack_stable
@@ -491,51 +492,56 @@ class PandaAgent:
         planning_active = True
         num_steps = len(ros_req.goal_state)
         while num_success < num_steps:
-            # Wait for a valid plan
-            plan = []
-            while len(plan) == 0 and planning_active:
-                time.sleep(3)
-                ros_resp = self.get_plan_client.call()
-                planning_active = ros_resp.planning_active
-                plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
-                if not planning_active:
-                    print("Planning ended on server side")
-                    return False, stack_stable, reset_stable
-            print("\nGot plan:")
-            print(plan)
+            try:
+                # Wait for a valid plan
+                plan = []
+                while len(plan) == 0 and planning_active:
+                    time.sleep(3)
+                    ros_resp = self.get_plan_client.call()
+                    planning_active = ros_resp.planning_active
+                    plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
+                    if not planning_active:
+                        print("Planning ended on server side")
+                        return False, stack_stable, reset_stable
+                print("\nGot plan:")
+                print(plan)
 
-            # Once we have a plan, execute it
-            self.execute()
-            ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False)
+                # Once we have a plan, execute it
+                self.execute()
+                ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False)
 
-            # Manage the moved blocks (add to the set when stacking, remove when unstacking)
-            query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
-            desired_pose = query_block.get_base_link_point()
-            if query_block not in self.moved_blocks:
-                self.moved_blocks.add(query_block)
-            else:
-                self.moved_blocks.remove(query_block)
-            
-            # Check stability
-            if not real:
-                self.step_simulation(T, vis_frames=False)
-            input('Press enter to check stability.')
-            stable = self.check_stability(real, query_block, desired_pose)
-            input('Continue?')
+                # Manage the moved blocks (add to the set when stacking, remove when unstacking)
+                query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
+                desired_pose = query_block.get_base_link_point()
+                if query_block not in self.moved_blocks:
+                    self.moved_blocks.add(query_block)
+                else:
+                    self.moved_blocks.remove(query_block)
+                
+                # Check stability
+                if not real:
+                    self.step_simulation(T, vis_frames=False)
+                input('Press enter to check stability.')
+                stable = self.check_stability(real, query_block, desired_pose)
+                input('Continue?')
 
-            # Manage the success status of the plan
-            if stable == 0.:
-                print("Unstable after execution!")
-                return True, stack_stable, reset_stable
-            else:
-                num_success += 1
-                if stack and num_success == num_steps/2:
-                    print("Completed tower stack!")
-                    stack_stable = True 
-                elif num_success == num_steps:
-                    print("Completed tower reset!")
-                    reset_stable = True
+                # Manage the success status of the plan
+                if stable == 0.:
+                    print("Unstable after execution!")
                     return True, stack_stable, reset_stable
+                else:
+                    num_success += 1
+                    if stack and num_success == num_steps/2:
+                        print("Completed tower stack!")
+                        stack_stable = True 
+                    elif num_success == num_steps:
+                        print("Completed tower reset!")
+                        reset_stable = True
+                        return True, stack_stable, reset_stable
+            except Exception as e:
+                print("Planning/execution failed.")
+                print(e)
+                return False, stack_stable, reset_stable
 
 
     def plan_and_execute_tower(self, ros_req, base_xy=(0.5, -0.3)):
