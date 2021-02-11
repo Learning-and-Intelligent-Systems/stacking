@@ -8,7 +8,7 @@ from learning.domains.towers.active_utils import sample_sequential_data, sample_
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.bottomup_net import BottomUpNet
-from learning.models.gn import FCGN, ConstructableFCGN
+from learning.models.gn import FCGN, ConstructableFCGN, FCGNFC
 from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
 from agents.panda_agent import PandaAgent, PandaClientAgent
@@ -37,6 +37,9 @@ def run_active_towers(args):
     # Initialize ensemble. 
     if args.model == 'fcgn':
         base_model = FCGN
+        base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
+    if args.model == 'fcgn-fc':
+        base_model = FCGNFC
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
     elif args.model == 'fcgn-con':
         base_model = ConstructableFCGN
@@ -157,7 +160,7 @@ if __name__ == '__main__':
     parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')
     parser.add_argument('--sampler', choices=['random', 'sequential'], default='random', help='Choose how the unlabeled pool will be generated. Sequential assumes every tower has a stable base.')
     parser.add_argument('--pool-fname', type=str, default='')  
-    parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      
+    parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-fc', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      
     # simple-model: does not perturb the blocks, uses TowerPlanner to check constructability
     # noisy-model: perturbs the blocks, uses TowerPlanner to check constructability
     # sim: uses pyBullet with no noise

@@ -65,7 +65,7 @@ if __name__ == '__main__':
     
     ts_str = ''.join([str(ts) for ts in args.tower_sizes])
     if args.problem == 'tallest':
-        fname = pre+'random_planner_tallest'+ts_str+'_block_towers'
+        fname = pre+'random_planner_tallest_'+ts_str+'_block_towers'
         tallest_tower_regret_evaluation(logger, block_set, fname, args)
     elif args.problem == 'overhang':
         fname = pre+'random_planner_max_overhang_'+ts_str+'_block_towers'
