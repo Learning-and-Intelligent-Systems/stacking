@@ -45,6 +45,7 @@ class PlanningServer():
         self.pddl_block_lookup = get_pddl_block_lookup(blocks, self.pddl_blocks)
 
         # Initialize variables
+        self.planning = False
         self.plan_buffer = []
         self.planning_active = False
         self.cancel_planning = False
@@ -282,26 +283,19 @@ class PlanningServer():
 
             # Plan
             plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=1)
-            if plan is not None and not self.cancel_planning:
-                self.simulate_plan(plan)
-                self.plan_buffer.append(plan)
+            if plan is not None:
+                if self.cancel_planning:
+                    print("Discarding latest plan")
+                    self.plan_buffer = []
+                    return
+                else:
+                    self.simulate_plan(plan)
+                    self.plan_buffer.append(plan)
             else:
                 print(f"No plan found to place {blk}")
                 self.goal_block_states = []
                 self.planning_active = False
                 return
-
-            # Now check stability
-            # desired_pose = blk.get_point()
-            # T = 2500
-            # self.step_simulation(T, vis_frames=False)
-            # end_pose = blk.get_point()
-            # if numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose)) > 0.01:
-            #     print("Unstable during planning!")
-            #     self.planning_active = False
-            #     return
-            # else:
-
 
         # Set the completion flag if the plan succeeded until the end
         self.plan_complete = True
@@ -328,6 +322,7 @@ class PlanningServer():
         self.cancel_planning = True
         self.planning_active = True
         self.plan_complete = False
+        print("Reset request received!")
 
         # Get the new initial poses of blocks based on the execution world
         self.new_block_states = []
@@ -354,7 +349,6 @@ class PlanningServer():
         # Get the robot configuration
         self.latest_robot_config = ros_request.robot_config.angles
 
-        print("Reset request received!")
         return SetPlanningStateResponse()
 
 
@@ -366,9 +360,6 @@ class PlanningServer():
             blk.set_base_link_pose(pose)
             print(f"Repositioning {blk}")
         print("Planning state reset!")
-
-        tower = sample_random_tower(blocks)
-        self.generate_tower_plans(tower)
 
 
     def pddlstream_plan(self, init, goal, fixed_objs, max_tries=1):
