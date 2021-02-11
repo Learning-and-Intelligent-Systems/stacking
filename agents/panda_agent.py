@@ -385,7 +385,11 @@ class PandaAgent:
         from stacking_ros.srv import SetPlanningStateRequest
         from tamp.ros_utils import block_init_to_ros, pose_to_ros, pose_tuple_to_ros, transform_to_ros
         ros_req = SetPlanningStateRequest()
-        # Initial poses
+        # Initial poses and robot configuration
+        if self.real:
+            raise NotImplementedError("Get joint angles from real robot") # TODO
+        else:
+            ros_req.robot_config.angles = self.robot.arm.GetJointValues()
         ros_req.init_state = block_init_to_ros(self.pddl_blocks)
         # Goal poses
         # TODO: Set base block to be rotated in its current position.
@@ -431,6 +435,10 @@ class PandaAgent:
         block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
         ros_req = SetPlanningStateRequest()
         ros_req.init_state = block_init_to_ros(self.pddl_blocks)
+        if self.real:
+            raise NotImplementedError("Get joint angles from real robot") # TODO
+        else:
+            ros_req.robot_config.angles = self.robot.arm.GetJointValues()
         for ix in block_ixs:
             blk, pose = self.pddl_blocks[ix], original_poses[ix]
             if blk in self.moved_blocks:
