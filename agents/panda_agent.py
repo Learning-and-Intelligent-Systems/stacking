@@ -22,7 +22,7 @@ from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
 
 
 class PandaAgent:
-    def __init__(self, blocks, noise=0.00005, block_init_xy_poses=None, 
+    def __init__(self, blocks, noise=0.00005, block_init_xy_poses=None,
                  teleport=False, use_platform=False, use_vision=False, real=False,
                  use_action_server=False, use_learning_server=False):
         """
@@ -70,6 +70,11 @@ class PandaAgent:
         self.execution_robot = pb_robot.panda.Panda()
         self.execution_robot.arm.hand.Open()
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
+
+        # Create an arm interface
+        if real:
+            from franka_interface import ArmInterface
+            self.real_arm = ArmInterface()
 
         # Set up ROS plumbing if using features that require it
         if self.use_vision or self.use_action_server or real:
@@ -221,6 +226,7 @@ class PandaAgent:
         """
         fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
         conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
+        print('Initial configuration:', conf.configuration)
         init = [('CanMove',),
                 ('Conf', conf),
                 ('AtConf', conf),
@@ -385,7 +391,11 @@ class PandaAgent:
         from stacking_ros.srv import SetPlanningStateRequest
         from tamp.ros_utils import block_init_to_ros, pose_to_ros, pose_tuple_to_ros, transform_to_ros
         ros_req = SetPlanningStateRequest()
-        # Initial poses
+        # Initial poses and robot configuration
+        if self.real:
+            ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
+        else:
+            ros_req.robot_config.angles = self.robot.arm.GetJointValues()
         ros_req.init_state = block_init_to_ros(self.pddl_blocks)
         # Goal poses
         # TODO: Set base block to be rotated in its current position.
@@ -421,7 +431,7 @@ class PandaAgent:
         success, stack_stable = self.execute_plans_from_server(ros_req, real, T)
         print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
 
-        if self.use_vision:
+        if self.use_vision and not stack_stable:
             self._update_block_poses()
 
         # Instruct a reset plan
@@ -431,6 +441,10 @@ class PandaAgent:
         block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
         ros_req = SetPlanningStateRequest()
         ros_req.init_state = block_init_to_ros(self.pddl_blocks)
+        if self.real:
+            ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
+        else:
+            ros_req.robot_config.angles = self.robot.arm.GetJointValues()
         for ix in block_ixs:
             blk, pose = self.pddl_blocks[ix], original_poses[ix]
             if blk in self.moved_blocks:
@@ -490,12 +504,12 @@ class PandaAgent:
                     return True, stable
 
 
-    def plan_and_execute_tower(self, ros_req, base_xy=(0.5, -0.3), real=False):
+    def plan_and_execute_tower(self, ros_req, base_xy=(0.5, -0.3)):
         """ Service callback function to plan and execute a tower """
         from stacking_ros.srv import PlanTowerResponse
         from tamp.ros_utils import ros_to_tower
         tower = ros_to_tower(ros_req.tower_info)
-        success, stable = self.simulate_tower_parallel(tower, True, real=real, base_xy=base_xy)
+        success, stable = self.simulate_tower_parallel(tower, True, real=self.real, base_xy=base_xy)
         resp = PlanTowerResponse()
         resp.success = success
         resp.stable = stable
@@ -645,7 +659,7 @@ class PandaAgent:
                 ExecuteActions(plan, real=real, pause=True, wait=False)
         if not real:
             self.step_simulation(T, vis_frames=False)
-        if self.use_vision:
+        if self.use_vision and not stable:
             input('Update block poses after tower?')
             self._update_block_poses()
 
