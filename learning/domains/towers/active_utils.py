@@ -124,7 +124,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
     for k in keys:
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
         if sampled_towers[k]['towers'].shape[0] == 0:
-            sampled_towers[k]['towers'] = sampled_towers[k]['towers'].reshape((0, int(k[0]), 17))
+            sampled_towers[k]['towers'] = sampled_towers[k]['towers'].reshape((0, int(k[0]), 21))
         sampled_towers[k]['labels'] = np.zeros((sampled_towers[k]['towers'].shape[0],))
         if block_set is not None:
             sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])

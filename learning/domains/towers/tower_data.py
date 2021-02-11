@@ -12,7 +12,7 @@ from learning.domains.towers.augment_dataset import augment as augment_towers
 def preprocess(towers):
     # remove the three color channels at the end of each block encoding
     # (see block_utils.Object.vectorize for details)
-    towers = towers[...,:14]
+    #towers = towers[...,:14]
     #towers = towers[...,[0, 1, 2, 4, 5, 7, 8]]
     # convert absolute xy positions to relative positions
     #towers[:,1:,7:9] -= towers[:,:-1,7:9]
@@ -101,7 +101,7 @@ class TowerDataset(Dataset):
                 break
         
         tower_ix = ix - self.start_indices[tower_size]
-        return self.tower_tensors[tower_size][tower_ix,:,:], self.tower_labels[tower_size][tower_ix]
+        return self.tower_tensors[tower_size][tower_ix,:,:14], self.tower_labels[tower_size][tower_ix]
         
     def __len__(self):
         """

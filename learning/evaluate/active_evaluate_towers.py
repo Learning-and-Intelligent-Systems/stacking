@@ -618,7 +618,7 @@ def single_2block_tower_analysis(logger):
     unlabeled = sample_unlabeled_data(1000)
     tower = unlabeled['2block']['towers'][0:1,:,:].copy()
     displacements = np.linspace(-0.1, 0.1, 1000).reshape(1000,1,1)
-    unlabeled['2block']['towers'] = np.resize(tower, (1000, 2, 17))
+    unlabeled['2block']['towers'] = np.resize(tower, (1000, 2, 21))
     unlabeled['2block']['labels'] = np.zeros((1000,))
     print(displacements.shape, unlabeled['2block']['towers'][:,1,7:8].shape)
     unlabeled['2block']['towers'][:,1:2,7:8] += displacements
