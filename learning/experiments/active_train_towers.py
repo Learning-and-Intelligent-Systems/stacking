@@ -93,20 +93,20 @@ def run_active_towers(args):
     
     else:
         towers_dict = sample_unlabeled_data(40, block_set=block_set)
-        towers_dict = get_labels(towers_dict, args.exec_mode, agent)
+        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
         val_towers_dict = sample_unlabeled_data(40, block_set=block_set)
-        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent)
+        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
     if args.sampler == 'sequential':
         towers_dict = sample_sequential_data(block_set, None, 40)
-        towers_dict = get_labels(towers_dict, args.exec_mode, agent)
+        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
         val_towers_dict = sample_sequential_data(block_set, None, 40)
-        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent)
+        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
         
         if block_set is None:
