@@ -486,6 +486,20 @@ class PandaAgent:
         return success, stack_stable
 
 
+    def validate_ros_plan(self, ros_resp, tgt_block):
+        """ Validates a ROS plan to move a block against the expected target block name """
+        if len(ros_resp.plan) == 0:
+            return True
+        else:
+            plan_blocks = [t.obj1 for t in ros_resp.plan if t.type == "pick"]
+            if len(plan_blocks) > 0:
+                plan_block = plan_blocks[0]
+            else:
+                return False
+            print(f"Received plan to move {plan_block} and expected to move {tgt_block}")
+            return (tgt_block == plan_block)
+
+
     def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True):
         """ Executes plans received from planning server """
         self.init_state_client.call(ros_req)
@@ -500,10 +514,12 @@ class PandaAgent:
                 # Wait for a valid plan
                 plan = []
                 while len(plan) == 0 and planning_active:
-                    time.sleep(3)
+                    time.sleep(1)
                     ros_resp = self.get_plan_client.call()
                     planning_active = ros_resp.planning_active
-                    plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
+                    tgt_block = ros_req.goal_state[num_success].name
+                    if self.validate_ros_plan(ros_resp, tgt_block):
+                        plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
                     if not planning_active:
                         print("Planning ended on server side")
                         return False, stack_stable, reset_stable
