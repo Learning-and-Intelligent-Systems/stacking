@@ -79,7 +79,8 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
                                                    data_label_fn=data_label_fn,
                                                    data_pred_fn=data_pred_fn,
                                                    exec_mode=args.exec_mode,
-                                                   agent=agent)
+                                                   agent=agent,
+                                                   logger=logger)
         logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
 
         # Add to dataset.

@@ -618,7 +618,7 @@ def single_2block_tower_analysis(logger):
     unlabeled = sample_unlabeled_data(1000)
     tower = unlabeled['2block']['towers'][0:1,:,:].copy()
     displacements = np.linspace(-0.1, 0.1, 1000).reshape(1000,1,1)
-    unlabeled['2block']['towers'] = np.resize(tower, (1000, 2, 17))
+    unlabeled['2block']['towers'] = np.resize(tower, (1000, 2, 21))
     unlabeled['2block']['labels'] = np.zeros((1000,))
     print(displacements.shape, unlabeled['2block']['towers'][:,1,7:8].shape)
     unlabeled['2block']['towers'][:,1:2,7:8] += displacements
@@ -724,8 +724,7 @@ def min_contact_regret_evaluation(logger, block_set, fname, args):
     return evaluate_planner(logger, block_set, contact_area, fname, args)
 
 def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
-    tower_sizes = [args.tower_size]
-    tower_keys = [str(ts)+'block' for ts in tower_sizes]
+    tower_keys = [str(ts)+'block' for ts in args.tower_sizes]
     tp = TowerPlanner(stability_mode='contains')
     ep = EnsemblePlanner(logger, n_samples=args.n_samples)
 
@@ -745,8 +744,14 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
         if torch.cuda.is_available():
             ensemble = ensemble.cuda()
 
-        for k, size in zip(tower_keys, tower_sizes):
+        for k, size in zip(tower_keys, args.tower_sizes):
             print('Tower size', k)
+            if size == 2 or size == 3:
+                ep.n_samples = 5000
+            elif size == 4:
+                ep.n_samples = 10000
+            elif size == 5:
+                ep.n_samples = 15000
             num_failures, num_pw_failures = 0, 0
             curr_regrets = []
             curr_rewards = []

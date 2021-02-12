@@ -8,7 +8,7 @@ from learning.domains.towers.active_utils import sample_sequential_data, sample_
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.bottomup_net import BottomUpNet
-from learning.models.gn import FCGN, ConstructableFCGN
+from learning.models.gn import FCGN, ConstructableFCGN, FCGNFC
 from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
 from agents.panda_agent import PandaAgent, PandaClientAgent
@@ -38,6 +38,9 @@ def run_active_towers(args):
     if args.model == 'fcgn':
         base_model = FCGN
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
+    elif args.model == 'fcgn-fc':
+        base_model = FCGNFC
+        base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
     elif args.model == 'fcgn-con':
         base_model = ConstructableFCGN
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
@@ -66,7 +69,9 @@ def run_active_towers(args):
         data_sampler_fn = pool_sampler.sample_unlabeled_data
     elif args.block_set_fname is not '':
         data_subset_fn = get_subset
-        with open(args.block_set_fname, 'rb') as f: block_set = pickle.load(f)
+        with open(args.block_set_fname, 'rb') as f: 
+            block_set = pickle.load(f)
+            #block_set = [block_set[1], block_set[2]]
         data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
     else:
         data_subset_fn = get_subset
@@ -88,20 +93,20 @@ def run_active_towers(args):
     
     else:
         towers_dict = sample_unlabeled_data(40, block_set=block_set)
-        towers_dict = get_labels(towers_dict, args.exec_mode, agent)
+        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
         val_towers_dict = sample_unlabeled_data(40, block_set=block_set)
-        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent)
+        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
     if args.sampler == 'sequential':
         towers_dict = sample_sequential_data(block_set, None, 40)
-        towers_dict = get_labels(towers_dict, args.exec_mode, agent)
+        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
         val_towers_dict = sample_sequential_data(block_set, None, 40)
-        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent)
+        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
         
         if block_set is None:
@@ -155,7 +160,7 @@ if __name__ == '__main__':
     parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')
     parser.add_argument('--sampler', choices=['random', 'sequential'], default='random', help='Choose how the unlabeled pool will be generated. Sequential assumes every tower has a stable base.')
     parser.add_argument('--pool-fname', type=str, default='')  
-    parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      
+    parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-fc', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      
     # simple-model: does not perturb the blocks, uses TowerPlanner to check constructability
     # noisy-model: perturbs the blocks, uses TowerPlanner to check constructability
     # sim: uses pyBullet with no noise

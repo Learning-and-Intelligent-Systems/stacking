@@ -12,14 +12,14 @@ from scipy.spatial.transform import Rotation as R
 
 DEBUG_FAILURE = False
 
-def get_grasp_gen(robot, add_slanted_grasps=True):
-    add_slanted_grasps = True
+def get_grasp_gen(robot, add_slanted_grasps=True, add_orthogonal_grasps=True):
+    # add_slanted_grasps = True
     # I opt to use TSR to define grasp sets but you could replace this
     # with your favorite grasp generator
     def gen(body):
         # Note, add_slanted_grasps should be True when we're using the platform.
         grasp_tsr = pb_robot.tsrs.panda_box.grasp(body,
-            add_slanted_grasps=add_slanted_grasps, add_orthogonal_grasps=False)
+            add_slanted_grasps=add_slanted_grasps, add_orthogonal_grasps=add_orthogonal_grasps)
         grasps = []
 
         for sampled_tsr in grasp_tsr:
@@ -88,7 +88,7 @@ def get_stable_gen_block(fixed=[]):
 
 
 def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
-    def fn(body, pose, grasp):
+    def fn(body, pose, grasp, return_grasp_q=False):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = np.dot(obj_worldF, grasp.grasp_objF)
@@ -154,7 +154,8 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
             else:
                 q_backoff = robot.arm.ComputeIK(backoff_tform, seed_q=q_grasp)
                 if (q_backoff is None): continue
-                if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles): return None
+                if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles):
+                    return None
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
 
             path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
@@ -175,9 +176,13 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
                 p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
                 p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
 
+
             command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp, grasp, body, use_wrist_camera),
                        grasp,
                        pb_robot.vobj.MoveFromTouch(robot.arm, q_backoff)]
+
+            if return_grasp_q:
+                return (pb_robot.vobj.BodyConf(robot, q_grasp),)
             return (conf_approach, conf_backoff, command)
         return None
     return fn

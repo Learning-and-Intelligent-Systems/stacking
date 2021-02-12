@@ -1,7 +1,6 @@
 import argparse
 import pickle
 import numpy as np
-import matplotlib.pyplot as plt
 
 from learning.active.utils import ActiveExperimentLogger
 from block_utils import Object
@@ -42,12 +41,14 @@ if __name__ == '__main__':
                         default=5000,
                         type=int,
                         help='number of samples to select from in total planning method')
-    parser.add_argument('--tower-size',
-                        default=5,
-                        type=int,
-                        help='number of blocks in goal tower')
+    parser.add_argument('--tower-sizes',
+                        default=[5],
+                        nargs='+',
+                        help='number of blocks in goal tower (can do multiple)')
     
     args = parser.parse_args()
+    
+    args.tower_sizes = [int(ts) for ts in args.tower_sizes]
     
     assert ((args.acquisition_step is None) and (args.max_acquisitions is not None)) \
             or ((args.max_acquisitions is None) and (args.acquisition_step is not None)), \
@@ -62,13 +63,14 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path)
     pre = 'discrete_' if args.discrete else ''
     
+    ts_str = ''.join([str(ts) for ts in args.tower_sizes])
     if args.problem == 'tallest':
-        fname = pre+'random_planner_tallest'+str(args.tower_size)+'_block_towers'
+        fname = pre+'random_planner_tallest_'+ts_str+'_block_towers'
         tallest_tower_regret_evaluation(logger, block_set, fname, args)
     elif args.problem == 'overhang':
-        fname = pre+'random_planner_max_overhang_'+str(args.tower_size)+'_block_towers'
+        fname = pre+'random_planner_max_overhang_'+ts_str+'_block_towers'
         longest_overhang_regret_evaluation(logger, block_set, fname, args)
     elif args.problem == 'min-contact':
-        fname = pre+'random_planner_min_contact_'+str(args.tower_size)+'_block_towers'
+        fname = pre+'random_planner_min_contact_'+ts_str+'_block_towers'
         min_contact_regret_evaluation(logger, block_set, fname, args)
     

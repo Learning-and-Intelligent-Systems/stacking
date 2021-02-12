@@ -79,22 +79,23 @@ class Object:
       4 quat
       3 color
       """
-      v = np.zeros(17)
+      v = np.zeros(21)
       v[0] = self.mass
       v[1:4] = self.com
       v[4:7] = self.dimensions
       v[7:10] = self.pose.pos
       v[10:14] = self.pose.orn
-      v[14:17] = self.color
+      v[14:18] = self.rotation
+      v[18:21] = self.color
 
       return v
     
     @staticmethod
     def from_vector(vblock):
-        if len(vblock) <= 14:
+        if len(vblock) <= 18:
             color = [1,0,0]
         else:
-            color = vblock[14:17].tolist()
+            color = vblock[18:21].tolist()
         block = Object('from_vec', 
                        dimensions=Dimensions(*vblock[4:7].tolist()), 
                        mass=vblock[0], 
@@ -103,6 +104,7 @@ class Object:
         pose = Pose(Position(*vblock[7:10].tolist()),
                     Quaternion(*vblock[10:14].tolist()))
         block.set_pose(pose)
+        block.rotation = vblock[14:18]
         return block
 
     @staticmethod

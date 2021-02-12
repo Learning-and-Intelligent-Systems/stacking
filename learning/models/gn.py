@@ -125,3 +125,31 @@ class ConstructableFCGN(nn.Module):
         preds = torch.cat(preds, dim=1)
         return preds.prod(dim=1).unsqueeze(-1)
         
+class FCGNFC(FCGN):
+    def __init__(self, n_in, n_hidden):
+        """ This network is given input of size (N, K, n_in) where N, K can vary per batch.
+        It is a fully connected version of FCGN
+        :param n_in: Number of block-specific parameters.
+        :param n_hidden: Number of hidden units unsed throughout the network.
+        """
+        super(FCGNFC, self).__init__(n_in, n_hidden)
+
+    def edge_fn(self, towers, h):
+        N, K, _ = towers.shape
+
+        # Get features between all node. 
+        # xx.shape = (N, K, K, 2*n_in)
+        x = towers 
+        x = x[:, :, None, :].expand(N, K, K, self.n_in)
+        xx = torch.cat([x, x.transpose(1, 2)], dim=3)
+        xx = xx.view(-1, 2*self.n_in)
+
+        # Calculate the edge features for each node 
+        # all_edges.shape = (N, K, K, n_hidden)
+        all_edges = self.M(xx) 
+        all_edges = all_edges.view(N, K, K, self.n_hidden)
+
+        # edges.shape = (N, K, n_hidden)
+        edges = torch.sum(all_edges, dim=2)
+        return edges
+        

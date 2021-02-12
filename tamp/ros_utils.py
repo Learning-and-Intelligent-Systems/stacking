@@ -317,9 +317,9 @@ def ros_to_tower(msg):
         # Now create a Pose namedtuple
         pose = ros_to_pose_tuple(ros_blk.pose)
         pos = Position(pose[0][0], pose[0][1], pose[0][2])
-        orn = Quaternion(pose[1][0], pose[1][1], pose[1][2], pose[1][3])
-        pose_named = Pose(pos=pos, orn=orn)
+        rot = Quaternion(pose[1][0], pose[1][1], pose[1][2], pose[1][3])
+        pose_named = Pose(pos=pos, orn=Quaternion(0,0,0,1))
         blk.set_pose(pose_named)
-        blk.rotation = orn
+        blk.rotation = rot
         tower.append(blk)
     return tower

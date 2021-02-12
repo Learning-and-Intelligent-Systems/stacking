@@ -2,6 +2,7 @@ import os
 import pickle
 import time
 import torch
+import datetime
 
 from torch.utils.data import DataLoader
 
@@ -91,6 +92,7 @@ class ActiveExperimentLogger:
 
         os.mkdir(exp_path)
         os.mkdir(os.path.join(exp_path, 'figures'))
+        os.mkdir(os.path.join(exp_path, 'towers'))
         os.mkdir(os.path.join(exp_path, 'models'))
         os.mkdir(os.path.join(exp_path, 'datasets'))
         os.mkdir(os.path.join(exp_path, 'acquisition_data'))
@@ -112,7 +114,12 @@ class ActiveExperimentLogger:
         return dataset
 
     def get_figure_path(self, fname):
+        if not os.path.exists(os.path.join(self.exp_path, 'figures')): 
+            os.mkdir(os.path.join(self.exp_path, 'figures'))
         return os.path.join(self.exp_path, 'figures', fname)
+
+    def get_towers_path(self, fname):
+        return os.path.join(self.exp_path, 'towers', fname)
 
     def get_ensemble(self, tx):
         """ Load an ensemble from the logging structure.
@@ -152,6 +159,12 @@ class ActiveExperimentLogger:
         # Save ensemble weights.
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
         torch.save(ensemble.state_dict(), os.path.join(path))
+
+    def save_tower_data(self, block_tower, label):
+        fname = 'labeled_tower_{:%Y-%m-%d_%H-%M-%S}.pkl'.format(datetime.datetime.now())
+        path = os.path.join(self.exp_path, 'towers', fname)
+        with open(path, 'wb') as handle:
+            pickle.dump([block_tower, label], handle)
 
     def save_acquisition_data(self, new_data, samples, tx):
         data = {
