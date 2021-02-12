@@ -408,6 +408,7 @@ class PandaAgent:
         base_pose = pb_robot.vobj.BodyPose(base_block, base_pose)
         base_block_ros = BodyInfo()
         base_block_ros.name = base_block.readableName
+        base_block_ros.stack = True
         pose_to_ros(base_pose, base_block_ros.pose)
         ros_req.goal_state.append(base_block_ros)
         # Now loop through the other tower blocks
@@ -428,15 +429,17 @@ class PandaAgent:
             block_ros.base_obj = bottom_pddl.readableName
             transform_to_ros(rel_tform, block_ros.pose)
             block_ros.is_rel_pose = True
+            block_ros.stack = True
             ros_req.goal_state.append(block_ros)
         # Finally, tack on the tower resetting steps
         for ix in reversed(tower_block_order):
             blk, pose = self.pddl_blocks[ix], original_poses[ix]
             goal_pose = pb_robot.vobj.BodyPose(blk, pose)
-            ros_block = BodyInfo()
-            ros_block.name = blk.readableName
-            pose_to_ros(goal_pose, ros_block.pose)
-            ros_req.goal_state.append(ros_block)
+            block_ros = BodyInfo()
+            block_ros.name = blk.readableName
+            block_ros.stack = False
+            pose_to_ros(goal_pose, block_ros.pose)
+            ros_req.goal_state.append(block_ros)
 
         # Execute the stacking plan
         success, stack_stable, reset_stable = \
@@ -466,10 +469,11 @@ class PandaAgent:
                     blk, pose = self.pddl_blocks[ix], original_poses[ix]
                     if blk in self.moved_blocks:
                         goal_pose = pb_robot.vobj.BodyPose(blk, pose)
-                        ros_block = BodyInfo()
-                        ros_block.name = blk.readableName
-                        pose_to_ros(goal_pose, ros_block.pose)
-                        ros_req.goal_state.append(ros_block)
+                        block_ros = BodyInfo()
+                        block_ros.name = blk.readableName
+                        block_ros.stack = False
+                        pose_to_ros(goal_pose, block_ros.pose)
+                        ros_req.goal_state.append(block_ros)
 
                 # Execute the reset plan
                 success, _, reset_stable = self.execute_plans_from_server(ros_req, real, T, stack=False)
