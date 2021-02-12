@@ -474,7 +474,7 @@ class PandaAgent:
                 # Execute the reset plan
                 success, _, reset_stable = self.execute_plans_from_server(ros_req, real, T, stack=False)
                 print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
-        except Exception as e
+        except Exception as e:
             print("Planning/execution failed during tower reset.")
             print(e)
 
