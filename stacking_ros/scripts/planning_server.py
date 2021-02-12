@@ -281,7 +281,7 @@ class PlanningServer():
                 pose_obj = pb_robot.vobj.BodyPose(blk, pose)
 
                 # If resetting a block, consider all orientations
-                if self.alternate_orientations: # and not stack:
+                if self.alternate_orientations and not stack:
                     pos_tgt, orn_tgt = pose_obj.pose
                     pose_goal_terms = []
                     for orn in all_orns:
@@ -301,8 +301,6 @@ class PlanningServer():
                     pose_goal = ("AtPose", blk, pose_obj)
                 
                 goal = ("and", ("On", blk, self.table), pose_goal)
-                print(init)
-                print(goal)
             else:
                 rel_tform = pose_to_transform(pose)
                 init += [("RelPose", blk, base, rel_tform)]
