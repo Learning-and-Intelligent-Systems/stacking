@@ -537,7 +537,7 @@ class PandaAgent:
                     self.moved_blocks.add(query_block)
                 else:
                     self.moved_blocks.remove(query_block)
-                
+
                 # Check stability
                 if not real:
                     self.step_simulation(T, vis_frames=False)
@@ -553,7 +553,7 @@ class PandaAgent:
                     num_success += 1
                     if stack and num_success == num_steps/2:
                         print("Completed tower stack!")
-                        stack_stable = True 
+                        stack_stable = True
                     elif num_success == num_steps:
                         print("Completed tower reset!")
                         reset_stable = True
@@ -785,7 +785,7 @@ class PandaAgent:
                     position = (pose.position.x, pose.position.y, pose.position.z)
                     print('Desired Pos:', desired_pose)
                     print('Detected Pos:', position)
-                    if numpy.linalg.norm(numpy.array(position)-numpy.array(desired_pose)) > 0.05:
+                    if numpy.linalg.norm(numpy.array(position)-numpy.array(desired_pose)) > 0.04:
                         return 0.
 
             # If block isn't visible, return 0.
