@@ -290,14 +290,14 @@ class PlanningServer():
                 pose_orig = blk.get_base_link_pose()
                 pose_obj = pb_robot.vobj.BodyPose(blk, pose)
 
-                if stack and self.alternate_orientations:
-                    init += [("Pose", blk, pose_obj),
-                             ("Supported", blk, pose_obj, self.table, self.table_pose)]
-                    pose_goal = ("AtPose", blk, pose_obj)
-                else:
+                if not stack and self.alternate_orientations:
                     init += [("Reset",), ("Pose", blk, pose_obj),
                              ("Home", blk, pose_obj, self.table, self.table_pose)]
                     pose_goal = ("AtHome", blk)
+                else:
+                    init += [("Pose", blk, pose_obj),
+                             ("Supported", blk, pose_obj, self.table, self.table_pose)]
+                    pose_goal = ("AtPose", blk, pose_obj)
 
                 goal = ("and", ("On", blk, self.table), pose_goal)
             else:
