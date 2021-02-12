@@ -255,7 +255,8 @@ class PlanningServer():
         while not rospy.is_shutdown():
 
             # If no planning has been received, just keep waiting
-            if not self.planning_active or (self.planning_active and self.plan_complete):
+            if not self.cancel_planning and \
+              (not self.planning_active or (self.planning_active and self.plan_complete)):
                 # print("Waiting for client ...")
                 rospy.sleep(1)
 
@@ -282,6 +283,9 @@ class PlanningServer():
 
         # Plan for all goals sequentially
         for blk, base, pose, stack in self.goal_block_states:
+            if self.cancel_planning:
+                break
+
             # Unpack the goal states into PDDLStream
             init = self.get_initial_pddl_state()
 
@@ -307,20 +311,17 @@ class PlanningServer():
 
             # Plan
             plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=1)
-            if plan is not None:
-                if self.cancel_planning:
-                    print("Discarding latest plan")
-                    self.plan_buffer = []
-                    self.cancel_planning = False
-                    return
-                else:
-                    self.simulate_plan(plan)
-                    self.plan_buffer.append(plan)
-            else:
+            if self.cancel_planning:
+                print("Discarding latest plan")
+                self.plan_buffer = []
+            elif plan is None:
                 print(f"No plan found to place {blk}")
                 self.goal_block_states = []
                 self.planning_active = False
-                return
+            else:
+                print(f"Simulating plan")
+                self.simulate_plan(plan)
+                self.plan_buffer.append(plan)
 
         # Set the completion flag if the plan succeeded until the end
         self.plan_complete = True
