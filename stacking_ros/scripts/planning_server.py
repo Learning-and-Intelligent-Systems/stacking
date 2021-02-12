@@ -314,14 +314,18 @@ class PlanningServer():
             if self.cancel_planning:
                 print("Discarding latest plan")
                 self.plan_buffer = []
-            elif plan is None:
-                print(f"No plan found to place {blk}")
-                self.goal_block_states = []
-                self.planning_active = False
-            else:
+            elif plan is not None:
                 print(f"Simulating plan")
                 self.simulate_plan(plan)
-                self.plan_buffer.append(plan)
+                if self.cancel_planning:
+                    print("Discarding latest plan")
+                    self.plan_buffer = []
+                else:
+                    self.plan_buffer.append(plan)
+            print(f"No plan found to place {blk}")
+            self.goal_block_states = []
+            self.planning_active = False
+            
 
         # Set the completion flag if the plan succeeded until the end
         self.plan_complete = True
