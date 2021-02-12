@@ -183,7 +183,7 @@ def task_plan_to_ros(plan):
             ros_act.obj2 = obj2.readableName
             pose_to_ros(pose1, ros_act.pose1)
             grasp_to_ros(grasp, ros_act.grasp)
-        elif ros_act.type == "place":
+        elif ros_act.type in ["place", "place-home"]:
             obj1, pose1, obj2, pose2, grasp, q1, q2, traj = act_args
             ros_act.obj1 = obj1.readableName
             ros_act.obj2 = obj2.readableName
@@ -289,7 +289,7 @@ def ros_to_task_plan(msg, robot, pddl_block_lookup):
         elif name == "pick":
             args = (0,0,0,0,0,
                 ros_to_traj(ros_act, robot, pddl_block_lookup))
-        elif name == "place":
+        elif name in ["place", "place-home"]:
             args = (0,0,0,0,0,0,0,
                 ros_to_traj(ros_act, robot, pddl_block_lookup))
         # TODO: Note we are padding the action tuples with zeros since executing

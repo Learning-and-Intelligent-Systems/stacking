@@ -218,7 +218,7 @@ class PlanningServer():
         print_planning_problem(init, goal, fixed_objs)
         saved_world = pb_robot.utils.WorldSaver()
 
-        # Get PDDLStream planning information
+        # Get PDDLStream planning information 
         pddl_info = get_pddlstream_info(self.robot,
                                         self.pddl_blocks,
                                         add_slanted_grasps=False,
@@ -274,35 +274,31 @@ class PlanningServer():
 
     def plan_from_goals(self):
         """ Executes plan for a set of goal states """
+        # Get the home poses
+        self.home_poses = {}
+        for blk, base, pose, stack in self.goal_block_states:
+            if not stack:
+                self.home_poses[blk.get_name()] = pose
+
+        # Plan for all goals sequentially
         for blk, base, pose, stack in self.goal_block_states:
             # Unpack the goal states into PDDLStream
             init = self.get_initial_pddl_state()
+
             fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != blk]
             if base == self.table:
                 pose_orig = blk.get_base_link_pose()
                 pose_obj = pb_robot.vobj.BodyPose(blk, pose)
 
-                # If resetting a block, consider all orientations
-                if self.alternate_orientations: # and not stack:
-                    pos_tgt, orn_tgt = pose_obj.pose
-                    tgt_poses = []
-                    for orn in all_orns:
-                        orn_tf = quaternion_multiply(orn, orn_tgt)
-                        blk.set_base_link_pose((pos_tgt, orn_tf))
-                        stable_z = pb_robot.placements.stable_z(blk, self.table)
-                        tgt_pose = pb_robot.vobj.BodyPose(
-                            blk, ((pos_tgt[0], pos_tgt[1], stable_z), orn_tf))
-                        init += [("Pose", blk, tgt_pose), 
-                                 ("Supported", blk, tgt_pose, self.table, self.table_pose)]
-                        tgt_poses.append(tgt_pose)
-                    blk.set_base_link_pose(pose_orig)
-                    pose_goal = ("AtAnyPose", blk) + tuple(tgt_poses)
-                # Otherwise, just consider the single orientation specified in the plan
-                else:
+                if stack and self.alternate_orientations:
                     init += [("Pose", blk, pose_obj),
                              ("Supported", blk, pose_obj, self.table, self.table_pose)]
                     pose_goal = ("AtPose", blk, pose_obj)
-                
+                else:
+                    init += [("Reset",), ("Pose", blk, pose_obj),
+                             ("Home", blk, pose_obj, self.table, self.table_pose)]
+                    pose_goal = ("AtHome", blk)
+
                 goal = ("and", ("On", blk, self.table), pose_goal)
             else:
                 rel_tform = pose_to_transform(pose)
@@ -315,6 +311,7 @@ class PlanningServer():
                 if self.cancel_planning:
                     print("Discarding latest plan")
                     self.plan_buffer = []
+                    self.cancel_planning = False
                     return
                 else:
                     self.simulate_plan(plan)
@@ -384,7 +381,6 @@ class PlanningServer():
     def reset_planning_state(self):
         """ Resets the state of planning """
         self.plan_buffer = []
-        self.cancel_planning = False
         for blk, pose in self.new_block_states:
             blk.set_base_link_pose(pose)
             print(f"Repositioning {blk}")
@@ -412,7 +408,8 @@ class PlanningServer():
                                             self.pddl_blocks,
                                             add_slanted_grasps=False,
                                             approach_frame="global",
-                                            use_vision=self.use_vision)
+                                            use_vision=self.use_vision,
+                                            home_poses=self.home_poses)
 
             # Run PDDLStream focused solver
             start = time.time()
