@@ -21,6 +21,7 @@ def count_grasp_solutions(agent, block, pose):
     
     n_picks = 0
     n_places = 0
+    print(f'Number of grasps: {len(grasps)}')
     for g in grasps:
         pick_sol = pick_ik_fn(block, pose, g[0])
         if pick_sol is not None:
@@ -30,6 +31,7 @@ def count_grasp_solutions(agent, block, pose):
         #     n_places += 1
         #input('Next grasp?')
         #p.removeAllUserDebugItems(physicsClientId=1)
+    print(f'Number of grasps: {len(grasps)}')
     print('Valid pick grasps:', n_picks)
     print('Valid place grasps:', n_places)
 
@@ -127,6 +129,7 @@ def validate_regrasps(agent, blocks, base_xy):
                 input('Continue?')
 
 def check_initial_positions(agent, blocks):
+    agent.plan()
     for b in blocks:
         block = agent.pddl_block_lookup[b.name]
         pose =  block.get_base_link_pose()
@@ -147,9 +150,9 @@ def main(args):
                        use_vision=False)
 
     # check_tower_position(agent, blocks, (0.5, -0.3))
-    check_regrasp_position(agent, blocks, (0.4, 0.4))
+    #check_regrasp_position(agent, blocks, (0.4, 0.4))
     # validate_regrasps(agent, blocks, (-0.4, -0.4))
-    #check_initial_positions(agent, blocks)
+    check_initial_positions(agent, blocks)
     
     
 

@@ -8,4 +8,5 @@ geometry_msgs/Pose pose
 std_msgs/ColorRGBA color
 bool is_rel_pose
 bool fixed
+bool stack
 string base_obj

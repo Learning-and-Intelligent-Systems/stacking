@@ -103,15 +103,15 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
         is_top_grasp = grasp_worldR[:,2].dot(-e_z) > 0.999
         is_upside_down_grasp = grasp_worldR[:,2].dot(e_z) > 0.001
         is_gripper_sideways = np.abs(grasp_worldR[:,1].dot(e_z)) > 0.999
-        is_camera_down = np.abs(grasp_worldR[:,0].dot(-e_z)) > 0.999
+        is_camera_down = grasp_worldR[:,0].dot(-e_z) > 0.999
         is_wrist_too_low = grasp_worldF[2,3] < 0.088/2 + 0.005
-
+    
 
         if is_gripper_sideways:
             return None
         if is_upside_down_grasp:
             return None
-        if is_camera_down:
+        if is_camera_down:# and approach_frame == 'gripper':
             return None
 
         # the gripper is too close to the ground. the wrist of the arm is 88mm
@@ -163,6 +163,19 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
             if path_approach is None or path_backoff is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
+
+            if False:
+                length, lifeTime = 0.2, 0.0
+
+                pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
+                new_x = transformation([length, 0.0, 0.0], pos, quat)
+                new_y = transformation([0.0, length, 0.0], pos, quat)
+                new_z = transformation([0.0, 0.0, length], pos, quat)
+
+                p.addUserDebugLine(pos, new_x, [1,0,0], lifeTime=lifeTime, physicsClientId=1)
+                p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
+                p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
+
 
             command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp, grasp, body, use_wrist_camera),
                        grasp,
