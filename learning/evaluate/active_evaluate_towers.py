@@ -747,11 +747,11 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
         for k, size in zip(tower_keys, args.tower_sizes):
             print('Tower size', k)
             if size == 2 or size == 3:
-                ep.n_samples = 5000
-            elif size == 4:
                 ep.n_samples = 10000
+            elif size == 4:
+                ep.n_samples = 100000
             elif size == 5:
-                ep.n_samples = 15000
+                ep.n_samples = 100000
             num_failures, num_pw_failures = 0, 0
             curr_regrets = []
             curr_rewards = []
