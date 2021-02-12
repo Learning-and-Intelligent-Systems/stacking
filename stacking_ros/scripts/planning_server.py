@@ -97,12 +97,7 @@ class PlanningServer():
         experiment.
         """
         fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
-        if self.latest_robot_config is None:
-            robot_config = self.robot.arm.GetJointValues()
-        else:
-            robot_config = [q for q in self.latest_robot_config]
-            self.robot.arm.SetJointValues(robot_config)
-            self.latest_robot_config = None
+        robot_config = self.robot.arm.GetJointValues()
         conf = pb_robot.vobj.BodyConf(self.robot, robot_config)
         init = [('CanMove',),
                 ('Conf', conf),
@@ -259,17 +254,9 @@ class PlanningServer():
               (not self.planning_active or (self.planning_active and self.plan_complete)):
                 # print("Waiting for client ...")
                 rospy.sleep(1)
-
             # Otherwise, plan until failure or cancellation
             else:
-                self.plan_buffer = []
-                self.cancel_planning = False
-                # Reposition all the blocks
-                for blk, pose in self.new_block_states:
-                    blk.set_base_link_pose(pose)
-                    print(f"Repositioning {blk}")
-
-                # Build the tower
+                self.reset_planning_state()
                 self.plan_from_goals()
 
 
@@ -322,11 +309,11 @@ class PlanningServer():
                     self.plan_buffer = []
                 else:
                     self.plan_buffer.append(plan)
-            print(f"No plan found to place {blk}")
-            self.goal_block_states = []
-            self.planning_active = False
+            else:
+                print(f"No plan found to place {blk}")
+                self.goal_block_states = []
+                self.planning_active = False
             
-
         # Set the completion flag if the plan succeeded until the end
         self.plan_complete = True
 
@@ -384,11 +371,15 @@ class PlanningServer():
 
 
     def reset_planning_state(self):
-        """ Resets the state of planning """
+        """ Resets the state of planning (blocks and robot arm) """
         self.plan_buffer = []
+        self.cancel_planning = False
         for blk, pose in self.new_block_states:
             blk.set_base_link_pose(pose)
             print(f"Repositioning {blk}")
+        robot_config = [q for q in self.latest_robot_config]
+        self.robot.arm.SetJointValues(robot_config)
+        print("Reset robot joint angles")
         print("Planning state reset!")
 
 
