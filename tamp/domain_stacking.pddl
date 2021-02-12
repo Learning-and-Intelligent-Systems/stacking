@@ -42,6 +42,8 @@
     (Stackable ?o)
     ; Movable: Blocks that have nothing on top of them are Movable.
     (Movable ?o)
+    ; AtAnyPose: Block can be at any one of a list of poses
+    ;(AtAnyPose ?o ?p1 ?p2 ?p3 ?p4)
   )
 
   (:action move_free
@@ -111,5 +113,10 @@
   (:derived (Movable ?o)
     (and (Block ?o) (not (exists (?o2) (On ?o2 ?o))))
   )
+
+  ;(:derived (AtAnyPose ?o ?p1 ?p2 ?p3 ?p4)
+  ;  (or (AtPose ?o ?p1) (AtPose ?o ?p2) (AtPose ?o ?p3) (AtPose ?o ?p4)
+  ;  )
+  ;)
 
 )
