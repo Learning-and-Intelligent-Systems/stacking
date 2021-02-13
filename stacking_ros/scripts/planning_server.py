@@ -271,7 +271,7 @@ class PlanningServer():
         # Plan for all goals sequentially
         for blk, base, pose, stack in self.goal_block_states:
             if self.cancel_planning:
-                break
+                return
 
             # Unpack the goal states into PDDLStream
             init = self.get_initial_pddl_state()
@@ -307,12 +307,16 @@ class PlanningServer():
                 if self.cancel_planning:
                     print("Discarding latest plan")
                     self.plan_buffer = []
-                else:
-                    self.plan_buffer.append(plan)
             else:
                 print(f"No plan found to place {blk}")
                 self.goal_block_states = []
                 self.planning_active = False
+
+            # Convert the plan to a ROS message
+            result = GetPlanResponse()
+            result.plan = task_plan_to_ros(plan)
+            result.planning_active = self.planning_active
+            self.plan_buffer.append(result)
             
         # Set the completion flag if the plan succeeded until the end
         self.plan_complete = True
@@ -320,14 +324,13 @@ class PlanningServer():
 
     def get_latest_plan(self, request):
         """ Extracts the latest action plan from the plan buffer """
-        if len(self.plan_buffer) > 0:
-            print("Popped plan from buffer!")
-            latest_plan = self.plan_buffer.pop(0)
-        else:
-            latest_plan = None
-        result = GetPlanResponse()
-        result.plan = task_plan_to_ros(latest_plan)
-        result.planning_active = self.planning_active
+        result = None
+        while result is None:
+            if len(self.plan_buffer) > 0:
+                print("Popped plan from buffer!")
+                result = self.plan_buffer.pop(0)
+            else:
+                rospy.sleep(1)
         return result
 
 
