@@ -5,6 +5,7 @@ import time
 
 from copy import deepcopy
 
+import pyquaternion
 import pb_robot
 import tamp.primitives
 
@@ -408,6 +409,7 @@ class PandaAgent:
         base_pose = pb_robot.vobj.BodyPose(base_block, base_pose)
         base_block_ros = BodyInfo()
         base_block_ros.name = base_block.readableName
+        base_block_ros.stack = True
         pose_to_ros(base_pose, base_block_ros.pose)
         ros_req.goal_state.append(base_block_ros)
         # Now loop through the other tower blocks
@@ -428,15 +430,17 @@ class PandaAgent:
             block_ros.base_obj = bottom_pddl.readableName
             transform_to_ros(rel_tform, block_ros.pose)
             block_ros.is_rel_pose = True
+            block_ros.stack = True
             ros_req.goal_state.append(block_ros)
         # Finally, tack on the tower resetting steps
         for ix in reversed(tower_block_order):
             blk, pose = self.pddl_blocks[ix], original_poses[ix]
             goal_pose = pb_robot.vobj.BodyPose(blk, pose)
-            ros_block = BodyInfo()
-            ros_block.name = blk.readableName
-            pose_to_ros(goal_pose, ros_block.pose)
-            ros_req.goal_state.append(ros_block)
+            block_ros = BodyInfo()
+            block_ros.name = blk.readableName
+            block_ros.stack = False
+            pose_to_ros(goal_pose, block_ros.pose)
+            ros_req.goal_state.append(block_ros)
 
         # Execute the stacking plan
         success, stack_stable, reset_stable = \
@@ -466,10 +470,11 @@ class PandaAgent:
                     blk, pose = self.pddl_blocks[ix], original_poses[ix]
                     if blk in self.moved_blocks:
                         goal_pose = pb_robot.vobj.BodyPose(blk, pose)
-                        ros_block = BodyInfo()
-                        ros_block.name = blk.readableName
-                        pose_to_ros(goal_pose, ros_block.pose)
-                        ros_req.goal_state.append(ros_block)
+                        block_ros = BodyInfo()
+                        block_ros.name = blk.readableName
+                        block_ros.stack = False
+                        pose_to_ros(goal_pose, block_ros.pose)
+                        ros_req.goal_state.append(block_ros)
 
                 # Execute the reset plan
                 success, _, reset_stable = self.execute_plans_from_server(ros_req, real, T, stack=False)
@@ -480,6 +485,20 @@ class PandaAgent:
 
         # Return the final planning state
         return success, stack_stable
+
+
+    def validate_ros_plan(self, ros_resp, tgt_block):
+        """ Validates a ROS plan to move a block against the expected target block name """
+        if len(ros_resp.plan) == 0:
+            return True
+        else:
+            plan_blocks = [t.obj1 for t in ros_resp.plan if t.type == "pick"]
+            if len(plan_blocks) > 0:
+                plan_block = plan_blocks[0]
+            else:
+                return False
+            print(f"Received plan to move {plan_block} and expected to move {tgt_block}")
+            return (tgt_block == plan_block)
 
 
     def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True):
@@ -496,13 +515,15 @@ class PandaAgent:
                 # Wait for a valid plan
                 plan = []
                 while len(plan) == 0 and planning_active:
-                    time.sleep(3)
+                    time.sleep(1)
                     ros_resp = self.get_plan_client.call()
-                    planning_active = ros_resp.planning_active
-                    plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
-                    if not planning_active:
+                    if not ros_resp.planning_active:
                         print("Planning ended on server side")
                         return False, stack_stable, reset_stable
+                    tgt_block = ros_req.goal_state[num_success].name
+                    if self.validate_ros_plan(ros_resp, tgt_block):
+                        plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
+                    
                 print("\nGot plan:")
                 print(plan)
 
@@ -512,12 +533,12 @@ class PandaAgent:
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
                 query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
-                desired_pose = query_block.get_base_link_point()
+                desired_pose = query_block.get_base_link_pose()
                 if query_block not in self.moved_blocks:
                     self.moved_blocks.add(query_block)
                 else:
                     self.moved_blocks.remove(query_block)
-                
+
                 # Check stability
                 if not real:
                     self.step_simulation(T, vis_frames=False)
@@ -533,7 +554,7 @@ class PandaAgent:
                     num_success += 1
                     if stack and num_success == num_steps/2:
                         print("Completed tower stack!")
-                        stack_stable = True 
+                        stack_stable = True
                     elif num_success == num_steps:
                         print("Completed tower reset!")
                         reset_stable = True
@@ -671,7 +692,7 @@ class PandaAgent:
                     self.teleport_block(top_pddl, pose.pose)
 
                 # Execute the block placement.
-                desired_pose = top_pddl.get_base_link_point()
+                desired_pose = top_pddl.get_base_link_pose()
                 if not real:
                     self.step_simulation(T, vis_frames=False)
                 # TODO: Check if the tower was stable, stop construction if not.
@@ -762,10 +783,24 @@ class PandaAgent:
                 if named_pose.block_id in block_pddl.readableName:
                     visible = True
                     pose = named_pose.pose.pose
-                    position = (pose.position.x, pose.position.y, pose.position.z)
-                    print('Desired Pos:', desired_pose)
-                    print('Detected Pos:', position)
-                    if numpy.linalg.norm(numpy.array(position)-numpy.array(desired_pose)) > 0.05:
+
+                    des_pos = desired_pose[0]
+                    obs_pos = (pose.position.x, pose.position.y, pose.position.z)
+                    print('[Check Stability] Desired Pos:', des_pos)
+                    print('[Check Stability] Detected Pos:', obs_pos)
+                    # First check if the pose is too far away.
+                    dist = numpy.linalg.norm(numpy.array(obs_pos)-numpy.array(des_pos))
+                    print(f'[Check Stability] Position Distance (>0.04): {dist}')
+                    if dist > 0.04:
+                        return 0.
+                    # Also check that the block is flat on the table.
+                    orn = desired_pose[1]
+                    obs_orn = pyquaternion.Quaternion(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z)
+                    des_orn = pyquaternion.Quaternion(orn[3], orn[0], orn[1], orn[2])
+                    angle = (des_orn.inverse*obs_orn).angle
+                    angle = numpy.abs(numpy.rad2deg(angle))
+                    print(f'[Check Stability] Orientation Distance (> 15): {angle}')
+                    if angle > 15:
                         return 0.
 
             # If block isn't visible, return 0.
@@ -774,7 +809,7 @@ class PandaAgent:
 
         else:
             end_pose = block_pddl.get_base_link_point()
-            dist = numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose))
+            dist = numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose[0]))
             print(f"Distance is {dist}")
             print(f"Block dimensions are {block_pddl.get_dimensions()}")
             if dist > 0.01:

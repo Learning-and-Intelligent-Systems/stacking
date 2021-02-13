@@ -74,6 +74,45 @@ def get_stable_gen_table(fixed=[]):
     return gen
 
 
+def get_stable_gen_home(home_poses, fixed=[]):
+    def gen(body, surface, surface_pos, protation=None):
+        """
+        Generate a random pose (possibly rotated) on a surface. Rotation
+        can be specified for debugging.
+        """
+        # These poses are useful for regrasping. Poses are more useful for grasping
+        # if they are upright.
+        dims = body.get_dimensions()
+
+        rotations = all_rotations()
+        poses = []
+        home_pose = home_poses[body.get_name()]
+        for rotation in rotations:
+            start_pose = body.get_base_link_pose()
+
+            # Get regrasp pose.
+            pose = (ZERO_POS, rotation.as_quat())
+            body.set_base_link_pose(pose)
+            z = pb_robot.placements.stable_z(body, surface)
+            x, y = home_pose[0][0:2]
+            pose = ((x, y, z), rotation.as_quat())
+
+            # Check if regrasp pose is valid.
+            body.set_base_link_pose(pose)
+            if (pose is None) or any(pb_robot.collisions.pairwise_collision(body, b) for b in fixed):
+                body.set_base_link_pose(start_pose)
+                continue
+            body.set_base_link_pose(start_pose)
+
+
+            body_pose = pb_robot.vobj.BodyPose(body, pose)
+            poses.append((body_pose,))
+        np.random.shuffle(poses)
+        return poses
+    return gen
+
+
+
 def get_stable_gen_block(fixed=[]):
     def fn(body, surface, surface_pose, rel_pose):
         """
@@ -242,6 +281,7 @@ def get_holding_motion_gen(robot, fixed=[]):
             if o.get_name() not in fluent_names:
                 obstacles.append(o)
 
+        old_q = robot.arm.GetJointValues()
         orig_pose = body.get_base_link_pose()
         robot.arm.SetJointValues(conf1.configuration)
         robot.arm.Grab(body, grasp.grasp_objF)
@@ -250,6 +290,7 @@ def get_holding_motion_gen(robot, fixed=[]):
 
         robot.arm.Release(body)
         body.set_base_link_pose(orig_pose)
+        robot.arm.SetJointValues(old_q)
 
         if path is None:
             if DEBUG_FAILURE: input('Holding motion failed')

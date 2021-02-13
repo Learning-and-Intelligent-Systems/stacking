@@ -184,7 +184,7 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
     return pddl_blocks, pddl_platform, pddl_leg, pddl_table, pddl_frame, pddl_wall
 
 
-def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_frame, use_vision):
+def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_frame, use_vision, home_poses=None):
     domain_pddl = read('tamp/domain_stacking.pddl')
     stream_pddl = read('tamp/stream_stacking.pddl')
     constant_map = {}
@@ -192,6 +192,7 @@ def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_fram
     fixed = [f for f in fixed if f is not None]
     stream_map = {
         'sample-pose-table': from_list_fn(primitives.get_stable_gen_table(fixed)),
+        'sample-pose-home': from_list_fn(primitives.get_stable_gen_home(home_poses, fixed)),
         'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
         'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot, add_slanted_grasps=True, add_orthogonal_grasps=False)),
         'pick-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='gripper', backoff_frame='global', use_wrist_camera=use_vision)),

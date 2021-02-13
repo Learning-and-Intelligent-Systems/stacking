@@ -12,6 +12,12 @@
     :outputs (?p1)
     :certified (and (Pose ?o1 ?p1) (Supported ?o1 ?p1 ?o2 ?p2))
   )
+  (:stream sample-pose-home
+    :inputs (?o1 ?o2 ?p2)
+    :domain (and (Block ?o1) (Table ?o2) (Pose ?o2 ?p2))
+    :outputs (?p1)
+    :certified (and (Pose ?o1 ?p1) (Home ?o1 ?p1 ?o2 ?p2))
+  )
   (:stream sample-grasp
     :inputs (?o)
     :domain (Graspable ?o)

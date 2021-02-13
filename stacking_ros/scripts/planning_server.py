@@ -15,6 +15,7 @@ import argparse
 import pb_robot
 import pickle
 import pybullet as pb
+from block_utils import all_rotations
 from stacking_ros.msg import TaskPlanAction, TaskPlanResult, TaskAction
 from stacking_ros.srv import (
     GetPlan, GetPlanResponse, SetPlanningState, SetPlanningStateResponse)
@@ -24,10 +25,16 @@ from tamp.ros_utils import (pose_to_transform, ros_to_pose,
     ros_to_transform, task_plan_to_ros)
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.utils import INF
+from tf.transformations import quaternion_multiply
 
+
+all_orns = [tuple(r.as_quat()) for r in all_rotations()]
+all_orns = [all_orns[i] for i in [0, 1, 4, 20]]
 
 class PlanningServer():
-    def __init__(self, blocks, block_init_xy_poses=None, use_platform=False, use_vision=False):
+    def __init__(self, blocks, block_init_xy_poses=None,
+                 alternate_orientations=False, 
+                 use_platform=False, use_vision=False):
 
         # Start up a robot simulation for planning
         self._planning_client_id = pb_robot.utils.connect(use_gui=False)
@@ -37,6 +44,7 @@ class PlanningServer():
         self.robot.arm.hand.Open()
 
         self.use_vision = use_vision
+        self.alternate_orientations = alternate_orientations
 
         # Initialize the world
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = \
@@ -89,13 +97,9 @@ class PlanningServer():
         experiment.
         """
         fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
-        if self.latest_robot_config is None:
-            robot_config = self.robot.arm.GetJointValues()
-        else:
-            robot_config = [q for q in self.latest_robot_config]
-            self.robot.arm.SetJointValues(robot_config)
-            self.latest_robot_config = None
+        robot_config = self.robot.arm.GetJointValues()
         conf = pb_robot.vobj.BodyConf(self.robot, robot_config)
+        print('Initial config:', robot_config)
         init = [('CanMove',),
                 ('Conf', conf),
                 ('AtConf', conf),
@@ -210,7 +214,7 @@ class PlanningServer():
         print_planning_problem(init, goal, fixed_objs)
         saved_world = pb_robot.utils.WorldSaver()
 
-        # Get PDDLStream planning information
+        # Get PDDLStream planning information 
         pddl_info = get_pddlstream_info(self.robot,
                                         self.pddl_blocks,
                                         add_slanted_grasps=False,
@@ -222,7 +226,7 @@ class PlanningServer():
         plan, _, _ = solve_focused(pddlstream_problem,
                                 success_cost=numpy.inf,
                                 max_skeletons=2,
-                                search_sample_ratio=1.,
+                                search_sample_ratio=1000.,
                                 max_time=INF)
         duration = time.time() - start
         saved_world.restore()
@@ -247,35 +251,47 @@ class PlanningServer():
         while not rospy.is_shutdown():
 
             # If no planning has been received, just keep waiting
-            if not self.planning_active or (self.planning_active and self.plan_complete):
+            if not self.cancel_planning and \
+              (not self.planning_active or (self.planning_active and self.plan_complete)):
                 # print("Waiting for client ...")
                 rospy.sleep(1)
-
             # Otherwise, plan until failure or cancellation
             else:
-                self.plan_buffer = []
-                self.cancel_planning = False
-                # Reposition all the blocks
-                for blk, pose in self.new_block_states:
-                    blk.set_base_link_pose(pose)
-                    print(f"Repositioning {blk}")
-
-                # Build the tower
+                self.reset_planning_state()
                 self.plan_from_goals()
 
 
     def plan_from_goals(self):
         """ Executes plan for a set of goal states """
-        for blk, base, pose in self.goal_block_states:
+        # Get the home poses
+        self.home_poses = {}
+        for blk, base, pose, stack in self.goal_block_states:
+            if not stack:
+                self.home_poses[blk.get_name()] = pose
+
+        # Plan for all goals sequentially
+        for blk, base, pose, stack in self.goal_block_states:
+            if self.cancel_planning:
+                return
+
             # Unpack the goal states into PDDLStream
             init = self.get_initial_pddl_state()
+
             fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != blk]
             if base == self.table:
+                pose_orig = blk.get_base_link_pose()
                 pose_obj = pb_robot.vobj.BodyPose(blk, pose)
-                init += [("Pose", blk, pose_obj),
-                         ("Supported", blk, pose_obj, self.table, self.table_pose)]
-                goal = ("and", ("AtPose", blk, pose_obj),
-                               ("On", blk, self.table))
+
+                if not stack and self.alternate_orientations:
+                    init += [("Reset",), ("Pose", blk, pose_obj),
+                             ("Home", blk, pose_obj, self.table, self.table_pose)]
+                    pose_goal = ("AtHome", blk)
+                else:
+                    init += [("Pose", blk, pose_obj),
+                             ("Supported", blk, pose_obj, self.table, self.table_pose)]
+                    pose_goal = ("AtPose", blk, pose_obj)
+
+                goal = ("and", ("On", blk, self.table), pose_goal)
             else:
                 rel_tform = pose_to_transform(pose)
                 init += [("RelPose", blk, base, rel_tform)]
@@ -283,34 +299,39 @@ class PlanningServer():
 
             # Plan
             plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=1)
-            if plan is not None:
+            if self.cancel_planning:
+                print("Discarding latest plan")
+                self.plan_buffer = []
+            elif plan is not None:
+                print(f"Simulating plan")
+                self.simulate_plan(plan)
                 if self.cancel_planning:
                     print("Discarding latest plan")
                     self.plan_buffer = []
-                    return
-                else:
-                    self.simulate_plan(plan)
-                    self.plan_buffer.append(plan)
             else:
                 print(f"No plan found to place {blk}")
                 self.goal_block_states = []
                 self.planning_active = False
-                return
 
+            # Convert the plan to a ROS message
+            result = GetPlanResponse()
+            result.plan = task_plan_to_ros(plan)
+            result.planning_active = self.planning_active
+            self.plan_buffer.append(result)
+            
         # Set the completion flag if the plan succeeded until the end
         self.plan_complete = True
 
 
     def get_latest_plan(self, request):
         """ Extracts the latest action plan from the plan buffer """
-        if len(self.plan_buffer) > 0:
-            print("Popped plan from buffer!")
-            latest_plan = self.plan_buffer.pop(0)
-        else:
-            latest_plan = None
-        result = GetPlanResponse()
-        result.plan = task_plan_to_ros(latest_plan)
-        result.planning_active = self.planning_active
+        result = None
+        while result is None:
+            if len(self.plan_buffer) > 0:
+                print("Popped plan from buffer!")
+                result = self.plan_buffer.pop(0)
+            else:
+                rospy.sleep(1)
         return result
 
 
@@ -344,7 +365,8 @@ class PlanningServer():
             pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
             orn = [elem.pose.orientation.x, elem.pose.orientation.y,
                 elem.pose.orientation.z, elem.pose.orientation.w]
-            self.goal_block_states.append((blk, base, (pos,orn)))
+            stack = elem.stack
+            self.goal_block_states.append((blk, base, (pos,orn), stack))
 
         # Get the robot configuration
         self.latest_robot_config = ros_request.robot_config.angles
@@ -353,12 +375,15 @@ class PlanningServer():
 
 
     def reset_planning_state(self):
-        """ Resets the state of planning """
+        """ Resets the state of planning (blocks and robot arm) """
         self.plan_buffer = []
         self.cancel_planning = False
         for blk, pose in self.new_block_states:
             blk.set_base_link_pose(pose)
             print(f"Repositioning {blk}")
+        robot_config = [q for q in self.latest_robot_config]
+        self.robot.arm.SetJointValues(robot_config)
+        print("Reset robot joint angles")
         print("Planning state reset!")
 
 
@@ -367,15 +392,10 @@ class PlanningServer():
         found_plan = False
         num_tries = 0
 
-        # Check if a cancellation is pending
-        if self.cancel_planning:
-            self.reset_planning_state()
-            return None
-
         while (not found_plan) and (num_tries < max_tries):
             print("Planning...")
             saved_world = pb_robot.utils.WorldSaver()
-            print_planning_problem(init, goal, fixed_objs)
+            # print_planning_problem(init, goal, fixed_objs)
 
             # Get PDDLStream planning information
             pddl_info = get_pddlstream_info(self.robot,
@@ -383,13 +403,14 @@ class PlanningServer():
                                             self.pddl_blocks,
                                             add_slanted_grasps=False,
                                             approach_frame="global",
-                                            use_vision=self.use_vision)
+                                            use_vision=self.use_vision,
+                                            home_poses=self.home_poses)
 
             # Run PDDLStream focused solver
             start = time.time()
             pddlstream_problem = tuple([*pddl_info, init, goal])
             plan, _, _ = solve_focused(pddlstream_problem,
-                                    success_cost=numpy.inf,
+                                    success_cost=INF,
                                     max_skeletons=2,
                                     search_sample_ratio=1.,
                                     max_time=INF,
@@ -443,6 +464,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--num-blocks', type=int, default=4)
     parser.add_argument('--use-vision', default=False, action='store_true')
+    parser.add_argument('--alternate-orientations', default=False, action='store_true')
     parser.add_argument('--blocks-file', default='', type=str)
     args = parser.parse_args()
 
@@ -454,5 +476,6 @@ if __name__=="__main__":
         block_init_xy_poses = None
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
-    s = PlanningServer(blocks, use_vision=args.use_vision)
+    s = PlanningServer(blocks, use_vision=args.use_vision, 
+                       alternate_orientations=args.alternate_orientations)
     s.planning_loop()

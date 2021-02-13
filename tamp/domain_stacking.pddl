@@ -27,6 +27,8 @@
     (HoldingMotion ?q1 ?t ?q2 ?o ?g)
     ; Supported: Block ?o at Pose ?p1 will be supported by Table or Object ?o2 at Pose ?p2.
     (Supported ?o1 ?p1 ?o2 ?p2)
+    ; Home: Block ?o at Pose ?p1 will be at its home position on Object ?o2 at Pose ?p2.
+    (Home ?o1 ?p1 ?o2 ?p2)
 
     ; Fluents 
     (On ?o1 ?o2)
@@ -34,7 +36,9 @@
     (AtGrasp ?o ?g)
     (HandEmpty)
     (AtConf ?q)
+    (AtHome ?o)
     (CanMove)
+    (Reset)
 
     ; Derived
     ; Stackable: Blocks can only have one object placed on them. A Table is always Stackable
@@ -82,7 +86,8 @@
                  (not (AtConf ?q1))
                  (not (AtPose ?o1 ?p1)) 
                  (not (HandEmpty))
-                 (not (On ?o1 ?o2)))
+                 (not (On ?o1 ?o2))
+                 (not (AtHome ?o1)))
   )
   
   ; Place Block ?o at Pose ?p1 on Object (Block or Table) ?o2 which is at Pose ?p2
@@ -91,11 +96,32 @@
     :precondition (and (PlaceKin ?o1 ?p1 ?g ?q1 ?q2 ?t)
                        (AtGrasp ?o1 ?g) 
                        (AtConf ?q1) 
-                       (Supported ?o1 ?p1 ?o2 ?p2) 
+                       (Supported ?o1 ?p1 ?o2 ?p2)
                        (AtPose ?o2 ?p2) 
                        (Stackable ?o2) 
                        (not (CanMove)))
     :effect (and (AtPose ?o1 ?p1) 
+                 (HandEmpty) 
+                 (CanMove) 
+                 (AtConf ?q2)
+                 (not (AtConf ?q1))
+                 (not (AtGrasp ?o1 ?g)) 
+                 (On ?o1 ?o2))
+  )
+
+  ; Place Block ?o at Pose ?p1 on Object (Block or Table) ?o2 which is at Pose ?p2
+  (:action place-home
+    :parameters (?o1 ?p1 ?o2 ?p2 ?g ?q1 ?q2 ?t)
+    :precondition (and (Reset)
+                       (PlaceKin ?o1 ?p1 ?g ?q1 ?q2 ?t)
+                       (AtGrasp ?o1 ?g) 
+                       (AtConf ?q1) 
+                       (Home ?o1 ?p1 ?o2 ?p2)
+                       (AtPose ?o2 ?p2) 
+                       (Stackable ?o2) 
+                       (not (CanMove)))
+    :effect (and (AtHome ?o1)
+                 (AtPose ?o1 ?p1) 
                  (HandEmpty) 
                  (CanMove) 
                  (AtConf ?q2)
