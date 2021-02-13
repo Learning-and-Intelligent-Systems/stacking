@@ -99,6 +99,7 @@ class PlanningServer():
         fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
         robot_config = self.robot.arm.GetJointValues()
         conf = pb_robot.vobj.BodyConf(self.robot, robot_config)
+        print('Initial config:', robot_config)
         init = [('CanMove',),
                 ('Conf', conf),
                 ('AtConf', conf),
@@ -225,7 +226,7 @@ class PlanningServer():
         plan, _, _ = solve_focused(pddlstream_problem,
                                 success_cost=numpy.inf,
                                 max_skeletons=2,
-                                search_sample_ratio=1.,
+                                search_sample_ratio=1000.,
                                 max_time=INF)
         duration = time.time() - start
         saved_world.restore()

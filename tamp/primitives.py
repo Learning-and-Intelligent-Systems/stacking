@@ -104,6 +104,7 @@ def get_stable_gen_home(home_poses, fixed=[]):
                 continue
             body.set_base_link_pose(start_pose)
 
+
             body_pose = pb_robot.vobj.BodyPose(body, pose)
             poses.append((body_pose,))
         np.random.shuffle(poses)
@@ -265,6 +266,7 @@ def get_holding_motion_gen(robot, fixed=[]):
             if o.get_name() not in fluent_names:
                 obstacles.append(o)
 
+        old_q = robot.arm.GetJointValues()
         orig_pose = body.get_base_link_pose()
         robot.arm.SetJointValues(conf1.configuration)
         robot.arm.Grab(body, grasp.grasp_objF)
@@ -273,6 +275,7 @@ def get_holding_motion_gen(robot, fixed=[]):
 
         robot.arm.Release(body)
         body.set_base_link_pose(orig_pose)
+        robot.arm.SetJointValues(old_q)
 
         if path is None:
             if DEBUG_FAILURE: input('Holding motion failed')
