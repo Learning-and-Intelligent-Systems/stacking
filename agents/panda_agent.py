@@ -5,6 +5,7 @@ import time
 
 from copy import deepcopy
 
+import pyquaternion
 import pb_robot
 import tamp.primitives
 
@@ -532,7 +533,7 @@ class PandaAgent:
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
                 query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
-                desired_pose = query_block.get_base_link_point()
+                desired_pose = query_block.get_base_link_pose()
                 if query_block not in self.moved_blocks:
                     self.moved_blocks.add(query_block)
                 else:
@@ -691,7 +692,7 @@ class PandaAgent:
                     self.teleport_block(top_pddl, pose.pose)
 
                 # Execute the block placement.
-                desired_pose = top_pddl.get_base_link_point()
+                desired_pose = top_pddl.get_base_link_pose()
                 if not real:
                     self.step_simulation(T, vis_frames=False)
                 # TODO: Check if the tower was stable, stop construction if not.
@@ -782,10 +783,24 @@ class PandaAgent:
                 if named_pose.block_id in block_pddl.readableName:
                     visible = True
                     pose = named_pose.pose.pose
-                    position = (pose.position.x, pose.position.y, pose.position.z)
-                    print('Desired Pos:', desired_pose)
-                    print('Detected Pos:', position)
-                    if numpy.linalg.norm(numpy.array(position)-numpy.array(desired_pose)) > 0.04:
+
+                    des_pos = desired_pose[0]
+                    obs_pos = (pose.position.x, pose.position.y, pose.position.z)
+                    print('[Check Stability] Desired Pos:', des_pos)
+                    print('[Check Stability] Detected Pos:', obs_pos)
+                    # First check if the pose is too far away.
+                    dist = numpy.linalg.norm(numpy.array(obs_pos)-numpy.array(des_pos))
+                    print(f'[Check Stability] Position Distance (>0.04): {dist}')
+                    if dist > 0.04:
+                        return 0.
+                    # Also check that the block is flat on the table.
+                    orn = desired_pose[1]
+                    obs_orn = pyquaternion.Quaternion(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z)
+                    des_orn = pyquaternion.Quaternion(orn[3], orn[0], orn[1], orn[2])
+                    angle = (des_orn.inverse*obs_orn).angle
+                    angle = numpy.abs(numpy.rad2deg(angle))
+                    print(f'[Check Stability] Orientation Distance (> 15): {angle}')
+                    if angle > 15:
                         return 0.
 
             # If block isn't visible, return 0.
@@ -794,7 +809,7 @@ class PandaAgent:
 
         else:
             end_pose = block_pddl.get_base_link_point()
-            dist = numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose))
+            dist = numpy.linalg.norm(numpy.array(end_pose) - numpy.array(desired_pose[0]))
             print(f"Distance is {dist}")
             print(f"Block dimensions are {block_pddl.get_dimensions()}")
             if dist > 0.01:
