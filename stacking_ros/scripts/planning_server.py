@@ -97,12 +97,7 @@ class PlanningServer():
         experiment.
         """
         fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
-        if self.latest_robot_config is None:
-            robot_config = self.robot.arm.GetJointValues()
-        else:
-            robot_config = [q for q in self.latest_robot_config]
-            self.robot.arm.SetJointValues(robot_config)
-            self.latest_robot_config = None
+        robot_config = self.robot.arm.GetJointValues()
         conf = pb_robot.vobj.BodyConf(self.robot, robot_config)
         init = [('CanMove',),
                 ('Conf', conf),
@@ -259,17 +254,9 @@ class PlanningServer():
               (not self.planning_active or (self.planning_active and self.plan_complete)):
                 # print("Waiting for client ...")
                 rospy.sleep(1)
-
             # Otherwise, plan until failure or cancellation
             else:
-                self.plan_buffer = []
-                self.cancel_planning = False
-                # Reposition all the blocks
-                for blk, pose in self.new_block_states:
-                    blk.set_base_link_pose(pose)
-                    print(f"Repositioning {blk}")
-
-                # Build the tower
+                self.reset_planning_state()
                 self.plan_from_goals()
 
 
@@ -284,7 +271,7 @@ class PlanningServer():
         # Plan for all goals sequentially
         for blk, base, pose, stack in self.goal_block_states:
             if self.cancel_planning:
-                break
+                return
 
             # Unpack the goal states into PDDLStream
             init = self.get_initial_pddl_state()
@@ -314,29 +301,36 @@ class PlanningServer():
             if self.cancel_planning:
                 print("Discarding latest plan")
                 self.plan_buffer = []
-            elif plan is None:
+            elif plan is not None:
+                print(f"Simulating plan")
+                self.simulate_plan(plan)
+                if self.cancel_planning:
+                    print("Discarding latest plan")
+                    self.plan_buffer = []
+            else:
                 print(f"No plan found to place {blk}")
                 self.goal_block_states = []
                 self.planning_active = False
-            else:
-                print(f"Simulating plan")
-                self.simulate_plan(plan)
-                self.plan_buffer.append(plan)
 
+            # Convert the plan to a ROS message
+            result = GetPlanResponse()
+            result.plan = task_plan_to_ros(plan)
+            result.planning_active = self.planning_active
+            self.plan_buffer.append(result)
+            
         # Set the completion flag if the plan succeeded until the end
         self.plan_complete = True
 
 
     def get_latest_plan(self, request):
         """ Extracts the latest action plan from the plan buffer """
-        if len(self.plan_buffer) > 0:
-            print("Popped plan from buffer!")
-            latest_plan = self.plan_buffer.pop(0)
-        else:
-            latest_plan = None
-        result = GetPlanResponse()
-        result.plan = task_plan_to_ros(latest_plan)
-        result.planning_active = self.planning_active
+        result = None
+        while result is None:
+            if len(self.plan_buffer) > 0:
+                print("Popped plan from buffer!")
+                result = self.plan_buffer.pop(0)
+            else:
+                rospy.sleep(1)
         return result
 
 
@@ -380,11 +374,15 @@ class PlanningServer():
 
 
     def reset_planning_state(self):
-        """ Resets the state of planning """
+        """ Resets the state of planning (blocks and robot arm) """
         self.plan_buffer = []
+        self.cancel_planning = False
         for blk, pose in self.new_block_states:
             blk.set_base_link_pose(pose)
             print(f"Repositioning {blk}")
+        robot_config = [q for q in self.latest_robot_config]
+        self.robot.arm.SetJointValues(robot_config)
+        print("Reset robot joint angles")
         print("Planning state reset!")
 
 
