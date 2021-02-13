@@ -2,15 +2,16 @@ import argparse
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 from learning.active.utils import ActiveExperimentLogger
 from block_utils import Object
 from planning.plan import plan_mcts as sequential_planner
 from planning.problems import Tallest
 from learning.evaluate.active_evaluate_towers import tallest_tower_regret_evaluation as total_planner
-from learning.evaluate.active_evaluate_towers import plot_tallest_tower_regret
 
 if __name__ == '__main__':
+    start = time.process_time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--method',
                         choices=['sequential', 'total', 'both'],
@@ -85,8 +86,9 @@ if __name__ == '__main__':
         num_nodes = {k: [] for k in tower_keys}
         trees = []
         node_values = []
+        highest_exp_values = []
         
-        for tx in range(0, args.max_acquisitions, 10):
+        for tx in range(0, args.max_acquisitions, 50):
             print('Acquisition step:', tx)
             ensemble = logger.get_ensemble(tx)
 
@@ -95,11 +97,22 @@ if __name__ == '__main__':
             tx_rewards = {k: [] for k in tower_keys}
             tx_trees = []
             tx_node_values = []
+            tx_highest_exp_values = []
             for t in range(0, args.n_towers):
                 print('Tower number', t+1, '/', args.n_towers)
-                search_tree, _, _, _, tower_stats, node_values_t = sequential_planner(logger, args.timeout, block_set, problem, ensemble, discrete=args.discrete)
+                try:
+                    search_tree, tallest_tower, highest_exp_height, highest_value, \
+                        tower_stats, node_values_t = \
+                        sequential_planner(logger, args.timeout, \
+                            block_set, problem, ensemble, discrete=args.discrete)
+                except:
+                    import pdb, traceback, sys
+                    extype, value, tb = sys.exc_info()
+                    traceback.print_exc()
+                    pdb.post_mortem(tb)
                 tx_trees.append(search_tree)
                 tx_node_values.append(node_values_t)
+                tx_highest_exp_values.append(highest_exp_height)
                 for k, size in zip(tower_keys, tower_sizes):
                     print('Finding best tower size: ', size)
                     exp_best_node_id = search_tree.get_exp_best_node(size)
@@ -121,6 +134,7 @@ if __name__ == '__main__':
                 num_nodes[k].append(tower_stats)
             trees.append(tx_trees)
             node_values.append(tx_node_values)
+            highest_exp_values.append(tx_highest_exp_values)
             for k in tower_keys:
                 regrets[k].append(tx_regrets[k])
                 rewards[k].append(tx_rewards[k])
@@ -139,14 +153,13 @@ if __name__ == '__main__':
                 
             with open(logger.get_figure_path(pre+'node_values'+str(args.timeout)+'.pkl'), 'wb') as handle:
                 pickle.dump(node_values, handle)
+                
+            with open(logger.get_figure_path(pre+'highest_exp_values'+str(args.timeout)+'.pkl'), 'wb') as handle:
+                pickle.dump(highest_exp_values, handle)
 
     ## RUN RANDOM PLANNER
     if args.method == 'total' or args.method == 'both':
         total_planner(logger, args.max_acquisitions, pre+'total_planner_tallest_tower_'+str(args.n_samples), \
             args.n_towers, block_set, args.discrete, args.n_samples)
-
-    ## PLOT RESULTS
-    #if args.method in ['sequential', 'both']:
-        #plot_tallest_tower_regret(logger, pre+'sequential_planner_tallest_tower_regret.pkl')
-    #if args.method in ['total', 'both']:
-        #plot_tallest_tower_regret(logger, pre+'total_planner_tallest_tower_regret.pkl')
+            
+    print(time.process_time() - start)

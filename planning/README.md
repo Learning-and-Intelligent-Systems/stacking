@@ -1,6 +1,6 @@
 plan.py is the script that has the plan_mcts() function in it. You can run this script (with command line args) to compare different c values and also to just perform multiple runs under the same parameters. When you run searches with this file, figures will be output (to --exp-path/figures) that show:
 1. a histogram of the distribution of tower heights in the search tree over time
-2. the highect UCT value in the tree over time
+2. the highest UCT value in the tree over time
 3. the highest expected value in the tree over time
 4. the number of blocks in the tower with the most blocks in the tree over time
 

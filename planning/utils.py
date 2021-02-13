@@ -45,7 +45,10 @@ def make_tower_dataset(towers):
         tower_vectors.append([b.vectorize() for b in tower])
     towers_array = np.array(tower_vectors)
     labels = np.zeros((towers_array.shape[0],))
-    tower_dict = {}
+    tower_dict = {str(th)+'block': \
+                    {'towers': np.empty((0,th,21)), \
+                    'labels': np.empty(0)} \
+                        for th in [2,3,4,5]}
     k = len(tower)
     key = str(k)+'block'
     tower_dict[key] = {}
