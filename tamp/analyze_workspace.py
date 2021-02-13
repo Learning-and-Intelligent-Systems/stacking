@@ -15,14 +15,14 @@ def count_grasp_solutions(agent, block, pose):
     fixed = agent.fixed + [b for b in agent.pddl_blocks if b != block]
     fixed = [f for f in fixed if f is not None]
 
-    grasps = primitives.get_grasp_gen(agent.robot, True)(block)
+    grasps = primitives.get_grasp_gen(agent.robot, True, False)(block)
     pick_ik_fn = primitives.get_ik_fn(agent.robot, fixed, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False)
     place_ik_fn = primitives.get_ik_fn(agent.robot, fixed, approach_frame='global', backoff_frame='gripper', use_wrist_camera=False)
     
     n_picks = 0
     n_places = 0
     print(f'Number of grasps: {len(grasps)}')
-    for g in grasps:
+    for gx, g in enumerate(grasps):
         pick_sol = pick_ik_fn(block, pose, g[0])
         if pick_sol is not None:
             n_picks += 1
@@ -130,7 +130,8 @@ def validate_regrasps(agent, blocks, base_xy):
 
 def check_initial_positions(agent, blocks):
     agent.plan()
-    for b in blocks:
+    for bx, b in enumerate(blocks):
+        if bx != 7: continue
         block = agent.pddl_block_lookup[b.name]
         pose =  block.get_base_link_pose()
         pose = pb_robot.vobj.BodyPose(block, pose)

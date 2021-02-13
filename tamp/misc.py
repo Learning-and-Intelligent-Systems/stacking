@@ -36,12 +36,12 @@ def get_fixed(robot, movable):
     return fixed
 
 def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True):
-    if prompt:
-        input("Execute in Simulation?")
+    # if prompt:
+    #     input("Execute in Simulation?")
     for name, args in plan:
         # pb_robot.viz.remove_all_debug()
         # bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
-        # txt = '{} - {}'.format(name, bodyNames)
+        #txt = '{} - {}'.format(name, bodyNames)
         # pb_robot.viz.add_text(txt, position=(0, 0.25, 0.5), size=2)
 
         executionItems = args[-1]
@@ -128,16 +128,16 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
 
     # Set the initial positions randomly on table.
     if xy_poses is None:
-        storage_poses = [(-0.4, -0.4), (-0.25, -0.4), # Left Corner
-                         (-0.45, -0.), (-0.3, -0.),   # Back Center
-                         (-0.4, 0.4), (-0.25, 0.4),   # Right Corner
+        storage_poses = [(-0.4, -0.45), (-0.4, -0.25), # Left Corner
+                         (-0.25, -0.5), (-0.4, 0.25),   # Back Center
+                         (-0.4, 0.45), (-0.25, 0.5),   # Right Corner
                          (-0., -0.5), (0., -0.35),   # Left Side
                          (-0., 0.5), (0., 0.35)]     # Right Side
         print('Placing blocks in storage locations...')
         for ix, block in enumerate(pddl_blocks):
             x, y = storage_poses[ix]
             dimensions = numpy.array(block.get_dimensions()).reshape((3, 1))
-            if ix < 6:  # Back storage should have long side along y-axis.
+            if ix < 6 and (ix not in [2, 5]):  # Back storage should have long side along y-axis.
                 for rot in all_rotations():
                     rot_dims = numpy.abs(rot.as_matrix()@dimensions)[:, 0]
                     if rot_dims[1] >= rot_dims[0] and rot_dims[1] >= rot_dims[2]:
