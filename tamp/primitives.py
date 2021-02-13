@@ -88,7 +88,7 @@ def get_stable_gen_block(fixed=[]):
 
 
 def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
-    def fn(body, pose, grasp, return_grasp_q=False):
+    def fn(body, pose, grasp, return_grasp_q=False, check_robust=False):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
         grasp_worldF = np.dot(obj_worldF, grasp.grasp_objF)
@@ -118,6 +118,9 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
         # in diameter, and it is the widest part of the hand. Include a 5mm
         # clearance
         if not is_top_grasp and is_wrist_too_low:
+            return None
+        # If the block/gripper is in the storage area, don't use low grasps.
+        if grasp_worldF[0,3] < 0.2 and grasp_worldF[2,3] < 0.1:
             return None
 
 
@@ -163,8 +166,20 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
             if path_approach is None or path_backoff is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
+            
+            # If the grasp is valid, check that it is robust (i.e., also valid under pose estimation error).
+            if check_robust:
+                for _ in range(10):
+                    x, y, z = pose.pose[0]
+                    new_pose = ((x + np.random.randn()*0.02, y + np.random.randn()*0.02, z), pose.pose[1])
+                    new_pose = pb_robot.vobj.BodyPose(body, new_pose)
+                    valid = fn(body, pose, grasp, check_robust=False)
+                    if not valid:
+                        print('Grasp not robust')
+                        print(x - new_pose.pose[0][0], y - new_pose.pose[0][1])
+                        return None
 
-            if False:
+            if False and check_robust:
                 length, lifeTime = 0.2, 0.0
 
                 pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
