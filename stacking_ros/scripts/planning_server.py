@@ -391,11 +391,6 @@ class PlanningServer():
         found_plan = False
         num_tries = 0
 
-        # Check if a cancellation is pending
-        if self.cancel_planning:
-            self.reset_planning_state()
-            return None
-
         while (not found_plan) and (num_tries < max_tries):
             print("Planning...")
             saved_world = pb_robot.utils.WorldSaver()
