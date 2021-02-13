@@ -5,14 +5,14 @@ import matplotlib.pyplot as plt
 import os
 
 from learning.active.utils import ActiveExperimentLogger
-from learning.evaluate.active_evaluate_towers import plot_tallest_tower_regret
+from learning.evaluate.active_evaluate_towers import plot_regret
 
 # CONSTANTS
 min_towers_acq = 40         # number of towers in initial dataset
 towers_per_acq = 10         # number of towers acquired between each trained model
 acquisition_step_size = 10  # steps between models evaluated
 
-def plot_planner_performance(loggers, args, y_axis, title, fname):
+def plot_planner_performance(loggers, args, y_axis, method, fname):
     all_rs = {str(ts)+'block' : [] for ts in args.tower_sizes}
     for logger in loggers:
         for tower_size in args.tower_sizes:
@@ -58,10 +58,10 @@ def plot_planner_performance(loggers, args, y_axis, title, fname):
         axes[i].set_xlabel('Number of Training Towers')
         axes[i].legend()
         
-    fig.suptitle(title)
-    plot_dir = 'learning/experiments/logs/paper_plots/combine_models/'+title
+    fig.suptitle(method[:-2])
+    plot_dir = 'learning/experiments/logs/paper_plots/combine_models/'+method[:-2]
     if not os.path.exists(plot_dir): os.makedirs(plot_dir)
-    plt.savefig('learning/experiments/logs/paper_plots/combine_models/'+title+'/'+fname[:-4]+'.png')
+    plt.savefig('learning/experiments/logs/paper_plots/combine_models/'+method[:-2]+'/'+fname[:-4]+'.png')
     plt.close()
     
     return xs, plot_data
@@ -105,9 +105,9 @@ if __name__ == '__main__':
         loggers.append(ActiveExperimentLogger(os.path.join(results_path, exp_path)))
         
     y_axis = 'Regret' # TODO: detect from file name?
-    title = args.exp_path_root
+    method = args.exp_path_root
     fnames = ['random_planner_tallest_2345_block_towers_regrets.pkl', \
                 'random_planner_min_contact_2345_block_towers_regrets.pkl', \
                 'random_planner_max_overhang_2345_block_towers_regrets.pkl']
     for fname in fnames:
-        plot_planner_performance(loggers, args, y_axis, title, fname)
+        plot_planner_performance(loggers, args, y_axis, method, fname)

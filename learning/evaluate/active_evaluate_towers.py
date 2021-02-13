@@ -826,7 +826,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
         print('Final Regret: ', final_regret)
         print('Final Reward: ', final_reward)
 
-def plot_tallest_tower_regret(logger, fname):
+def plot_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:
         regrets = pickle.load(handle)
 
@@ -984,7 +984,7 @@ if __name__ == '__main__':
     #tallest_tower_regret_evaluation(logger)
     #longest_overhang_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
-    plot_tallest_tower_regret(logger)
+    plot_regret(logger)
     #plot_constructability_over_time(logger)
     #validate(logger, 125)
     #get_stability_composition(logger, tx=245)

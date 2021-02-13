@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import os
 
 from learning.active.utils import ActiveExperimentLogger
-from learning.evaluate.active_evaluate_towers import plot_tallest_tower_regret
 from learning.evaluate.plot_plan_evaluate_models import plot_planner_performance
 
 def plot_all_task_performance(xs, plot_task_data, args, task):
