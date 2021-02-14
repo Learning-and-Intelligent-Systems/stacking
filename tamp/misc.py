@@ -35,7 +35,7 @@ def get_fixed(robot, movable):
     fixed = [body for body in rigid if body.id not in movable_ids]
     return fixed
 
-def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True):
+def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True, obstacles=[]):
     # if prompt:
     #     input("Execute in Simulation?")
     for name, args in plan:
@@ -75,7 +75,7 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True):
         for name, args in plan:
             executionItems = args[-1]
             for e in executionItems:
-                e.execute(realRobot=arm)
+                e.execute(realRobot=arm, obstacles=obstacles)
                 #input("Next?")
 
 def create_pb_robot_urdf(obj, fname):
