@@ -19,7 +19,8 @@ from pddlstream.language.stream import StreamInfo
 from pddlstream.utils import INF
 from pybullet_utils import transformation
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
-                      get_pddlstream_info, print_planning_problem, ExecuteActions
+                      get_pddlstream_info, print_planning_problem, \
+                      ExecuteActions, ExecutionFailure
 
 
 class PandaAgent:
@@ -72,15 +73,15 @@ class PandaAgent:
         self.execution_robot.arm.hand.Open()
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
-        # Create an arm interface
-        if real:
-            from franka_interface import ArmInterface
-            self.real_arm = ArmInterface()
-
         # Set up ROS plumbing if using features that require it
         if self.use_vision or self.use_action_server or real:
             import rospy
             rospy.init_node("panda_agent")
+
+        # Create an arm interface
+        if real:
+            from franka_interface import ArmInterface
+            self.real_arm = ArmInterface()
 
         # Set initial poses of all blocks and setup vision ROS services.
         if self.use_vision:
@@ -443,11 +444,26 @@ class PandaAgent:
             ros_req.goal_state.append(block_ros)
 
         # Execute the stacking plan
-        success, stack_stable, reset_stable = \
+        success, stack_stable, reset_stable, num_success, fatal = \
             self.execute_plans_from_server(ros_req, real, T, stack=True)
         print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
         if reset_stable:
             print(f"Completed tower reset stable: {reset_stable}")
+
+        # If we have a nonfatal failure, replan from new state, removing successful goals
+        while (not success and not fatal):
+            print(f"Got recoverable failure. Replanning from step index {num_success}.")
+            if self.real:
+                ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
+            else:
+                ros_req.robot_config.angles = self.robot.arm.GetJointValues()
+            ros_req.init_state = block_init_to_ros(self.pddl_blocks)
+            ros_req.goal_state = ros_req.goal_state[num_success:]
+            success, stack_stable, reset_stable, num_success, fatal = \
+                self.execute_plans_from_server(ros_req, real, T, stack=True)
+            print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
+            if reset_stable:
+                print(f"Completed tower reset stable: {reset_stable}")
 
         # If the full tower did not succeed, send out another reset plan
         try:
@@ -477,8 +493,23 @@ class PandaAgent:
                         ros_req.goal_state.append(block_ros)
 
                 # Execute the reset plan
-                success, _, reset_stable = self.execute_plans_from_server(ros_req, real, T, stack=False)
+                success, _, reset_stable, num_success, fatal = \
+                    self.execute_plans_from_server(ros_req, real, T, stack=False)
                 print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
+
+                # If we have a nonfatal failure, replan from new state, removing successful goals
+                while (not success and not fatal):
+                    print(f"Got recoverable failure. Replanning from step index {num_success}.")
+                    if self.real:
+                        ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
+                    else:
+                        ros_req.robot_config.angles = self.robot.arm.GetJointValues()
+                    ros_req.init_state = block_init_to_ros(self.pddl_blocks)
+                    ros_req.goal_state = ros_req.goal_state[num_success:]
+                    success, _, reset_stable, num_success, fatal = \
+                    self.execute_plans_from_server(ros_req, real, T, stack=False)
+                    print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
+
         except Exception as e:
             print("Planning/execution failed during tower reset.")
             print(e)
@@ -502,7 +533,15 @@ class PandaAgent:
 
 
     def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True):
-        """ Executes plans received from planning server """
+        """
+        Executes plans received from planning server
+        Returns:
+            success : Flag for whether the plan execution succeeded
+            stack_stable : Flag for whether stacking a stable tower was successful
+            reset_stable : Flag for whether resetting a tower was successful
+            num_success : Progress (in number of steps) of successful tasks
+            fatal : Flag for whether the error was fatal (True) or recoverable (False)
+        """
         self.init_state_client.call(ros_req)
 
         stack_stable = False
@@ -519,17 +558,17 @@ class PandaAgent:
                     ros_resp = self.get_plan_client.call()
                     if not ros_resp.planning_active:
                         print("Planning ended on server side")
-                        return False, stack_stable, reset_stable
+                        return False, stack_stable, reset_stable, num_success, True
                     tgt_block = ros_req.goal_state[num_success].name
                     if self.validate_ros_plan(ros_resp, tgt_block):
                         plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
-                    
+
                 print("\nGot plan:")
                 print(plan)
 
                 # Once we have a plan, execute it
                 self.execute()
-                ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False)
+                ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False, obstacles=[f for f in self.fixed if f is not None], sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
                 query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
@@ -542,14 +581,14 @@ class PandaAgent:
                 # Check stability
                 if not real:
                     self.step_simulation(T, vis_frames=False)
-                input('Press enter to check stability.')
+                #input('Press enter to check stability.')
                 stable = self.check_stability(real, query_block, desired_pose)
-                input('Continue?')
+                #input('Continue?')
 
                 # Manage the success status of the plan
                 if stable == 0.:
                     print("Unstable after execution!")
-                    return True, stack_stable, reset_stable
+                    return True, stack_stable, reset_stable, num_success, False
                 else:
                     num_success += 1
                     if stack and num_success == num_steps/2:
@@ -558,11 +597,12 @@ class PandaAgent:
                     elif num_success == num_steps:
                         print("Completed tower reset!")
                         reset_stable = True
-                        return True, stack_stable, reset_stable
-            except Exception as e:
+                        return True, stack_stable, reset_stable, num_success, False
+
+            except ExecutionFailure as e:
                 print("Planning/execution failed.")
                 print(e)
-                return False, stack_stable, reset_stable
+                return False, stack_stable, reset_stable, num_success, e.fatal
 
 
     def plan_and_execute_tower(self, ros_req, base_xy=(0.5, -0.3)):
@@ -634,7 +674,7 @@ class PandaAgent:
                             has_plan = True
                         else:
                             time.sleep(1)
-                    ExecuteActions(plan, real=real, pause=True, wait=False)
+                    ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
             else:
                 self.teleport_block(base_block, base_pose.pose)
         moved_blocks.add(base_block)
@@ -684,7 +724,7 @@ class PandaAgent:
                                 has_plan = True
                             else:
                                 time.sleep(1)
-                        ExecuteActions(plan, real=real, pause=True, wait=False)
+                        ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
                 else:
                     get_pose = tamp.primitives.get_stable_gen_block()
                     pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -717,7 +757,7 @@ class PandaAgent:
                         has_plan = True
                     else:
                         time.sleep(1)
-                ExecuteActions(plan, real=real, pause=True, wait=False)
+                ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
         if not real:
             self.step_simulation(T, vis_frames=False)
         if self.use_vision and not stable:
@@ -764,7 +804,7 @@ class PandaAgent:
                         has_plan = True
                     else:
                         time.sleep(1)
-                ExecuteActions(plan, real=real, pause=True, wait=False)
+                ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
 
         return True, stable
 
@@ -896,9 +936,9 @@ class PandaAgent:
         else:
             saved_world.restore()
             self.execute()
-            ExecuteActions(plan, real=real, pause=True, wait=False)
+            ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
             self.plan()
-            ExecuteActions(plan, real=False, pause=False, wait=False)
+            ExecuteActions(plan, real=False, pause=False, wait=False, obstacles=[f for f in self.fixed if f is not None])
             return True
 
 
