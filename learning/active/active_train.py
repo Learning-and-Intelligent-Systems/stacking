@@ -80,7 +80,8 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
                                                    data_pred_fn=data_pred_fn,
                                                    exec_mode=args.exec_mode,
                                                    agent=agent,
-                                                   logger=logger)
+                                                   logger=logger,
+                                                   xy_noise=args.xy_noise)
         logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
 
         # Add to dataset.
