@@ -74,6 +74,7 @@ RUN python3.7 -m pip install \
   numpy \
   numpy-quaternion \
   pybullet \
+  pyquaternion \
   recordclass \
   rospy-message-converter \
   scipy \

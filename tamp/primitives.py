@@ -108,7 +108,7 @@ def get_stable_gen_home(home_poses, fixed=[]):
             body_pose = pb_robot.vobj.BodyPose(body, pose)
             poses.append((body_pose,))
         np.random.shuffle(poses)
-        return poses
+        return []
     return gen
 
 
@@ -126,7 +126,7 @@ def get_stable_gen_block(fixed=[]):
     return fn
 
 
-def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
+def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff_frame='global', use_wrist_camera=False):
     def fn(body, pose, grasp, return_grasp_q=False, check_robust=False):
         obstacles = fixed + [body]
         obj_worldF = pb_robot.geometry.tform_from_pose(pose.pose)
@@ -159,7 +159,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
         if not is_top_grasp and is_wrist_too_low:
             return None
         # If the block/gripper is in the storage area, don't use low grasps.
-        if grasp_worldF[0,3] < 0.2 and grasp_worldF[2,3] < 0.1:
+        if grasp_worldF[2,3] < 0.1 and grasp_worldF[0,3] < 0.2:
             return None
 
 
@@ -201,7 +201,10 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
 
             path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
-            path_backoff = robot.arm.snap.PlanToConfiguration(robot.arm, q_grasp, q_backoff, obstacles=obstacles)
+            if backoff_frame == 'global':
+                path_backoff = robot.arm.snap.PlanToConfiguration(robot.arm, q_grasp, q_backoff, obstacles=obstacles, check_upwards=True)
+            else:
+                path_backoff = robot.arm.snap.PlanToConfiguration(robot.arm, q_grasp, q_backoff, obstacles=obstacles, check_upwards=False)
             if path_approach is None or path_backoff is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
@@ -218,7 +221,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=3, approach_frame='gripper', backoff
                         print(x - new_pose.pose[0][0], y - new_pose.pose[0][1])
                         return None
 
-            if False and check_robust:
+            if False:# and check_robust:
                 length, lifeTime = 0.2, 0.0
 
                 pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
