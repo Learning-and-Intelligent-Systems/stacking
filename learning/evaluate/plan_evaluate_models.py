@@ -45,6 +45,10 @@ if __name__ == '__main__':
                         default=[5],
                         nargs='+',
                         help='number of blocks in goal tower (can do multiple)')
+    parser.add_argument('--xy-noise',
+                        type=float,
+                        required=True,
+                        help='noise to add to xy position of blocks')
     
     args = parser.parse_args()
     
