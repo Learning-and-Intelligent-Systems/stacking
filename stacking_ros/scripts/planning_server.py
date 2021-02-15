@@ -25,6 +25,7 @@ from tamp.ros_utils import (pose_to_transform, ros_to_pose,
     ros_to_transform, task_plan_to_ros)
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.utils import INF
+from pddlstream.algorithms.constraints import PlanConstraints, WILD
 from tf.transformations import quaternion_multiply
 
 
@@ -33,7 +34,7 @@ all_orns = [all_orns[i] for i in [0, 1, 4, 20]]
 
 class PlanningServer():
     def __init__(self, blocks, block_init_xy_poses=None,
-                 alternate_orientations=False, 
+                 max_tries=1, alternate_orientations=False, 
                  use_platform=False, use_vision=False):
 
         # Start up a robot simulation for planning
@@ -43,6 +44,7 @@ class PlanningServer():
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
 
+        self.max_tries = max_tries
         self.use_vision = use_vision
         self.alternate_orientations = alternate_orientations
 
@@ -225,13 +227,29 @@ class PlanningServer():
                                         self.pddl_blocks,
                                         add_slanted_grasps=False,
                                         approach_frame='global')
+        
+        from pddlstream.language.stream import StreamInfo
+        constraints = PlanConstraints(skeletons=self._get_regrasp_skeleton(),
+                                  exact=True)
+        stream_info = {
+            "sample-pose-table": StreamInfo(eager=False),
+            "sample-pose-home": StreamInfo(eager=False),
+            "sample-pose-block": StreamInfo(eager=False),
+            "sample-grasp": StreamInfo(eager=False),
+            "pick-inverse-kinematics": StreamInfo(eager=False, negate=False, defer=True),
+            "place-inverse-kinematics": StreamInfo(eager=False, negate=False, defer=True),
+            "plan-free-motion": StreamInfo(eager=False, negate=False, defer=True),
+            "plan-holding-motion": StreamInfo(eager=False, negate=False, defer=True)
+        }
 
         # Run PDDLStream focused solver
         start = time.time()
         pddlstream_problem = tuple([*pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
+                                stream_info=stream_info,
                                 success_cost=numpy.inf,
                                 max_skeletons=2,
+                                max_failures=3,
                                 search_sample_ratio=1.,
                                 max_time=INF)
         duration = time.time() - start
@@ -304,7 +322,7 @@ class PlanningServer():
                 goal = ("and", ("On", blk, base))
 
             # Plan
-            plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=1)
+            plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=self.max_tries)
             if self.cancel_planning:
                 print("Discarding latest plan")
                 self.plan_buffer = []
@@ -407,7 +425,7 @@ class PlanningServer():
         num_tries = 0
 
         while (not found_plan) and (num_tries < max_tries):
-            print("Planning...")
+            print(f"\n\nPlanning try {num_tries}...\n\n")
             saved_world = pb_robot.utils.WorldSaver()
             # print_planning_problem(init, goal, fixed_objs)
 
@@ -419,14 +437,16 @@ class PlanningServer():
                                             approach_frame="global",
                                             use_vision=self.use_vision,
                                             home_poses=self.home_poses)
-
+       
             # Run PDDLStream focused solver
-            start = time.time()
             pddlstream_problem = tuple([*pddl_info, init, goal])
-            plan, _, _ = solve_focused(pddlstream_problem,
-                                    success_cost=INF,
+            start = time.time()
+            plan, cost, _ = solve_focused(pddlstream_problem,
+                                    planner="dijkstra",
+                                    unit_costs=True,
                                     max_skeletons=2,
-                                    search_sample_ratio=1.,
+                                    search_sample_ratio=1.0,
+                                    success_cost=8.0,
                                     max_time=INF,
                                     verbose=False)
             duration = time.time() - start
@@ -438,6 +458,7 @@ class PlanningServer():
 
         print('Planning Complete: Time %f seconds' % duration)
         print(f"\nFINAL PLAN\n{plan}\n")
+        print(f"COST: {cost}")
         return plan
 
 
@@ -477,6 +498,7 @@ class PlanningServer():
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--num-blocks', type=int, default=4)
+    parser.add_argument('--max-tries', type=int, default=1)
     parser.add_argument('--use-vision', default=False, action='store_true')
     parser.add_argument('--alternate-orientations', default=False, action='store_true')
     parser.add_argument('--blocks-file', default='', type=str)
@@ -490,6 +512,7 @@ if __name__=="__main__":
         block_init_xy_poses = None
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
-    s = PlanningServer(blocks, use_vision=args.use_vision, 
+    s = PlanningServer(blocks, max_tries=args.max_tries,
+                       use_vision=args.use_vision, 
                        alternate_orientations=args.alternate_orientations)
     s.planning_loop()
