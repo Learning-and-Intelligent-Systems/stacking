@@ -93,20 +93,20 @@ def run_active_towers(args):
     
     else:
         towers_dict = sample_unlabeled_data(40, block_set=block_set)
-        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger)
+        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger, args.xy_noise)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
         val_towers_dict = sample_unlabeled_data(40, block_set=block_set)
-        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger)
+        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger, args.xy_noise)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
     if args.sampler == 'sequential':
         towers_dict = sample_sequential_data(block_set, None, 40)
-        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger)
+        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger, args.xy_noise)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
         val_towers_dict = sample_sequential_data(block_set, None, 40)
-        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger)
+        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger, args.xy_noise)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
         
         if block_set is None:
@@ -166,6 +166,7 @@ if __name__ == '__main__':
     # sim: uses pyBullet with no noise
     # real: uses the real robot
     parser.add_argument('--exec-mode', default='noisy-model', choices=['perfect-model', 'noisy-model', 'sim', 'real'])
+    parser.add_argument('--xy-noise', default=0.003, type=float, help='Variance in the normally distributed noise in block placements (used when args.exec-mode==noisy-model)')
     parser.add_argument('--use-panda-server', action='store_true')
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()

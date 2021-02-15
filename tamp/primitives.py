@@ -159,7 +159,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
         if not is_top_grasp and is_wrist_too_low:
             return None
         # If the block/gripper is in the storage area, don't use low grasps.
-        if grasp_worldF[2,3] < 0.1 and grasp_worldF[0,3] < 0.2:
+        if grasp_worldF[0,3] < 0.2 and grasp_worldF[2,3] < 0.1:
             return None
 
 
@@ -179,12 +179,14 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
 
         for ax in range(num_attempts):
             q_grasp = robot.arm.ComputeIK(grasp_worldF)
-            if (q_grasp is None): continue
+            if (q_grasp is None): 
+                continue
             if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
                 return None
 
             q_approach = robot.arm.ComputeIK(approach_tform, seed_q=q_grasp)
-            if (q_approach is None): continue
+            if (q_approach is None): 
+                continue
             if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
                 return None
             conf_approach = pb_robot.vobj.BodyConf(robot, q_approach)

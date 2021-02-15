@@ -19,11 +19,10 @@ def main(args):
     NOISE=0.00005
 
     # get a bunch of random blocks
-    # if args.use_vision:
-    if True:
+    if args.use_vision:
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)[:10]
-            blocks = blocks[:args.num_blocks]
+            blocks = [blocks[1], blocks[2]]
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
@@ -32,38 +31,22 @@ def main(args):
         use_action_server=args.use_action_server,
         use_vision=args.use_vision)
 
-    if args.show_frames:
-        agent.step_simulation(T=1, vis_frames=True, lifeTime=0.)
-        input('Start building?')
-        p.removeAllUserDebugItems()
+    agent.execute()
 
-    for tx in range(0, args.num_towers):
-        # Build a random tower out of blocks.
-        n_blocks = np.random.randint(2, args.num_blocks + 1)
-        tower_blocks = np.random.choice(blocks, n_blocks, replace=False)
+    # q1 = [0.14654724763473187,  0.21575351569801834,  -0.5849719978198809,  -2.2556906748089887,  -0.6774525616969749, 2.550307508491763,  -0.6516565082767167]
+    # q2 = [ -0.14025885624634593, 0.7700725373762062,  -0.8396436988360126,  -1.5055244809443935,  0.8368880648676954,  1.5269749777979318,  -1.9275477043905236]
 
-        tower = sample_random_tower(tower_blocks)
-        #tower = build_tower(tower_blocks, constructable=True, max_attempts=50000)
+    # q1 = [-1.9857389225545983, -1.308321625545317,  2.0046107570246647, -2.319278960161609, 0.28307999774306025, 2.756969932860798,  2.387599795313007]
+    # q2 = [ 1.14995860276477,-1.0715086746146851, 1.821738397538161,  -2.8114018193240318, 1.9648736125191266,  1.671743112918798,  -0.9022175132022459]
 
-        # and execute the resulting plan.
-        print(f"Starting tower {tx}")
-        if args.use_action_server:
-            agent.simulate_tower_parallel(tower,
-                                          real=args.real,
-                                          base_xy=(0.5, -0.3),
-                                          vis=True,
-                                          T=2500)
-        else:
-            success, stable = agent.simulate_tower(tower,
-                                real=args.real,
-                                base_xy=(0.5, -0.3),
-                                vis=True,
-                                T=2500,
-                                save_tower=args.save_tower)
-            if not success:
-                print('Planner failed.')
-        print(f"Finished tower {tx}")
+    q1 = [ -1.8355401421019457,  1.0773125105481844, 1.7073429337217094, -2.1553081323948593, -1.5797996042351563,  1.5594502235915926, -0.43448741828070747]
+    q2 = [-2.486464799947595,  -1.0559115633903473,  1.8381697061523825, -2.6442660035967593, 2.5008998526608957,  1.5902258537646063,  -1.4465391565816694]
 
+
+    agent.execution_robot.arm.SetJointValues(q1)
+    input()
+    agent.execution_robot.arm.SetJointValues(q2)
+    input()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

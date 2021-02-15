@@ -73,15 +73,15 @@ class PandaAgent:
         self.execution_robot.arm.hand.Open()
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
-        # Create an arm interface
-        if real:
-            from franka_interface import ArmInterface
-            self.real_arm = ArmInterface()
-
         # Set up ROS plumbing if using features that require it
         if self.use_vision or self.use_action_server or real:
             import rospy
             rospy.init_node("panda_agent")
+
+        # Create an arm interface
+        if real:
+            from franka_interface import ArmInterface
+            self.real_arm = ArmInterface()
 
         # Set initial poses of all blocks and setup vision ROS services.
         if self.use_vision:
@@ -93,6 +93,7 @@ class PandaAgent:
             self._update_block_poses()
 
         # Start ROS clients and servers as needed
+        self.last_obj_held = None
         if self.use_action_server:
             from stacking_ros.srv import GetPlan, SetPlanningState, PlanTower
             from tamp.ros_utils import goal_to_ros, ros_to_task_plan
@@ -459,6 +460,9 @@ class PandaAgent:
                 ros_req.robot_config.angles = self.robot.arm.GetJointValues()
             ros_req.init_state = block_init_to_ros(self.pddl_blocks)
             ros_req.goal_state = ros_req.goal_state[num_success:]
+            if isinstance(self.last_obj_held, pb_robot.vobj.BodyGrasp):
+                ros_req.held_block.name = self.last_obj_held.body.readableName
+                transform_to_ros(self.last_obj_held.grasp_objF, ros_req.held_block.pose)
             success, stack_stable, reset_stable, num_success, fatal = \
                 self.execute_plans_from_server(ros_req, real, T, stack=True)
             print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
@@ -533,8 +537,8 @@ class PandaAgent:
 
 
     def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True):
-        """ 
-        Executes plans received from planning server 
+        """
+        Executes plans received from planning server
         Returns:
             success : Flag for whether the plan execution succeeded
             stack_stable : Flag for whether stacking a stable tower was successful
@@ -558,18 +562,17 @@ class PandaAgent:
                     ros_resp = self.get_plan_client.call()
                     if not ros_resp.planning_active:
                         print("Planning ended on server side")
-                        return False, stack_stable, reset_stable, num_success, True
+                        return False, stack_stable, reset_stable, num_success, False
                     tgt_block = ros_req.goal_state[num_success].name
                     if self.validate_ros_plan(ros_resp, tgt_block):
                         plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
-                    
+
                 print("\nGot plan:")
                 print(plan)
 
                 # Once we have a plan, execute it
                 self.execute()
-                ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False,
-                    sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
+                ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False, obstacles=[f for f in self.fixed if f is not None], sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
                 query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
@@ -582,9 +585,9 @@ class PandaAgent:
                 # Check stability
                 if not real:
                     self.step_simulation(T, vis_frames=False)
-                input('Press enter to check stability.')
+                #input('Press enter to check stability.')
                 stable = self.check_stability(real, query_block, desired_pose)
-                input('Continue?')
+                #input('Continue?')
 
                 # Manage the success status of the plan
                 if stable == 0.:
@@ -599,10 +602,11 @@ class PandaAgent:
                         print("Completed tower reset!")
                         reset_stable = True
                         return True, stack_stable, reset_stable, num_success, False
-            
+
             except ExecutionFailure as e:
                 print("Planning/execution failed.")
                 print(e)
+                self.last_obj_held = e.obj_held
                 return False, stack_stable, reset_stable, num_success, e.fatal
 
 
@@ -675,7 +679,7 @@ class PandaAgent:
                             has_plan = True
                         else:
                             time.sleep(1)
-                    ExecuteActions(plan, real=real, pause=True, wait=False)
+                    ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
             else:
                 self.teleport_block(base_block, base_pose.pose)
         moved_blocks.add(base_block)
@@ -725,7 +729,7 @@ class PandaAgent:
                                 has_plan = True
                             else:
                                 time.sleep(1)
-                        ExecuteActions(plan, real=real, pause=True, wait=False)
+                        ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
                 else:
                     get_pose = tamp.primitives.get_stable_gen_block()
                     pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -758,7 +762,7 @@ class PandaAgent:
                         has_plan = True
                     else:
                         time.sleep(1)
-                ExecuteActions(plan, real=real, pause=True, wait=False)
+                ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
         if not real:
             self.step_simulation(T, vis_frames=False)
         if self.use_vision and not stable:
@@ -805,7 +809,7 @@ class PandaAgent:
                         has_plan = True
                     else:
                         time.sleep(1)
-                ExecuteActions(plan, real=real, pause=True, wait=False)
+                ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
 
         return True, stable
 
@@ -937,9 +941,9 @@ class PandaAgent:
         else:
             saved_world.restore()
             self.execute()
-            ExecuteActions(plan, real=real, pause=True, wait=False)
+            ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
             self.plan()
-            ExecuteActions(plan, real=False, pause=False, wait=False)
+            ExecuteActions(plan, real=False, pause=False, wait=False, obstacles=[f for f in self.fixed if f is not None])
             return True
 
 

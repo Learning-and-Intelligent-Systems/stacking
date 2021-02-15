@@ -12,21 +12,27 @@ from pddlstream.utils import read
 
 
 class ExecutionFailure(Exception):
-    """ 
+    """
     Defines a task execution failure for the robot.
     If fatal is True, manual intervention is needed. Otherwise, the error
     can be recovered by replanning from current state.
+    Optionally, a BodyGrasp can be specified to indicate that the 
+    robot was holding a particular object to replan with that knowledge.
     """
-    def __init__(self, reason="", fatal=False):
+    def __init__(self, reason="", fatal=False, obj_held=None):
         self.reason = reason
         self.fatal = fatal
+        self.obj_held = obj_held
 
     def __str__(self):
         if self.fatal:
             descriptor = "Fatal"
         else:
             descriptor = "Recoverable"
-        return descriptor + " execution failure: " + self.reason
+        print_str = descriptor + " execution failure: " + self.reason
+        if self.obj_held is not None:
+            print_str += f" while holding {self.obj_held.body.readableName}"
+        return print_str
 
 
 def getDirectory():
@@ -54,10 +60,10 @@ def get_fixed(robot, movable):
     fixed = [body for body in rigid if body.id not in movable_ids]
     return fixed
 
-def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True,
-                   sim_fatal_failure_prob=0, sim_recoverable_failure_prob=0):
+def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True, obstacles=[], sim_fatal_failure_prob=0, sim_recoverable_failure_prob=0):
     # if prompt:
     #     input("Execute in Simulation?")
+    # obj_held = None
     for name, args in plan:
         # pb_robot.viz.remove_all_debug()
         # bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
@@ -71,12 +77,25 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True,
             else:
                 e.simulate(timestep=0.05)
 
+            # Assign the object being held
+            # if isinstance(e, pb_robot.vobj.BodyGrasp):
+            #     if name == "pick":
+            #         obj_held = e
+            #     else:
+            #         obj_held = None
+
             # Simulate failures if specified
-            if not isinstance(e, pb_robot.vobj.BodyGrasp):
+            if (name in ["pick", "move_free"] and not isinstance(e, pb_robot.vobj.BodyGrasp)
+                and not isinstance(e, pb_robot.vobj.MoveFromTouch)):
                 if numpy.random.rand() < sim_fatal_failure_prob:
                     raise ExecutionFailure(fatal=True,
                         reason=f"Simulated fatal failure in {e}")
                 elif numpy.random.rand() < sim_recoverable_failure_prob:
+                    # if (name in ["place", "place_home", "move_holding"]) or \
+                    # (name=="pick" and isinstance(e, pb_robot.vobj.MoveFromTouch)):
+                    #     obj_held_arg = obj_held
+                    # else:
+                    #     obj_held_arg = None
                     raise ExecutionFailure(fatal=False,
                         reason=f"Simulated recoverable failure in {e}")
             
@@ -105,7 +124,7 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True,
         for name, args in plan:
             executionItems = args[-1]
             for e in executionItems:
-                e.execute(realRobot=arm)
+                e.execute(realRobot=arm, obstacles=obstacles)
                 #input("Next?")
 
 def create_pb_robot_urdf(obj, fname):

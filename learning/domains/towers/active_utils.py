@@ -232,7 +232,7 @@ def get_predictions(dataset, ensemble):
     return torch.cat(preds, dim=0)
 
 
-def get_labels(samples, exec_mode, agent, logger, xy_noise=0.003):
+def get_labels(samples, exec_mode, agent, logger, xy_noise):
     """ Takes as input a dictionary from the get_subset function. 
     Augment it with stability labels. 
     :param samples:
