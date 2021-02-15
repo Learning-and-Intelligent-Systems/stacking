@@ -137,7 +137,7 @@ class PlanningServer():
     def unpack_goal(self, ros_goal):
         """
         Convert TaskPlanGoal ROS message to PDDLStream compliant
-        initial conditions and goal specification
+        initial conditions and goal specification (DEPRECATED)
         """
         pddl_goal = ["and",]
         fixed_objs = [f for f in self.fixed]
@@ -212,7 +212,7 @@ class PlanningServer():
 
 
     def find_plan(self, ros_goal):
-        """ Main PDDLStream planning function """
+        """ Main PDDLStream planning function (DEPRECATED)"""
         print("Planning...")
         self.plan()
         self.robot.arm.hand.Open()
@@ -421,9 +421,8 @@ class PlanningServer():
 
     def pddlstream_plan(self, init, goal, fixed_objs, max_tries=1):
         """ Plans using PDDLStream and the necessary specifications """
-        found_plan = False
         num_tries = 0
-
+        found_plan = False
         while (not found_plan) and (num_tries < max_tries):
             print(f"\n\nPlanning try {num_tries}...\n\n")
             saved_world = pb_robot.utils.WorldSaver()
@@ -457,8 +456,7 @@ class PlanningServer():
             saved_world.restore()
 
         print('Planning Complete: Time %f seconds' % duration)
-        print(f"\nFINAL PLAN\n{plan}\n")
-        print(f"COST: {cost}")
+        print(f"\nFINAL PLAN:\n{plan}\nCOST: {cost}\n")
         return plan
 
 
@@ -472,36 +470,13 @@ class PlanningServer():
         print("Plan simulated")
 
 
-    def step_simulation(self, T, vis_frames=False):
-        pb.setGravity(0, 0, -10, physicsClientId=self._planning_client_id)
-        q = self.robot.get_joint_positions()
-
-        for _ in range(T):
-            pb.stepSimulation(physicsClientId=self._planning_client_id)
-            self.plan()
-            self.robot.set_joint_positions(self.robot.joints, q)
-            time.sleep(1/2400.)
-
-            if vis_frames:
-                length, lifeTime = 0.1, 0.1
-                for pddl_block in self.pddl_blocks:
-                    pos, quat = pddl_block.get_pose()
-                    new_x = transformation([length, 0.0, 0.0], pos, quat)
-                    new_y = transformation([0.0, length, 0.0], pos, quat)
-                    new_z = transformation([0.0, 0.0, length], pos, quat)
-
-                    pb.addUserDebugLine(pos, new_x, [1,0,0], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
-                    pb.addUserDebugLine(pos, new_y, [0,1,0], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
-                    pb.addUserDebugLine(pos, new_z, [0,0,1], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
-
-
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--blocks-file', default='', type=str)
     parser.add_argument('--num-blocks', type=int, default=4)
-    parser.add_argument('--max-tries', type=int, default=1)
+    parser.add_argument('--max-tries', type=int, default=2)
     parser.add_argument('--use-vision', default=False, action='store_true')
     parser.add_argument('--alternate-orientations', default=False, action='store_true')
-    parser.add_argument('--blocks-file', default='', type=str)
     args = parser.parse_args()
 
     if args.use_vision or len(args.blocks_file) > 0:
@@ -512,6 +487,7 @@ if __name__=="__main__":
     else:
         from block_utils import get_adversarial_blocks
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+    
     s = PlanningServer(blocks, max_tries=args.max_tries,
                        use_vision=args.use_vision, 
                        alternate_orientations=args.alternate_orientations)
