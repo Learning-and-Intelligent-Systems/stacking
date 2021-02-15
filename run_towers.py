@@ -23,7 +23,7 @@ def main(args):
     if True:
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)[:10]
-            blocks = blocks[:args.num_blocks]
+            blocks = blocks[:min(len(blocks), args.num_blocks)]
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 

@@ -504,13 +504,13 @@ if __name__=="__main__":
     parser.add_argument('--blocks-file', default='', type=str)
     args = parser.parse_args()
 
-    from block_utils import get_adversarial_blocks
     if args.use_vision or len(args.blocks_file) > 0:
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)
-            blocks = blocks[:args.num_blocks]
+            blocks = blocks[:min(len(blocks), args.num_blocks)]
         block_init_xy_poses = None
     else:
+        from block_utils import get_adversarial_blocks
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
     s = PlanningServer(blocks, max_tries=args.max_tries,
                        use_vision=args.use_vision, 
