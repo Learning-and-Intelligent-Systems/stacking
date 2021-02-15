@@ -110,7 +110,7 @@
   )
 
   ; Place Block ?o at Pose ?p1 on Object (Block or Table) ?o2 which is at Pose ?p2
-  (:action place-home
+  (:action place_home
     :parameters (?o1 ?p1 ?o2 ?p2 ?g ?q1 ?q2 ?t)
     :precondition (and (Reset)
                        (PlaceKin ?o1 ?p1 ?g ?q1 ?q2 ?t)

@@ -221,7 +221,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
                         print(x - new_pose.pose[0][0], y - new_pose.pose[0][1])
                         return None
 
-            if True:# and check_robust:
+            if False:# and check_robust:
                 length, lifeTime = 0.2, 0.0
 
                 pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
