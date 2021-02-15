@@ -28,7 +28,7 @@
     :inputs (?o ?p ?g)
     :domain (and (Pose ?o ?p) (Grasp ?o ?g))
     :outputs (?q1 ?q2 ?t)
-    :certified (and (Conf ?q2) (Conf ?q1) (PickKin ?o ?p ?g ?q1 ?q2 ?t))
+    :certified (and (Conf ?q1) (Conf ?q2) (PickKin ?o ?p ?g ?q1 ?q2 ?t))
   )
   (:stream place-inverse-kinematics
     :inputs (?o ?p ?g)
