@@ -144,7 +144,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
         is_gripper_sideways = np.abs(grasp_worldR[:,1].dot(e_z)) > 0.999
         is_camera_down = grasp_worldR[:,0].dot(-e_z) > 0.999
         is_wrist_too_low = grasp_worldF[2,3] < 0.088/2 + 0.005
-    
+
 
         if is_gripper_sideways:
             return None
@@ -179,12 +179,14 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
 
         for ax in range(num_attempts):
             q_grasp = robot.arm.ComputeIK(grasp_worldF)
-            if (q_grasp is None): continue
+            if (q_grasp is None):
+                continue
             if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
                 return None
 
             q_approach = robot.arm.ComputeIK(approach_tform, seed_q=q_grasp)
-            if (q_approach is None): continue
+            if (q_approach is None):
+                continue
             if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
                 return None
             conf_approach = pb_robot.vobj.BodyConf(robot, q_approach)
@@ -208,7 +210,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
             if path_approach is None or path_backoff is None:
                 if DEBUG_FAILURE: input('Approach motion failed')
                 continue
-            
+
             # If the grasp is valid, check that it is robust (i.e., also valid under pose estimation error).
             if check_robust:
                 for _ in range(10):
@@ -221,7 +223,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
                         print(x - new_pose.pose[0][0], y - new_pose.pose[0][1])
                         return None
 
-            if True:# and check_robust:
+            if False:# and check_robust:
                 length, lifeTime = 0.2, 0.0
 
                 pos, quat = pb_robot.geometry.pose_from_tform(approach_tform)
@@ -233,10 +235,9 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
                 p.addUserDebugLine(pos, new_y, [0,1,0], lifeTime=lifeTime, physicsClientId=1)
                 p.addUserDebugLine(pos, new_z, [0,0,1], lifeTime=lifeTime, physicsClientId=1)
 
-
             command = [pb_robot.vobj.MoveToTouch(robot.arm, q_approach, q_grasp, grasp, body, use_wrist_camera),
                        grasp,
-                       pb_robot.vobj.MoveFromTouch(robot.arm, q_backoff)]
+                       pb_robot.vobj.MoveFromTouch(robot.arm, q_backoff, use_wrist_camera=use_wrist_camera)]
 
             if return_grasp_q:
                 return (pb_robot.vobj.BodyConf(robot, q_grasp),)

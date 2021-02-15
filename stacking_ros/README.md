@@ -44,7 +44,8 @@ export PYTHONPATH=$PYTHONPATH:/catkin_ws/src/stacking
 First, go to the top-level folder of the `stacking` repository. Then,
 
 ```
-python3.7 stacking_ros/scripts/planning_server.py --num-blocks 4
+python3.7 stacking_ros/scripts/planning_server.py --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
+
 ```
 
 ---
@@ -53,17 +54,17 @@ python3.7 stacking_ros/scripts/planning_server.py --num-blocks 4
 First, start the planning server with the block list of choice. Keep it handy because we need to use it for every separate call below.
 
 ```
-rosrun stacking_ros planning_server.py --blocks-file learning/domains/towers/sim_adversarial_blocks.pkl 
+rosrun stacking_ros planning_server.py --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
 ```
 
 Then, start the Panda agent server with the same block list.
 
 ```
-rosrun stacking_ros panda_agent_server.py --blocks-file learning/domains/towers/sim_adversarial_blocks.pkl 
+rosrun stacking_ros panda_agent_server.py --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
 ```
 
 Finally, start active learning.
 
 ```
-python3.7 -m learning.experiments.active_train_towers --exec-mode sim --use-panda-server --block-set-fname learning/domains/towers/sim_adversarial_blocks.pkl 
+python3.7 -m learning.experiments.active_train_towers --exec-mode sim --use-panda-server --block-set-fname learning/domains/towers/final_block_set.pkl
 ```

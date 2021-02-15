@@ -4,6 +4,7 @@
 BodyInfo[] init_state
 BodyInfo[] goal_state
 RobotConfig robot_config
+BodyInfo held_block
 
 ---
 

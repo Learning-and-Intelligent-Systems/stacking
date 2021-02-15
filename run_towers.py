@@ -19,10 +19,11 @@ def main(args):
     NOISE=0.00005
 
     # get a bunch of random blocks
-    if args.use_vision:
+    # if args.use_vision:
+    if True:
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)[:10]
-            #blocks = [blocks[1], blocks[2]]
+            blocks = blocks[:args.num_blocks]
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
