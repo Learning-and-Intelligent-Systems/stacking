@@ -93,6 +93,7 @@ class PandaAgent:
             self._update_block_poses()
 
         # Start ROS clients and servers as needed
+        self.last_obj_held = None
         if self.use_action_server:
             from stacking_ros.srv import GetPlan, SetPlanningState, PlanTower
             from tamp.ros_utils import goal_to_ros, ros_to_task_plan
@@ -459,6 +460,9 @@ class PandaAgent:
                 ros_req.robot_config.angles = self.robot.arm.GetJointValues()
             ros_req.init_state = block_init_to_ros(self.pddl_blocks)
             ros_req.goal_state = ros_req.goal_state[num_success:]
+            if isinstance(self.last_obj_held, pb_robot.vobj.BodyGrasp):
+                ros_req.held_block.name = self.last_obj_held.body.readableName
+                transform_to_ros(self.last_obj_held.grasp_objF, ros_req.held_block.pose)
             success, stack_stable, reset_stable, num_success, fatal = \
                 self.execute_plans_from_server(ros_req, real, T, stack=True)
             print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
@@ -558,7 +562,7 @@ class PandaAgent:
                     ros_resp = self.get_plan_client.call()
                     if not ros_resp.planning_active:
                         print("Planning ended on server side")
-                        return False, stack_stable, reset_stable, num_success, True
+                        return False, stack_stable, reset_stable, num_success, False
                     tgt_block = ros_req.goal_state[num_success].name
                     if self.validate_ros_plan(ros_resp, tgt_block):
                         plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
@@ -602,6 +606,7 @@ class PandaAgent:
             except ExecutionFailure as e:
                 print("Planning/execution failed.")
                 print(e)
+                self.last_obj_held = e.obj_held
                 return False, stack_stable, reset_stable, num_success, e.fatal
 
 

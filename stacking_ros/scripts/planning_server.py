@@ -102,8 +102,13 @@ class PlanningServer():
         print('Initial config:', robot_config)
         init = [('CanMove',),
                 ('Conf', conf),
-                ('AtConf', conf),
-                ('HandEmpty',)]
+                ('AtConf', conf)]
+
+        # Get the grasp state
+        if self.latest_body_grasp is None:
+            init += [('HandEmpty',)]
+        else:
+            init += [('AtGrasp', self.latest_body_grasp.body, self.latest_body_grasp)]
 
         self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
         init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
@@ -112,11 +117,12 @@ class PlanningServer():
             print(type(body), body)
             pose = pb_robot.vobj.BodyPose(body, body.get_base_link_pose())
             init += [('Graspable', body),
-                    ('Pose', body, pose),
-                    ('AtPose', body, pose),
-                    ('Block', body),
-                    ('On', body, self.table),
-                    ('Supported', body, pose, self.table, self.table_pose)]
+                     ('Pose', body, pose),
+                     ('AtPose', body, pose),
+                     ('Block', body)]
+            if (self.latest_body_grasp is None) or (body != self.latest_body_grasp.body):
+                init += [('On', body, self.table),
+                         ('Supported', body, pose, self.table, self.table_pose)]
 
         if not self.platform_table is None:
             self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
@@ -226,7 +232,7 @@ class PlanningServer():
         plan, _, _ = solve_focused(pddlstream_problem,
                                 success_cost=numpy.inf,
                                 max_skeletons=2,
-                                search_sample_ratio=1000.,
+                                search_sample_ratio=1.,
                                 max_time=INF)
         duration = time.time() - start
         saved_world.restore()
@@ -343,7 +349,7 @@ class PlanningServer():
         self.cancel_planning = True
         self.planning_active = True
         self.plan_complete = False
-        print("Reset request received!")
+        print("\n\nReset request received!\n\n")
 
         # Get the new initial poses of blocks based on the execution world
         self.new_block_states = []
@@ -370,6 +376,14 @@ class PlanningServer():
 
         # Get the robot configuration
         self.latest_robot_config = ros_request.robot_config.angles
+
+        # Get the held block, if any
+        if len(ros_request.held_block.name) == 0:
+            self.latest_body_grasp = None
+        else:
+            held_block = self.pddl_block_lookup[ros_request.held_block.name]
+            T = ros_to_transform(ros_request.held_block.pose)
+            self.latest_body_grasp = pb_robot.vobj.BodyGrasp(held_block, T, self.robot.arm)
 
         return SetPlanningStateResponse()
 
@@ -472,7 +486,7 @@ if __name__=="__main__":
     if args.use_vision or len(args.blocks_file) > 0:
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)
-            # blocks = [blocks[1], blocks[2]]
+            blocks = blocks[:args.num_blocks]
         block_init_xy_poses = None
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
