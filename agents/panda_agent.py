@@ -622,7 +622,7 @@ class PandaAgent:
         return resp
 
 
-    def simulate_tower(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5), save_tower=False, solve_joint=False):
+    def simulate_tower(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5), save_tower=False):
         """
         :param tower: list of belief blocks that are rotated to have no
                       orientation in the tower. These are in the order of
@@ -634,54 +634,64 @@ class PandaAgent:
             print('Dims:', block.dimensions)
             print('CoM:', block.com)
             print('-----')
+
         if self.use_vision:
             self._update_block_poses()
 
         moved_blocks = set()
         original_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
 
+        # starting state of the PDDL planning problem. includes block poses
+        # and robot configuration
         init = self._get_initial_pddl_state()
         goal_terms = []
 
-        stable = 1.
-
         # TODO: Set base block to be rotated in its current position.
+
+        # before we begin planning, figure out the pose of the block that will
+        # be the base of the tower
         base_block = self.pddl_block_lookup[tower[0].name]
         base_pos = (base_xy[0], base_xy[1], tower[0].pose.pos.z)
         base_pose = (base_pos, tower[0].rotation)
-
+        # I believe that this adds that pose to the planning problem, and says that
+        # a block placed at that pose will satisfy the `Supported` predicate
         base_pose = pb_robot.vobj.BodyPose(base_block, base_pose)
         init += [('Pose', base_block, base_pose),
                  ('Supported', base_block, base_pose, self.table, self.table_pose)]
+        # And this specifies that we would like the base block to end up at the
+        # the base pose
         goal_terms.append(('AtPose', base_block, base_pose))
         goal_terms.append(('On', base_block, self.table))
-
+        # all the objects other than the base block are fixed
         fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != base_block]
+        # get the pddl problem spec
         self.pddl_info = get_pddlstream_info(self.robot,
                                              fixed_objs,
                                              self.pddl_blocks,
                                              add_slanted_grasps=False,
                                              approach_frame='global',
                                              use_vision=self.use_vision)
-        if not solve_joint:
-            if not self.teleport:
-                goal = tuple(['and'] + goal_terms)
-                if not self.use_action_server:
-                    plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-                    if not plan_found: return False, None
-                else:
-                    self.execute()
-                    has_plan = False
-                    while not has_plan:
-                        plan = self._request_plan_from_server(
-                            init, goal, fixed_objs, reset=True)
-                        if len(plan) > 0:
-                            has_plan = True
-                        else:
-                            time.sleep(1)
-                    ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
+        # this first section set up a PDDL instance to move the base block into the
+        # desired configuration. now we solve that PDDL problem and execute the plan
+        if not self.teleport:
+            goal = tuple(['and'] + goal_terms)
+            if not self.use_action_server:
+                plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+                if not plan_found: return False, None
             else:
-                self.teleport_block(base_block, base_pose.pose)
+                self.execute()
+                has_plan = False
+                while not has_plan:
+                    plan = self._request_plan_from_server(
+                        init, goal, fixed_objs, reset=True)
+                    if len(plan) > 0:
+                        has_plan = True
+                    else:
+                        time.sleep(1)
+                ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
+        else:
+            self.teleport_block(base_block, base_pose.pose)
+
         moved_blocks.add(base_block)
         stable = self.check_stability(real, base_block, base_pose.pose[0])
         poses = [base_pose]
@@ -698,9 +708,8 @@ class PandaAgent:
             top_pddl = self.pddl_block_lookup[top_block.name]
             bottom_pddl = self.pddl_block_lookup[bottom_block.name]
 
-            if not solve_joint:
-                init = self._get_initial_pddl_state()
-                goal_terms = []
+            init = self._get_initial_pddl_state()
+            goal_terms = []
 
             fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != top_pddl]
             self.pddl_info = get_pddlstream_info(self.robot,
@@ -713,56 +722,40 @@ class PandaAgent:
             goal_terms.append(('On', top_pddl, bottom_pddl))
 
             moved_blocks.add(top_pddl)
-            if not solve_joint:
-                if not self.teleport:
-                    goal = tuple(['and'] + goal_terms)
-                    if not self.use_action_server:
-                        plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-                        if not plan_found: return False, None
-                    else:
-                        has_plan = False
-                        while not has_plan:
-                            self.execute()
-                            plan = self._request_plan_from_server(
-                                init, goal, fixed_objs, reset=False)
-                            if len(plan) > 0:
-                                has_plan = True
-                            else:
-                                time.sleep(1)
-                        ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
+
+            if not self.teleport:
+                goal = tuple(['and'] + goal_terms)
+                if not self.use_action_server:
+                    plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
+                    if not plan_found: return False, None
                 else:
-                    get_pose = tamp.primitives.get_stable_gen_block()
-                    pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
-                    poses.append(pose)
-                    self.teleport_block(top_pddl, pose.pose)
-
-                # Execute the block placement.
-                desired_pose = top_pddl.get_base_link_pose()
-                if not real:
-                    self.step_simulation(T, vis_frames=False)
-                # TODO: Check if the tower was stable, stop construction if not.
-                #input('Press enter to stability.')
-                stable = self.check_stability(real, top_pddl, desired_pose)
-                #input('Continue?')
-                if stable == 0.:
-                    break
-
-        if solve_joint:
-            goal = tuple(['and'] + goal_terms)
-            if not self.use_action_server:
-                plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-                if not plan_found: return False, None
+                    self.execute()
+                    has_plan = False
+                    while not has_plan:
+                        plan = self._request_plan_from_server(
+                            init, goal, fixed_objs, reset=False)
+                        if len(plan) > 0:
+                            has_plan = True
+                        else:
+                            time.sleep(1)
+                    ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
             else:
-                self.execute()
-                has_plan = False
-                while not has_plan:
-                    plan = self._request_plan_from_server(
-                        init, goal, fixed_objs, reset=True)
-                    if len(plan) > 0:
-                        has_plan = True
-                    else:
-                        time.sleep(1)
-                ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
+                get_pose = tamp.primitives.get_stable_gen_block()
+                pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
+                poses.append(pose)
+                self.teleport_block(top_pddl, pose.pose)
+
+            # Execute the block placement.
+            desired_pose = top_pddl.get_base_link_pose()
+            if not real:
+                self.step_simulation(T, vis_frames=False)
+            # TODO: Check if the tower was stable, stop construction if not.
+            #input('Press enter to stability.')
+            stable = self.check_stability(real, top_pddl, desired_pose)
+            #input('Continue?')
+            if stable == 0.:
+                break
+
         if not real:
             self.step_simulation(T, vis_frames=False)
         if self.use_vision and not stable:

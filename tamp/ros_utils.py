@@ -6,7 +6,7 @@ import pb_robot
 import numpy as np
 from block_utils import Object, Pose, Position, Quaternion
 from stacking_ros.msg import (
-    BodyInfo, GoalInfo, RobotConfig, TaskAction, 
+    BodyInfo, GoalInfo, RobotConfig, TaskAction,
     TaskPlanGoal, TaskPlanResult, TrajInfo)
 from tf.transformations import (
     quaternion_matrix, quaternion_from_matrix, translation_from_matrix)
@@ -33,12 +33,12 @@ def goal_to_ros(init, goal, fixed_objs):
                 info.target_obj = elem[1].readableName
                 info.base_obj = elem[2].readableName
             ros_goal.goal.append(info)
-    
+
     # Convert the PDDL initial conditions (+ fixed objects)
     init_dict = {}
     init_rel_poses = []
     for elem in init:
-        name = elem[0]                
+        name = elem[0]
         # Robot configuration e.g. ("Conf", conf)
         if name == "Conf":
             ros_goal.robot_config.angles = elem[1].configuration
@@ -59,7 +59,7 @@ def goal_to_ros(init, goal, fixed_objs):
             ros_blk.base_obj = elem[2].readableName
             transform_to_ros(elem[3], ros_blk.pose)
             init_rel_poses.append(ros_blk)
-            
+
     for blk_name in init_dict:
         info = BodyInfo()
         info.name = blk_name
@@ -134,13 +134,15 @@ def traj_to_ros(traj_list, msg):
 
     for traj in traj_list:
         traj_msg = TrajInfo()
-        
+
         # Joint path case
         if (isinstance(traj, pb_robot.vobj.JointSpacePath)):
+            print('JointSpacePath')
             traj_msg.type = "JointSpacePath"
             for config in traj.path:
                 traj_msg.joint_path.append(
                     RobotConfig(angles=config))
+                print(config)
             traj_msg.joint_path_speed = traj.speed
         # BodyGrasp case
         elif (isinstance(traj, pb_robot.vobj.BodyGrasp)):
@@ -155,6 +157,7 @@ def traj_to_ros(traj_list, msg):
         elif (isinstance(traj, pb_robot.vobj.MoveFromTouch)):
             traj_msg.type = "MoveFromTouch"
             traj_msg.q_end.angles = traj.end
+            traj_msg.use_wrist_camera = traj.use_wrist_camera
 
         msg.append(traj_msg)
 
@@ -260,13 +263,13 @@ def ros_to_traj(msg, robot, pddl_block_lookup):
             T = ros_to_transform(msg.grasp)
             grasp = pb_robot.vobj.BodyGrasp(body, T, robot.arm)
             traj = pb_robot.vobj.MoveToTouch(
-                robot.arm, q_approach, q_grasp, grasp, body, 
+                robot.arm, q_approach, q_grasp, grasp, body,
                 ros_traj.use_wrist_camera)
         # MoveFromTouch case
         elif name == "MoveFromTouch":
-            q_end = ros_traj.q_end.angles 
+            q_end = ros_traj.q_end.angles
             traj = pb_robot.vobj.MoveFromTouch(
-                robot.arm, q_end)
+                robot.arm, q_end, use_wrist_camera=ros_traj.use_wrist_camera)
 
         traj_list.append(traj)
     return traj_list
@@ -293,12 +296,12 @@ def ros_to_task_plan(msg, robot, pddl_block_lookup):
             args = (0,0,0,0,0,0,0,
                 ros_to_traj(ros_act, robot, pddl_block_lookup))
         # TODO: Note we are padding the action tuples with zeros since executing
-        # each action only really requires the final argument. In future, we 
+        # each action only really requires the final argument. In future, we
         # should be more thorough about passing back *all* the information.
 
         act = (name, args)
         plan.append(act)
-    
+
     return plan
 
 
@@ -313,7 +316,7 @@ def ros_to_tower(msg):
         mass = ros_blk.mass
         color = (ros_blk.color.r, ros_blk.color.g, ros_blk.color.b)
         blk = Object(name, dims, mass, com, color)
-        
+
         # Now create a Pose namedtuple
         pose = ros_to_pose_tuple(ros_blk.pose)
         pos = Position(pose[0][0], pose[0][1], pose[0][2])
