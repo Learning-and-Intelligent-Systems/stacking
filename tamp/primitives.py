@@ -10,6 +10,8 @@ from pybullet_utils import transformation
 
 from scipy.spatial.transform import Rotation as R
 
+
+rotations = all_rotations()
 DEBUG_FAILURE = False
 
 def get_grasp_gen(robot, add_slanted_grasps=True, add_orthogonal_grasps=True):
@@ -22,6 +24,7 @@ def get_grasp_gen(robot, add_slanted_grasps=True, add_orthogonal_grasps=True):
             add_slanted_grasps=add_slanted_grasps, add_orthogonal_grasps=add_orthogonal_grasps)
         grasps = []
 
+        # np.random.shuffle(grasp_tsr)
         for sampled_tsr in grasp_tsr:
             grasp_worldF = sampled_tsr.sample()
             grasp_objF = np.dot(np.linalg.inv(body.get_base_link_transform()), grasp_worldF)
@@ -47,10 +50,10 @@ def get_stable_gen_table(fixed=[]):
         # if they are upright.
         dims = body.get_dimensions()
 
-        rotations = all_rotations()
         poses = []
         # These are the pre-chosen regrap locations.
         for x, y in [(0.4, 0.4)]:
+            np.random.shuffle(rotations)
             for rotation in rotations:
                 start_pose = body.get_base_link_pose()
 
@@ -69,7 +72,6 @@ def get_stable_gen_table(fixed=[]):
 
                 body_pose = pb_robot.vobj.BodyPose(body, pose)
                 poses.append((body_pose,))
-        np.random.shuffle(poses)
         return poses
     return gen
 
@@ -84,7 +86,6 @@ def get_stable_gen_home(home_poses, fixed=[]):
         # if they are upright.
         dims = body.get_dimensions()
 
-        rotations = all_rotations()
         poses = []
         home_pose = home_poses[body.get_name()]
         for rotation in rotations:
