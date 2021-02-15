@@ -137,10 +137,12 @@ def traj_to_ros(traj_list, msg):
         
         # Joint path case
         if (isinstance(traj, pb_robot.vobj.JointSpacePath)):
+            print('JointSpacePath')
             traj_msg.type = "JointSpacePath"
             for config in traj.path:
                 traj_msg.joint_path.append(
                     RobotConfig(angles=config))
+                print(config)
             traj_msg.joint_path_speed = traj.speed
         # BodyGrasp case
         elif (isinstance(traj, pb_robot.vobj.BodyGrasp)):
