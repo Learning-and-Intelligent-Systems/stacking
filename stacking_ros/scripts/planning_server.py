@@ -226,7 +226,7 @@ class PlanningServer():
         plan, _, _ = solve_focused(pddlstream_problem,
                                 success_cost=numpy.inf,
                                 max_skeletons=2,
-                                search_sample_ratio=1000.,
+                                search_sample_ratio=1.,
                                 max_time=INF)
         duration = time.time() - start
         saved_world.restore()
@@ -343,7 +343,7 @@ class PlanningServer():
         self.cancel_planning = True
         self.planning_active = True
         self.plan_complete = False
-        print("Reset request received!")
+        print("\n\nReset request received!\n\n")
 
         # Get the new initial poses of blocks based on the execution world
         self.new_block_states = []

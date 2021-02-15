@@ -558,7 +558,7 @@ class PandaAgent:
                     ros_resp = self.get_plan_client.call()
                     if not ros_resp.planning_active:
                         print("Planning ended on server side")
-                        return False, stack_stable, reset_stable, num_success, True
+                        return False, stack_stable, reset_stable, num_success, False
                     tgt_block = ros_req.goal_state[num_success].name
                     if self.validate_ros_plan(ros_resp, tgt_block):
                         plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)

@@ -16,17 +16,23 @@ class ExecutionFailure(Exception):
     Defines a task execution failure for the robot.
     If fatal is True, manual intervention is needed. Otherwise, the error
     can be recovered by replanning from current state.
+    Optionally, a BodyGrasp can be specified to indicate that the 
+    robot was holding a particular object to replan with that knowledge.
     """
-    def __init__(self, reason="", fatal=False):
+    def __init__(self, reason="", fatal=False, obj_held=None):
         self.reason = reason
         self.fatal = fatal
+        self.obj_held = obj_held
 
     def __str__(self):
         if self.fatal:
             descriptor = "Fatal"
         else:
             descriptor = "Recoverable"
-        return descriptor + " execution failure: " + self.reason
+        print_str = descriptor + " execution failure: " + self.reason
+        if self.obj_held is not None:
+            print_str += f" while holding {self.obj_held}"
+        return print_str
 
 
 def getDirectory():
@@ -57,11 +63,15 @@ def get_fixed(robot, movable):
 def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True, obstacles=[], sim_fatal_failure_prob=0, sim_recoverable_failure_prob=0):
     # if prompt:
     #     input("Execute in Simulation?")
+    obj_held = None
     for name, args in plan:
         # pb_robot.viz.remove_all_debug()
         # bodyNames = [args[i].get_name() for i in range(len(args)) if isinstance(args[i], pb_robot.body.Body)]
         #txt = '{} - {}'.format(name, bodyNames)
         # pb_robot.viz.add_text(txt, position=(0, 0.25, 0.5), size=2)
+
+        is_pick = "pick" in name
+        is_place = "place" in name
 
         executionItems = args[-1]
         for e in executionItems:
@@ -70,15 +80,23 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True, obstacl
             else:
                 e.simulate(timestep=0.05)
 
-            # Simulate failures if specified
-            if not isinstance(e, pb_robot.vobj.BodyGrasp):
-                if numpy.random.rand() < sim_fatal_failure_prob:
-                    raise ExecutionFailure(fatal=True,
-                        reason=f"Simulated fatal failure in {e}")
-                elif numpy.random.rand() < sim_recoverable_failure_prob:
-                    raise ExecutionFailure(fatal=False,
-                        reason=f"Simulated recoverable failure in {e}")
+            # Assign the object being held
+            if isinstance(e, pb_robot.vobj.BodyGrasp):
+                if is_pick:
+                    obj_held = e
+                if is_place:
+                    obj_held = None
 
+            # Simulate failures if specified
+            if numpy.random.rand() < sim_fatal_failure_prob:
+                raise ExecutionFailure(fatal=True,
+                    reason=f"Simulated fatal failure in {e}",
+                    obj_held=obj_held)
+            elif numpy.random.rand() < sim_recoverable_failure_prob:
+                raise ExecutionFailure(fatal=False,
+                    reason=f"Simulated recoverable failure in {e}",
+                    obj_held=obj_held)
+            
             if wait:
                 input("Next?")
             elif pause:
