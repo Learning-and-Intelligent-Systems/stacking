@@ -37,10 +37,6 @@ if __name__ == '__main__':
     parser.add_argument('--discrete',
                         action='store_true',
                         help='use if you want to ONLY search the space of block orderings and orientations')
-    parser.add_argument('--n-samples',
-                        default=5000,
-                        type=int,
-                        help='number of samples to select from in total planning method')
     parser.add_argument('--tower-sizes',
                         default=[5],
                         nargs='+',
