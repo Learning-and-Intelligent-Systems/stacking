@@ -16,7 +16,7 @@ class ExecutionFailure(Exception):
     Defines a task execution failure for the robot.
     If fatal is True, manual intervention is needed. Otherwise, the error
     can be recovered by replanning from current state.
-    Optionally, a BodyGrasp can be specified to indicate that the 
+    Optionally, a BodyGrasp can be specified to indicate that the
     robot was holding a particular object to replan with that knowledge.
     """
     def __init__(self, reason="", fatal=False, obj_held=None):
@@ -73,7 +73,7 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True, obstacl
         executionItems = args[-1]
         for e in executionItems:
             if real:
-                e.simulate(timestep=0.25)
+                e.simulate(timestep=0.1)
             else:
                 e.simulate(timestep=0.05)
 
@@ -98,7 +98,7 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True, obstacl
                     #     obj_held_arg = None
                     raise ExecutionFailure(fatal=False,
                         reason=f"Simulated recoverable failure in {e}")
-            
+
             if wait:
                 input("Next?")
             elif pause:
