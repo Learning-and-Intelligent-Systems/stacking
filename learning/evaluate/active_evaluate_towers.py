@@ -723,7 +723,7 @@ def min_contact_regret_evaluation(logger, block_set, fname, args):
 
     return evaluate_planner(logger, block_set, contact_area, fname, args)
 
-def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
+def evaluate_planner(logger, blocks, reward_fn, fname, args):
     tower_keys = [str(ts)+'block' for ts in args.tower_sizes]
     tp = TowerPlanner(stability_mode='contains')
     ep = EnsemblePlanner(logger, n_samples=args.n_samples)
@@ -746,12 +746,14 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
 
         for k, size in zip(tower_keys, args.tower_sizes):
             print('Tower size', k)
-            if size == 2 or size == 3:
+            if size == 2:
+                ep.n_samples = 5000
+            elif size == 3:
                 ep.n_samples = 10000
             elif size == 4:
                 ep.n_samples = 100000
             elif size == 5:
-                ep.n_samples = 500000
+                ep.n_samples = 200000
             num_failures, num_pw_failures = 0, 0
             curr_regrets = []
             curr_rewards = []
@@ -762,7 +764,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, xy_noise=0.003):
                 # perturb tower
                 block_tower = []
                 for vec_block in tower:
-                    vec_block[7:9] += np.random.randn(2)*xy_noise 
+                    vec_block[7:9] += np.random.randn(2)*args.xy_noise 
                     block_tower.append(Object.from_vector(vec_block))
                 if not tp.tower_is_constructable(block_tower):
                     reward = 0
