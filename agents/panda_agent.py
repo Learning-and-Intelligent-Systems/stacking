@@ -547,23 +547,33 @@ class PandaAgent:
         """
         self.init_state_client.call(ros_req)
 
+        num_success = 0
         stack_stable = False
         reset_stable = False
-        num_success = 0
         planning_active = True
         num_steps = len(ros_req.goal_state)
         while num_success < num_steps:
             try:
+                query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
+
                 # Wait for a valid plan
                 plan = []
                 while len(plan) == 0 and planning_active:
                     time.sleep(1)
                     ros_resp = self.get_plan_client.call()
                     if not ros_resp.planning_active:
-                        print("Planning ended on server side")
-                        return False, stack_stable, reset_stable, num_success, True
-                    tgt_block = ros_req.goal_state[num_success].name
-                    # if self.validate_ros_plan(ros_resp, tgt_block):
+                        print("Planning failed on server side.")
+                        # If failure happened during stacking, it is a fatal failure
+                        if (ros_req.goal_state[num_success].stack):
+                            print(f"Failed during stacking {query_block}")
+                            fatal = True
+                        # If failure happened during resetting, prompt user to manually reset blocks
+                        else:
+                            print(f"Failed during resetting {query_block}")
+                            input("Manually reset the blocks and press Enter to continue")
+                            fatal = False
+                        return False, stack_stable, reset_stable, num_success, fatal
+                    # if self.validate_ros_plan(ros_resp, query_block):
                     plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
 
                 print("\nGot plan:")
@@ -574,7 +584,6 @@ class PandaAgent:
                 ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False, obstacles=[f for f in self.fixed if f is not None], sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
-                query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
                 desired_pose = query_block.get_base_link_pose()
                 if query_block not in self.moved_blocks:
                     self.moved_blocks.add(query_block)
