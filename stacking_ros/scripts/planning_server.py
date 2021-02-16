@@ -18,21 +18,18 @@ import actionlib
 import argparse
 import pb_robot
 import pybullet as pb
-from block_utils import all_rotations
+from multiprocessing import Process, Manager
+from pddlstream.algorithms.focused import solve_focused
+from pddlstream.utils import INF
 from stacking_ros.msg import TaskPlanAction, TaskPlanResult, TaskAction
-from stacking_ros.srv import (
-    GetPlan, GetPlanResponse, SetPlanningState, SetPlanningStateResponse)
+from stacking_ros.srv import (GetPlan, GetPlanResponse, 
+    SetPlanningState, SetPlanningStateResponse)
 from tamp.misc import (get_pddl_block_lookup, get_pddlstream_info,
     print_planning_problem, setup_panda_world, ExecuteActions)
 from tamp.ros_utils import (pose_to_transform, ros_to_pose,
     ros_to_transform, task_plan_to_ros)
-from pddlstream.algorithms.focused import solve_focused
-from pddlstream.utils import INF
 from tf.transformations import quaternion_multiply
-from multiprocessing import Process, Manager
 
-all_orns = [tuple(r.as_quat()) for r in all_rotations()]
-all_orns = [all_orns[i] for i in [0, 1, 4, 20]]
 
 class PlanningServer():
     def __init__(self, blocks, block_init_xy_poses=None, max_tries=1, 
@@ -46,9 +43,13 @@ class PlanningServer():
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
 
+        # Initialize general attributes
         self.max_tries = max_tries
         self.use_vision = use_vision
         self.alternate_orientations = alternate_orientations
+        self.multiprocessing = multiprocessing
+        if self.multiprocessing:
+            self.proc_manager = Manager()
 
         # Initialize the world
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = \
@@ -56,7 +57,7 @@ class PlanningServer():
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
         self.pddl_block_lookup = get_pddl_block_lookup(blocks, self.pddl_blocks)
 
-        # Initialize variables
+        # Initialize planning variables
         self.planning = False
         self.plan_buffer = []
         self.planning_active = False
@@ -64,9 +65,6 @@ class PlanningServer():
         self.plan_complete = False
         self.new_block_states = []
         self.goal_block_states = []
-        self.multiprocessing = multiprocessing
-        if self.multiprocessing:
-            self.proc_manager = Manager()
 
         # Create the ROS services
         rospy.init_node("planning_server")
