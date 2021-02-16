@@ -26,7 +26,7 @@ from stacking_ros.msg import TaskPlanAction, TaskPlanResult, TaskAction
 from stacking_ros.srv import (GetPlan, GetPlanResponse, 
     SetPlanningState, SetPlanningStateResponse)
 from tamp.misc import (get_pddl_block_lookup, get_pddlstream_info,
-    print_planning_problem, setup_panda_world, ExecuteActions)
+    print_planning_problem, setup_panda_world, ExecuteActions, load_blocks)
 from tamp.ros_utils import (pose_to_transform, ros_to_pose,
     ros_to_transform, task_plan_to_ros)
 from tf.transformations import quaternion_multiply
@@ -503,9 +503,9 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     if args.use_vision or len(args.blocks_file) > 0:
-        with open(args.blocks_file, 'rb') as handle:
-            blocks = pickle.load(handle)
-            blocks = blocks[:min(len(blocks), args.num_blocks)]
+        blocks = load_blocks(fname=args.blocks_file,
+                             num_blocks=args.num_blocks,
+                             remove_ixs=[1])
         block_init_xy_poses = None
     else:
         from block_utils import get_adversarial_blocks

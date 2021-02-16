@@ -12,6 +12,7 @@ from block_utils import Object, Dimensions, Position, Color, get_adversarial_blo
 from learning.domains.towers.generate_tower_training_data import sample_random_tower, build_tower
 from particle_belief import ParticleBelief
 from tower_planner import TowerPlanner
+from tamp.misc import load_blocks
 import pb_robot
 
 
@@ -21,9 +22,9 @@ def main(args):
     # get a bunch of random blocks
     # if args.use_vision:
     if True:
-        with open(args.blocks_file, 'rb') as handle:
-            blocks = pickle.load(handle)[:10]
-            blocks = blocks[:min(len(blocks), args.num_blocks)]
+        blocks = load_blocks(fname=args.blocks_file,
+                             num_blocks=args.num_blocks,
+                             remove_ixs=[1])
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 

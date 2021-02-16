@@ -1,6 +1,7 @@
 import numpy
 import pb_robot
 import os
+import pickle
 import shutil
 import time
 
@@ -34,6 +35,18 @@ class ExecutionFailure(Exception):
             print_str += f" while holding {self.obj_held.body.readableName}"
         return print_str
 
+def load_blocks(fname, num_blocks, remove_ixs=[]):
+    """"
+    Load blocks from a pickle file. Option to remove specific block ids.
+    :param fname: .pkl file of the blocks.
+    :param num_blocks: The number of desired blocks to load.
+    :param remove_ixs: List of indices to exclude from the final set.
+    """
+    with open(fname, 'rb') as handle:
+        blocks = pickle.load(handle)
+    for ix in sorted(remove_ixs, reverse=True):
+        del blocks[ix]
+    return blocks[:num_blocks]
 
 def getDirectory():
     '''Get the file path for the location of kinbody
