@@ -73,9 +73,9 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True, obstacl
         executionItems = args[-1]
         for e in executionItems:
             if real:
-                e.simulate(timestep=0.1)
+                e.simulate(timestep=0.1, obstacles=obstacles)
             else:
-                e.simulate(timestep=0.05)
+                e.simulate(timestep=0.05, obstacles=obstacles)
 
             # Assign the object being held
             # if isinstance(e, pb_robot.vobj.BodyGrasp):
