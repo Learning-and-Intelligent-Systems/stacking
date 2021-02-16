@@ -671,24 +671,33 @@ class PandaAgent:
                                              add_slanted_grasps=False,
                                              approach_frame='global',
                                              use_vision=self.use_vision)
-        # this first section set up a PDDL instance to move the base block into the
-        # desired configuration. now we solve that PDDL problem and execute the plan
-        if not self.teleport:
+
+        # NOTE(izzy): this codeblock was getting called three times in this function, so I decided to
+        # remove the redundancy. this should get a refactor sometime soon tho
+        def _solve_and_execute_pddl_subroutine(init, goal_terms, real, fixed_objs, reset=True):
             goal = tuple(['and'] + goal_terms)
             if not self.use_action_server:
                 plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-                if not plan_found: return False, None
+                if not plan_found: return False
             else:
                 self.execute()
                 has_plan = False
                 while not has_plan:
                     plan = self._request_plan_from_server(
-                        init, goal, fixed_objs, reset=True)
+                        init, goal, fixed_objs, reset=reset)
                     if len(plan) > 0:
                         has_plan = True
                     else:
                         time.sleep(1)
                 ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
+
+            return True
+
+        # this first section set up a PDDL instance to move the base block into the
+        # desired configuration. now we solve that PDDL problem and execute the plan
+        if not self.teleport:
+            if not _solve_and_execute_pddl_subroutine(init, goal_terms, real, fixed_objs, reset=True):
+                return False, None
         else:
             self.teleport_block(base_block, base_pose.pose)
 
@@ -724,21 +733,8 @@ class PandaAgent:
             moved_blocks.add(top_pddl)
 
             if not self.teleport:
-                goal = tuple(['and'] + goal_terms)
-                if not self.use_action_server:
-                    plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-                    if not plan_found: return False, None
-                else:
-                    self.execute()
-                    has_plan = False
-                    while not has_plan:
-                        plan = self._request_plan_from_server(
-                            init, goal, fixed_objs, reset=False)
-                        if len(plan) > 0:
-                            has_plan = True
-                        else:
-                            time.sleep(1)
-                    ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
+                if not _solve_and_execute_pddl_subroutine(init, goal_terms, real, fixed_objs, reset=False):
+                    return False, None
             else:
                 get_pose = tamp.primitives.get_stable_gen_block()
                 pose = get_pose(top_pddl, bottom_pddl, poses[-1], rel_tform)[0]
@@ -788,21 +784,8 @@ class PandaAgent:
             goal_terms.append(('AtPose', b, goal_pose))
             goal_terms.append(('On', b, self.table))
 
-            goal = tuple(['and'] + goal_terms)
-            if not self.use_action_server:
-                plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
-                if not plan_found: return False, None
-            else:
-                self.execute()
-                has_plan = False
-                while not has_plan:
-                    plan = self._request_plan_from_server(
-                        init, goal, fixed_objs, reset=True)
-                    if len(plan) > 0:
-                        has_plan = True
-                    else:
-                        time.sleep(1)
-                ExecuteActions(plan, real=real, pause=True, wait=False, obstacles=[f for f in self.fixed if f is not None])
+            if not _solve_and_execute_pddl_subroutine(init, goal_terms, real, fixed_objs, reset=True):
+                return False, None
 
         return True, stable
 
