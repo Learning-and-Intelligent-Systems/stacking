@@ -760,8 +760,11 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
             for t in range(0, args.n_towers):
                 print('Tower number', t)
                 
-                plan_blocks = np.random.choice(blocks, size, replace=False)	
-                plan_blocks = copy.deepcopy(plan_blocks)	
+                if blocks is not None:
+                    plan_blocks = np.random.choice(blocks, size, replace=False)	
+                    plan_blocks = copy.deepcopy(plan_blocks)	
+                else:
+                    plan_blocks = [Object.random() for _ in range(size)]
                     
                 tower, reward, max_reward = ep.plan(plan_blocks, ensemble, reward_fn, num_blocks=size, discrete=args.discrete)
                 # perturb tower

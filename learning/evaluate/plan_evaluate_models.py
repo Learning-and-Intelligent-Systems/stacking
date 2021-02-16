@@ -16,7 +16,6 @@ if __name__ == '__main__':
     parser.add_argument('--block-set-fname', 
                         type=str, 
                         default='',
-                        required = True,
                         help='path to the block set file. if not set, args.n_blocks random blocks generated.')
     parser.add_argument('--exp-path', 
                         type=str, 
@@ -57,8 +56,11 @@ if __name__ == '__main__':
     if args.debug:
         import pdb; pdb.set_trace()
  
-    with open(args.block_set_fname, 'rb') as f:
-        block_set = pickle.load(f)
+    if args.block_set_fname != '':
+        with open(args.block_set_fname, 'rb') as f:
+            block_set = pickle.load(f)
+    else:
+        block_set = None
 
     logger = ActiveExperimentLogger(args.exp_path)
     pre = 'discrete_' if args.discrete else ''
