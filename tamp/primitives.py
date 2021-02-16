@@ -88,6 +88,7 @@ def get_stable_gen_home(home_poses, fixed=[]):
 
         poses = []
         home_pose = home_poses[body.get_name()]
+        np.random.shuffle(rotations)
         for rotation in rotations:
             start_pose = body.get_base_link_pose()
 
@@ -105,11 +106,9 @@ def get_stable_gen_home(home_poses, fixed=[]):
                 continue
             body.set_base_link_pose(start_pose)
 
-
             body_pose = pb_robot.vobj.BodyPose(body, pose)
             poses.append((body_pose,))
-        np.random.shuffle(poses)
-        return []
+        return poses
     return gen
 
 
