@@ -27,14 +27,16 @@ from pddlstream.algorithms.focused import solve_focused
 from pddlstream.utils import INF
 from pddlstream.algorithms.constraints import PlanConstraints, WILD
 from tf.transformations import quaternion_multiply
+from multiprocessing import Process, Manager
+import dill
 
 
 all_orns = [tuple(r.as_quat()) for r in all_rotations()]
 all_orns = [all_orns[i] for i in [0, 1, 4, 20]]
 
 class PlanningServer():
-    def __init__(self, blocks, block_init_xy_poses=None,
-                 max_tries=1, alternate_orientations=False, 
+    def __init__(self, blocks, block_init_xy_poses=None, max_tries=1, 
+                 alternate_orientations=False, multiprocessing=True,
                  use_platform=False, use_vision=False):
 
         # Start up a robot simulation for planning
@@ -62,6 +64,9 @@ class PlanningServer():
         self.plan_complete = False
         self.new_block_states = []
         self.goal_block_states = []
+        self.multiprocessing = multiprocessing
+        if self.multiprocessing:
+            self.proc_manager = Manager()
 
         # Create the ROS services
         rospy.init_node("planning_server")
@@ -322,7 +327,26 @@ class PlanningServer():
                 goal = ("and", ("On", blk, base))
 
             # Plan
-            plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=self.max_tries)
+            if self.multiprocessing:
+                ret_dict = self.proc_manager.dict()
+                p = Process(target=self.pddlstream_plan,
+                            args=(ret_dict, init, goal, fixed_objs, self.max_tries))
+                p.start()
+                while p.is_alive():
+                    if self.cancel_planning:
+                        print("Killed planning process")
+                        p.kill()
+                    rospy.sleep(3)
+                if "plan" in ret_dict:
+                    plan = dill.loads(ret_dict["plan"])
+                else:
+                    print("No plan returned")
+                    return 
+            else:
+                ret_dict = {}
+                plan = self.pddlstream_plan(ret_dict, init, goal, fixed_objs, self.max_tries)
+                plan = ret_dict["plan"]
+
             if self.cancel_planning:
                 print("Discarding latest plan")
                 self.plan_buffer = []
@@ -419,7 +443,7 @@ class PlanningServer():
         print("Planning state reset!")
 
 
-    def pddlstream_plan(self, init, goal, fixed_objs, max_tries=1):
+    def pddlstream_plan(self, return_dict, init, goal, fixed_objs, max_tries=1):
         """ Plans using PDDLStream and the necessary specifications """
         num_tries = 0
         found_plan = False
@@ -457,6 +481,7 @@ class PlanningServer():
 
         print('Planning Complete: Time %f seconds' % duration)
         print(f"\nFINAL PLAN:\n{plan}\nCOST: {cost}\n")
+        return_dict["plan"] = dill.dumps(plan)
         return plan
 
 
