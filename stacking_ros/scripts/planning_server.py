@@ -13,6 +13,7 @@ import time
 import numpy
 import rospy
 import pickle
+import psutil
 import signal
 import actionlib
 import argparse
@@ -319,8 +320,11 @@ class PlanningServer():
                 p.start()
                 while p.is_alive():
                     if self.cancel_planning:
-                        print("Killed planning process")
-                        os.kill(p.pid, signal.SIGKILL)
+                        print("Killing planning process")
+                        parent = psutil.Process(p.pid)
+                        for child in parent.children(recursive=True):  # or parent.children() for recursive=False
+                            child.kill()
+                        parent.kill()
                     rospy.sleep(3)
                 if "plan" in ret_dict:
                     plan = dill.loads(ret_dict["plan"])

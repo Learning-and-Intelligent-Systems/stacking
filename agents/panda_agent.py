@@ -458,12 +458,11 @@ class PandaAgent:
             else:
                 ros_req.robot_config.angles = self.robot.arm.GetJointValues()
             ros_req.init_state = block_init_to_ros(self.pddl_blocks)
-            ros_req.goal_state = ros_req.goal_state[num_success:]
             if isinstance(self.last_obj_held, pb_robot.vobj.BodyGrasp):
                 ros_req.held_block.name = self.last_obj_held.body.readableName
                 transform_to_ros(self.last_obj_held.grasp_objF, ros_req.held_block.pose)
             success, stack_stable, reset_stable, num_success, fatal = \
-                self.execute_plans_from_server(ros_req, real, T, stack=True)
+                self.execute_plans_from_server(ros_req, real, T, stack=True, start_idx=num_success)
             print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
             if reset_stable:
                 print(f"Completed tower reset stable: {reset_stable}")
@@ -508,9 +507,8 @@ class PandaAgent:
                     else:
                         ros_req.robot_config.angles = self.robot.arm.GetJointValues()
                     ros_req.init_state = block_init_to_ros(self.pddl_blocks)
-                    ros_req.goal_state = ros_req.goal_state[num_success:]
                     success, _, reset_stable, num_success, fatal = \
-                    self.execute_plans_from_server(ros_req, real, T, stack=False)
+                    self.execute_plans_from_server(ros_req, real, T, stack=False, start_idx=num_success)
                     print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
 
         except Exception as e:
@@ -535,7 +533,7 @@ class PandaAgent:
             return (tgt_block == plan_block)
 
 
-    def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True):
+    def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True, start_idx=0):
         """
         Executes plans received from planning server
         Returns:
@@ -544,14 +542,20 @@ class PandaAgent:
             reset_stable : Flag for whether resetting a tower was successful
             num_success : Progress (in number of steps) of successful tasks
             fatal : Flag for whether the error was fatal (True) or recoverable (False)
+            start_idx : Start index of planning (for recovering from partial plans)
         """
-        self.init_state_client.call(ros_req)
-
-        num_success = 0
+        # Initialize variables
+        num_success = start_idx
         stack_stable = False
         reset_stable = False
         planning_active = True
         num_steps = len(ros_req.goal_state)
+
+        # Send a reset request to the planning server
+        trimmed_ros_req = deepcopy(ros_req)
+        trimmed_ros_req.goal_state = trimmed_ros_req.goal_state[start_idx:]
+        self.init_state_client.call(trimmed_ros_req)
+
         while num_success < num_steps:
             try:
                 query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
