@@ -174,7 +174,6 @@ class PandaAgent:
 
         for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
             for named_pose in named_poses:
-                print(pddl_block_name, named_pose.block_id)
                 if named_pose.block_id in pddl_block_name:
                     pose = named_pose.pose.pose
                     # Skip changes the pose of objects in storage.
@@ -209,10 +208,10 @@ class PandaAgent:
             for jx in range(ix+1, len(block_ixs)):
                 top_block = self.pddl_blocks[block_ixs[jx]]
 
-                if pb_robot.collisions.body_collision(bottom_block, top_block):
+                while pb_robot.collisions.body_collision(bottom_block, top_block):
                     print('Collision with bottom %s and top %s:' % (bottom_block.readableName, top_block.readableName))
                     position, orientation = top_block.get_base_link_pose()
-                    stable_z = pb_robot.placements.stable_z(top_block, bottom_block)
+                    stable_z = position[2] + 0.001
                     position = (position[0], position[1], stable_z)
                     self.execute()
                     top_block.set_base_link_pose((position, orientation))
