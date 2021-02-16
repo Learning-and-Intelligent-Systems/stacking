@@ -74,6 +74,7 @@ RUN python3.7 -m pip install \
   numba \
   numpy \
   numpy-quaternion \
+  psutil \
   pybullet \
   pyquaternion \
   recordclass \

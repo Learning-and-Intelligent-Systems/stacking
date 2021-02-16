@@ -13,11 +13,12 @@ import time
 import numpy
 import rospy
 import pickle
-import signal
+import psutil
 import actionlib
 import argparse
 import pb_robot
 import pybullet as pb
+from random import getrandbits
 from multiprocessing import Process, Manager
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.utils import INF
@@ -32,7 +33,8 @@ from tf.transformations import quaternion_multiply
 
 
 class PlanningServer():
-    def __init__(self, blocks, block_init_xy_poses=None, max_tries=1, 
+    def __init__(self, blocks, block_init_xy_poses=None, 
+                 max_tries=1, sim_failure_prob=0.0, 
                  alternate_orientations=False, multiprocessing=True,
                  use_platform=False, use_vision=False):
 
@@ -47,6 +49,7 @@ class PlanningServer():
         self.max_tries = max_tries
         self.use_vision = use_vision
         self.alternate_orientations = alternate_orientations
+        self.sim_failure_prob = sim_failure_prob
         self.multiprocessing = multiprocessing
         if self.multiprocessing:
             self.proc_manager = Manager()
@@ -312,12 +315,15 @@ class PlanningServer():
             if self.multiprocessing:
                 ret_dict = self.proc_manager.dict()
                 p = Process(target=self.pddlstream_plan,
-                            args=(ret_dict, init, goal, fixed_objs, self.max_tries))
+                            args=(ret_dict, init, goal, fixed_objs, self.max_tries, getrandbits(32)))
                 p.start()
                 while p.is_alive():
                     if self.cancel_planning:
-                        print("Killed planning process")
-                        os.kill(p.pid, signal.SIGKILL)
+                        print("Killing planning process")
+                        parent = psutil.Process(p.pid)
+                        for child in parent.children(recursive=True):
+                            child.kill()
+                        parent.kill()
                     rospy.sleep(3)
                 if "plan" in ret_dict:
                     plan = dill.loads(ret_dict["plan"])
@@ -425,35 +431,44 @@ class PlanningServer():
         print("Planning state reset!")
 
 
-    def pddlstream_plan(self, return_dict, init, goal, fixed_objs, max_tries=1):
+    def pddlstream_plan(self, return_dict, init, goal, fixed_objs, max_tries=1, random_seed=None):
         """ Plans using PDDLStream and the necessary specifications """
         num_tries = 0
+        plan = None
+        cost = 0.0
         found_plan = False
         while (not found_plan) and (num_tries < max_tries):
             print(f"\n\nPlanning try {num_tries}...\n\n")
             saved_world = pb_robot.utils.WorldSaver()
+            start = time.time()
             # print_planning_problem(init, goal, fixed_objs)
 
-            # Get PDDLStream planning information
-            pddl_info = get_pddlstream_info(self.robot,
-                                            fixed_objs,
-                                            self.pddl_blocks,
-                                            add_slanted_grasps=False,
-                                            approach_frame="global",
-                                            use_vision=self.use_vision,
-                                            home_poses=self.home_poses)
-       
-            # Run PDDLStream focused solver
-            pddlstream_problem = tuple([*pddl_info, init, goal])
-            start = time.time()
-            plan, cost, _ = solve_focused(pddlstream_problem,
-                                    planner="dijkstra",
-                                    unit_costs=True,
-                                    max_skeletons=2,
-                                    search_sample_ratio=1.0,
-                                    success_cost=8.0,
-                                    max_time=INF,
-                                    verbose=False)
+            # Simulate planning failures (for testing)
+            if random_seed is not None:
+                numpy.random.seed(random_seed)
+            if numpy.random.random() < self.sim_failure_prob:
+                print("Simulated planning failure!")
+                rospy.sleep(5)
+            else:
+                # Get PDDLStream planning information
+                pddl_info = get_pddlstream_info(self.robot,
+                                                fixed_objs,
+                                                self.pddl_blocks,
+                                                add_slanted_grasps=False,
+                                                approach_frame="global",
+                                                use_vision=self.use_vision,
+                                                home_poses=self.home_poses)
+        
+                # Run PDDLStream focused solver
+                pddlstream_problem = tuple([*pddl_info, init, goal])
+                plan, cost, _ = solve_focused(pddlstream_problem,
+                                        planner="dijkstra",
+                                        unit_costs=True,
+                                        max_skeletons=2,
+                                        search_sample_ratio=1.0,
+                                        success_cost=8.0,
+                                        max_time=INF,
+                                        verbose=False)
             duration = time.time() - start
 
             if plan is not None:
@@ -481,9 +496,10 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--blocks-file', default='', type=str)
     parser.add_argument('--num-blocks', type=int, default=4)
-    parser.add_argument('--max-tries', type=int, default=2)
+    parser.add_argument('--max-tries', type=int, default=1)
     parser.add_argument('--use-vision', default=False, action='store_true')
     parser.add_argument('--alternate-orientations', default=False, action='store_true')
+    parser.add_argument('--sim-failure-prob', type=float, default=0.0)
     args = parser.parse_args()
 
     if args.use_vision or len(args.blocks_file) > 0:
@@ -495,7 +511,10 @@ if __name__=="__main__":
         from block_utils import get_adversarial_blocks
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
     
-    s = PlanningServer(blocks, max_tries=args.max_tries,
+    s = PlanningServer(blocks, 
+                       max_tries=args.max_tries,
+                       multiprocessing=True,
                        use_vision=args.use_vision, 
-                       alternate_orientations=args.alternate_orientations)
+                       alternate_orientations=args.alternate_orientations,
+                       sim_failure_prob=args.sim_failure_prob)
     s.planning_loop()

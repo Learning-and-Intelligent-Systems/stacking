@@ -28,11 +28,17 @@ rosmsg list | grep stacking
 ---
 
 ## Tower Simulation Usage
-The `scripts/planning_server.py` file holds the service server. To run this, you have a few options.
+First, start up a Panda agent that communicates with the planning server. For example,
+
+```
+python3.7 -m run_towers --use-action-server --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
+```
+
+The `scripts/planning_server.py` file contains the planning server that will feed plans to the Panda agent. To run this, you have a few options.
 
 ### rosrun
 ```
-rosrun stacking_ros planning_server.py --num-blocks 4
+rosrun stacking_ros planning_server.py --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
 ```
 
 To do this, you will need to ensure the `stacking` repo is on the Python path. You can force this, e.g.
