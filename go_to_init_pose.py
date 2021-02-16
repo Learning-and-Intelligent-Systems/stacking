@@ -14,13 +14,16 @@ from particle_belief import ParticleBelief
 from tower_planner import TowerPlanner
 import pb_robot
 from tamp.primitives import get_free_motion_gen, get_ik_fn, get_grasp_gen
+from tamp.misc import load_blocks
+
 
 def main(args):
     NOISE=0.00005
 
     # get a bunch of random blocks
-    with open(args.blocks_file, 'rb') as handle:
-        blocks = pickle.load(handle)[:10]
+    blocks = load_blocks(fname=args.blocks_file,
+                         num_blocks=args.num_blocks,
+                         remove_ixs=[1])
 
     agent = PandaAgent(blocks, NOISE,
         use_platform=False, teleport=False,

@@ -9,6 +9,8 @@ from block_utils import Object, Dimensions, Position, Color, get_adversarial_blo
 from learning.domains.towers.generate_tower_training_data import sample_random_tower
 import pb_robot
 import tamp.primitives as primitives
+from tamp.misc import load_blocks
+
 
 def count_grasp_solutions(agent, block, pose):
     agent.execute()
@@ -75,7 +77,7 @@ def check_tower_position(agent, blocks, base_xy):
         input('Wait')
 
 def check_regrasp_position(agent, blocks, base_xy):
-    block = [blocks[5]] #np.random.choice(blocks, 1, replace=False)
+    block = [blocks[0]] #np.random.choice(blocks, 1, replace=False)
     tower = sample_random_tower(block)
     # while tower[0].pose.pos.z < 0.04:
     #     tower = sample_random_tower(block)
@@ -131,7 +133,7 @@ def validate_regrasps(agent, blocks, base_xy):
 def check_initial_positions(agent, blocks):
     agent.plan()
     for bx, b in enumerate(blocks):
-        if bx != 7: continue
+        #if bx != 7: continue
         block = agent.pddl_block_lookup[b.name]
         pose =  block.get_base_link_pose()
         pose = pb_robot.vobj.BodyPose(block, pose)
@@ -141,8 +143,9 @@ def check_initial_positions(agent, blocks):
 def main(args):
     NOISE=0.00005
 
-    with open(args.blocks_file, 'rb') as handle:
-        blocks = pickle.load(handle)[:10]
+    blocks = load_blocks(fname=args.blocks_file,
+                         num_blocks=10,
+                         remove_ixs=[1])
 
     agent = PandaAgent(blocks, NOISE,
                        use_platform=False, 
@@ -151,8 +154,8 @@ def main(args):
                        use_vision=False)
 
     # check_tower_position(agent, blocks, (0.5, -0.3))
-    #check_regrasp_position(agent, blocks, (0.4, 0.4))
-    # validate_regrasps(agent, blocks, (-0.4, -0.4))
+    #check_regrasp_position(agent, blocks, (0.3, 0.3))
+    #validate_regrasps(agent, blocks, (-0.4, -0.4))
     check_initial_positions(agent, blocks)
     
     
@@ -162,6 +165,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/final_block_set.pkl')
+    #parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/initial_block_set.pkl')
     args = parser.parse_args()
 
     main(args)
