@@ -726,7 +726,7 @@ def min_contact_regret_evaluation(logger, block_set, fname, args):
 def evaluate_planner(logger, blocks, reward_fn, fname, args):
     tower_keys = [str(ts)+'block' for ts in args.tower_sizes]
     tp = TowerPlanner(stability_mode='contains')
-    ep = EnsemblePlanner(logger, n_samples=args.n_samples)
+    ep = EnsemblePlanner(logger)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
@@ -751,16 +751,19 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
             elif size == 3:
                 ep.n_samples = 10000
             elif size == 4:
-                ep.n_samples = 100000
+                ep.n_samples = 20000
             elif size == 5:
-                ep.n_samples = 200000
+                ep.n_samples = 100000
             num_failures, num_pw_failures = 0, 0
             curr_regrets = []
             curr_rewards = []
             for t in range(0, args.n_towers):
                 print('Tower number', t)
-                blocks = copy.deepcopy(blocks)
-                tower, reward, max_reward = ep.plan(blocks, ensemble, reward_fn, num_blocks=size, discrete=args.discrete)
+                
+                plan_blocks = np.random.choice(blocks, size, replace=False)	
+                plan_blocks = copy.deepcopy(plan_blocks)	
+                    
+                tower, reward, max_reward = ep.plan(plan_blocks, ensemble, reward_fn, num_blocks=size, discrete=args.discrete)
                 # perturb tower
                 block_tower = []
                 for vec_block in tower:

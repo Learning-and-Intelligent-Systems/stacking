@@ -21,7 +21,7 @@ def plot_all_task_performance(xs, plot_task_data, args, task):
     fig.suptitle(task)
     plot_dir = 'learning/experiments/logs/paper_plots/compare_methods/'
     if not os.path.exists(plot_dir): os.makedirs(plot_dir)
-    plt.savefig('learning/experiments/logs/paper_plots/compare_methods/'+task+'.png')
+    plt.savefig(plot_dir+task+'.png')
     plt.close()
     
     
@@ -38,6 +38,12 @@ if __name__ == '__main__':
                         default=[2, 3, 4, 5],
                         nargs = '+',
                         help='number of blocks in goal tower')
+    parser.add_argument('--problems',
+                        default=['tallest', 'min_contact', 'max_overhang'],
+                        nargs='+')
+    parser.add_argument('--runs',
+                        nargs='+',
+                        default=[0, 1, 2, 3, 4])
     parser.add_argument('--max-acquisitions',
                         type=int, 
                         help='evaluate from 0 to this acquisition step (use either this or --acquisition-step)')
@@ -57,14 +63,13 @@ if __name__ == '__main__':
     for exp_path_root in args.exp_path_roots:
         # find exp_paths with the given root in paper_results/
         results_path = 'paper_results'
-        exp_path_roots = [exp_path_root+'-'+str(r) for r in [0, 1, 2, 3, 4]]
+        exp_path_full_roots = [exp_path_root+'-'+str(r) for r in args.runs]
         all_paper_results = os.listdir(results_path)
         exp_paths = []
         for result in all_paper_results:
-            for exp_path_root in exp_path_roots:
-                if exp_path_root in result:
+            for exp_path_full_root in exp_path_full_roots:
+                if exp_path_full_root in result:
                     exp_paths.append(result)
-        print(exp_paths)
         
         loggers = []
         for exp_path in exp_paths:
@@ -72,9 +77,10 @@ if __name__ == '__main__':
             
         
         label = exp_path_root
-        fnames = ['random_planner_tallest2345_block_towers_regrets.pkl', \
-                    'random_planner_min_contact_2345_block_towers_regrets.pkl', \
-                    'random_planner_max_overhang_2345_block_towers_regrets.pkl']
+        fnames = []
+        for problem in args.problems:
+            fnames += ['random_planner_'+problem+'_2345_block_towers_regrets.pkl']
+            
         for fname, task_plot_data in zip(fnames, all_plot_data):
             xs, plot_data = plot_planner_performance(loggers, args, y_axis, label, fname)
             task_plot_data[label] = plot_data

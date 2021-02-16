@@ -20,6 +20,7 @@ if __name__=="__main__":
         import pickle
         with open(args.blocks_file, 'rb') as handle:
             blocks = pickle.load(handle)
+            blocks = blocks[:min(len(blocks), args.num_blocks)]
         block_init_xy_poses = None
     else:
         from block_utils import get_adversarial_blocks
