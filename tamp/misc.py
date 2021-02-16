@@ -102,7 +102,7 @@ def ExecuteActions(plan, real=False, pause=True, wait=True, prompt=True, obstacl
             if wait:
                 input("Next?")
             elif pause:
-                time.sleep(0.5)
+                time.sleep(0.1)
 
     if real:
         input("Execute on Robot?")
