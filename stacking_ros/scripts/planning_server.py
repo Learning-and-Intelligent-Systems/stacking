@@ -7,34 +7,33 @@ as well as a mode to continue planning towers and pass along plans from a
 buffer upon request from a service client.
 """
 
+import os
+import dill
 import time
 import numpy
 import rospy
+import pickle
+import signal
 import actionlib
 import argparse
 import pb_robot
-import pickle
 import pybullet as pb
-from block_utils import all_rotations
+from multiprocessing import Process, Manager
+from pddlstream.algorithms.focused import solve_focused
+from pddlstream.utils import INF
 from stacking_ros.msg import TaskPlanAction, TaskPlanResult, TaskAction
-from stacking_ros.srv import (
-    GetPlan, GetPlanResponse, SetPlanningState, SetPlanningStateResponse)
+from stacking_ros.srv import (GetPlan, GetPlanResponse, 
+    SetPlanningState, SetPlanningStateResponse)
 from tamp.misc import (get_pddl_block_lookup, get_pddlstream_info,
     print_planning_problem, setup_panda_world, ExecuteActions)
 from tamp.ros_utils import (pose_to_transform, ros_to_pose,
     ros_to_transform, task_plan_to_ros)
-from pddlstream.algorithms.focused import solve_focused
-from pddlstream.utils import INF
-from pddlstream.algorithms.constraints import PlanConstraints, WILD
 from tf.transformations import quaternion_multiply
 
 
-all_orns = [tuple(r.as_quat()) for r in all_rotations()]
-all_orns = [all_orns[i] for i in [0, 1, 4, 20]]
-
 class PlanningServer():
-    def __init__(self, blocks, block_init_xy_poses=None,
-                 max_tries=1, alternate_orientations=False, 
+    def __init__(self, blocks, block_init_xy_poses=None, max_tries=1, 
+                 alternate_orientations=False, multiprocessing=True,
                  use_platform=False, use_vision=False):
 
         # Start up a robot simulation for planning
@@ -44,9 +43,13 @@ class PlanningServer():
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
 
+        # Initialize general attributes
         self.max_tries = max_tries
         self.use_vision = use_vision
         self.alternate_orientations = alternate_orientations
+        self.multiprocessing = multiprocessing
+        if self.multiprocessing:
+            self.proc_manager = Manager()
 
         # Initialize the world
         self.pddl_blocks, self.platform_table, self.platform_leg, self.table, self.frame, self.wall = \
@@ -54,7 +57,7 @@ class PlanningServer():
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
         self.pddl_block_lookup = get_pddl_block_lookup(blocks, self.pddl_blocks)
 
-        # Initialize variables
+        # Initialize planning variables
         self.planning = False
         self.plan_buffer = []
         self.planning_active = False
@@ -137,7 +140,7 @@ class PlanningServer():
     def unpack_goal(self, ros_goal):
         """
         Convert TaskPlanGoal ROS message to PDDLStream compliant
-        initial conditions and goal specification
+        initial conditions and goal specification (DEPRECATED)
         """
         pddl_goal = ["and",]
         fixed_objs = [f for f in self.fixed]
@@ -212,7 +215,7 @@ class PlanningServer():
 
 
     def find_plan(self, ros_goal):
-        """ Main PDDLStream planning function """
+        """ Main PDDLStream planning function (DEPRECATED)"""
         print("Planning...")
         self.plan()
         self.robot.arm.hand.Open()
@@ -227,26 +230,11 @@ class PlanningServer():
                                         self.pddl_blocks,
                                         add_slanted_grasps=False,
                                         approach_frame='global')
-        
-        from pddlstream.language.stream import StreamInfo
-        constraints = PlanConstraints(skeletons=self._get_regrasp_skeleton(),
-                                  exact=True)
-        stream_info = {
-            "sample-pose-table": StreamInfo(eager=False),
-            "sample-pose-home": StreamInfo(eager=False),
-            "sample-pose-block": StreamInfo(eager=False),
-            "sample-grasp": StreamInfo(eager=False),
-            "pick-inverse-kinematics": StreamInfo(eager=False, negate=False, defer=True),
-            "place-inverse-kinematics": StreamInfo(eager=False, negate=False, defer=True),
-            "plan-free-motion": StreamInfo(eager=False, negate=False, defer=True),
-            "plan-holding-motion": StreamInfo(eager=False, negate=False, defer=True)
-        }
 
         # Run PDDLStream focused solver
         start = time.time()
         pddlstream_problem = tuple([*pddl_info, init, goal])
         plan, _, _ = solve_focused(pddlstream_problem,
-                                stream_info=stream_info,
                                 success_cost=numpy.inf,
                                 max_skeletons=2,
                                 max_failures=3,
@@ -307,8 +295,7 @@ class PlanningServer():
                 pose_obj = pb_robot.vobj.BodyPose(blk, pose)
 
                 if not stack and self.alternate_orientations:
-                    init += [("Reset",), ("Pose", blk, pose_obj),
-                             ("Home", blk, pose_obj, self.table, self.table_pose)]
+                    init += [("Reset",)]
                     pose_goal = ("AtHome", blk)
                 else:
                     init += [("Pose", blk, pose_obj),
@@ -322,7 +309,26 @@ class PlanningServer():
                 goal = ("and", ("On", blk, base))
 
             # Plan
-            plan = self.pddlstream_plan(init, goal, fixed_objs, max_tries=self.max_tries)
+            if self.multiprocessing:
+                ret_dict = self.proc_manager.dict()
+                p = Process(target=self.pddlstream_plan,
+                            args=(ret_dict, init, goal, fixed_objs, self.max_tries))
+                p.start()
+                while p.is_alive():
+                    if self.cancel_planning:
+                        print("Killed planning process")
+                        os.kill(p.pid, signal.SIGKILL)
+                    rospy.sleep(3)
+                if "plan" in ret_dict:
+                    plan = dill.loads(ret_dict["plan"])
+                else:
+                    print("No plan returned")
+                    return 
+            else:
+                ret_dict = {}
+                plan = self.pddlstream_plan(ret_dict, init, goal, fixed_objs, self.max_tries)
+                plan = ret_dict["plan"]
+
             if self.cancel_planning:
                 print("Discarding latest plan")
                 self.plan_buffer = []
@@ -419,11 +425,10 @@ class PlanningServer():
         print("Planning state reset!")
 
 
-    def pddlstream_plan(self, init, goal, fixed_objs, max_tries=1):
+    def pddlstream_plan(self, return_dict, init, goal, fixed_objs, max_tries=1):
         """ Plans using PDDLStream and the necessary specifications """
-        found_plan = False
         num_tries = 0
-
+        found_plan = False
         while (not found_plan) and (num_tries < max_tries):
             print(f"\n\nPlanning try {num_tries}...\n\n")
             saved_world = pb_robot.utils.WorldSaver()
@@ -457,8 +462,8 @@ class PlanningServer():
             saved_world.restore()
 
         print('Planning Complete: Time %f seconds' % duration)
-        print(f"\nFINAL PLAN\n{plan}\n")
-        print(f"COST: {cost}")
+        print(f"\nFINAL PLAN:\n{plan}\nCOST: {cost}\n")
+        return_dict["plan"] = dill.dumps(plan)
         return plan
 
 
@@ -472,36 +477,13 @@ class PlanningServer():
         print("Plan simulated")
 
 
-    def step_simulation(self, T, vis_frames=False):
-        pb.setGravity(0, 0, -10, physicsClientId=self._planning_client_id)
-        q = self.robot.get_joint_positions()
-
-        for _ in range(T):
-            pb.stepSimulation(physicsClientId=self._planning_client_id)
-            self.plan()
-            self.robot.set_joint_positions(self.robot.joints, q)
-            time.sleep(1/2400.)
-
-            if vis_frames:
-                length, lifeTime = 0.1, 0.1
-                for pddl_block in self.pddl_blocks:
-                    pos, quat = pddl_block.get_pose()
-                    new_x = transformation([length, 0.0, 0.0], pos, quat)
-                    new_y = transformation([0.0, length, 0.0], pos, quat)
-                    new_z = transformation([0.0, 0.0, length], pos, quat)
-
-                    pb.addUserDebugLine(pos, new_x, [1,0,0], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
-                    pb.addUserDebugLine(pos, new_y, [0,1,0], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
-                    pb.addUserDebugLine(pos, new_z, [0,0,1], lineWidth=3, lifeTime=lifeTime, physicsClientId=self._execution_client_id)
-
-
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--blocks-file', default='', type=str)
     parser.add_argument('--num-blocks', type=int, default=4)
-    parser.add_argument('--max-tries', type=int, default=1)
+    parser.add_argument('--max-tries', type=int, default=2)
     parser.add_argument('--use-vision', default=False, action='store_true')
     parser.add_argument('--alternate-orientations', default=False, action='store_true')
-    parser.add_argument('--blocks-file', default='', type=str)
     args = parser.parse_args()
 
     if args.use_vision or len(args.blocks_file) > 0:
@@ -512,6 +494,7 @@ if __name__=="__main__":
     else:
         from block_utils import get_adversarial_blocks
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+    
     s = PlanningServer(blocks, max_tries=args.max_tries,
                        use_vision=args.use_vision, 
                        alternate_orientations=args.alternate_orientations)

@@ -67,6 +67,7 @@ RUN python3.7 -m pip install --upgrade pip setuptools
 RUN python3.7 -m pip install wheel
 RUN python3.7 -m pip install \
   catkin_pkg \
+  dill \
   empy \
   IPython \
   networkx \
