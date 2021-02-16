@@ -312,8 +312,7 @@ class PlanningServer():
                 pose_obj = pb_robot.vobj.BodyPose(blk, pose)
 
                 if not stack and self.alternate_orientations:
-                    init += [("Reset",), ("Pose", blk, pose_obj),
-                             ("Home", blk, pose_obj, self.table, self.table_pose)]
+                    init += [("Reset",)]
                     pose_goal = ("AtHome", blk)
                 else:
                     init += [("Pose", blk, pose_obj),
