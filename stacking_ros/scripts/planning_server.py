@@ -14,7 +14,6 @@ import numpy
 import rospy
 import pickle
 import psutil
-import signal
 import actionlib
 import argparse
 import pb_robot
@@ -322,7 +321,7 @@ class PlanningServer():
                     if self.cancel_planning:
                         print("Killing planning process")
                         parent = psutil.Process(p.pid)
-                        for child in parent.children(recursive=True):  # or parent.children() for recursive=False
+                        for child in parent.children(recursive=True):
                             child.kill()
                         parent.kill()
                     rospy.sleep(3)
