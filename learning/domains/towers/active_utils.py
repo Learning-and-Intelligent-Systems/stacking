@@ -249,7 +249,7 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
             # Add noise to blocks and convert tower to Block representation.
             block_tower = []
             for jx in range(n_blocks): 
-                vec_block = samples[k]['towers'][ix, jx, :]
+                vec_block = deepcopy(samples[k]['towers'][ix, jx, :])
                 if exec_mode == 'noisy-model':
                     vec_block[7:9] += np.random.randn(2)*xy_noise
                 block = Object.from_vector(vec_block) # block is already rotated
