@@ -1,3 +1,4 @@
+import re
 import os
 import pickle
 import time
@@ -79,6 +80,21 @@ class ActiveExperimentLogger:
             self.args = pickle.load(handle)
 
     @staticmethod
+    def get_experiments_logger(exp_path):
+        logger = ActiveExperimentLogger(exp_path)
+        dataset_path = os.path.join(exp_path, 'datasets')
+        dataset_files = os.listdir(dataset_path)
+        if len(dataset_files) == 0:
+            raise Exception('No datasets found on args.exp_path. Cannot restart active training.')
+        txs = []
+        for file in dataset_files:
+            matches = re.match(r'active_(.*).pkl', file)
+            if matches: # sometimes system files are saved here, don't parse these
+                txs += [int(matches.group(1))]
+        logger.acquisition_step = max(txs)
+        return logger
+
+    @staticmethod
     def setup_experiment_directory(args):
         """
         Setup the directory structure to store models, figures, datasets
@@ -116,10 +132,26 @@ class ActiveExperimentLogger:
             pickle.dump(val_dataset, handle)
 
     def load_dataset(self, tx):
-        fname = 'active_%d.pkl' % tx
-        with open(os.path.join(self.exp_path, 'datasets', fname), 'rb') as handle:
-            dataset = pickle.load(handle)
-        return dataset
+        fname = 'active_%d.pkl' % tx 
+        path = os.path.join(self.exp_path, 'datasets', fname)
+        try:
+            with open(path, 'rb') as handle:
+                dataset = pickle.load(handle)
+            return dataset
+        except:
+            print('active_%d.pkl not found on path' % tx)
+            return None
+            
+    def load_val_dataset(self, tx):
+        fname = 'val_active_%d.pkl' % tx 
+        path = os.path.join(self.exp_path, 'val_datasets', fname)
+        try:
+            with open(path, 'rb') as handle:
+                val_dataset = pickle.load(handle)
+            return val_dataset
+        except:
+            print('val_active_%d.pkl not found on path' % tx)
+            return None
 
     def get_figure_path(self, fname):
         if not os.path.exists(os.path.join(self.exp_path, 'figures')): 
@@ -144,8 +176,12 @@ class ActiveExperimentLogger:
 
         # Load ensemble weights.
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
-        ensemble.load_state_dict(torch.load(path, map_location='cpu'))
-        return ensemble
+        try:
+            ensemble.load_state_dict(torch.load(path, map_location='cpu'))
+            return ensemble
+        except:
+            print('ensemble_%d.pkl not found on path' % tx)
+            return None
 
     def save_ensemble(self, ensemble, tx):
         """ Save an ensemble within the logging directory. The weights
@@ -168,12 +204,24 @@ class ActiveExperimentLogger:
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
         torch.save(ensemble.state_dict(), os.path.join(path))
 
-    def save_tower_data(self, block_tower, label):
+    def get_towers_data(self, tx):
+        tower_data = []
+        for tower_file in os.listdir(os.path.join(self.exp_path, 'towers')):
+            matches = re.match(r'labeled_tower_(.*)_(.*)_(.*)_(.*).pkl', tower_file)
+            if matches: # sometimes other system files get saved here (eg. .DStore on a mac). don't parse these
+                tower_tx = int(matches.group(4))
+                if tower_tx == tx:
+                    with open(self.get_towers_path(tower_file), 'rb') as handle:
+                        tower_tx_data = pickle.load(handle)
+                    tower_data += [tower_tx_data]
+        return tower_data
+
+    def save_tower_data(self, block_tower, block_ids, label):
         fname = 'labeled_tower_{:%Y-%m-%d_%H-%M-%S}_'.format(datetime.datetime.now())\
                 +str(self.tower_counter)+'_'+str(self.acquisition_step)+'.pkl'
-        path = os.path.join(self.exp_path, 'towers', fname)
+        path = self.get_towers_path(fname)
         with open(path, 'wb') as handle:
-            pickle.dump([block_tower, label], handle)
+            pickle.dump([block_tower, block_ids, label], handle)
         self.tower_counter += 1
 
     def save_acquisition_data(self, new_data, samples, tx):
@@ -189,6 +237,10 @@ class ActiveExperimentLogger:
 
     def load_acquisition_data(self, tx):
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
-        with open(path, 'rb') as handle:
-            data = pickle.load(handle)
-        return data['acquired_data'], data['samples']
+        try:
+            with open(path, 'rb') as handle:
+                data = pickle.load(handle)
+            return data['acquired_data'], data['samples']
+        except:
+            print('acquired_%d.pkl not found on path' % tx)
+            return None, None
