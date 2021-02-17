@@ -1038,5 +1038,15 @@ class PandaClientAgent:
         from tamp.ros_utils import tower_to_ros, ros_to_tower
         request = PlanTowerRequest()
         request.tower_info = tower_to_ros(tower)
+
+        if vis:
+            w = World(new_tower)
+            env = Environment([w], vis_sim=True, vis_frames=True)
+            env.step(vis_frames=True)
+                
         response = self.client.call(request)
+
+        if vis:
+            env.disconnect()
+            
         return response.success, response.stable
