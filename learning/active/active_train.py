@@ -57,10 +57,12 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
     :param args: Commandline arguments such as the number of acquisition points.
     :return: The fully trained ensemble.
     """
-    for tx in range(args.max_acquisitions):
+    for tx in range(logger.acquisition_step, args.max_acquisitions):
         print('Acquisition Step: ', tx)
         start_time = time.time()
         logger.save_dataset(dataset, tx)
+        if val_dataloader is not None:
+            logger.save_val_dataset(val_dataset, tx)
 
         # Initialize and train models.
         ensemble.reset()

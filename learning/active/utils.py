@@ -72,6 +72,7 @@ class ActiveExperimentLogger:
 
     def __init__(self, exp_path):
         self.exp_path = exp_path
+        self.acquisition_step = 0
 
         with open(os.path.join(self.exp_path, 'args.pkl'), 'rb') as handle:
             self.args = pickle.load(handle)
@@ -95,6 +96,7 @@ class ActiveExperimentLogger:
         os.mkdir(os.path.join(exp_path, 'towers'))
         os.mkdir(os.path.join(exp_path, 'models'))
         os.mkdir(os.path.join(exp_path, 'datasets'))
+        os.mkdir(os.path.join(exp_path, 'val_datasets'))
         os.mkdir(os.path.join(exp_path, 'acquisition_data'))
 
         with open(os.path.join(exp_path, 'args.pkl'), 'wb') as handle:
@@ -106,6 +108,11 @@ class ActiveExperimentLogger:
         fname = 'active_%d.pkl' % tx
         with open(os.path.join(self.exp_path, 'datasets', fname), 'wb') as handle:
             pickle.dump(dataset, handle)
+            
+    def save_val_dataset(self, val_dataset, tx):
+        fname = 'val_active_%d.pkl' % tx
+        with open(os.path.join(self.exp_path, 'val_datasets', fname), 'wb') as handle:
+            pickle.dump(val_dataset, handle)
 
     def load_dataset(self, tx):
         fname = 'active_%d.pkl' % tx
@@ -174,6 +181,7 @@ class ActiveExperimentLogger:
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
         with open(path, 'wb') as handle:
             pickle.dump(data, handle)
+        self.acquisition_step = tx+1
 
     def load_acquisition_data(self, tx):
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
