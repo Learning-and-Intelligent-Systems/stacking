@@ -83,6 +83,13 @@ class PandaAgent:
             from franka_interface import ArmInterface
             self.real_arm = ArmInterface()
 
+            from franka_core_msgs.msg import RobotState
+            state_topic = "/franka_ros_interface/custom_franka_state_controller/robot_state"
+            self.arm_last_error_time = time.time()
+            self.arm_error_check_time = 3.0
+            self.arm_state_subscriber = rospy.Subscriber(
+                state_topic, RobotState, self.robot_state_callback)
+
         # Set initial poses of all blocks and setup vision ROS services.
         if self.use_vision:
             from panda_vision.srv import GetBlockPosesWorld, GetBlockPosesWrist
@@ -482,12 +489,11 @@ class PandaAgent:
         return success, stack_stable
 
 
-    def plan_reset_parallel(self, original_poses, real, T, import_ros=False):
+    def plan_reset_parallel(self, original_poses, real, T):
         # Instruct a reset plan
-        if import_ros:
-            from stacking_ros.msg import BodyInfo
-            from stacking_ros.srv import SetPlanningStateRequest
-            from tamp.ros_utils import block_init_to_ros, pose_to_ros, pose_tuple_to_ros, transform_to_ros
+        from stacking_ros.msg import BodyInfo
+        from stacking_ros.srv import SetPlanningStateRequest
+        from tamp.ros_utils import block_init_to_ros, pose_to_ros, pose_tuple_to_ros, transform_to_ros
         print("Resetting blocks...")
         current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
         block_ixs = range(len(self.pddl_blocks))
@@ -523,9 +529,8 @@ class PandaAgent:
             ros_req.init_state = block_init_to_ros(self.pddl_blocks)
             ros_req.goal_state = ros_req.goal_state[num_success:]
             success, _, reset_stable, num_success, fatal = \
-            self.execute_plans_from_server(ros_req, real, T, stack=False)
+                self.execute_plans_from_server(ros_req, real, T, stack=False)
             print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
-
 
 
     def validate_ros_plan(self, ros_resp, tgt_block):
@@ -539,7 +544,7 @@ class PandaAgent:
             else:
                 return False
             print(f"Received plan to move {plan_block} and expected to move {tgt_block}")
-            return (tgt_block == plan_block)
+            return (tgt_block.readableName == plan_block)
 
 
     def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True, start_idx=0):
@@ -572,7 +577,7 @@ class PandaAgent:
                 # Wait for a valid plan
                 plan = []
                 while len(plan) == 0 and planning_active:
-                    time.sleep(1)
+                    time.sleep(5)
                     ros_resp = self.get_plan_client.call()
                     if not ros_resp.planning_active:
                         print("Planning failed on server side.")
@@ -584,15 +589,18 @@ class PandaAgent:
                         else:
                             print(f"Failed during resetting {query_block}")
                             input("Manually reset the blocks and press Enter to continue")
+                            if real:
+                                self._update_block_poses()
                             fatal = False
                         return False, stack_stable, reset_stable, num_success, fatal
-                    # if self.validate_ros_plan(ros_resp, query_block):
-                    plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
+                    if self.validate_ros_plan(ros_resp, query_block):
+                        plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
 
                 print("\nGot plan:")
                 print(plan)
 
                 # Once we have a plan, execute it
+                saved_world = pb_robot.utils.WorldSaver()
                 self.execute()
                 ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False, obstacles=[f for f in self.fixed if f is not None], sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
 
@@ -627,6 +635,10 @@ class PandaAgent:
             except ExecutionFailure as e:
                 print("Planning/execution failed.")
                 print(e)
+                saved_world.restore()
+                if real:
+                    self._update_block_poses()
+                    self.robot.arm.SetJointValues(self.real_arm.convertToList(self.real_arm.joint_angles()))
                 self.last_obj_held = e.obj_held
                 return False, stack_stable, reset_stable, num_success, e.fatal
 
@@ -858,6 +870,27 @@ class PandaAgent:
                 print('Unstable!')
                 return 0.
         return 1.
+
+    def robot_state_callback(self, msg):
+        """ Processes robot state errors and raises execution failures for planning """
+        cur_time = time.time()
+        if (cur_time - self.arm_last_error_time) < self.arm_error_check_time:
+            return
+
+        self.arm_last_error_time = cur_time
+        cur_errors = msg.current_errors
+        # if cur_errors.cartesian_reflex:
+        #     reason = "Cartesian reflex error detected!"
+        #     raise ExecutionFailure(reason=reason, fatal=False)
+        if cur_errors.communication_constraints_violation:
+            reason = "Communication constraints violation detected!"
+            raise ExecutionFailure(reason=reason, fatal=True)
+        if cur_errors.joint_position_limits_violation:
+            reason = "Joint position limits violation detected!"
+            raise ExecutionFailure(reason=reason, fatal=True)
+        if cur_errors.joint_motion_generator_position_limits_violation:
+            reason = "Joint motion generator position limits violation detected!"
+            raise ExecutionFailure(reason=reason, fatal=True)
 
 
     def step_simulation(self, T, vis_frames=False, lifeTime=0.1):

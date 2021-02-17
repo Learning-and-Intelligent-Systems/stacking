@@ -31,7 +31,8 @@ def main(args):
     agent = PandaAgent(blocks, NOISE,
         use_platform=False, teleport=False,
         use_action_server=args.use_action_server,
-        use_vision=args.use_vision)
+        use_vision=args.use_vision,
+        real=args.real)
 
     if args.show_frames:
         agent.step_simulation(T=1, vis_frames=True, lifeTime=0.)
