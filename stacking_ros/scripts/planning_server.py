@@ -376,9 +376,7 @@ class PlanningServer():
         Clears any existing planning buffer and sets the initial
         block and robot states based on the request information
         """
-        self.cancel_planning = True
-        self.planning_active = True
-        self.plan_complete = False
+        self.plan_buffer = []
         print("\n\nReset request received!\n\n")
 
         # Get the new initial poses of blocks based on the execution world
@@ -415,6 +413,9 @@ class PlanningServer():
             T = ros_to_transform(ros_request.held_block.pose)
             self.latest_body_grasp = pb_robot.vobj.BodyGrasp(held_block, T, self.robot.arm)
 
+        self.cancel_planning = True
+        self.planning_active = True
+        self.plan_complete = False
         return SetPlanningStateResponse()
 
 
@@ -461,7 +462,8 @@ class PlanningServer():
         
                 # Run PDDLStream focused solver
                 pddlstream_problem = tuple([*pddl_info, init, goal])
-                plan, cost, _ = solve_focused(pddlstream_problem,
+                try:
+                    plan, cost, _ = solve_focused(pddlstream_problem,
                                         planner="dijkstra",
                                         unit_costs=True,
                                         max_skeletons=2,
@@ -469,6 +471,10 @@ class PlanningServer():
                                         success_cost=8.0,
                                         max_time=INF,
                                         verbose=False)
+                except Exception as e:
+                    print("Failed planning")
+                    print(e)
+                    pass                  
             duration = time.time() - start
 
             if plan is not None:
