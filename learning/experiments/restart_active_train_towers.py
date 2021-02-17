@@ -192,6 +192,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--debug', action='store_true')
+    
+    # NOTE: only use the below arguments if you want to overwrite the arguments used
+    # in the initial run!
+    parser.add_argument('--max-acquisitions', type=int,
+                        help='Number of iterations to run the main active learning loop for.')
+    parser.add_argument('--block-set-fname', type=str, help='File containing a list of AT LEAST 5 blocks (block_utils.Object) where the block.name is formatted obj_#')
+    parser.add_argument('--xy-noise', type=float, help='Variance in the normally distributed noise in block placements (used when args.exec-mode==noisy-model)')
     restart_args = parser.parse_args()
 
     if restart_args.debug:
@@ -200,4 +207,12 @@ if __name__ == '__main__':
     with open(os.path.join(restart_args.exp_path, 'args.pkl'), 'rb') as f: 
         args = pickle.load(f)
 
+    # replace args (if set in restart_args)
+    if restart_args.max_acquisitions:
+        args.max_acquisitions = restart_args.max_acquisitions
+    if restart_args.block_set_fname:
+        args.block_set_fname = restart_args.block_set_fname
+    if restart_args.xy_noise:
+        args.xy_noise = restart_args.xy_noise
+    
     restart_active_towers(restart_args.exp_path, args)
