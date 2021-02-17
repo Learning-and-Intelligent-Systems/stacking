@@ -174,7 +174,7 @@ class PandaAgent:
 
         for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
             for named_pose in named_poses:
-                if named_pose.block_id in pddl_block_name:
+                if named_pose.block_id == pddl_block_name.split('_')[-1]:
                     pose = named_pose.pose.pose
                     # Skip changes the pose of objects in storage.
                     if pose.position.x < 0.05:
@@ -398,7 +398,7 @@ class PandaAgent:
         ros_req = SetPlanningStateRequest()
         # Initial poses and robot configuration
         if self.real:
-            ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
+            ros_req.robot_config.angles = self.real_arm.convertToList(self.real_arm.joint_angles())
         else:
             ros_req.robot_config.angles = self.robot.arm.GetJointValues()
         ros_req.init_state = block_init_to_ros(self.pddl_blocks)
@@ -454,16 +454,15 @@ class PandaAgent:
         while (not success and not fatal):
             print(f"Got recoverable failure. Replanning from step index {num_success}.")
             if self.real:
-                ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
+                ros_req.robot_config.angles = self.real_arm.convertToList(self.real_arm.joint_angles())
             else:
                 ros_req.robot_config.angles = self.robot.arm.GetJointValues()
             ros_req.init_state = block_init_to_ros(self.pddl_blocks)
-            ros_req.goal_state = ros_req.goal_state[num_success:]
             if isinstance(self.last_obj_held, pb_robot.vobj.BodyGrasp):
                 ros_req.held_block.name = self.last_obj_held.body.readableName
                 transform_to_ros(self.last_obj_held.grasp_objF, ros_req.held_block.pose)
             success, stack_stable, reset_stable, num_success, fatal = \
-                self.execute_plans_from_server(ros_req, real, T, stack=True)
+                self.execute_plans_from_server(ros_req, real, T, stack=True, start_idx=num_success)
             print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
             if reset_stable:
                 print(f"Completed tower reset stable: {reset_stable}")
@@ -473,52 +472,60 @@ class PandaAgent:
             if not (stack_stable and reset_stable):
                 if self.use_vision and not stack_stable:
                     self._update_block_poses()
-
-                # Instruct a reset plan
-                print("Resetting blocks...")
-                current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
-                block_ixs = range(len(self.pddl_blocks))
-                block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
-                ros_req = SetPlanningStateRequest()
-                ros_req.init_state = block_init_to_ros(self.pddl_blocks)
-                if self.real:
-                    ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
-                else:
-                    ros_req.robot_config.angles = self.robot.arm.GetJointValues()
-                for ix in block_ixs:
-                    blk, pose = self.pddl_blocks[ix], original_poses[ix]
-                    if blk in self.moved_blocks:
-                        goal_pose = pb_robot.vobj.BodyPose(blk, pose)
-                        block_ros = BodyInfo()
-                        block_ros.name = blk.readableName
-                        block_ros.stack = False
-                        pose_to_ros(goal_pose, block_ros.pose)
-                        ros_req.goal_state.append(block_ros)
-
-                # Execute the reset plan
-                success, _, reset_stable, num_success, fatal = \
-                    self.execute_plans_from_server(ros_req, real, T, stack=False)
-                print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
-
-                # If we have a nonfatal failure, replan from new state, removing successful goals
-                while (not success and not fatal):
-                    print(f"Got recoverable failure. Replanning from step index {num_success}.")
-                    if self.real:
-                        ros_req.robot_config.angles = self.real_arm.convertToList(arm.joint_angles())
-                    else:
-                        ros_req.robot_config.angles = self.robot.arm.GetJointValues()
-                    ros_req.init_state = block_init_to_ros(self.pddl_blocks)
-                    ros_req.goal_state = ros_req.goal_state[num_success:]
-                    success, _, reset_stable, num_success, fatal = \
-                    self.execute_plans_from_server(ros_req, real, T, stack=False)
-                    print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
-
+                    # TODO: Return arm to home position to help with vision.
+                    self.plan_reset_parallel(original_poses, real, T)
         except Exception as e:
             print("Planning/execution failed during tower reset.")
             print(e)
 
         # Return the final planning state
         return success, stack_stable
+
+
+    def plan_reset_parallel(self, original_poses, real, T, import_ros=False):
+        # Instruct a reset plan
+        if import_ros:
+            from stacking_ros.msg import BodyInfo
+            from stacking_ros.srv import SetPlanningStateRequest
+            from tamp.ros_utils import block_init_to_ros, pose_to_ros, pose_tuple_to_ros, transform_to_ros
+        print("Resetting blocks...")
+        current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+        block_ixs = range(len(self.pddl_blocks))
+        block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
+        ros_req = SetPlanningStateRequest()
+        ros_req.init_state = block_init_to_ros(self.pddl_blocks)
+        if self.real:
+            ros_req.robot_config.angles = self.real_arm.convertToList(self.real_arm.joint_angles())
+        else:
+            ros_req.robot_config.angles = self.robot.arm.GetJointValues()
+        for ix in block_ixs:
+            blk, pose = self.pddl_blocks[ix], original_poses[ix]
+            if blk in self.moved_blocks:
+                goal_pose = pb_robot.vobj.BodyPose(blk, pose)
+                block_ros = BodyInfo()
+                block_ros.name = blk.readableName
+                block_ros.stack = False
+                pose_to_ros(goal_pose, block_ros.pose)
+                ros_req.goal_state.append(block_ros)
+
+        # Execute the reset plan
+        success, _, reset_stable, num_success, fatal = \
+            self.execute_plans_from_server(ros_req, real, T, stack=False)
+        print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
+
+        # If we have a nonfatal failure, replan from new state, removing successful goals
+        while (not success and not fatal):
+            print(f"Got recoverable failure. Replanning from step index {num_success}.")
+            if self.real:
+                ros_req.robot_config.angles = self.real_arm.convertToList(self.real_arm.joint_angles())
+            else:
+                ros_req.robot_config.angles = self.robot.arm.GetJointValues()
+            ros_req.init_state = block_init_to_ros(self.pddl_blocks)
+            ros_req.goal_state = ros_req.goal_state[num_success:]
+            success, _, reset_stable, num_success, fatal = \
+            self.execute_plans_from_server(ros_req, real, T, stack=False)
+            print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
+
 
 
     def validate_ros_plan(self, ros_resp, tgt_block):
@@ -535,7 +542,7 @@ class PandaAgent:
             return (tgt_block == plan_block)
 
 
-    def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True):
+    def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True, start_idx=0):
         """
         Executes plans received from planning server
         Returns:
@@ -544,26 +551,42 @@ class PandaAgent:
             reset_stable : Flag for whether resetting a tower was successful
             num_success : Progress (in number of steps) of successful tasks
             fatal : Flag for whether the error was fatal (True) or recoverable (False)
+            start_idx : Start index of planning (for recovering from partial plans)
         """
-        self.init_state_client.call(ros_req)
-
+        # Initialize variables
+        num_success = start_idx
         stack_stable = False
         reset_stable = False
-        num_success = 0
         planning_active = True
         num_steps = len(ros_req.goal_state)
+
+        # Send a reset request to the planning server
+        trimmed_ros_req = deepcopy(ros_req)
+        trimmed_ros_req.goal_state = trimmed_ros_req.goal_state[start_idx:]
+        self.init_state_client.call(trimmed_ros_req)
+
         while num_success < num_steps:
             try:
+                query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
+
                 # Wait for a valid plan
                 plan = []
                 while len(plan) == 0 and planning_active:
                     time.sleep(1)
                     ros_resp = self.get_plan_client.call()
                     if not ros_resp.planning_active:
-                        print("Planning ended on server side")
-                        return False, stack_stable, reset_stable, num_success, True
-                    tgt_block = ros_req.goal_state[num_success].name
-                    # if self.validate_ros_plan(ros_resp, tgt_block):
+                        print("Planning failed on server side.")
+                        # If failure happened during stacking, it is a fatal failure
+                        if (ros_req.goal_state[num_success].stack):
+                            print(f"Failed during stacking {query_block}")
+                            fatal = True
+                        # If failure happened during resetting, prompt user to manually reset blocks
+                        else:
+                            print(f"Failed during resetting {query_block}")
+                            input("Manually reset the blocks and press Enter to continue")
+                            fatal = False
+                        return False, stack_stable, reset_stable, num_success, fatal
+                    # if self.validate_ros_plan(ros_resp, query_block):
                     plan = self.ros_to_task_plan(ros_resp, self.execution_robot, self.pddl_block_lookup)
 
                 print("\nGot plan:")
@@ -574,7 +597,6 @@ class PandaAgent:
                 ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False, obstacles=[f for f in self.fixed if f is not None], sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
-                query_block = self.pddl_block_lookup[ros_req.goal_state[num_success].name]
                 desired_pose = query_block.get_base_link_pose()
                 if query_block not in self.moved_blocks:
                     self.moved_blocks.add(query_block)
@@ -800,7 +822,7 @@ class PandaAgent:
             # Check if pose is close to desired_pose.
             visible = False
             for named_pose in poses:
-                if named_pose.block_id in block_pddl.readableName:
+                if named_pose.block_id in block_pddl.readableName.split('_')[-1]:
                     visible = True
                     pose = named_pose.pose.pose
 
