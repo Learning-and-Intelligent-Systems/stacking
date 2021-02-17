@@ -73,6 +73,7 @@ class ActiveExperimentLogger:
     def __init__(self, exp_path):
         self.exp_path = exp_path
         self.acquisition_step = 0
+        self.tower_counter = 0
 
         with open(os.path.join(self.exp_path, 'args.pkl'), 'rb') as handle:
             self.args = pickle.load(handle)
@@ -168,10 +169,12 @@ class ActiveExperimentLogger:
         torch.save(ensemble.state_dict(), os.path.join(path))
 
     def save_tower_data(self, block_tower, label):
-        fname = 'labeled_tower_{:%Y-%m-%d_%H-%M-%S}.pkl'.format(datetime.datetime.now())
+        fname = 'labeled_tower_{:%Y-%m-%d_%H-%M-%S}_'.format(datetime.datetime.now())\
+                +str(self.tower_counter)+'_'+str(self.acquisition_step)+'.pkl'
         path = os.path.join(self.exp_path, 'towers', fname)
         with open(path, 'wb') as handle:
             pickle.dump([block_tower, label], handle)
+        self.tower_counter += 1
 
     def save_acquisition_data(self, new_data, samples, tx):
         data = {
@@ -182,6 +185,7 @@ class ActiveExperimentLogger:
         with open(path, 'wb') as handle:
             pickle.dump(data, handle)
         self.acquisition_step = tx+1
+        self.tower_counter = 0
 
     def load_acquisition_data(self, tx):
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)

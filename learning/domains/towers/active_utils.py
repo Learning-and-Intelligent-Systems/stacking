@@ -232,7 +232,7 @@ def get_predictions(dataset, ensemble):
     return torch.cat(preds, dim=0)
 
 
-def get_labels(samples, exec_mode, agent, logger, xy_noise):
+def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
     """ Takes as input a dictionary from the get_subset function. 
     Augment it with stability labels. 
     :param samples:
@@ -260,6 +260,8 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise):
             if exec_mode == 'simple-model' or exec_mode == 'noisy-model':
                 if not tp.tower_is_constructable(block_tower):
                     labels[ix] = 0.
+                if save_tower:
+                    logger.save_tower_data(samples[k]['towers'][ix, :, :], labels[ix])
             else:
                 vis = True
                 success = False
