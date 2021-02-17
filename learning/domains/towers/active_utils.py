@@ -59,10 +59,15 @@ def sample_sequential_data(block_set, dataset, n_samples):
                         block.name = 'obj_'+str(int(dataset.tower_block_ids[k][ix, bx]))
                     block_tower.append(block)
                 stable_towers.append(block_tower)
-
-    block_lookup = {}
-    for block in block_set:
-        block_lookup[block.mass] = block
+            
+    # maintain block info my block id, or mass if using random blocks    
+    block_lookup = {}    
+    if dataset.tower_block_ids:
+        for block in block_set:
+            block_lookup[block.name] = block
+    else:
+        for block in block_set:
+            block_lookup[block.mass] = block
 
     # Sample random towers by randomly choosing a stable base then trying to add a block.
     for ix in range(n_samples):
@@ -75,11 +80,18 @@ def sample_sequential_data(block_set, dataset, n_samples):
         for k in block_lookup:
             used = False
             for block in base_tower:
-                if np.abs(k - block.mass) < 0.0001:
-                    used = True
+                if dataset.tower_block_ids:
+                    if k == block.name:
+                        used = True
+                else:
+                    if np.abs(k - block.mass) < 0.0001:
+                        used = True
             if not used:
                 remaining_blocks[k] = block_lookup[k]
-        assert(len(remaining_blocks) == len(block_set) - len(base_tower))
+                
+        # if we switch block sets during training then the remaining_blocks list
+        # will be longer than block_set - len(base_tower)
+        #assert(len(remaining_blocks) == len(block_set) - len(base_tower))
 
         new_block = deepcopy(np.random.choice(list(remaining_blocks.values())))
         
@@ -117,7 +129,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
     
         # save block id
         if block_set is not None:
-            block_ids = [int(block.name.strip('obj_')) for block in new_tower]
+            block_ids = [block.get_id() for block in new_tower]
             sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
     
     # convert all the sampled towers to numpy arrays
@@ -163,7 +175,7 @@ def sample_unlabeled_data(n_samples, block_set=None):
         # and save that tower in the sampled_towers dict
         sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(rotated_tower))
         if block_set is not None:
-            block_ids = [int(block.name.strip('obj_')) for block in rotated_tower]
+            block_ids = [block.get_id() for block in rotated_tower]
             sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
     
     # convert all the sampled towers to numpy arrays

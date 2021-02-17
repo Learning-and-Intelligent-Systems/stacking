@@ -112,7 +112,7 @@ def setup_active_train(dataset,
         
     return ensemble
 
-def restart_active_towers(exp_path, args):
+def restart_active_towers(exp_path, args, changing_block_set):
     logger = ActiveExperimentLogger.get_experiments_logger(exp_path)
     
     # starting dataset (must be at least one in the exp_path)
@@ -154,6 +154,11 @@ def restart_active_towers(exp_path, args):
         data_subset_fn = get_subset
         with open(args.block_set_fname, 'rb') as f: 
             block_set = pickle.load(f)
+            
+            # if using a new block set, prevent name conflicts by adding a 0 to block names
+            if changing_block_set:
+                for block in block_set:
+                    block.name += '0' # TODO: this will mess up vision system which is looking at block names
         data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
     else:
         data_subset_fn = get_subset
@@ -210,9 +215,11 @@ if __name__ == '__main__':
     # replace args (if set in restart_args)
     if restart_args.max_acquisitions:
         args.max_acquisitions = restart_args.max_acquisitions
+    changing_block_set = False
     if restart_args.block_set_fname:
         args.block_set_fname = restart_args.block_set_fname
+        changing_block_set = True
     if restart_args.xy_noise:
         args.xy_noise = restart_args.xy_noise
     
-    restart_active_towers(restart_args.exp_path, args)
+    restart_active_towers(restart_args.exp_path, args, changing_block_set)

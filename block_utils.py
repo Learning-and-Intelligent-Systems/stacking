@@ -5,6 +5,7 @@ import os
 import pybullet as p
 import shutil
 import time
+import re
 
 from collections import namedtuple
 from copy import copy
@@ -63,11 +64,9 @@ class Object:
     def get_pose(self):
         return self.pose
 
-    def set_id(self, id):
-        self.id = id
-
     def get_id(self):
-        return self.id
+        matches = re.match(r'obj_(.*)', self.name)
+        return int(matches.group(1))
 
     def vectorize(self):
       """ Summarize a block in a vector
@@ -289,7 +288,7 @@ class Environment:
                         obj_id = self.pybullet_server.load_urdf(self.tmp_dir+'/'+str(obj)+'.urdf',
                                                                 obj.pose.pos,
                                                                 obj.pose.orn)
-                        obj.set_id(obj_id)
+                        #obj.set_id(obj_id) # NOTE: the id no longer corresponds to the pybullet id
                         if vis_frames:
                             pos, quat = self.pybullet_server.get_pose(obj_id)
                             self.pybullet_server.vis_frame(pos, quat)
