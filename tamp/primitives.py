@@ -162,7 +162,6 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
         if grasp_worldF[0,3] < 0.2 and grasp_worldF[2,3] < 0.1:
             return None
 
-
         if approach_frame == 'gripper':
             approach_tform = ComputePrePose(grasp_worldF, [0, 0, -0.1], approach_frame)
         elif approach_frame == 'global':
@@ -180,14 +179,18 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
         for ax in range(num_attempts):
             q_grasp = robot.arm.ComputeIK(grasp_worldF)
             if (q_grasp is None):
+                if DEBUG_FAILURE: input('No Grasp IK')
                 continue
-            if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles):
+            if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles, debug=DEBUG_FAILURE):
+                if DEBUG_FAILURE: input('Grasp collision')
                 return None
 
             q_approach = robot.arm.ComputeIK(approach_tform, seed_q=q_grasp)
             if (q_approach is None):
+                if DEBUG_FAILURE: input('No approach IK')
                 continue
-            if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles):
+            if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles, debug=DEBUG_FAILURE):
+                if DEBUG_FAILURE: input('Approach motion collision')
                 return None
             conf_approach = pb_robot.vobj.BodyConf(robot, q_approach)
 
@@ -197,8 +200,11 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
                 q_backoff = q_approach
             else:
                 q_backoff = robot.arm.ComputeIK(backoff_tform, seed_q=q_grasp)
-                if (q_backoff is None): continue
-                if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles):
+                if (q_backoff is None):
+                    if DEBUG_FAILURE: input('No backoff IK')
+                    continue
+                if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles, debug=DEBUG_FAILURE):
+                    if DEBUG_FAILURE: input('Backoff motion collision')
                     return None
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
 

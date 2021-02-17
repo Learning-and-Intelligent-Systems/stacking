@@ -272,7 +272,7 @@ def get_pddl_block_lookup(blocks, pddl_blocks):
     pddl_block_lookup = {}
     for block in blocks:
         for pddl_block in pddl_blocks:
-            if block.name in pddl_block.get_name():
+            if block.name == pddl_block.get_name()[:len(block.name)]:
                 pddl_block_lookup[block.name] = pddl_block
     return pddl_block_lookup
 

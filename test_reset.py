@@ -13,7 +13,7 @@ from learning.domains.towers.generate_tower_training_data import sample_random_t
 from particle_belief import ParticleBelief
 from tower_planner import TowerPlanner
 import pb_robot
-
+from tamp.misc import load_blocks
 
 def main(args):
     NOISE=0.00005
@@ -21,9 +21,7 @@ def main(args):
     # get a bunch of random blocks
     # if args.use_vision:
     if True:
-        with open(args.blocks_file, 'rb') as handle:
-            blocks = pickle.load(handle)[:10]
-            blocks = blocks[:min(len(blocks), args.num_blocks)]
+        blocks = load_blocks(args.blocks_file, 10, [1])
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
@@ -37,7 +35,7 @@ def main(args):
     while True:
         input('Set blocks to clean up position. Ready?')
         agent._update_block_poses()
-
+        
         # Check which blocks are in the front of the table.
         agent.moved_blocks = set()
         for b in agent.pddl_blocks:

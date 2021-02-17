@@ -22,7 +22,7 @@ def main(args):
 
     # get a bunch of random blocks
     blocks = load_blocks(fname=args.blocks_file,
-                         num_blocks=args.num_blocks,
+                         num_blocks=10,
                          remove_ixs=[1])
 
     agent = PandaAgent(blocks, NOISE,
@@ -39,7 +39,7 @@ def main(args):
 
     from franka_interface import ArmInterface
     arm = ArmInterface()
-    arm.move_to_neutral()
+    #arm.move_to_neutral()
     start_q = arm.convertToList(arm.joint_angles())
     start_q = pb_robot.vobj.BodyConf(agent.robot, start_q)
 

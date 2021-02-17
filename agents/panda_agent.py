@@ -174,7 +174,7 @@ class PandaAgent:
 
         for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
             for named_pose in named_poses:
-                if named_pose.block_id in pddl_block_name:
+                if named_pose.block_id == pddl_block_name.split('_')[-1]:
                     pose = named_pose.pose.pose
                     # Skip changes the pose of objects in storage.
                     if pose.position.x < 0.05:
@@ -822,7 +822,7 @@ class PandaAgent:
             # Check if pose is close to desired_pose.
             visible = False
             for named_pose in poses:
-                if named_pose.block_id in block_pddl.readableName:
+                if named_pose.block_id in block_pddl.readableName.split('_')[-1]:
                     visible = True
                     pose = named_pose.pose.pose
 
