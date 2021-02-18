@@ -12,6 +12,7 @@ from learning.models.gn import FCGN, ConstructableFCGN, FCGNFC
 from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
 from agents.panda_agent import PandaAgent, PandaClientAgent
+from tamp.misc import load_blocks
 
 
 def run_active_towers(args):
@@ -32,6 +33,9 @@ def run_active_towers(args):
         if args.use_panda_server:
             agent = PandaClientAgent()
         else:
+            block_set = load_blocks(fname=args.block_set_fname,
+                                    num_blocks=10,
+                                    remove_ixs=[1])
             agent = PandaAgent(block_set)
     
     # Initialize ensemble. 
@@ -70,8 +74,11 @@ def run_active_towers(args):
     elif args.block_set_fname is not '':
         data_subset_fn = get_subset
         with open(args.block_set_fname, 'rb') as f: 
+            # TODO: Unify block loading
             block_set = pickle.load(f)
-            #block_set = [block_set[1], block_set[2]]
+            if args.exec_mode == "sim" or args.exec_mode == "real":
+                block_set = load_blocks(fname=args.block_set_fname,
+                                        num_blocks=10)
         data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
     else:
         data_subset_fn = get_subset
@@ -79,6 +86,7 @@ def run_active_towers(args):
 
     # Sample initial dataset.
     if len(args.init_data_fname) > 0:
+        print(f'Loading an initial dataset from {args.init_data_fname}')
         # A good dataset to use is learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl
         with open(args.init_data_fname, 'rb') as handle:
             towers_dict = pickle.load(handle)
@@ -90,8 +98,21 @@ def run_active_towers(args):
         val_dataset = TowerDataset(val_dict, 
                                    augment=True,
                                    K_skip=10)
-    
+    elif args.sampler == 'sequential':
+        print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
+        towers_dict = sample_sequential_data(block_set, None, 40)
+        towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
+        dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
+
+        val_towers_dict = sample_sequential_data(block_set, None, 40)
+        val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
+        val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
+        
+        if block_set is None:
+            raise NotImplementedError()
+        data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
     else:
+        print('Sampling initial dataset randomly.')
         towers_dict = sample_unlabeled_data(40, block_set=block_set)
         towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger, args.xy_noise)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
@@ -100,18 +121,7 @@ def run_active_towers(args):
         val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger, args.xy_noise)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
 
-    if args.sampler == 'sequential':
-        towers_dict = sample_sequential_data(block_set, None, 40)
-        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger, args.xy_noise)
-        dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
-
-        val_towers_dict = sample_sequential_data(block_set, None, 40)
-        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger, args.xy_noise)
-        val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
-        
-        if block_set is None:
-            raise NotImplementedError()
-        data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
+    
 
     #print(len(dataset), len(val_dataset)) 
     sampler = TowerSampler(dataset=dataset,
@@ -127,6 +137,8 @@ def run_active_towers(args):
     val_dataloader = DataLoader(val_dataset,
                                 batch_sampler=val_sampler)
 
+    print('Starting training from scratch.')
+    input('Press enter to confirm you want to start training from scratch.')
     active_train(ensemble=ensemble, 
                  dataset=dataset, 
                  val_dataset=val_dataset,
@@ -165,7 +177,7 @@ if __name__ == '__main__':
     # noisy-model: perturbs the blocks, uses TowerPlanner to check constructability
     # sim: uses pyBullet with no noise
     # real: uses the real robot
-    parser.add_argument('--exec-mode', default='noisy-model', choices=['perfect-model', 'noisy-model', 'sim', 'real'])
+    parser.add_argument('--exec-mode', default='noisy-model', choices=['simple-model', 'noisy-model', 'sim', 'real'])
     parser.add_argument('--xy-noise', default=0.003, type=float, help='Variance in the normally distributed noise in block placements (used when args.exec-mode==noisy-model)')
     parser.add_argument('--use-panda-server', action='store_true')
     parser.add_argument('--debug', action='store_true')

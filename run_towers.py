@@ -23,8 +23,7 @@ def main(args):
     # if args.use_vision:
     if True:
         blocks = load_blocks(fname=args.blocks_file,
-                             num_blocks=args.num_blocks,
-                             remove_ixs=[1])
+                             num_blocks=args.num_blocks)
     else:
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
@@ -76,7 +75,7 @@ if __name__ == '__main__':
     parser.add_argument('--save-tower', action='store_true')
     parser.add_argument('--use-action-server', action='store_true')
     parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
-    parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/final_block_set.pkl')
+    parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/final_block_set_10.pkl')
     parser.add_argument('--real', action='store_true', help='run on real robot')
     parser.add_argument('--show-frames', action='store_true')
     args = parser.parse_args()

@@ -18,6 +18,8 @@ from learning.active.train import train
 from learning.active.acquire import choose_acquisition_data
 from learning.active.active_train import split_data
 from agents.panda_agent import PandaAgent, PandaClientAgent
+from tamp.misc import load_blocks
+
 
 def combine_data(tower_data, new_data):
     for tower, block_ids, label in tower_data:
@@ -73,6 +75,7 @@ def setup_active_train(dataset,
     ensemble = initialize_ensemble(args)
     
     # training stopped after data was acquired but before adding it to dataset
+    print(f"Resuming from Logger acquisition step: {logger.acquisition_step}, tower step {logger.tower_counter}")
     acquired_data, pool_data = logger.load_acquisition_data(logger.acquisition_step)
     next_dataset = logger.load_dataset(logger.acquisition_step+1)
     
@@ -84,7 +87,7 @@ def setup_active_train(dataset,
 
     else:
         # training stopped after dataset was saved but before model was trained and saved
-        ensemble = logger.get_ensemble(logger.acquisition_step)
+        ensemble = logger.get_ensemble(logger.acquisition_step).cuda()
         if dataset and not ensemble:
             ensemble = initialize_ensemble(args)
             ensemble.reset()
@@ -96,6 +99,7 @@ def setup_active_train(dataset,
         acquired_data, _ = logger.load_acquisition_data(logger.acquisition_step)
         if ensemble and not acquired_data:
             tower_data = logger.get_towers_data(logger.acquisition_step)
+            print(f"Already found {len(tower_data)} towers in acquisition step {logger.acquisition_step}.")
             n_acquire_restart = args.n_acquire - len(tower_data)
             
             # acquire missing towers for this acquisition step
@@ -154,6 +158,9 @@ def restart_active_towers(exp_path, args):
         data_subset_fn = get_subset
         with open(args.block_set_fname, 'rb') as f: 
             block_set = pickle.load(f)
+            if args.exec_mode == "sim" or args.exec_mode == "real":
+                block_set = load_blocks(fname=args.block_set_fname,
+                                        num_blocks=10)
         data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
     else:
         data_subset_fn = get_subset
@@ -162,6 +169,7 @@ def restart_active_towers(exp_path, args):
     if args.sampler == 'sequential':
         data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
 
+    print("Setting up dataset")
     ensemble = setup_active_train(dataset,
                                     val_dataset,
                                     dataloader=dataloader,
@@ -174,6 +182,7 @@ def restart_active_towers(exp_path, args):
                                     agent=agent, 
                                     args=args)
 
+    print("Restarting active learning")
     active_train(ensemble=ensemble, 
                  dataset=dataset, 
                  val_dataset=val_dataset,

@@ -500,7 +500,7 @@ class PlanningServer():
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--blocks-file', default='', type=str)
+    parser.add_argument('--blocks-file', default='learning/domains/towers/final_block_set_10.pkl', type=str)
     parser.add_argument('--num-blocks', type=int, default=4)
     parser.add_argument('--max-tries', type=int, default=1)
     parser.add_argument('--use-vision', default=False, action='store_true')
@@ -508,14 +508,9 @@ if __name__=="__main__":
     parser.add_argument('--sim-failure-prob', type=float, default=0.0)
     args = parser.parse_args()
 
-    if args.use_vision or len(args.blocks_file) > 0:
-        blocks = load_blocks(fname=args.blocks_file,
-                             num_blocks=args.num_blocks,
-                             remove_ixs=[1])
-        block_init_xy_poses = None
-    else:
-        from block_utils import get_adversarial_blocks
-        blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+    blocks = load_blocks(fname=args.blocks_file,
+                            num_blocks=args.num_blocks)
+    block_init_xy_poses = None
     
     s = PlanningServer(blocks, 
                        max_tries=args.max_tries,

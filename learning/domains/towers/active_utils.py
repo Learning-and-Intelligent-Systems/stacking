@@ -11,6 +11,8 @@ from learning.domains.towers.generate_tower_training_data import sample_random_t
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler, unprocess
 from tower_planner import TowerPlanner
 
+from agents.panda_agent import PandaClientAgent
+
 
 def sample_sequential_data(block_set, dataset, n_samples):
     """ Generate n_samples random towers. Each tower has the property that its
@@ -75,7 +77,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
         for k in block_lookup:
             used = False
             for block in base_tower:
-                if np.abs(k - block.mass) < 0.0001:
+                if np.abs(k - block.mass) < 0.00001:
                     used = True
             if not used:
                 remaining_blocks[k] = block_lookup[k]
@@ -246,6 +248,7 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
         labels = np.ones((n_towers,))
 
         for ix in range(0, n_towers):
+            print(f'Collecting tower {ix+1}/{n_towers} for {k} towers...')
             # Add noise to blocks and convert tower to Block representation.
             block_tower = []
             for jx in range(n_blocks): 
@@ -272,7 +275,7 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
             else:
                 vis = True
                 success = False
-                real = exec_mode == 'real'
+                real = (exec_mode == 'real')
                 # if planning fails, reset and try again
                 while not success:
                     success, label = agent.simulate_tower(block_tower, vis, real=real)
@@ -281,6 +284,8 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
                         if real:
                             input('Resolve conflict causing planning to fail, then press \
                                     enter to try again.')
+                            if isinstance(agent, PandaClientAgent):
+                                agent.restart_services()
                         else: # in sim
                             input('Should reset sim. Not yet handled. Exit and restart training.')
                 labels[ix] = label
@@ -315,7 +320,6 @@ def get_subset(samples, indices):
         if 'block_ids' in selected_towers[k].keys():
             selected_towers[k]['block_ids'] = samples[k]['block_ids'][tower_ixs,...]
         start = end
-
     return selected_towers
 
 

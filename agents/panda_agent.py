@@ -12,7 +12,7 @@ import tamp.primitives
 from actions import PlaceAction, make_platform_world
 from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
                         Quaternion, get_rotated_block, Pose, add_noise, \
-                        Environment, Position
+                        Environment, Position, World
 from pddlstream.algorithms.constraints import PlanConstraints, WILD
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.language.stream import StreamInfo
@@ -1024,6 +1024,11 @@ class PandaClientAgent:
     def __init__(self):
         import rospy
         rospy.init_node("panda_client")
+        self.restart_services()
+
+
+    def restart_services(self):
+        import rospy
         from stacking_ros.srv import PlanTower
         print("Waiting for Panda Agent server...")
         rospy.wait_for_service("/plan_tower")
@@ -1040,10 +1045,15 @@ class PandaClientAgent:
         request.tower_info = tower_to_ros(tower)
 
         if vis:
-            w = World(new_tower)
+            w = World(tower)
             env = Environment([w], vis_sim=True, vis_frames=True)
             env.step(vis_frames=True)
-                
+            for b in tower:
+                print('----- Block info -----')
+                print(b.name)
+                print(b.dimensions) 
+                print(b.pose)
+                print(b.rotation)
         response = self.client.call(request)
 
         if vis:

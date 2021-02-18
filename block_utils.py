@@ -565,9 +565,16 @@ def get_adversarial_blocks(num_blocks=4):
 if __name__ == '__main__':
     blocks = get_adversarial_blocks()
 
-    for r in rotation_group():
+    for r in all_rotations():
         b = copy(blocks[0])
         b.pose = Pose(ZERO_POS, Quaternion(*r.as_quat()))
-        b = get_rotated_block(b)
+        b_rot = get_rotated_block(b)
+
+        w = World([b])
+        w_rot = World([b_rot])
+        env = Environment([w, w_rot], vis_sim=True, vis_frames=True)
+        env.step(vis_frames=True)
+        input()
+        env.disconnect()
 
         print(b.com, b.dimensions)
