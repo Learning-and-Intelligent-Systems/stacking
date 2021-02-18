@@ -80,7 +80,7 @@ class ActiveExperimentLogger:
             self.args = pickle.load(handle)
 
     @staticmethod
-    def get_experiments_logger(exp_path):
+    def get_experiments_logger(exp_path, args):
         logger = ActiveExperimentLogger(exp_path)
         dataset_path = os.path.join(exp_path, 'datasets')
         dataset_files = os.listdir(dataset_path)
@@ -92,6 +92,10 @@ class ActiveExperimentLogger:
             if matches: # sometimes system files are saved here, don't parse these
                 txs += [int(matches.group(1))]
         logger.acquisition_step = max(txs)
+        
+        with open(os.path.join(self.exp_path, 'args_restart.pkl'), 'rb') as handle:
+            self.args = pickle.load(handle)
+
         return logger
 
     @staticmethod
