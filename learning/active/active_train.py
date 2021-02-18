@@ -65,13 +65,16 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
             logger.save_val_dataset(val_dataset, tx)
 
         # Initialize and train models.
+        print('Training ensemble....')
         ensemble.reset()
         for model in ensemble.models:
             train(dataloader, val_dataloader, model, args.n_epochs)
-        
+        print('Done training.')
+
         logger.save_ensemble(ensemble, tx)
 
         # Collect new samples.
+        print('Collecting datapoints...')
         new_data, all_samples = acquire_datapoints(ensemble=ensemble, 
                                                    n_samples=args.n_samples, 
                                                    n_acquire=args.n_acquire, 
@@ -84,6 +87,7 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
                                                    agent=agent,
                                                    logger=logger,
                                                    xy_noise=args.xy_noise)
+        print('Done data collection.')
         logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
 
         # Add to dataset.
