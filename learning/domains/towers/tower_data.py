@@ -52,7 +52,7 @@ class TowerDataset(Dataset):
         :param K_skip: Option to this the original dataset by taking every K_skip tower. Must be used with augment.
         :param augment: Whether to include augmented towers in the dataset.
         """
-        self.tower_keys = ['2block', '3block', '4block', '5block']
+        self.tower_keys = list(tower_dict.keys())
         self.tower_tensors = {}
         self.tower_labels = {}
         self.tower_block_ids = {}
