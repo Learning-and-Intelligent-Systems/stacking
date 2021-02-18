@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score # TODO: remove this dependency
 from torch.nn import functional as F
 from torch.optim import Adam
 from torch.utils.data import DataLoader
