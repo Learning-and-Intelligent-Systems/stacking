@@ -20,17 +20,34 @@ from learning.active.active_train import split_data
 from agents.panda_agent import PandaAgent, PandaClientAgent
 from block_utils import block_conflicts
 
-def combine_data(tower_data, new_data):
-    for tower, block_ids, label in tower_data:
-        key = '%dblock' % tower.shape[0] 
-        new_data[key]['towers'] = np.concatenate([new_data[key]['towers'], np.expand_dims(tower,0)])
-        new_data[key]['labels'] = np.concatenate([new_data[key]['labels'], np.expand_dims(label,0)])
-        if block_ids is not None:
-            new_data[key]['block_ids'] = np.concatenate([new_data[key]['block_ids'], np.expand_dims(block_ids,0)])
+
+def tower_index(towers_data, tower):
+    for tdi, (tdi_tower, _, _) in enumerate(towers_data):
+        if np.array_equal(tower, tdi_tower):
+            return tdi
+    return None
     
-    return new_data
+
+def recover_labels(logger, args, agent):
+    towers_data = logger.get_towers_data(logger.acquisition_step)
+    acquisition_data = logger.get_unlabeled_acquisition_data()
+    for k, data_k in acquisition_data.items():
+        towers_k = data_k['towers']
+        block_ids_k = data_k['block_ids']
+        labels_k = np.zeros(towers_k.shape[0])
+        for ti in range(towers_k.shape[0]):
+            ix = tower_index(towers_data, towers_k[ti])
+            if ix is not None:
+                labels_k[ti] = towers_data[ix][2] # towers_data is a list of [tower, block_ids, label] lists
+            else:
+                tower_to_label = {k : {'towers': np.array([towers_k[ti]]), \
+                                        'block_ids': np.array([block_ids_k[ti]])}}
+                labeled_tower = get_labels(tower_to_label, args.exec_mode, agent, logger, args.xy_noise, save_tower=True)
+                labels_k[ti] = labeled_tower[k]['labels'][0]
+        acquisition_data[k]['labels'] = labels_k
+    return acquisition_data
     
-    
+
 def initialize_ensemble(args):
     # Initialize ensemble. 
     if args.model == 'fcgn':
@@ -94,27 +111,22 @@ def setup_active_train(dataset,
             logger.save_ensemble(ensemble, logger.acquisition_step)
         
         # training stopped after model was trained but before (or during) data acquisition
+        # NOTE: if training stops between getting unlabeled samples and starting to label them
+        # then this won't work (but I think that scenario is highly unlikely)
         acquired_data, _ = logger.load_acquisition_data(logger.acquisition_step)
         if ensemble and not acquired_data:
-            tower_data = logger.get_towers_data(logger.acquisition_step)
-            n_acquire_restart = args.n_acquire - len(tower_data)
-            
-            # acquire missing towers for this acquisition step
-            unlabeled_pool = data_sampler_fn(args.n_samples)
-            xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire_restart, args.strategy, data_pred_fn, data_subset_fn)
-            new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True)
-            combine_data(tower_data, new_data)
-            logger.save_acquisition_data(new_data, None, logger.acquisition_step)
+            acquisition_data = recover_labels(logger, args, agent)
+            logger.save_acquisition_data(acquisition_data, None, logger.acquisition_step)
 
             # Add to dataset.
-            train_data, val_data = split_data(new_data, n_val=2)
+            train_data, val_data = split_data(acquisition_data, n_val=2)
             dataset.add_to_dataset(train_data)
             val_dataset.add_to_dataset(val_data)
         
     return ensemble
 
 def restart_active_towers(exp_path, args):
-    logger = ActiveExperimentLogger.get_experiments_logger(exp_path)
+    logger = ActiveExperimentLogger.get_experiments_logger(exp_path, args)
     
     # starting dataset (must be at least one in the exp_path)
     dataset = logger.load_dataset(logger.acquisition_step)

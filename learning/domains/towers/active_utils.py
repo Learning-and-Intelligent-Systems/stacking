@@ -267,11 +267,11 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
                     labels[ix] = 0.
                 if save_tower:
                     if 'block_ids' in samples[k].keys():
-                        logger.save_tower_data(samples[k]['towers'][ix, :, :], 
+                        logger.save_towers_data(samples[k]['towers'][ix, :, :], 
                                                 samples[k]['block_ids'][ix, :],
                                                 labels[ix])
                     else:
-                        logger.save_tower_data(samples[k]['towers'][ix, :, :], 
+                        logger.save_towers_data(samples[k]['towers'][ix, :, :], 
                                                 None,
                                                 labels[ix])
             else:
@@ -290,11 +290,11 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
                             input('Should reset sim. Not yet handled. Exit and restart training.')
                 labels[ix] = label
                 if 'block_ids' in samples[k].keys():
-                    logger.save_tower_data(samples[k]['towers'][ix, :, :], 
+                    logger.save_towers_data(samples[k]['towers'][ix, :, :], 
                                             samples[k]['block_ids'][ix, :],
                                             labels[ix])
                 else:
-                    logger.save_tower_data(samples[k]['towers'][ix, :, :], 
+                    logger.save_towers_data(samples[k]['towers'][ix, :, :], 
                                             None,
                                             labels[ix])
         samples[k]['labels'] = labels
