@@ -18,6 +18,7 @@ from learning.active.train import train
 from learning.active.acquire import choose_acquisition_data
 from learning.active.active_train import split_data
 from agents.panda_agent import PandaAgent, PandaClientAgent
+from block_utils import block_conflicts
 from tamp.misc import load_blocks
 
 
@@ -220,6 +221,12 @@ if __name__ == '__main__':
     if restart_args.max_acquisitions:
         args.max_acquisitions = restart_args.max_acquisitions
     if restart_args.block_set_fname:
+        with open(args.block_set_fname, 'rb') as f: 
+            old_block_set = pickle.load(f)
+        with open(args.block_set_fname, 'rb') as f: 
+            new_block_set = pickle.load(f)
+        assert (not block_conflicts(old_block_set+new_block_set)), \
+                'There are conflicting block names in the previously used and new block sets'
         args.block_set_fname = restart_args.block_set_fname
     if restart_args.xy_noise:
         args.xy_noise = restart_args.xy_noise

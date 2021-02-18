@@ -215,10 +215,17 @@ class PandaAgent:
             for jx in range(ix+1, len(block_ixs)):
                 top_block = self.pddl_blocks[block_ixs[jx]]
 
+                dist_moved = 0
                 while pb_robot.collisions.body_collision(bottom_block, top_block):
                     print('Collision with bottom %s and top %s:' % (bottom_block.readableName, top_block.readableName))
                     position, orientation = top_block.get_base_link_pose()
                     stable_z = position[2] + 0.001
+                    dist_moved += 0.001
+                    if self.real and dist_moved > 0.04:
+                        print(f"Found blocks {bottom_block} and {top_block} in collision")
+                        input("Manually move the blocks and press Enter to continue")
+                        self._update_block_poses()
+                        return
                     position = (position[0], position[1], stable_z)
                     self.execute()
                     top_block.set_base_link_pose((position, orientation))
@@ -388,6 +395,7 @@ class PandaAgent:
             print('Pose:', block.pose)
             print('Dims:', block.dimensions)
             print('CoM:', block.com)
+            print('Rotations:', block.rotation)
             print('-----')
         if self.use_vision:
             self._update_block_poses()
@@ -480,7 +488,7 @@ class PandaAgent:
                 if self.use_vision and not stack_stable:
                     self._update_block_poses()
                     # TODO: Return arm to home position to help with vision.
-                    self.plan_reset_parallel(original_poses, real, T)
+                self.plan_reset_parallel(original_poses, real, T)
         except Exception as e:
             print("Planning/execution failed during tower reset.")
             print(e)
@@ -1058,5 +1066,5 @@ class PandaClientAgent:
 
         if vis:
             env.disconnect()
-            
+
         return response.success, response.stable
