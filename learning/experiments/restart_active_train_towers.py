@@ -34,6 +34,7 @@ def recover_labels(logger, args, agent):
     towers_data = logger.get_towers_data(logger.acquisition_step)
     acquisition_data = logger.get_unlabeled_acquisition_data()
     print(f"Already found {len(towers_data)} towers in acquisition step {logger.acquisition_step}.")
+    logger.tower_counter = len(towers_data)
     for k, data_k in acquisition_data.items():
         towers_k = data_k['towers']
         block_ids_k = data_k['block_ids']
@@ -106,7 +107,7 @@ def setup_active_train(dataset,
 
     else:
         # training stopped after dataset was saved but before model was trained and saved
-        ensemble = logger.get_ensemble(logger.acquisition_step).cuda()
+        ensemble = logger.get_ensemble(logger.acquisition_step)
         if dataset and not ensemble:
             ensemble = initialize_ensemble(args)
             ensemble.reset()
