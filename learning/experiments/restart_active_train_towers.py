@@ -95,7 +95,7 @@ def setup_active_train(dataset,
     ensemble = initialize_ensemble(args)
     
     # training stopped after data was acquired but before adding it to dataset
-    print(f"Resuming from Logger acquisition step: {logger.acquisition_step}, tower step {logger.tower_counter}")
+    print(f"Resuming from Logger acquisition step: {logger.acquisition_step}")
     acquired_data, pool_data = logger.load_acquisition_data(logger.acquisition_step)
     next_dataset = logger.load_dataset(logger.acquisition_step+1)
     
@@ -232,8 +232,10 @@ if __name__ == '__main__':
 
     # replace args (if set in restart_args)
     if restart_args.max_acquisitions:
+        print('WARNING: Using new max_acquisitions.')
         args.max_acquisitions = restart_args.max_acquisitions
     if restart_args.block_set_fname:
+        print('WARNING: Using new block set.')
         with open(args.block_set_fname, 'rb') as f: 
             old_block_set = pickle.load(f)
         with open(args.block_set_fname, 'rb') as f: 
@@ -242,6 +244,7 @@ if __name__ == '__main__':
                 'There are conflicting block names in the previously used and new block sets'
         args.block_set_fname = restart_args.block_set_fname
     if restart_args.xy_noise:
+        print('WARNING: Using new xy-noise.')
         args.xy_noise = restart_args.xy_noise
     
     restart_active_towers(restart_args.exp_path, args)
