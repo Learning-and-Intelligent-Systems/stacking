@@ -18,7 +18,7 @@ cd ~/catkin_ws
 rosrun franka_interface interface.py
 ```
 
-Moving to neutral
+Interactive Python console to reset the robot position/error state
 ```
 roscd franka_interface/scripts
 python3.7 -i interactive.py
@@ -26,20 +26,20 @@ python3.7 -i interactive.py
 >> arm.resetErrors()
 ```
 
-Starting vision
+Starting vision server
 
 ```
 taskset --cpu-list 10,11 roslaunch panda_vision vision.launch
 ```
 
-Starting the panda agent server
+Starting the Panda agent server
 
 ```
 taskset --cpu-list 4,5,8,9 rosrun stacking_ros panda_agent_server.py --num-blocks 10 --real -use-vision
 ```
 
 ## Desktop Setup
-Planning server
+Starting the task and motion planning server
 
 ```
 python stacking_ros/scripts/planning_server.py --blocks-file learning/domains/towers/final_block_set_10.pkl --use-vision --alternate-orientations --num-blocks 10 --max-tries 2 
