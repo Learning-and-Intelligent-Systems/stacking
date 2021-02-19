@@ -7,6 +7,7 @@ Machines:
 * RTK -- runs Panda agent, robot interface, and vision
 * Desktop machine -- runs planning server and active learning
 
+
 ## RTK Setup
 Connecting to the robot
 
@@ -48,13 +49,13 @@ python stacking_ros/scripts/planning_server.py --blocks-file learning/domains/to
 Active learning (starting from scratch)
 
 ```
-python -m learning.experiments.active_train_towers --exec-mode real --use-panda-server --block-set-fname learning/domains/towers/final_block_set_10.pkl --n-epochs 2 --n-acquire 3 --sampler sequential
+python -m learning.experiments.active_train_towers --exec-mode real --use-panda-server --block-set-fname learning/domains/towers/final_block_set_10.pkl --n-epochs 20 --n-acquire 10 --sampler sequential --exp-name robot-seq-init-sim --n-samples 100000
 ```
 
 Active learning (restarting from existing results)
 
 ```
-python -m learning.experiments.restart_active_train_towers --exp-path learning/experiments/logs/exp-20210218-132207
+python -m learning.experiments.restart_active_train_towers --exp-path learning/experiments/logs/exp-20210218-161131
 ```
 
 ## Video collection laptop setup
