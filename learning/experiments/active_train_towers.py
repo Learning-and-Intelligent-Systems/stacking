@@ -138,7 +138,8 @@ def run_active_towers(args):
                                 batch_sampler=val_sampler)
 
     print('Starting training from scratch.')
-    input('Press enter to confirm you want to start training from scratch.')
+    if args.exec_mode == 'real':
+        input('Press enter to confirm you want to start training from scratch.')
     active_train(ensemble=ensemble, 
                  dataset=dataset, 
                  val_dataset=val_dataset,
