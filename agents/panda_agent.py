@@ -493,7 +493,7 @@ class PandaAgent:
         try:
             if not (stack_stable and reset_stable):
                 if self.use_vision and not stack_stable:
-                    self._update_block_poses()
+                    self._update_block_poses(find_moved=True)
                     # TODO: Return arm to home position to help with vision.
                 self.plan_reset_parallel(original_poses, real, T)
         except Exception as e:
