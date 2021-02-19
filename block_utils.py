@@ -57,6 +57,7 @@ class Object:
         self.pose = ZERO_POSE           # Pose (set later)
         self.id = None                  # int (set later)
         self.com_filter = None          # ParticleDistribution (set later)
+        self.pb_id = None
 
     def set_pose(self, pose):
         self.pose = pose
@@ -288,7 +289,7 @@ class Environment:
                         obj_id = self.pybullet_server.load_urdf(self.tmp_dir+'/'+str(obj)+'.urdf',
                                                                 obj.pose.pos,
                                                                 obj.pose.orn)
-                        #obj.set_id(obj_id) # NOTE: the id no longer corresponds to the pybullet id
+                        obj.pb_id = obj_id
                         if vis_frames:
                             pos, quat = self.pybullet_server.get_pose(obj_id)
                             self.pybullet_server.vis_frame(pos, quat)
@@ -312,7 +313,7 @@ class Environment:
             with open(filepath, 'w') as handle:
                 obj_writer = csv.writer(handle)
                 for obj in self.worlds[0].objects:
-                    pos, orn = self.pybullet_server.get_pose(obj.id)
+                    pos, orn = self.pybullet_server.get_pose(obj.pb_id)
                     row = [str(obj)+'.urdf']+\
                             [str(p) for p in pos]+\
                             [str(o) for o in orn]+\
@@ -333,8 +334,8 @@ class Environment:
         # update all world object poses
         for world in self.worlds:
             for obj in world.objects:
-                pos, orn = self.pybullet_server.get_pose(obj.id)
-                dynamics = p.getDynamicsInfo(bodyUniqueId=obj.id,
+                pos, orn = self.pybullet_server.get_pose(obj.pb_id)
+                dynamics = p.getDynamicsInfo(bodyUniqueId=obj.pb_id,
                                              linkIndex=-1,
                                              physicsClientId=self.pybullet_server.client)
                 (point, quat) = p.multiplyTransforms(pos,

@@ -169,7 +169,7 @@ class PandaAgent:
         pb_robot.utils.set_client(self._planning_client_id)
         pb_robot.viz.set_client(self._planning_client_id)
 
-    def _update_block_poses(self):
+    def _update_block_poses(self, find_moved=False):
         """ Use the global world cameras to update the positions of the blocks """
         try:
             resp = self._get_block_poses_world()
@@ -179,6 +179,7 @@ class PandaAgent:
             print('Service call to get block poses failed. Exiting.')
             sys.exit()
 
+        n_found = 0
         for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
             for named_pose in named_poses:
                 if named_pose.block_id == pddl_block_name.split('_')[-1]:
@@ -186,6 +187,7 @@ class PandaAgent:
                     # Skip changes the pose of objects in storage.
                     if pose.position.x < 0.05:
                         continue
+                    n_found += 1
                     position = (pose.position.x, pose.position.y, pose.position.z)
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
                     self.execute()
@@ -193,6 +195,11 @@ class PandaAgent:
                     if not self.use_action_server:
                         self.plan()
                         pddl_block.set_base_link_pose((position, orientation))
+
+        if find_moved and n_found != len(self.moved_blocks):
+            input('Could not find all the moved blocks. Please reposition blocks outside of the camera view and hit enter to continue.')
+            self._update_block_poses(find_moved=True)
+            return
 
         # After loading from vision, objects may be in collision. Resolve this.
         for _, pddl_block in self.pddl_block_lookup.items():
@@ -224,7 +231,7 @@ class PandaAgent:
                     if self.real and dist_moved > 0.04:
                         print(f"Found blocks {bottom_block} and {top_block} in collision")
                         input("Manually move the blocks and press Enter to continue")
-                        self._update_block_poses()
+                        self._update_block_poses(find_moved=False)
                         return
                     position = (position[0], position[1], stable_z)
                     self.execute()
@@ -486,7 +493,7 @@ class PandaAgent:
         try:
             if not (stack_stable and reset_stable):
                 if self.use_vision and not stack_stable:
-                    self._update_block_poses()
+                    self._update_block_poses(find_moved=True)
                     # TODO: Return arm to home position to help with vision.
                 self.plan_reset_parallel(original_poses, real, T)
         except Exception as e:
