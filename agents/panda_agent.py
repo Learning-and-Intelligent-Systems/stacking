@@ -12,7 +12,7 @@ import tamp.primitives
 from actions import PlaceAction, make_platform_world
 from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
                         Quaternion, get_rotated_block, Pose, add_noise, \
-                        Environment, Position
+                        Environment, Position, World
 from pddlstream.algorithms.constraints import PlanConstraints, WILD
 from pddlstream.algorithms.focused import solve_focused
 from pddlstream.language.stream import StreamInfo
@@ -169,7 +169,7 @@ class PandaAgent:
         pb_robot.utils.set_client(self._planning_client_id)
         pb_robot.viz.set_client(self._planning_client_id)
 
-    def _update_block_poses(self):
+    def _update_block_poses(self, find_moved=False):
         """ Use the global world cameras to update the positions of the blocks """
         try:
             resp = self._get_block_poses_world()
@@ -179,6 +179,7 @@ class PandaAgent:
             print('Service call to get block poses failed. Exiting.')
             sys.exit()
 
+        n_found = 0
         for pddl_block_name, pddl_block in self.pddl_block_lookup.items():
             for named_pose in named_poses:
                 if named_pose.block_id == pddl_block_name.split('_')[-1]:
@@ -186,6 +187,7 @@ class PandaAgent:
                     # Skip changes the pose of objects in storage.
                     if pose.position.x < 0.05:
                         continue
+                    n_found += 1
                     position = (pose.position.x, pose.position.y, pose.position.z)
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
                     self.execute()
@@ -193,6 +195,11 @@ class PandaAgent:
                     if not self.use_action_server:
                         self.plan()
                         pddl_block.set_base_link_pose((position, orientation))
+
+        if find_moved and n_found != len(self.moved_blocks):
+            input('Could not find all the moved blocks. Please reposition blocks outside of the camera view and hit enter to continue.')
+            self._update_block_poses(find_moved=True)
+            return
 
         # After loading from vision, objects may be in collision. Resolve this.
         for _, pddl_block in self.pddl_block_lookup.items():
@@ -215,10 +222,17 @@ class PandaAgent:
             for jx in range(ix+1, len(block_ixs)):
                 top_block = self.pddl_blocks[block_ixs[jx]]
 
+                dist_moved = 0
                 while pb_robot.collisions.body_collision(bottom_block, top_block):
                     print('Collision with bottom %s and top %s:' % (bottom_block.readableName, top_block.readableName))
                     position, orientation = top_block.get_base_link_pose()
                     stable_z = position[2] + 0.001
+                    dist_moved += 0.001
+                    if self.real and dist_moved > 0.04:
+                        print(f"Found blocks {bottom_block} and {top_block} in collision")
+                        input("Manually move the blocks and press Enter to continue")
+                        self._update_block_poses(find_moved=False)
+                        return
                     position = (position[0], position[1], stable_z)
                     self.execute()
                     top_block.set_base_link_pose((position, orientation))
@@ -388,6 +402,7 @@ class PandaAgent:
             print('Pose:', block.pose)
             print('Dims:', block.dimensions)
             print('CoM:', block.com)
+            print('Rotations:', block.rotation)
             print('-----')
         if self.use_vision:
             self._update_block_poses()
@@ -478,9 +493,9 @@ class PandaAgent:
         try:
             if not (stack_stable and reset_stable):
                 if self.use_vision and not stack_stable:
-                    self._update_block_poses()
+                    self._update_block_poses(find_moved=True)
                     # TODO: Return arm to home position to help with vision.
-                    self.plan_reset_parallel(original_poses, real, T)
+                self.plan_reset_parallel(original_poses, real, T)
         except Exception as e:
             print("Planning/execution failed during tower reset.")
             print(e)
@@ -495,6 +510,7 @@ class PandaAgent:
         from stacking_ros.srv import SetPlanningStateRequest
         from tamp.ros_utils import block_init_to_ros, pose_to_ros, pose_tuple_to_ros, transform_to_ros
         print("Resetting blocks...")
+        print("Moved Blocks:", self.moved_blocks)
         current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
         block_ixs = range(len(self.pddl_blocks))
         block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
@@ -515,8 +531,13 @@ class PandaAgent:
                 ros_req.goal_state.append(block_ros)
 
         # Execute the reset plan
-        success, _, reset_stable, num_success, fatal = \
-            self.execute_plans_from_server(ros_req, real, T, stack=False)
+        success = True
+        reset_stable = False
+        while len(self.moved_blocks) > 0 and success:
+            success, _, reset_stable, num_success, fatal = \
+                self.execute_plans_from_server(ros_req, real, T, stack=False)
+            if len(self.moved_blocks) > 0:
+                print(f"Still have {len(self.moved_blocks)} to move. Executing again.")
         print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
 
         # If we have a nonfatal failure, replan from new state, removing successful goals
@@ -603,6 +624,7 @@ class PandaAgent:
                 saved_world = pb_robot.utils.WorldSaver()
                 self.execute()
                 ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False, obstacles=[f for f in self.fixed if f is not None], sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
+                print('Finished executing actions.')
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
                 desired_pose = query_block.get_base_link_pose()
@@ -1024,6 +1046,11 @@ class PandaClientAgent:
     def __init__(self):
         import rospy
         rospy.init_node("panda_client")
+        self.restart_services()
+
+
+    def restart_services(self):
+        import rospy
         from stacking_ros.srv import PlanTower
         print("Waiting for Panda Agent server...")
         rospy.wait_for_service("/plan_tower")
@@ -1040,13 +1067,18 @@ class PandaClientAgent:
         request.tower_info = tower_to_ros(tower)
 
         if vis:
-            w = World(new_tower)
+            w = World(tower)
             env = Environment([w], vis_sim=True, vis_frames=True)
             env.step(vis_frames=True)
-                
+            for b in tower:
+                print('----- Block info -----')
+                print(b.name)
+                print(b.dimensions)
+                print(b.pose)
+                print(b.rotation)
         response = self.client.call(request)
 
         if vis:
             env.disconnect()
-            
+
         return response.success, response.stable

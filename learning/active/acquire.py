@@ -131,5 +131,6 @@ def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn
     """
     unlabeled_pool = data_sampler_fn(n_samples)
     xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
+    logger.save_unlabeled_acquisition_data(xs)
     new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True)
     return new_data, unlabeled_pool

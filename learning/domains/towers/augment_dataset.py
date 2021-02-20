@@ -36,6 +36,7 @@ def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
                 #print(ix)
             original_tower = [Object.from_vector(towers[ix, jx, :]) for jx in range(num_blocks)]
 
+            rot_towers = []
             for kx, z_rot in enumerate([0., np.pi/2., np.pi, 3*np.pi/2]):
                 rot = R.from_rotvec([0., 0., z_rot])
                 # rotate each block in the tower and add the new tower to the dataset
@@ -48,8 +49,13 @@ def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
                     # new_pose = Pose(Position(*rot.apply(block.pose.pos)),
                     #                 Quaternion(*rot.as_quat().tolist()))
                     rot_block.set_pose(new_pose)
-                    rot_tower.append(get_rotated_block(rot_block))
-                    augmented_towers[tower_multiplier*ix + kx, bx, :] = rot_tower[bx].vectorize()
+                    orig_rot = R.from_quat(rot_block.rotation)
+                    rot_block = get_rotated_block(rot_block)
+                    rot_block.rotation = (rot*orig_rot).as_quat().tolist()
+                    rot_tower.append(rot_block)
+                    augmented_towers[tower_multiplier*ix + kx, bx, :] = rot_tower[bx].vectorize()            
+
+                rot_towers.append(rot_tower)
                 augmented_labels[tower_multiplier*ix + kx] = labels[ix]
                 if 'block_ids' in data.keys():
                     augmented_block_ids[tower_multiplier*ix + kx, :] = block_ids[ix, :]
@@ -64,7 +70,14 @@ def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
 
                 #     augmented_towers[tower_multiplier*ix + N_angles + kx, :, :] = shifted_tower
                 #     augmented_labels[tower_multiplier*ix + N_angles + kx] = labels[ix]
+            
+            # worlds = [World(original_tower)] + [World(tower) for tower in rot_towers] 
+            # env = Environment(worlds, vis_sim=True, vis_frames=True)
+            # env.step(vis_frames=True)
+            # input('Next?')
 
+            # env.disconnect()
+            
             # flip the mirror the COM about the COG and negate the relative position in x
             # and y for each block. Creates a new tower that is the mirror of the original
             # tower about the x and y axes

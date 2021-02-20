@@ -183,7 +183,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
                 continue
             if not robot.arm.IsCollisionFree(q_grasp, obstacles=obstacles, debug=DEBUG_FAILURE):
                 if DEBUG_FAILURE: input('Grasp collision')
-                return None
+                continue
 
             q_approach = robot.arm.ComputeIK(approach_tform, seed_q=q_grasp)
             if (q_approach is None):
@@ -191,7 +191,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
                 continue
             if not robot.arm.IsCollisionFree(q_approach, obstacles=obstacles, debug=DEBUG_FAILURE):
                 if DEBUG_FAILURE: input('Approach motion collision')
-                return None
+                continue
             conf_approach = pb_robot.vobj.BodyConf(robot, q_approach)
 
 
@@ -205,7 +205,7 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
                     continue
                 if not robot.arm.IsCollisionFree(q_backoff, obstacles=obstacles, debug=DEBUG_FAILURE):
                     if DEBUG_FAILURE: input('Backoff motion collision')
-                    return None
+                    continue
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
 
             path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)

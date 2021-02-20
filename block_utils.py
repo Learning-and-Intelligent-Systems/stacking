@@ -5,6 +5,7 @@ import os
 import pybullet as p
 import shutil
 import time
+import re
 
 from collections import namedtuple
 from copy import copy
@@ -56,6 +57,7 @@ class Object:
         self.pose = ZERO_POSE           # Pose (set later)
         self.id = None                  # int (set later)
         self.com_filter = None          # ParticleDistribution (set later)
+        self.pb_id = None
 
     def set_pose(self, pose):
         self.pose = pose
@@ -63,11 +65,9 @@ class Object:
     def get_pose(self):
         return self.pose
 
-    def set_id(self, id):
-        self.id = id
-
     def get_id(self):
-        return self.id
+        matches = re.match(r'obj_(.*)', self.name)
+        return int(matches.group(1))
 
     def vectorize(self):
       """ Summarize a block in a vector
@@ -289,7 +289,7 @@ class Environment:
                         obj_id = self.pybullet_server.load_urdf(self.tmp_dir+'/'+str(obj)+'.urdf',
                                                                 obj.pose.pos,
                                                                 obj.pose.orn)
-                        obj.set_id(obj_id)
+                        obj.pb_id = obj_id
                         if vis_frames:
                             pos, quat = self.pybullet_server.get_pose(obj_id)
                             self.pybullet_server.vis_frame(pos, quat)
@@ -313,7 +313,7 @@ class Environment:
             with open(filepath, 'w') as handle:
                 obj_writer = csv.writer(handle)
                 for obj in self.worlds[0].objects:
-                    pos, orn = self.pybullet_server.get_pose(obj.id)
+                    pos, orn = self.pybullet_server.get_pose(obj.pb_id)
                     row = [str(obj)+'.urdf']+\
                             [str(p) for p in pos]+\
                             [str(o) for o in orn]+\
@@ -334,8 +334,8 @@ class Environment:
         # update all world object poses
         for world in self.worlds:
             for obj in world.objects:
-                pos, orn = self.pybullet_server.get_pose(obj.id)
-                dynamics = p.getDynamicsInfo(bodyUniqueId=obj.id,
+                pos, orn = self.pybullet_server.get_pose(obj.pb_id)
+                dynamics = p.getDynamicsInfo(bodyUniqueId=obj.pb_id,
                                              linkIndex=-1,
                                              physicsClientId=self.pybullet_server.client)
                 (point, quat) = p.multiplyTransforms(pos,
@@ -564,13 +564,28 @@ def get_adversarial_blocks(num_blocks=4):
                 color=Color(0, 1, 0))
     return [b1, b2, b3, b4][:num_blocks]
 
+def block_conflicts(block_set):
+    block_names = [block.name for block in block_set]
+    conflict = False
+    for block_name in block_names:
+        if block_names.count(block_name) > 1:
+            conflict = True
+            print('%s occurs more than once in block set' % block_name)
+    return conflict
 
 if __name__ == '__main__':
     blocks = get_adversarial_blocks()
 
-    for r in rotation_group():
+    for r in all_rotations():
         b = copy(blocks[0])
         b.pose = Pose(ZERO_POS, Quaternion(*r.as_quat()))
-        b = get_rotated_block(b)
+        b_rot = get_rotated_block(b)
+
+        w = World([b])
+        w_rot = World([b_rot])
+        env = Environment([w, w_rot], vis_sim=True, vis_frames=True)
+        env.step(vis_frames=True)
+        input()
+        env.disconnect()
 
         print(b.com, b.dimensions)

@@ -80,7 +80,7 @@ class ActiveExperimentLogger:
             self.args = pickle.load(handle)
 
     @staticmethod
-    def get_experiments_logger(exp_path):
+    def get_experiments_logger(exp_path, args):
         logger = ActiveExperimentLogger(exp_path)
         dataset_path = os.path.join(exp_path, 'datasets')
         dataset_files = os.listdir(dataset_path)
@@ -92,6 +92,11 @@ class ActiveExperimentLogger:
             if matches: # sometimes system files are saved here, don't parse these
                 txs += [int(matches.group(1))]
         logger.acquisition_step = max(txs)
+        
+        # save potentially new args
+        with open(os.path.join(exp_path, 'args_restart.pkl'), 'wb') as handle:
+            pickle.dump(args, handle)
+
         return logger
 
     @staticmethod
@@ -216,7 +221,7 @@ class ActiveExperimentLogger:
                     tower_data += [tower_tx_data]
         return tower_data
 
-    def save_tower_data(self, block_tower, block_ids, label):
+    def save_towers_data(self, block_tower, block_ids, label):
         fname = 'labeled_tower_{:%Y-%m-%d_%H-%M-%S}_'.format(datetime.datetime.now())\
                 +str(self.tower_counter)+'_'+str(self.acquisition_step)+'.pkl'
         path = self.get_towers_path(fname)
@@ -234,7 +239,22 @@ class ActiveExperimentLogger:
             pickle.dump(data, handle)
         self.acquisition_step = tx+1
         self.tower_counter = 0
-
+        self.remove_unlabeled_acquisition_data()
+        
+    def remove_unlabeled_acquisition_data(self):
+        os.remove(os.path.join(self.exp_path, 'acquired_processing.pkl'))
+        
+    def save_unlabeled_acquisition_data(self, data):
+        path = os.path.join(self.exp_path, 'acquired_processing.pkl')
+        with open(path, 'wb') as handle:
+            pickle.dump(data, handle)
+            
+    def get_unlabeled_acquisition_data(self):
+        path = os.path.join(self.exp_path, 'acquired_processing.pkl')
+        with open(path, 'rb') as handle:
+            data = pickle.load(handle)
+        return data
+    
     def load_acquisition_data(self, tx):
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
         try:
