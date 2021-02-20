@@ -2,12 +2,13 @@ import numpy as np
 import pickle
 import time
 import torch
+from random import choices as sample_with_replacement
 
 from copy import deepcopy
 from torch.utils.data import DataLoader
 
-from block_utils import World, Environment, Object, Quaternion, Pose, get_rotated_block, ZERO_POS
-from learning.domains.towers.generate_tower_training_data import sample_random_tower, vectorize, QUATERNIONS
+from block_utils import World, Environment, Object, Quaternion, Pose, get_rotated_block, ZERO_POS, QUATERNIONS
+from learning.domains.towers.generate_tower_training_data import sample_random_tower, vectorize
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler, unprocess
 from tower_planner import TowerPlanner
 
@@ -130,7 +131,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
             sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
     return sampled_towers
 
-def sample_unlabeled_data(n_samples, block_set=None):
+def sample_unlabeled_data(n_samples, block_set=None, range_n_blocks=(2, 5)):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
@@ -148,10 +149,13 @@ def sample_unlabeled_data(n_samples, block_set=None):
         if block_set is not None:
             sampled_towers[k]['block_ids'] = []
 
+
+    min_n_blocks = range_n_blocks[0]
+    max_n_blocks = min(range_n_blocks[1], len(block_set))
+
     # sample random towers and add them to the lists in the dictionary
     for ix in range(n_samples):
-        max_blocks = min(5, len(block_set))
-        n_blocks = np.random.randint(2, max_blocks+1)
+        n_blocks = np.random.randint(min_n_blocks, max_n_blocks+1)
         # get n_blocks, either from scratch or from the block set
         if block_set is not None: 
             blocks = np.random.choice(block_set, n_blocks, replace=False)
@@ -174,6 +178,71 @@ def sample_unlabeled_data(n_samples, block_set=None):
             sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
 
     return sampled_towers
+
+def sample_next_block(towers, n_samples, block_set=None):
+    # if the dataset is empty, we are sampling the 2-block bases of the towers
+    if towers is {}:
+        return sample_unlabeled_data(n_samples, block_set=block_set, range_n_blocks=(2,2))
+    # if the dataset is non-empty, then for each tower in the dataset we need to sample
+    # a bunch of options for the next block to be placed on top
+    else:
+        n_towers = towers['towers'].shape[0]
+        n_blocks_per_tower = np.ceil(n_samples/n_towers).astype(int)
+        new_towers = []
+        new_block_ids = []
+        for i in range(n_towers):
+            # pull out some information about the tower we're working on
+            current_tower = towers['towers'][i]
+            top_block = current_tower[-1]
+            top_block_dims = top_block[4:7]
+            top_block_pos = top_block[7:10]
+            top_of_tower_height = top_block_pos[2] + top_block_dims[2]/2
+
+            # get n_blocks_per_tower new blocks to add on top of the tower
+            if block_set is None:
+                new_top_blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks_per_tower)]
+            else:
+                block_ids_already_in_tower = towers['block_ids'][i]
+                remaining_blocks = [b for b in block_set if b.name.strip('obj_') not in block_ids_already_in_tower]
+                new_top_blocks = sample_with_replacement(remaining_blocks, k=n_blocks_per_tower)
+
+            # get random rotations for each block
+            orns = sample_with_replacement(QUATERNIONS, k=n_blocks_per_tower)
+
+            # apply the rotations to each block
+            rotated_blocks = []
+            for orn, block in zip(orns, new_top_blocks):
+                block.pose = Pose(ZERO_POS, orn)
+                rotated_blocks.append(get_rotated_block(block))
+
+            # figure out how far each block can be moved w/ losing contact w/ the block below
+            dims_xy = np.array([rb.dimensions for rb in rotated_blocks])[:,:2]
+            # figure out how far each block can be moved w/ losing contact w/ the block below
+            max_displacements_xy = (top_block_dims[:2] + dims_xy)/2.
+            # sample unscaled noise (clip bceause random normal can exceed -1, 1)
+            noise_xy = np.clip(0.5*np.random.randn(n_blocks_per_tower, 2), -0.95, 0.95)
+            # and scale the noise by the max allowed displacement
+            rel_xy = max_displacements_xy * noise_xy
+            # and get the actual pos by the difference to the top block pos
+            pos_xy = top_block_pos[:2] + rel_xy
+
+            # calculate the height of each block
+            pos_z = np.array([rb.dimensions.z/2 + top_of_tower_height for rb in rotated_blocks])
+            pos_xyz = pos_xyz = np.hstack([pos_xy, pos_z[:,None]])
+
+            for pos, orn, block in zip(pos_xyz, orns, new_top_blocks):
+                block.pose = Pose(Position(*pos), orn)
+                block.rotation = orn
+
+            # create an array to hold all the new towers
+            new_towers_local = np.zeros(n_blocks_per_tower, current_tower.shape[0] + 1, current_tower.shape[1])
+            # add the existing base of the tower to the array
+            new_towers[:,:-1] = current_tower
+            # and add the new top block to each tower
+            new_towers_local[:,-1] = vectorize(new_top_blocks)
+            new_towers.append(new_towers_local)
+
+        return {'towers': new_towers, 'labels': np.zeros(new_towers.shape[0])}
 
 def get_sequential_predictions(dataset, ensemble):
     """

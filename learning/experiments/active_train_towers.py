@@ -111,7 +111,12 @@ def run_active_towers(args):
         
         if block_set is None:
             raise NotImplementedError()
-        data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
+        # TODO: finish block sampling function for subtower-greedy
+        # elif args.strategy == 'subtower-greedy':
+        #     print(f'{args.strategy} strategy is incompatible with {args.sampler} sampler.')
+        #     raise NotImplementedError()
+        else:
+            data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
 
     #print(len(dataset), len(val_dataset)) 
     sampler = TowerSampler(dataset=dataset,
@@ -157,7 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
-    parser.add_argument('--strategy', choices=['random', 'bald'], default='bald')
+    parser.add_argument('--strategy', choices=['random', 'bald', 'subtower', 'subtower-greedy'], default='bald')
     parser.add_argument('--sampler', choices=['random', 'sequential'], default='random', help='Choose how the unlabeled pool will be generated. Sequential assumes every tower has a stable base.')
     parser.add_argument('--pool-fname', type=str, default='')  
     parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-fc', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])      

@@ -3,7 +3,7 @@
 Izzy Brand, 2020
 """
 from agents.teleport_agent import TeleportAgent
-from block_utils import World, Environment, Object, Position, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block, all_rotations
+from block_utils import World, Environment, Object, Position, Quaternion, Pose, ZERO_POS, rotation_group, get_rotated_block, all_rotations, QUATERNIONS
 from tower_planner import TowerPlanner
 from pybullet_utils import transformation
 import argparse
@@ -17,9 +17,6 @@ import matplotlib.pyplot as plt
 def vectorize(tower):
     return [b.vectorize() for b in tower]
 
-ROTATIONS = list(rotation_group())
-ROTATIONS = list(all_rotations())
-QUATERNIONS = [Quaternion(*o.as_quat()) for o in ROTATIONS]
 ROTATED_BLOCKS = {}
 def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=False):
     if num_blocks is None:
