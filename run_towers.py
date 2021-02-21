@@ -42,7 +42,6 @@ def main(args):
         # Build a random tower out of blocks.
         n_blocks = np.random.randint(2, args.num_blocks + 1)
         tower_blocks = np.random.choice(blocks, n_blocks, replace=False)
-
         tower = sample_random_tower(tower_blocks)
         #tower = build_tower(tower_blocks, constructable=True, max_attempts=50000)
 

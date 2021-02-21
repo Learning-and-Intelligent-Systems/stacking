@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from learning.domains.towers.active_utils import sample_next_block
 
 def bald(predictions, eps=1e-5):
     """ Get the BALD score for each example.
@@ -21,22 +22,16 @@ def bald(predictions, eps=1e-5):
 
     return bald
 
-def subtower_bald(samples, ensemble, data_pred_fn, greedy=False):
-    """  subtower_bald is the sum of the bald scores for each subtower
+def subtower_bald(samples, ensemble, data_pred_fn):
+    """ subtower_bald is the sum of the bald scores for each subtower
 
-    If "greedy" is True, we just sum the BALD scores. this does not
-    consider that a tower might fall over before we collect an
-    observation for every block. If "greedy" is False, then we
-    multiply the BALD score for each subtower by the predicted probability
+    Multiply the BALD score for each subtower by the predicted probability
     that we collect an observation for that subtower.
 
     Arguments:
         samples {dict} -- sampled towers of different sizes
         ensemble {Ensemble} -- the model
         data_pred_fn {function} -- uses the model to label towers
-
-    Keyword Arguments:
-        greedy {bool} -- don't consider constructability (default: {False})
 
     Returns:
         torch.Tensor -- scores
@@ -60,30 +55,28 @@ def subtower_bald(samples, ensemble, data_pred_fn, greedy=False):
         subtower_preds = torch.stack(subtower_preds)
         subtower_scores = torch.stack(subtower_scores)
 
-        # NOTE(izzy): the version of "greedy" that i've implmented here is the
-        # one that fits most readily with our existing infrastructure, but it
-        # isn't quite right. what we're doing here is sampling a bunch of
-        # towers, adding the bald scores for all the subtowers, and picking
-        # the best one. what would really be "greedy" is adding blocks to those
-        # towers one at a time.
-
-        if greedy:
-            # if we're being greedy, then we're not considering the fact that
-            # a tower might fall over before we get to observe the outcome of
-            # a taller tower, so we just sum the acquisition scores for each
-            # subtower
-            scores.append(subtower_scores.sum(axis=0))
-        else:
-            # to avoid being greedy, we need to consider that building risky
-            # towers might prevent us from observing every block in that tower,
-            # so we multiply the bald score for each added block by the
-            # predicted probability that the tower will reach that height
-            two_block_scores = subtower_scores[0]
-            constructability = subtower_preds.mean(axis=2)
-            n_block_expected_scores = (constructability[:-1] * subtower_scores[1:]).sum(axis=0)
-            scores.append(two_block_scores + n_block_expected_scores)
+        # to avoid being greedy, we need to consider that building risky
+        # towers might prevent us from observing every block in that tower,
+        # so we multiply the bald score for each added block by the
+        # predicted probability that the tower will reach that height
+        two_block_scores = subtower_scores[0]
+        constructability = subtower_preds.mean(axis=2)
+        n_block_expected_scores = (constructability[:-1] * subtower_scores[1:]).sum(axis=0)
+        scores.append(two_block_scores + n_block_expected_scores)
 
     return torch.cat(scores)
+
+def greedy_sequential_choose_acquisition_data(ensemble, n_samples, n_acquire, data_sampler_fn, \
+        data_label_fn, data_pred_fn, data_subset_fn):
+    """ Acquires towers by adding blocks one at a time, and after each new block choosing the
+    highest scoring towers
+    """
+    samples = {}
+    for _ in range(2, 6):
+        samples = data_sampler_fn(n_samples, bases=samples)
+        samples = choose_acquisition_data(samples, ensemble, n_acquire, 'bald', data_pred_fn, data_subset_fn)
+
+    return samples
 
 def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn):
     """ Choose data points with the highest acquisition score
@@ -106,9 +99,9 @@ def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn
     elif strategy == 'random':
         scores = np.random.uniform(size=preds.shape[0]).astype('float32')
     elif strategy == 'subtower':
-        scores = subtower_bald(samples, ensemble, data_pred_fn, greedy=False).cpu().numpy()
-    elif strategy == 'subtower-greedy':
-        scores = subtower_bald(samples, ensemble, data_pred_fn, greedy=True).cpu().numpy()
+        scores = subtower_bald(samples, ensemble, data_pred_fn).cpu().numpy()
+    else:
+        raise NotImplementedError()
 
     # Return the n_acquire points with the highest score.
     acquire_indices = np.argsort(scores)[::-1][:n_acquire]
@@ -129,8 +122,17 @@ def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn
     :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
     :return: (n_acquire, 2), (n_acquire,) - x,y tuples of the new datapoints.
     """
-    unlabeled_pool = data_sampler_fn(n_samples)
-    xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
+    if strategy == 'subtower-greedy':
+        # NOTE(izzy): acquiring a tower by greedily adding blocks to the top requires interleaving
+        # sampling new candidate towers and scoring them. therefore this strategy doesn't perfectly
+        # fit the separation of functionality that the others did, and it requires its own special case
+        unlabeled_pool = None
+        xs = greedy_sequential_choose_acquisition_data(ensemble, n_samples, n_acquire, data_sampler_fn, \
+            data_label_fn, data_pred_fn, data_subset_fn)
+    else:
+        unlabeled_pool = data_sampler_fn(n_samples)
+        xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
+
     logger.save_unlabeled_acquisition_data(xs)
     new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True)
     return new_data, unlabeled_pool

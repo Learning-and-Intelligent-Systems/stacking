@@ -510,6 +510,7 @@ class PandaAgent:
         from stacking_ros.srv import SetPlanningStateRequest
         from tamp.ros_utils import block_init_to_ros, pose_to_ros, pose_tuple_to_ros, transform_to_ros
         print("Resetting blocks...")
+        print("Moved Blocks:", self.moved_blocks)
         current_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
         block_ixs = range(len(self.pddl_blocks))
         block_ixs = sorted(block_ixs, key=lambda ix: current_poses[ix][0][2], reverse=True)
@@ -530,8 +531,13 @@ class PandaAgent:
                 ros_req.goal_state.append(block_ros)
 
         # Execute the reset plan
-        success, _, reset_stable, num_success, fatal = \
-            self.execute_plans_from_server(ros_req, real, T, stack=False)
+        success = True
+        reset_stable = False
+        while len(self.moved_blocks) > 0 and success:
+            success, _, reset_stable, num_success, fatal = \
+                self.execute_plans_from_server(ros_req, real, T, stack=False)
+            if len(self.moved_blocks) > 0:
+                print(f"Still have {len(self.moved_blocks)} to move. Executing again.")
         print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
 
         # If we have a nonfatal failure, replan from new state, removing successful goals
@@ -618,6 +624,7 @@ class PandaAgent:
                 saved_world = pb_robot.utils.WorldSaver()
                 self.execute()
                 ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False, obstacles=[f for f in self.fixed if f is not None], sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
+                print('Finished executing actions.')
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
                 desired_pose = query_block.get_base_link_pose()
@@ -1066,7 +1073,7 @@ class PandaClientAgent:
             for b in tower:
                 print('----- Block info -----')
                 print(b.name)
-                print(b.dimensions) 
+                print(b.dimensions)
                 print(b.pose)
                 print(b.rotation)
         response = self.client.call(request)
