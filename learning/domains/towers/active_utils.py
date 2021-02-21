@@ -7,7 +7,7 @@ from random import choices as sample_with_replacement
 from copy import deepcopy
 from torch.utils.data import DataLoader
 
-from block_utils import World, Environment, Object, Quaternion, Pose, get_rotated_block, ZERO_POS, QUATERNIONS
+from block_utils import World, Environment, Object, Quaternion, Pose, Position, get_rotated_block, ZERO_POS, QUATERNIONS
 from learning.domains.towers.generate_tower_training_data import sample_random_tower, vectorize
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler, unprocess
 from tower_planner import TowerPlanner
@@ -146,11 +146,12 @@ def sample_unlabeled_data(n_samples, block_set=None, range_n_blocks=(2, 5)):
     :param block_set (optional): blocks to use in towers. generate new blocks if None
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
-    keys = ['2block', '3block', '4block', '5block']
-
     # initialize a dictionary of lists to store the generated data
-    sampled_towers = {k: {} for k in keys}
-    for k in keys:
+
+    sampled_towers = {}
+    for i in range(range_n_blocks[0], range_n_blocks[1]+1):
+        k = f'{i}block'
+        sampled_towers[k] = {}
         sampled_towers[k]['towers'] = []
         sampled_towers[k]['labels'] = []
         if block_set is not None:
@@ -178,7 +179,7 @@ def sample_unlabeled_data(n_samples, block_set=None, range_n_blocks=(2, 5)):
             sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
     
     # convert all the sampled towers to numpy arrays
-    for k in keys:
+    for k in sampled_towers.keys():
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
         sampled_towers[k]['labels'] = np.zeros((sampled_towers[k]['towers'].shape[0],))
         if block_set is not None:
@@ -186,35 +187,46 @@ def sample_unlabeled_data(n_samples, block_set=None, range_n_blocks=(2, 5)):
 
     return sampled_towers
 
-def sample_next_block(towers, n_samples, block_set=None):
+def sample_next_block(n_samples, bases={}, block_set=None):
     # if the dataset is empty, we are sampling the 2-block bases of the towers
-    if towers is {}:
+    if bases == {}:
         return sample_unlabeled_data(n_samples, block_set=block_set, range_n_blocks=(2,2))
     # if the dataset is non-empty, then for each tower in the dataset we need to sample
     # a bunch of options for the next block to be placed on top
     else:
-        n_towers = towers['towers'].shape[0]
-        n_blocks_per_tower = np.ceil(n_samples/n_towers).astype(int)
+        assert len(list(bases.keys())) == 1, 'I want all the towers to be the same height cuz i\'m rushing'
+        base_n_blocks_key = list(bases.keys())[0]
+        base_n_blocks = int(base_n_blocks_key.strip('block'))
+        n_towers = bases[base_n_blocks_key]['towers'].shape[0]
+        n_new_blocks_per_base = np.ceil(n_samples/n_towers).astype(int)
         new_towers = []
         new_block_ids = []
         for i in range(n_towers):
             # pull out some information about the tower we're working on
-            current_tower = towers['towers'][i]
+            current_tower = bases[base_n_blocks_key]['towers'][i]
             top_block = current_tower[-1]
             top_block_dims = top_block[4:7]
             top_block_pos = top_block[7:10]
             top_of_tower_height = top_block_pos[2] + top_block_dims[2]/2
 
-            # get n_blocks_per_tower new blocks to add on top of the tower
+            # get n_new_blocks_per_base new blocks to add on top of the tower
             if block_set is None:
-                new_top_blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks_per_tower)]
+                new_top_blocks = [Object.random(f'obj_{ix}') for ix in range(n_new_blocks_per_base)]
             else:
-                block_ids_already_in_tower = towers['block_ids'][i]
+                # we can't duplicate blocks, so only choose new top blocks from the 
+                # blocks that aren't already in the base
+                block_ids_already_in_tower = list(bases[base_n_blocks_key]['block_ids'][i])
                 remaining_blocks = [b for b in block_set if b.name.strip('obj_') not in block_ids_already_in_tower]
-                new_top_blocks = sample_with_replacement(remaining_blocks, k=n_blocks_per_tower)
+                new_top_blocks = sample_with_replacement(remaining_blocks, k=n_new_blocks_per_base)
+                # save the block ids for each of the new towers
+                new_top_block_ids = [b.name.strip('obj_') for b in new_top_blocks]
+                new_block_ids_local = np.zeros([n_new_blocks_per_base, base_n_blocks+1])
+                new_block_ids_local[:,:-1] = block_ids_already_in_tower
+                new_block_ids_local[:,-1] = new_top_block_ids
+                new_block_ids.append(new_block_ids_local)
 
             # get random rotations for each block
-            orns = sample_with_replacement(QUATERNIONS, k=n_blocks_per_tower)
+            orns = sample_with_replacement(QUATERNIONS, k=n_new_blocks_per_base)
 
             # apply the rotations to each block
             rotated_blocks = []
@@ -227,7 +239,7 @@ def sample_next_block(towers, n_samples, block_set=None):
             # figure out how far each block can be moved w/ losing contact w/ the block below
             max_displacements_xy = (top_block_dims[:2] + dims_xy)/2.
             # sample unscaled noise (clip bceause random normal can exceed -1, 1)
-            noise_xy = np.clip(0.5*np.random.randn(n_blocks_per_tower, 2), -0.95, 0.95)
+            noise_xy = np.clip(0.5*np.random.randn(n_new_blocks_per_base, 2), -0.95, 0.95)
             # and scale the noise by the max allowed displacement
             rel_xy = max_displacements_xy * noise_xy
             # and get the actual pos by the difference to the top block pos
@@ -242,14 +254,22 @@ def sample_next_block(towers, n_samples, block_set=None):
                 block.rotation = orn
 
             # create an array to hold all the new towers
-            new_towers_local = np.zeros(n_blocks_per_tower, current_tower.shape[0] + 1, current_tower.shape[1])
+            new_towers_local = np.zeros([n_new_blocks_per_base, current_tower.shape[0] + 1, current_tower.shape[1]])
             # add the existing base of the tower to the array
-            new_towers[:,:-1] = current_tower
+            new_towers_local[:,:-1] = current_tower
             # and add the new top block to each tower
             new_towers_local[:,-1] = vectorize(new_top_blocks)
             new_towers.append(new_towers_local)
 
-        return {'towers': new_towers, 'labels': np.zeros(new_towers.shape[0])}
+        # package the new towers into a dict of the appropriate format. include
+        # block_ids if we are using a block set
+        new_towers = np.concatenate(new_towers)
+        new_samples =   {'towers': new_towers,
+            'labels': np.zeros(new_towers.shape[0])}
+        if block_set is not None:
+            new_samples['block_ids'] = np.concatenate(new_block_ids)
+
+        return {f'{base_n_blocks+1}block': new_samples}
 
 def get_sequential_predictions(dataset, ensemble):
     """
@@ -381,7 +401,7 @@ def get_subset(samples, indices):
     :param samples: A tower_dict structure.
     :param indices: Which indices of the original structure to select.
     """
-    keys = ['2block', '3block', '4block', '5block']
+    keys = samples.keys()
     selected_towers = {k: {'towers': [], 'block_ids': []} for k in keys}
     
     # Initialize tower ranges.
@@ -415,7 +435,9 @@ class PoolSampler:
         """
         Remove chosen examples from the pool.
         """
-        selected_towers = {k: {'towers': []} for k in self.keys}
+        # NOTE(izzy): uhhh, where is samples used in here?
+
+        selected_towers = {k: {'towers': []} for k in self.pool.keys()}
 
         start = 0
         for k in self.keys:

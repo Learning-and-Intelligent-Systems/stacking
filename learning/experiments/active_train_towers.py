@@ -4,7 +4,7 @@ import pickle
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
-from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, get_predictions, get_labels, get_subset, PoolSampler
+from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, get_predictions, get_labels, get_subset, PoolSampler, sample_next_block
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.bottomup_net import BottomUpNet
@@ -121,6 +121,10 @@ def run_active_towers(args):
         val_towers_dict = sample_unlabeled_data(40, block_set=block_set)
         val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger, args.xy_noise)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
+
+
+    if args.strategy == 'subtower-greedy':
+        data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
 
     #print(len(dataset), len(val_dataset)) 
     sampler = TowerSampler(dataset=dataset,
