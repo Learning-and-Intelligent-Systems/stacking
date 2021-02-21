@@ -47,6 +47,18 @@ def visualize_train_constructability(args):
     plt.savefig(logger.get_figure_path('training_constructable_towers.png'))
     #plt.show()
 
+def print_tower_constructability(args): 
+    logger = ActiveExperimentLogger(args.exp_path)
+
+
+    for tx in range(14):
+        towers = logger.get_towers_data(tx)
+        for ti, tower_data in enumerate(towers):
+            #if tx == 12 and ti == 9:
+            #    import pdb; pdb.set_trace()
+            tower, block_ids, label = tower_data
+            print(f"Acquisition index: {tx}, Tower index: {ti}, Tower size: {len(tower)}, stable: {label}")
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path',
@@ -61,4 +73,5 @@ if __name__ == '__main__':
     if args.debug:
         import pdb; pdb.set_trace()
 
+    print_tower_constructability(args)
     visualize_train_constructability(args)

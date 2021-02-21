@@ -210,16 +210,22 @@ class ActiveExperimentLogger:
         torch.save(ensemble.state_dict(), os.path.join(path))
 
     def get_towers_data(self, tx):
+        # Get all tower files at the current acquisition step, in sorted order
+        tower_files = []
+        all_towers = os.listdir(os.path.join(self.exp_path, 'towers'))
+        for tower_file in all_towers:
+            match_str = r'labeled_tower_(.*)_(.*)_(.*)_{}.pkl'.format(tx)
+            if re.match(match_str, tower_file):
+                tower_files.append(tower_file)
+        tower_files.sort()
+        # Extract the tower data from each tower file
         tower_data = []
-        for tower_file in os.listdir(os.path.join(self.exp_path, 'towers')):
-            matches = re.match(r'labeled_tower_(.*)_(.*)_(.*)_(.*).pkl', tower_file)
-            if matches: # sometimes other system files get saved here (eg. .DStore on a mac). don't parse these
-                tower_tx = int(matches.group(4))
-                if tower_tx == tx:
-                    with open(self.get_towers_path(tower_file), 'rb') as handle:
-                        tower_tx_data = pickle.load(handle)
-                    tower_data += [tower_tx_data]
+        for tower_file in tower_files:
+            with open(self.get_towers_path(tower_file), 'rb') as handle:
+                tower_tx_data = pickle.load(handle)
+            tower_data.append(tower_tx_data)
         return tower_data
+
 
     def save_towers_data(self, block_tower, block_ids, label):
         fname = 'labeled_tower_{:%Y-%m-%d_%H-%M-%S}_'.format(datetime.datetime.now())\

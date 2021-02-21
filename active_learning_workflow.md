@@ -16,7 +16,7 @@ Starting the Franka interface
 ```
 cd ~/catkin_ws
 ./franka.sh master
-rosrun franka_interface interface.py
+roslaunch franka_interface interface.launch
 ```
 
 Interactive Python console to reset the robot position/error state
@@ -36,7 +36,7 @@ taskset --cpu-list 10,11 roslaunch panda_vision vision.launch
 Starting the Panda agent server
 
 ```
-taskset --cpu-list 4,5,8,9 rosrun stacking_ros panda_agent_server.py --num-blocks 10 --real -use-vision
+taskset --cpu-list 4,5,8,9 rosrun stacking_ros panda_agent_server.py --num-blocks 10 --real --use-vision
 ```
 
 ## Desktop Setup
@@ -58,5 +58,9 @@ Active learning (restarting from existing results)
 python -m learning.experiments.restart_active_train_towers --exp-path learning/experiments/logs/exp-20210218-161131
 ```
 
+To evaluate current progress, run this with the appropriate arguments (tx).
+```
+python -m learning.evaluate.plot_model_accuracy --exp-paths learning/experiments/logs/robot-seq-init-sim-20210219-131924 --max-acquisitions <tx> --plot-step 1 --test-set-fname learning/evaluate/test_datasets/eval_blocks_test_dataset.pkl --output-fname test
+```
 ## Video collection laptop setup
 FFMpeg magic command

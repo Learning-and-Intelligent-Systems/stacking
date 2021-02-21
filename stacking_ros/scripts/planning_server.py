@@ -333,7 +333,7 @@ class PlanningServer():
             else:
                 ret_dict = {}
                 plan = self.pddlstream_plan(ret_dict, init, goal, fixed_objs, self.max_tries)
-                plan = ret_dict["plan"]
+                #plan = ret_dict["plan"]
 
             if self.cancel_planning:
                 print("Discarding latest plan")
@@ -442,6 +442,7 @@ class PlanningServer():
             print(f"\n\nPlanning try {num_tries}...\n\n")
             saved_world = pb_robot.utils.WorldSaver()
             start = time.time()
+            
             # print_planning_problem(init, goal, fixed_objs)
 
             # Simulate planning failures (for testing)
@@ -484,7 +485,8 @@ class PlanningServer():
 
         print('Planning Complete: Time %f seconds' % duration)
         print(f"\nFINAL PLAN:\n{plan}\nCOST: {cost}\n")
-        return_dict["plan"] = dill.dumps(plan)
+        if self.multiprocessing:
+            return_dict["plan"] = dill.dumps(plan)
         return plan
 
 

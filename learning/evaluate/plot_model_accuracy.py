@@ -21,6 +21,8 @@ def calc_model_accuracy(logger, dataset, args, exp_path):
     for tx in eval_range:
         print('Acquisition step '+str(tx))
         ensemble = logger.get_ensemble(tx)
+        if torch.cuda.is_available():
+            ensemble = ensemble.cuda()
         preds = get_sequential_predictions(dataset, ensemble)
         preds = preds.mean(axis=1).round()
         

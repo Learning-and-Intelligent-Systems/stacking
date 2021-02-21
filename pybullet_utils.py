@@ -34,7 +34,7 @@ class PyBulletServer():
     def get_vel(self, object_id):
         return p.getBaseVelocity(object_id, physicsClientId=self.client)
 
-    def vis_frame(self, pos, quat, length=0.2, lifeTime=0.4):
+    def vis_frame(self, pos, quat, length=0.2, lifeTime=0.):
         """ This function visualizes a coordinate frame for the supplied frame where the
         red,green,blue lines correpsond to the x,y,z axes.
         :param p: a vector of length 3, position of the frame (x,y,z)
