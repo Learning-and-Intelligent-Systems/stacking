@@ -62,5 +62,16 @@ To evaluate current progress, run this with the appropriate arguments (tx).
 ```
 python -m learning.evaluate.plot_model_accuracy --exp-paths learning/experiments/logs/robot-seq-init-sim-20210219-131924 --max-acquisitions <tx> --plot-step 1 --test-set-fname learning/evaluate/test_datasets/eval_blocks_test_dataset.pkl --output-fname test
 ```
+
+If a tower is mislabeled, run the following BEFORE the end of the full acquisition. ```<tx>``` and ```<tn>``` correspond to the ints in the towers file name. The <l> is 
+the correct label.
+```
+python -m learning.experiments.fix_tower_label --exp-path <path> --acquisition-step <tx>
+--tower-number <tn> --label <l>
+```
+NOTE: If you notice a tower was mislabeled after the full acquisition is done (saved to
+acquired.pkl), then there is a fix by using ```experiments/acquired_data_from_towers.py```
+and manually doing some file management.
+
 ## Video collection laptop setup
 FFMpeg magic command
