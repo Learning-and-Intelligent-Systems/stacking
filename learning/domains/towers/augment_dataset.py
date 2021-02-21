@@ -11,7 +11,8 @@ from scipy.spatial.transform import Rotation as R
 
 def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
     datasets = {}
-    for num_blocks in range(2, 6):
+    for k_block in all_data.keys():
+        num_blocks = int(k_block.strip('block'))
         #print('Augmenting %d block towers...' % num_blocks)
         data = all_data[f'{num_blocks}block']
         # load the tower data
