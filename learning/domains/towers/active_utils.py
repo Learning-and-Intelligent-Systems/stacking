@@ -336,6 +336,12 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
     :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
     :return:
     """
+    labeled_samples = {'%dblock' % k : {} for k in [2,3,4,5]}
+    for k in labeled_samples:
+        labeled_samples[k]['towers'] = []
+        labeled_samples[k]['block_ids'] = []
+        labeled_samples[k]['labels'] = []
+        
     tp = TowerPlanner(stability_mode='contains')
     for k in samples.keys():
         n_towers, n_blocks, _ = samples[k]['towers'].shape
@@ -355,17 +361,34 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
                 block_tower.append(block)
             #  Use tp to check for stability.
             if exec_mode == 'simple-model' or exec_mode == 'noisy-model':
-                if not tp.tower_is_constructable(block_tower):
-                    labels[ix] = 0.
-                if save_tower:
-                    if 'block_ids' in samples[k].keys():
-                        logger.save_towers_data(samples[k]['towers'][ix, :, :], 
-                                                samples[k]['block_ids'][ix, :],
-                                                labels[ix])
+                
+                # iterate through each subtower until it falls (is not constructable)
+                subtowers = [block_tower[:k_sub] for k_sub in list(range(2,len(block_tower)+1))]
+                for k_sub, subtower in enumerate(subtowers, 2):
+                    if tp.tower_is_constructable(subtower):
+                        label = 1.0
                     else:
-                        logger.save_towers_data(samples[k]['towers'][ix, :, :], 
-                                                None,
-                                                labels[ix])
+                        label = 0.0
+                    
+                    # add to labeled samples    
+                    labeled_samples['%dblock' % k_sub]['towers'].append(samples[k]['towers'][ix, :k_sub, :])
+                    if 'block_ids' in labeled_samples['%dblock' % k_sub]:
+                        labeled_samples['%dblock' % k_sub]['block_ids'].append(samples[k]['block_ids'][ix, :k_sub])
+                    labeled_samples['%dblock' % k_sub]['labels'].append(label)
+                    
+                    # save tower file
+                    if save_tower:
+                        if 'block_ids' in samples[k].keys():
+                            logger.save_towers_data(samples[k]['towers'][ix, :k_sub, :], 
+                                                    samples[k]['block_ids'][ix, :k_sub],
+                                                    label)
+                        else:
+                            logger.save_towers_data(samples[k]['towers'][ix, :k_sub, :], 
+                                                    None,
+                                                    label)
+                    # stop when tower falls
+                    if label == 0.0:
+                        break
             else:
                 vis = True
                 success = False
@@ -392,7 +415,20 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
                                             None,
                                             labels[ix])
         samples[k]['labels'] = labels
-    return samples
+        
+    if exec_mode == 'noisy-model' or exec_mode == 'simple-model':
+        # vectorize labeled samples and return
+        for ki, k in enumerate(labeled_samples, 2):
+            if labeled_samples[k]['towers'] == []:
+                labeled_samples[k]['towers'] = np.zeros((0,ki,21))
+                labeled_samples[k]['block_ids'] = np.zeros((0,ki))
+                labeled_samples[k]['labels'] = np.zeros(0)
+            labeled_samples[k]['towers'] = np.array(labeled_samples[k]['towers'])
+            labeled_samples[k]['block_ids'] = np.array(labeled_samples[k]['block_ids'])
+            labeled_samples[k]['labels'] = np.array(labeled_samples[k]['labels'])
+        return labeled_samples
+    else:
+        return samples
 
 
 def get_subset(samples, indices):
