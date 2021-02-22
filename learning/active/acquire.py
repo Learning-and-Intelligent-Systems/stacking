@@ -42,27 +42,27 @@ def subtower_bald(samples, ensemble, data_pred_fn):
     for k in samples.keys():
         n_blocks = int(k.strip('block'))
         data = samples[k]['towers']
+        if data.shape[0] != 0: # only score if there is data for this k
+            # predict subtower constructability with the ensemble
+            subtower_preds = []
+            subtower_scores = []
+            for i in range(2, n_blocks+1):
+                subtowers = {f'{i}block': {'towers': data[:,:i,:],
+                                           'labels': np.zeros(data.shape[0])}}
+                subtower_preds.append(data_pred_fn(subtowers, ensemble))
+                subtower_scores.append(bald(subtower_preds[-1]))
 
-        # predict subtower constructability with the ensemble
-        subtower_preds = []
-        subtower_scores = []
-        for i in range(2, n_blocks+1):
-            subtowers = {f'{i}block': {'towers': data[:,:i,:],
-                                       'labels': np.zeros(data.shape[0])}}
-            subtower_preds.append(data_pred_fn(subtowers, ensemble))
-            subtower_scores.append(bald(subtower_preds[-1]))
+            subtower_preds = torch.stack(subtower_preds)
+            subtower_scores = torch.stack(subtower_scores)
 
-        subtower_preds = torch.stack(subtower_preds)
-        subtower_scores = torch.stack(subtower_scores)
-
-        # to avoid being greedy, we need to consider that building risky
-        # towers might prevent us from observing every block in that tower,
-        # so we multiply the bald score for each added block by the
-        # predicted probability that the tower will reach that height
-        two_block_scores = subtower_scores[0]
-        constructability = subtower_preds.mean(axis=2)
-        n_block_expected_scores = (constructability[:-1] * subtower_scores[1:]).sum(axis=0)
-        scores.append(two_block_scores + n_block_expected_scores)
+            # to avoid being greedy, we need to consider that building risky
+            # towers might prevent us from observing every block in that tower,
+            # so we multiply the bald score for each added block by the
+            # predicted probability that the tower will reach that height
+            two_block_scores = subtower_scores[0]
+            constructability = subtower_preds.mean(axis=2)
+            n_block_expected_scores = (constructability[:-1] * subtower_scores[1:]).sum(axis=0)
+            scores.append(two_block_scores + n_block_expected_scores)
 
     return torch.cat(scores)
 
