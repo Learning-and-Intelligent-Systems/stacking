@@ -73,16 +73,21 @@ def plot_planner_performance(loggers, args, y_axis, method, fname):
     if len(loggers) > 1:
         plot_dir = 'learning/experiments/logs/paper_plots/combine_models/'+method
         if not os.path.exists(plot_dir): os.makedirs(plot_dir)
-        plt.savefig(plot_dir+'/'+fname[:-4]+'.png')
+        fig_path = os.path.join(plot_dir, fname[:-4]+'.png')
+        plt.savefig(fig_path)
+        print('Saved to %s.' % fig_path)
     else:
-        plt.savefig(loggers[0].get_figure_path(+fname[:-4]+'.png'))
+        plt.savefig(loggers[0].get_figure_path(fname[:-4]+'.png'))
     plt.close()
     
     return xs, plot_data
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp-path-root', 
+    parser.add_argument('--exp-path-root',
+                        type=str,
+                        required=True)
+    parser.add_argument('--exp-path-prefix', 
                         type=str,
                         required=True)
     parser.add_argument('--debug',
@@ -95,7 +100,12 @@ if __name__ == '__main__':
     parser.add_argument('--max-acquisitions',
                         type=int, 
                         help='evaluate from 0 to this acquisition step (use either this or --acquisition-step)')
-    
+    parser.add_argument('--runs',
+                        nargs='+',
+                        default=[0, 1, 2, 3, 4])
+    parser.add_argument('--problems',
+                        default=['tallest', 'min_contact', 'max_overhang'],
+                        nargs='+')
     args = parser.parse_args()
     
     args.tower_sizes = [int(ts) for ts in args.tower_sizes]
@@ -103,25 +113,25 @@ if __name__ == '__main__':
     if args.debug:
         import pdb; pdb.set_trace()
  
-    # find exp_paths with the given root in paper_results/
-    results_path = 'paper_results'
-    exp_path_roots = [args.exp_path_root+'-'+str(r) for r in [0, 1, 2, 3, 4]]
-    all_paper_results = os.listdir(results_path)
-    exp_paths = []
-    for result in all_paper_results:
+    # find exp_paths with the given prefix
+    exp_path_roots = ['%s-%d' % (args.exp_path_prefix, r) for r in args.runs]
+    all_results = os.listdir(args.exp_path_root)
+    relevant_exp_paths = []
+    for result in all_results:
         for exp_path_root in exp_path_roots:
             if exp_path_root in result:
-                exp_paths.append(result)
-    print(exp_paths)
+                relevant_exp_paths.append(os.path.join(args.exp_path_root, result))
+    print(relevant_exp_paths)
     
     loggers = []
-    for exp_path in exp_paths:
-        loggers.append(ActiveExperimentLogger(os.path.join(results_path, exp_path)))
+    for exp_path in relevant_exp_paths:
+        loggers.append(ActiveExperimentLogger(exp_path))
         
     y_axis = 'Regret' # TODO: detect from file name?
-    method = args.exp_path_root[:-2]
-    fnames = ['random_planner_tallest_2345_block_towers_regrets.pkl', \
-                'random_planner_min_contact_2345_block_towers_regrets.pkl', \
-                'random_planner_max_overhang_2345_block_towers_regrets.pkl']
+    label = args.exp_path_prefix
+    fnames = []
+    for tower_size in args.tower_sizes:
+        for problem in args.problems:
+            fnames += ['random_planner_%s_%d_block_towers_regrets.pkl' % (problem, tower_size)]
     for fname in fnames:
-        plot_planner_performance(loggers, args, y_axis, method, fname)
+        plot_planner_performance(loggers, args, y_axis, label, fname)

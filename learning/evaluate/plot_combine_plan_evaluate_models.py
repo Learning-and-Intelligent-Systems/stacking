@@ -3,32 +3,45 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from datetime import datetime
 
 from learning.active.utils import ActiveExperimentLogger
 from learning.evaluate.plot_plan_evaluate_models import plot_planner_performance
 
 def plot_all_task_performance(xs, plot_task_data, args, task):
-    fig, axes = plt.subplots(len(args.tower_sizes), figsize=(7, 15))
+    plot_height = 4*len(args.tower_sizes)
+    fig, axes = plt.subplots(len(args.tower_sizes), figsize=(7, plot_height))
     for mi, (method, method_plot_data) in enumerate(plot_task_data.items()):
-        for ai, (tower_size, plot_data) in enumerate(method_plot_data.items()):
-            axes[ai].plot(xs, plot_data['median'], label=method)
-            axes[ai].fill_between(xs, plot_data['lower25'], plot_data['upper75'], alpha=0.2)
-            axes[ai].set_ylim(0, 1)
-            axes[ai].set_ylabel('Regret')
-            axes[ai].set_xlabel('Number of Training Towers')
-            axes[ai].legend()
+        if len(method_plot_data) == 1:
+            key = list(method_plot_data.keys())[0]
+            axes.plot(xs, method_plot_data[key]['median'], label=method)
+            axes.fill_between(xs, method_plot_data[key]['lower25'], method_plot_data[key]['upper75'], alpha=0.2)
+            axes.set_ylim(0, 1)
+            axes.set_ylabel('Regret')
+            axes.set_xlabel('Number of Training Towers')
+            axes.legend()
+        else:
+            for ai, (tower_size, plot_data) in enumerate(method_plot_data.items()):
+                axes[ai].plot(xs, plot_data['median'], label=method)
+                axes[ai].fill_between(xs, plot_data['lower25'], plot_data['upper75'], alpha=0.2)
+                axes[ai].set_ylim(0, 1)
+                axes[ai].set_ylabel('Regret')
+                axes[ai].set_xlabel('Number of Training Towers')
+                axes[ai].legend()
             
     fig.suptitle(task)
     plot_dir = 'learning/experiments/logs/paper_plots/compare_methods/'
     if not os.path.exists(plot_dir): os.makedirs(plot_dir)
-    plt.savefig(plot_dir+task+'.png')
+    timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
+    plt.savefig('%s_%s.png' % (os.path.join(plot_dir, task), timestamp))
     plt.close()
-    
-    
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp-path-roots', 
+    parser.add_argument('--exp-path-root',
+                        type=str,
+                        required=True)
+    parser.add_argument('--exp-path-prefixes', 
                         nargs='+',
                         required=True)
     parser.add_argument('--debug',
@@ -60,11 +73,10 @@ if __name__ == '__main__':
     max_overhang_plot_data = {}
     all_plot_data = [tallest_tower_plot_data, min_contact_plot_data, max_overhang_plot_data]
     y_axis = 'Regret' # TODO: detect from file name?
-    for exp_path_root in args.exp_path_roots:
-        # find exp_paths with the given root in paper_results/
-        results_path = 'paper_results'
+    for exp_path_root in args.exp_path_prefixes:
+        # find exp_paths with the given root
         exp_path_full_roots = [exp_path_root+'-'+str(r) for r in args.runs]
-        all_paper_results = os.listdir(results_path)
+        all_paper_results = os.listdir(args.exp_path_root)
         exp_paths = []
         for result in all_paper_results:
             for exp_path_full_root in exp_path_full_roots:
@@ -73,18 +85,21 @@ if __name__ == '__main__':
         
         loggers = []
         for exp_path in exp_paths:
-            loggers.append(ActiveExperimentLogger(os.path.join(results_path, exp_path)))
+            loggers.append(ActiveExperimentLogger(os.path.join(args.exp_path_root, exp_path)))
             
-        
         label = exp_path_root
         fnames = []
-        for problem in args.problems:
-            fnames += ['random_planner_'+problem+'_2345_block_towers_regrets.pkl']
+        for tower_size in args.tower_sizes:
+            for problem in args.problems:
+                fnames += ['random_planner_%s_%d_block_towers_regrets.pkl' % (problem, tower_size)]
             
         for fname, task_plot_data in zip(fnames, all_plot_data):
             xs, plot_data = plot_planner_performance(loggers, args, y_axis, label, fname)
             task_plot_data[label] = plot_data
             
-    tasks = ['Tallest Tower', 'Minimum Contact', 'Maximum Overhang']
+    tasks = []
+    if 'tallest' in args.problems: tasks.append('Tallest Tower')
+    if 'min_contact' in args.problems: tasks.append('Minimum Contact')
+    if 'max_overhang' in args.problems: tasks.append('Maximum Overhang')
     for task, task_plot_data in zip(tasks, all_plot_data):
         plot_all_task_performance(xs, task_plot_data, args, task)
