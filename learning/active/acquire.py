@@ -61,6 +61,11 @@ def subtower_bald(samples, ensemble, data_pred_fn):
             # predicted probability that the tower will reach that height
             two_block_scores = subtower_scores[0]
             constructability = subtower_preds.mean(axis=2)
+
+            # NOTE(izzy): this is the change Mike proposed where we need to take the product
+            # of the predicted "add-block-ability" labels for each subtower to get constuctability
+            constructability = torch.cumprod(constructability, axis=0)
+
             n_block_expected_scores = (constructability[:-1] * subtower_scores[1:]).sum(axis=0)
             scores.append(two_block_scores + n_block_expected_scores)
 
