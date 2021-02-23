@@ -29,13 +29,15 @@ def plot_planner_performance(loggers, args, y_axis, method, fname):
     for tsk in all_rs:
         n_towers = len(all_rs[tsk][0][0])
         acquisition_plot_steps = len(range(0, args.max_acquisitions, acquisition_step_size))
-        txs = list(range(0, n_towers*acquisition_plot_steps, n_towers)) # indices into lists
 
         median, lower25, upper75 = [], [], []
-        for tx in range(len(all_rs[tsk][0])):
+        for tx in range(acquisition_plot_steps):
             tx_rs = []
             for rs in all_rs[tsk]:
-                tx_rs.append(rs[tx])
+                try:
+                    tx_rs.append(rs[tx])
+                except Exception as e:
+                    print('You are asking for more acquisition steps than exist in the exp_path. Try a lower args.max_acquisitions.')
             median.append(np.median(tx_rs))
             lower25.append(np.quantile(tx_rs, 0.25))
             upper75.append(np.quantile(tx_rs, 0.75))
