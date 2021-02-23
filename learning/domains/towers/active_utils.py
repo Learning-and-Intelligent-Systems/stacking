@@ -328,7 +328,7 @@ def get_predictions(dataset, ensemble):
     return torch.cat(preds, dim=0)
 
 
-def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
+def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False, label_subtowers=False):
     """ Takes as input a dictionary from the get_subset function. 
     Augment it with stability labels. 
     :param samples:
@@ -391,6 +391,7 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
                     # stop when tower falls
                     if label == 0.0:
                         block_placements += k_sub
+                        labels[ix] = 0.0
                         break
             else:
                 vis = True
@@ -418,8 +419,12 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
                                             None,
                                             labels[ix])
         samples[k]['labels'] = labels
+    
+    if save_tower:
+        # save block placement data
+        logger.save_block_placement_data(block_placements)
         
-    if exec_mode == 'noisy-model' or exec_mode == 'simple-model':
+    if label_subtowers:
         # vectorize labeled samples and return
         for ki, k in enumerate(labeled_samples, 2):
             if labeled_samples[k]['towers'] == []:
@@ -429,10 +434,6 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
             labeled_samples[k]['towers'] = np.array(labeled_samples[k]['towers'])
             labeled_samples[k]['block_ids'] = np.array(labeled_samples[k]['block_ids'])
             labeled_samples[k]['labels'] = np.array(labeled_samples[k]['labels'])
-            
-        if save_tower:
-            # save block placement data
-            logger.save_block_placement_data(block_placements)
         return labeled_samples
     else:
         return samples

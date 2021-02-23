@@ -139,5 +139,8 @@ def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn
         xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
 
     logger.save_unlabeled_acquisition_data(xs)
-    new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True)
+    if strategy == 'subtower-greedy' or strategy == 'subtower':
+        new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=True)
+    else:
+        new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=False)
     return new_data, unlabeled_pool
