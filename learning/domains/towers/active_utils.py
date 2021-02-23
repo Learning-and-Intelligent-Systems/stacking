@@ -342,6 +342,8 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
         labeled_samples[k]['block_ids'] = []
         labeled_samples[k]['labels'] = []
         
+    block_placements = 0
+        
     tp = TowerPlanner(stability_mode='contains')
     for k in samples.keys():
         n_towers, n_blocks, _ = samples[k]['towers'].shape
@@ -388,6 +390,7 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
                                                     label)
                     # stop when tower falls
                     if label == 0.0:
+                        block_placements += k_sub
                         break
             else:
                 vis = True
@@ -426,6 +429,10 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False):
             labeled_samples[k]['towers'] = np.array(labeled_samples[k]['towers'])
             labeled_samples[k]['block_ids'] = np.array(labeled_samples[k]['block_ids'])
             labeled_samples[k]['labels'] = np.array(labeled_samples[k]['labels'])
+            
+        if save_tower:
+            # save block placement data
+            logger.save_block_placement_data(block_placements)
         return labeled_samples
     else:
         return samples
