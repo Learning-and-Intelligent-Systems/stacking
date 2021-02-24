@@ -832,7 +832,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
                 
                 elif args.exec_mode == 'sim' or args.exec_mode == 'real':
                     # save tower info to /towers to be executed separately
-                    logger.save_evaluation_tower(tx, block_tower, args.planning_model)
+                    logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model)
 
             if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
                 regrets[k].append(curr_regrets)
@@ -849,10 +849,25 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
     # if just ran for one acquisition step, output final regret and reward
     if args.acquisition_step is not None:
         if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-            final_regret = np.median(regrets[k][0][0])
-            final_reward = np.median(rewards[k][0][0])
-            print('Final Regret: ', final_regret)
-            print('Final Reward: ', final_reward)
+            final_median_regret = np.median(regrets[k][0])
+            final_upper75_regret = np.quantile(regrets[k][0], 0.75)
+            final_lower25_regret = np.quantile(regrets[k][0][0], 0.25)
+            
+            final_median_reward = np.median(rewards[k][0])
+            final_upper75_reward = np.quantile(rewards[k][0], 0.75)
+            final_lower25_reward = np.quantile(rewards[k][0], 0.25)
+            
+            final_average_regret = np.average(regrets[k][0])
+            final_std_regret = np.std(regrets[k][0])
+            
+            final_average_reward = np.average(rewards[k][0])
+            final_std_reward = np.std(rewards[k][0])
+            
+            print('Final Median Regret: (%f) %f (%f)' % (final_lower25_regret, final_median_regret, final_upper75_regret))
+            print('Final Median Reward: (%f) %f (%f)' % (final_lower25_reward, final_median_reward, final_upper75_reward))
+            
+            print('Final Average Regret: %f +/- %f' % (final_average_regret, final_std_regret))
+            print('Final Average Reward: %f +/- %f' % (final_average_reward, final_std_reward))
 
 def plot_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:

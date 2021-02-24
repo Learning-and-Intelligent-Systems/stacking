@@ -271,7 +271,7 @@ class ActiveExperimentLogger:
             print('acquired_%d.pkl not found on path' % tx)
             return None, None
             
-    def save_evaluation_tower(self, tx, tower, planning_model):
+    def save_evaluation_tower(self, tower, reward, max_reward, tx, planning_model):
         tower_file = 'towers_%d.pkl' % tx
         tower_height = len(tower)
         tower_key = '%dblock' % tower_height
@@ -284,8 +284,8 @@ class ActiveExperimentLogger:
             with open(os.path.join(tower_path, tower_file), 'rb') as f:
                 towers = pickle.load(f)
         if tower_key in towers:
-            towers[tower_key].append(tower)
+            towers[tower_key].append((tower, reward, max_reward))
         else:
-            towers[tower_key] = [tower]
+            towers[tower_key] = [(tower, reward, max_reward)]
         with open(os.path.join(tower_path, tower_file), 'wb') as f:
             pickle.dump(towers, f)        
