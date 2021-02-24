@@ -754,6 +754,10 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
                 ep.n_samples = 20000
             elif size == 5:
                 ep.n_samples = 100000
+            elif size == 6:
+                ep.n_samples = 250000
+            elif size == 7:
+                ep.n_samples = 500000
             num_failures, num_pw_failures = 0, 0
             curr_regrets = []
             curr_rewards = []
@@ -766,73 +770,89 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
                 else:
                     plan_blocks = [Object.random() for _ in range(size)]
                     
-                tower, reward, max_reward = ep.plan(plan_blocks, ensemble, reward_fn, num_blocks=size, discrete=args.discrete)
-                # perturb tower
+                tower, reward, max_reward, tower_block_ids = ep.plan(plan_blocks, 
+                                                                ensemble, 
+                                                                reward_fn,
+                                                                args,
+                                                                num_blocks=size)
                 block_tower = []
-                for vec_block in tower:
-                    vec_block[7:9] += np.random.randn(2)*args.xy_noise 
-                    block_tower.append(Object.from_vector(vec_block))
-                if not tp.tower_is_constructable(block_tower):
-                    reward = 0
-                    num_failures += 1
-                    if tp.tower_is_pairwise_stable(block_tower):
-                        num_pw_failures += 1
-                    else:
-                        pairs = []
-                        dists = []
-                        for i in range(len(tower) - 1):
-                            # check that each pair of blocks is stably individually
-                            top = block_tower[i+1]
-                            bottom = block_tower[i]
-                            if not tp.pair_is_stable(bottom, top): 
-                                pairs.append(False)
-                            else:
-                                pairs.append(True)
-                            top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
-                            top_rel_com = top_rel_pos + top.com
-                            dists.append((np.abs(top_rel_com)*2 - bottom.dimensions)[:2])
-                        print('Pairs:', pairs, dists)
-                        
-                
-                print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
-                print('Global Stable:', tp.tower_is_stable(block_tower))
+                for vec_block, block_id in zip(tower, tower_block_ids):
+                    if args.exec_mode == 'noisy-model':
+                        vec_block[7:9] += np.random.randn(2)*args.xy_noise 
+                    block = Object.from_vector(vec_block)
+                    block.name = 'obj_%d' % block_id
+                    block_tower.append(block)
 
-                if False and reward != 0:
-                    print(reward, max_reward)
-                    w = World(block_tower)
-                    env = Environment([w], vis_sim=True, vis_frames=True)
-                    input()
-                    for tx in range(240):
-                        env.step(vis_frames=True)
-                        time.sleep(1/240.)
-                    env.disconnect()
+                # build found tower
+                if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
+                    if not tp.tower_is_constructable(block_tower):
+                        reward = 0
+                        num_failures += 1
+                        if tp.tower_is_pairwise_stable(block_tower):
+                            num_pw_failures += 1
+                        else:
+                            pairs = []
+                            dists = []
+                            for i in range(len(tower) - 1):
+                                # check that each pair of blocks is stably individually
+                                top = block_tower[i+1]
+                                bottom = block_tower[i]
+                                if not tp.pair_is_stable(bottom, top): 
+                                    pairs.append(False)
+                                else:
+                                    pairs.append(True)
+                                top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
+                                top_rel_com = top_rel_pos + top.com
+                                dists.append((np.abs(top_rel_com)*2 - bottom.dimensions)[:2])
+                            print('Pairs:', pairs, dists)
+                            
+                    print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
+                    print('Global Stable:', tp.tower_is_stable(block_tower))
+                    
+                    if False and reward != 0:
+                        print(reward, max_reward)
+                        w = World(block_tower)
+                        env = Environment([w], vis_sim=True, vis_frames=True)
+                        input()
+                        for tx in range(240):
+                            env.step(vis_frames=True)
+                            time.sleep(1/240.)
+                        env.disconnect()
                 
-                # Note that in general max reward may not be the best possible due to sampling.
-                #ground_truth = np.sum([np.max(b.dimensions) for b in blocks])
-                #print(max_reward, ground_truth)
+                    # Note that in general max reward may not be the best possible due to sampling.
+                    #ground_truth = np.sum([np.max(b.dimensions) for b in blocks])
+                    #print(max_reward, ground_truth)
 
-                # Compare heights and calculate regret.
-                regret = (max_reward - reward)/max_reward
-                #print(reward, max_reward)
-                #print(regret)
-                curr_regrets.append(regret)
-                curr_rewards.append(reward)
-            regrets[k].append(curr_regrets)
-            rewards[k].append(curr_rewards)
+                    # Compare heights and calculate regret.
+                    regret = (max_reward - reward)/max_reward
+                    #print(reward, max_reward)
+                    #print(regret)
+                    curr_regrets.append(regret)
+                    curr_rewards.append(reward)
+                
+                elif args.exec_mode == 'sim' or args.exec_mode == 'real':
+                    # save tower info to /towers to be executed separately
+                    logger.save_evaluation_tower(tx, block_tower, args.planning_model)
+
+            if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
+                regrets[k].append(curr_regrets)
+                rewards[k].append(curr_rewards)
 
         if args.max_acquisitions is not None:
-            with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
-                pickle.dump(regrets, handle)
-                
-            with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
-                pickle.dump(rewards, handle)
+            if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
+                with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
+                    pickle.dump(regrets, handle)
+                    
+                with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
+                    pickle.dump(rewards, handle)
             
     # if just ran for one acquisition step, output final regret and reward
     if args.acquisition_step is not None:
-        final_regret = np.median(regrets[k][0][0])
-        final_reward = np.median(rewards[k][0][0])
-        print('Final Regret: ', final_regret)
-        print('Final Reward: ', final_reward)
+        if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
+            final_regret = np.median(regrets[k][0][0])
+            final_reward = np.median(rewards[k][0][0])
+            print('Final Regret: ', final_regret)
+            print('Final Reward: ', final_reward)
 
 def plot_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:

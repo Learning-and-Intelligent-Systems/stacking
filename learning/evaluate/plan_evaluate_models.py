@@ -1,13 +1,17 @@
 import argparse
 import pickle
 import numpy as np
+import sys
 
+from agents.panda_agent import PandaAgent, PandaClientAgent
 from learning.active.utils import ActiveExperimentLogger
 from block_utils import Object
 from learning.evaluate.active_evaluate_towers import tallest_tower_regret_evaluation, \
         longest_overhang_regret_evaluation, min_contact_regret_evaluation
 
 if __name__ == '__main__':
+    import time
+    start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--problem', 
                         choices=['tallest', 'overhang', 'min-contact', 'deconstruct'], 
@@ -18,8 +22,7 @@ if __name__ == '__main__':
                         default='',
                         help='path to the block set file. if not set, args.n_blocks random blocks generated.')
     parser.add_argument('--exp-path', 
-                        type=str, 
-                        required=True)
+                        type=str)
     parser.add_argument('--max-acquisitions',
                         type=int, 
                         help='evaluate from 0 to this acquisition step (use either this or --acquisition-step)')
@@ -38,24 +41,38 @@ if __name__ == '__main__':
                         help='use if you want to ONLY search the space of block orderings and orientations')
     parser.add_argument('--tower-sizes',
                         default=[5],
+                        type=int,
                         nargs='+',
                         help='number of blocks in goal tower (can do multiple)')
     parser.add_argument('--xy-noise',
                         type=float,
-                        required=True,
-                        help='noise to add to xy position of blocks')
+                        help='noise to add to xy position of blocks if exec-mode==noisy-model')
+    parser.add_argument('--exec-mode',
+                        type=str,
+                        default='simple-model',
+                        choices=['simple-model', 'noisy-model', 'sim', 'real'],
+                        help='this is the method used to execute the found plan')
+    parser.add_argument('--planning-model',
+                        type=str,
+                        default='learned',
+                        choices=['learned', 'noisy-model', 'simple-model'],
+                        help='this is the model used at planning time to determine the probability of a tower being stable')
     
     args = parser.parse_args()
-    
-    args.tower_sizes = [int(ts) for ts in args.tower_sizes]
-    
-    assert ((args.acquisition_step is None) and (args.max_acquisitions is not None)) \
-            or ((args.max_acquisitions is None) and (args.acquisition_step is not None)), \
-            'must set EITHER --aquisition-step OR --max-acquisitions'
-    
+
     if args.debug:
         import pdb; pdb.set_trace()
  
+    assert ((args.acquisition_step is None) and (args.max_acquisitions is not None)) \
+            or ((args.max_acquisitions is None) and (args.acquisition_step is not None)), \
+            'must set EITHER --aquisition-step OR --max-acquisitions'
+     
+    if args.planning_model == 'noisy-model' and not args.xy_noise:
+        sys.exit('Error: If planning with noisy model, MUST set args.xy_noise')
+        
+    if args.planning_model == 'learned' and not args.exp_path:
+        sys.exit('Error: If planning with learned model, MUST set args.exp_path')
+     
     if args.block_set_fname != '':
         with open(args.block_set_fname, 'rb') as f:
             block_set = pickle.load(f)
@@ -75,4 +92,6 @@ if __name__ == '__main__':
     elif args.problem == 'min-contact':
         fname = pre+'random_planner_min_contact_'+ts_str+'_block_towers'
         min_contact_regret_evaluation(logger, block_set, fname, args)
+    end = time.time()
+    print('Planner Runtime: %f sec' % (end - start))
     
