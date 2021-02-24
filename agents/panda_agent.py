@@ -548,7 +548,7 @@ class PandaAgent:
             else:
                 ros_req.robot_config.angles = self.robot.arm.GetJointValues()
             ros_req.init_state = block_init_to_ros(self.pddl_blocks)
-            rosstack_stable_req.goal_state = ros_req.goal_state[num_success:]
+            ros_req.goal_state = ros_req.goal_state[num_success:]
             success, _, reset_stable, num_success, fatal = \
                 self.execute_plans_from_server(ros_req, real, T, stack=False)
             print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
