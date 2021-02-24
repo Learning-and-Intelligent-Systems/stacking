@@ -38,6 +38,7 @@ if __name__ == '__main__':
                         help='use if you want to ONLY search the space of block orderings and orientations')
     parser.add_argument('--tower-sizes',
                         default=[5],
+                        type=int,
                         nargs='+',
                         help='number of blocks in goal tower (can do multiple)')
     parser.add_argument('--xy-noise',
@@ -46,8 +47,6 @@ if __name__ == '__main__':
                         help='noise to add to xy position of blocks')
     
     args = parser.parse_args()
-    
-    args.tower_sizes = [int(ts) for ts in args.tower_sizes]
     
     assert ((args.acquisition_step is None) and (args.max_acquisitions is not None)) \
             or ((args.max_acquisitions is None) and (args.acquisition_step is not None)), \
