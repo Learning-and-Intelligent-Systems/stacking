@@ -548,7 +548,7 @@ class PandaAgent:
             else:
                 ros_req.robot_config.angles = self.robot.arm.GetJointValues()
             ros_req.init_state = block_init_to_ros(self.pddl_blocks)
-            ros_req.goal_state = ros_req.goal_state[num_success:]
+            rosstack_stable_req.goal_state = ros_req.goal_state[num_success:]
             success, _, reset_stable, num_success, fatal = \
                 self.execute_plans_from_server(ros_req, real, T, stack=False)
             print(f"Completed tower reset with success: {success}, stable: {reset_stable}")
@@ -624,7 +624,6 @@ class PandaAgent:
                 saved_world = pb_robot.utils.WorldSaver()
                 self.execute()
                 ExecuteActions(plan, real=real, pause=True, wait=False, prompt=False, obstacles=[f for f in self.fixed if f is not None], sim_fatal_failure_prob=0.0, sim_recoverable_failure_prob=0.0)
-                print('Finished executing actions.')
 
                 # Manage the moved blocks (add to the set when stacking, remove when unstacking)
                 desired_pose = query_block.get_base_link_pose()
@@ -637,7 +636,10 @@ class PandaAgent:
                 if not real:
                     self.step_simulation(T, vis_frames=False)
                 #input('Press enter to check stability.')
-                stable = self.check_stability(real, query_block, desired_pose)
+                if stack:
+                    stable = self.check_stability(real, query_block, desired_pose)
+                else:
+                    stable = True # Don't care about stability on reset
                 #input('Continue?')
 
                 # Manage the success status of the plan
@@ -844,7 +846,7 @@ class PandaAgent:
 
         return True, stable
 
-    def check_stability(self, real, block_pddl, desired_pose):
+    def check_stability(self, real, block_pddl, desired_pose, max_tries=2):
         if self.use_vision:
             # Get pose of blocks using wrist camera.
             try:
@@ -881,6 +883,7 @@ class PandaAgent:
 
             # If block isn't visible, return 0.
             if not visible:
+                print('[Check Stability] Object not visible to camera.')
                 return 0.
 
         else:
