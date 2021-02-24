@@ -746,18 +746,6 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
 
         for k, size in zip(tower_keys, args.tower_sizes):
             print('Tower size', k)
-            if size == 2:
-                ep.n_samples = 5000
-            elif size == 3:
-                ep.n_samples = 10000
-            elif size == 4:
-                ep.n_samples = 20000
-            elif size == 5:
-                ep.n_samples = 100000
-            elif size == 6:
-                ep.n_samples = 250000
-            elif size == 7:
-                ep.n_samples = 500000
             num_failures, num_pw_failures = 0, 0
             curr_regrets = []
             curr_rewards = []
@@ -774,7 +762,8 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
                                                                 ensemble, 
                                                                 reward_fn,
                                                                 args,
-                                                                num_blocks=size)
+                                                                num_blocks=size,
+                                                                n_tower=t)
                 block_tower = []
                 for vec_block, block_id in zip(tower, tower_block_ids):
                     if args.exec_mode == 'noisy-model':
@@ -804,10 +793,10 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
                                 top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
                                 top_rel_com = top_rel_pos + top.com
                                 dists.append((np.abs(top_rel_com)*2 - bottom.dimensions)[:2])
-                            print('Pairs:', pairs, dists)
+                            #print('Pairs:', pairs, dists)
                             
-                    print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
-                    print('Global Stable:', tp.tower_is_stable(block_tower))
+                    #print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
+                    #print('Global Stable:', tp.tower_is_stable(block_tower))
                     
                     if False and reward != 0:
                         print(reward, max_reward)
