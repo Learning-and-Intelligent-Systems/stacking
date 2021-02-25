@@ -78,8 +78,8 @@ class EnsemblePlanner:
     def generate_candidate_towers(self, blocks, args, num_blocks=None, n_tower=None):
         if num_blocks is None:
             num_blocks = len(blocks)
-        tower_vectors, tower_block_ids = self.get_cached_towers(args, num_blocks, blocks, n_tower)
-        #tower_vectors = None
+        #tower_vectors, tower_block_ids = self.get_cached_towers(args, num_blocks, blocks, n_tower)
+        tower_vectors = None
         if tower_vectors is None:
             tower_vectors = []
             tower_block_ids = []
@@ -88,7 +88,7 @@ class EnsemblePlanner:
                                             ret_rotated=True, discrete=args.discrete)
                 tower_vectors.append([b.vectorize() for b in rotated_tower])
                 tower_block_ids.append([b.get_id() for b in rotated_tower])
-            self.cache_towers(args, tower_vectors, tower_block_ids, n_tower)
+            #self.cache_towers(args, tower_vectors, tower_block_ids, n_tower)
         return tower_vectors, tower_block_ids
 
     def plan(self, blocks, ensemble, reward_fn, args, num_blocks=None, n_tower=None):

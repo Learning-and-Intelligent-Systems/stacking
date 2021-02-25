@@ -46,10 +46,10 @@ def block_set_from_csv(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--csv-file', type=str)
-    parser.add_argument('--n-blocks', type=int)
+    parser.add_argument('--n-blocks', type=int) # only need it mode == random
     parser.add_argument('--mode', choices=['csv', 'random'])
-    parser.add_argument('--block-min-dim', type=float, default=0.05)
-    parser.add_argument('--block-max-dim', type=float, default=0.15)
+    parser.add_argument('--block-min-dim', type=float, default=0.05)# only need it mode == random
+    parser.add_argument('--block-max-dim', type=float, default=0.15)# only need it mode == random
     args = parser.parse_args()
 
     if args.mode == 'random':
