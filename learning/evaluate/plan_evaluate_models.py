@@ -71,7 +71,7 @@ if __name__ == '__main__':
         tallest_tower_regret_evaluation(logger, block_set, fname, args)
     elif args.problem == 'overhang':
         fname = pre+'random_planner_max_overhang_'+ts_str+'_block_towers'
-        longest_overhang_regret_evaluation(logger, block_set, fname, args)
+        longest_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=True)
     elif args.problem == 'min-contact':
         fname = pre+'random_planner_min_contact_'+ts_str+'_block_towers'
         min_contact_regret_evaluation(logger, block_set, fname, args)

@@ -55,6 +55,7 @@ def get_validation_accuracy(logger, fname):
         start = 0
         for k in tower_keys:
             end = start + val_towers[k]['towers'].shape[0]
+            print(val_towers[k]['labels'])
             acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
             f1 = f1_score(val_towers[k]['labels'], preds[start:end] > 0.5)
             print('Acc:', tx, k, acc)
@@ -686,22 +687,33 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def tallest_tower_regret_evaluation(logger, block_set, fname, args):
+def tallest_tower_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
     def tower_height(tower):
         """
         :param tower: A vectorized version of the tower.
         """
         return np.sum(tower[:, 6])
 
-    return evaluate_planner(logger, block_set, tower_height, fname, args)
+    return evaluate_planner(logger, block_set, tower_height, fname, args, save_imgs, img_prefix='height')
 
-def longest_overhang_regret_evaluation(logger, block_set, fname, args):
+def cumulative_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
+    def horizontal_overhang(tower):
+        total_overhang = 0
+        for tx in range(1, tower.shape[0]):
+            bx = tx - 1
+            overhang = (tower[tx, 7] + tower[tx, 4]/2.) - (tower[bx, 7] + tower[bx, 4]/2.)
+            total_overhang += overhang
+        return total_overhang
+    
+    return evaluate_planner(logger, block_set, horizontal_overhang, fname, args, save_imgs, img_prefix='cumulative_overhang')
+    
+def longest_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
     def horizontal_overhang(tower):
         return (tower[-1, 7] + tower[-1, 4]/2.) - (tower[0, 7] + tower[0, 4]/2.)
     
-    return evaluate_planner(logger, block_set, horizontal_overhang, fname, args)
+    return evaluate_planner(logger, block_set, horizontal_overhang, fname, args, save_imgs, img_prefix='overhang')
     
-def min_contact_regret_evaluation(logger, block_set, fname, args):
+def min_contact_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
     def contact_area(tower):
         """
         :param tower: A vectorized version of the tower.
@@ -721,9 +733,9 @@ def min_contact_regret_evaluation(logger, block_set, fname, args):
 
         return area
 
-    return evaluate_planner(logger, block_set, contact_area, fname, args)
+    return evaluate_planner(logger, block_set, contact_area, fname, args, save_imgs, img_prefix='contact')
 
-def evaluate_planner(logger, blocks, reward_fn, fname, args):
+def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, img_prefix=''):
     tower_keys = [str(ts)+'block' for ts in args.tower_sizes]
     tp = TowerPlanner(stability_mode='contains')
     ep = EnsemblePlanner(logger)
@@ -793,18 +805,39 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
                             dists.append((np.abs(top_rel_com)*2 - bottom.dimensions)[:2])
                         print('Pairs:', pairs, dists)
                         
-                
+                for b in block_tower:
+                    print(b.pose)
                 print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
                 print('Global Stable:', tp.tower_is_stable(block_tower))
 
-                if False and reward != 0:
-                    print(reward, max_reward)
-                    w = World(block_tower)
-                    env = Environment([w], vis_sim=True, vis_frames=True)
-                    input()
-                    for tx in range(240):
+                if save_imgs:
+                    # Build the tower up until the point where it falls over.
+                    for bx in range(2, len(block_tower)+1):
+                        if not tp.tower_is_constructable(block_tower[:bx]):
+                            break
+                    # Build the tower and let it fall.
+                    actual_tower = block_tower[:bx]
+                    w = World(actual_tower)
+                    env = Environment([w], vis_sim=False, vis_frames=True)
+                    for _ in range(2400):
                         env.step(vis_frames=True)
-                        time.sleep(1/240.)
+                        #time.sleep(1/240.)
+                    # Take a photo of the tower.
+                    view_matrix = p.computeViewMatrixFromYawPitchRoll(distance=0.3,
+                                                            yaw=45,
+                                                            pitch=-10,
+                                                            roll=0,
+                                                            upAxisIndex=2,
+                                                            cameraTargetPosition=(0., 0., 0.25))
+                    aspect = 100. / 190.
+                    nearPlane = 0.01
+                    farPlane = 10
+                    fov = 90
+                    projection_matrix = p.computeProjectionMatrixFOV(fov, aspect, nearPlane, farPlane)
+                    image_data = p.getCameraImage(200, 380, shadow=1,  viewMatrix=view_matrix, projectionMatrix=projection_matrix)
+                    w, h, im = image_data[:3]
+                    np_im = np.array(im, dtype=np.uint8).reshape(h, w, 4)[:, :, 0:3]
+                    plt.imsave(logger.get_figure_path(f'{img_prefix}_{tx}_{t}.png'), np_im)
                     env.disconnect()
                 
                 # Note that in general max reward may not be the best possible due to sampling.
@@ -813,8 +846,8 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
 
                 # Compare heights and calculate regret.
                 regret = (max_reward - reward)/max_reward
-                #print(reward, max_reward)
-                #print(regret)
+                print(reward, max_reward)
+                print(regret)
                 curr_regrets.append(regret)
                 curr_rewards.append(reward)
             regrets[k].append(curr_regrets)
@@ -958,7 +991,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 300
+    logger.args.max_acquisitions = 5
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
@@ -971,9 +1004,10 @@ if __name__ == '__main__':
 
     #inspect_validation_set('learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
 
-    # accs = get_validation_accuracy(logger,
-    #                                'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
-    # plot_val_accuracy(logger)
+    accs = get_validation_accuracy(logger,
+                                  #'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
+                                  'learning/evaluate/test_datasets/eval_blocks_test_dataset.pkl')
+    plot_val_accuracy(logger)
 
     # #analyze_collected_2block_towers(logger)
     # print(accs)
@@ -992,7 +1026,7 @@ if __name__ == '__main__':
     #tallest_tower_regret_evaluation(logger)
     #longest_overhang_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
-    plot_regret(logger)
+    #plot_regret(logger)
     #plot_constructability_over_time(logger)
     #validate(logger, 125)
     #get_stability_composition(logger, tx=245)
