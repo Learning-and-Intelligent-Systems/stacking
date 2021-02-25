@@ -46,6 +46,7 @@ class PandaAgent:
         """
         self.real = real
         self.use_vision = use_vision
+        self.use_platform = use_platform
         self.use_action_server = use_action_server
         self.use_learning_server = use_learning_server
 
@@ -63,6 +64,9 @@ class PandaAgent:
         self.fixed = [self.platform_table, self.platform_leg, self.table, self.frame, self.wall]
         self.pddl_block_lookup = get_pddl_block_lookup(blocks, self.pddl_blocks)
 
+        self.orig_joint_angles = self.robot.arm.GetJointValues()
+        self.orig_block_poses = [b.get_base_link_pose() for b in self.pddl_blocks]
+
         # Setup PyBullet instance that only visualizes plan execution. State needs to match the planning instance.
         poses = [b.get_base_link_pose() for b in self.pddl_blocks]
         poses = [Pose(Position(*p[0]), Quaternion(*p[1])) for p in poses]
@@ -76,7 +80,10 @@ class PandaAgent:
         # Set up ROS plumbing if using features that require it
         if self.use_vision or self.use_action_server or real:
             import rospy
-            rospy.init_node("panda_agent")
+            try:
+                rospy.init_node("panda_agent")
+            except:
+                print("ROS Node already created")
 
         # Create an arm interface
         if real:
@@ -97,7 +104,6 @@ class PandaAgent:
             rospy.wait_for_service('get_block_poses_wrist')
             self._get_block_poses_world = rospy.ServiceProxy('get_block_poses_world', GetBlockPosesWorld)
             self._get_block_poses_wrist = rospy.ServiceProxy('get_block_poses_wrist', GetBlockPosesWrist)
-            self._update_block_poses()
 
         # Start ROS clients and servers as needed
         self.last_obj_held = None
@@ -168,6 +174,17 @@ class PandaAgent:
         pb_robot.planning.set_client(self._planning_client_id)
         pb_robot.utils.set_client(self._planning_client_id)
         pb_robot.viz.set_client(self._planning_client_id)
+
+    def reset_world(self):
+        """ Resets the planning world to its original configuration """
+        print("Resetting world")
+        self.plan()
+        self.robot.arm.SetJointValues(self.orig_joint_angles)
+        self.execute()
+        self.execution_robot.arm.SetJointValues(self.orig_joint_angles)
+        for bx, b in enumerate(self.pddl_blocks):
+            b.set_base_link_pose(self.orig_block_poses[bx])
+        print("Done")
 
     def _update_block_poses(self, find_moved=False):
         """ Use the global world cameras to update the positions of the blocks """
@@ -392,9 +409,14 @@ class PandaAgent:
         block.set_base_link_pose(pose)
 
 
-    def simulate_tower_parallel(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5)):
+    def simulate_tower_parallel(self, tower, vis, T=2500, real=False, base_xy=(0., 0.5), ignore_resets=False):
         """
         Simulates a tower stacking and unstacking by requesting plans from a separate planning server
+
+        Returns:
+          success : Flag indicating success of execution (True/False)
+          stable : Flag indicating (0 or 1)
+          num_stack_success : Number of blocks successfully stacked
         """
 
         for block in tower:
@@ -467,7 +489,7 @@ class PandaAgent:
 
         # Execute the stacking plan
         success, stack_stable, reset_stable, num_success, fatal = \
-            self.execute_plans_from_server(ros_req, real, T, stack=True)
+            self.execute_plans_from_server(ros_req, real, T, stack=True, ignore_resets=ignore_resets)
         print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
         if reset_stable:
             print(f"Completed tower reset stable: {reset_stable}")
@@ -484,24 +506,28 @@ class PandaAgent:
                 ros_req.held_block.name = self.last_obj_held.body.readableName
                 transform_to_ros(self.last_obj_held.grasp_objF, ros_req.held_block.pose)
             success, stack_stable, reset_stable, num_success, fatal = \
-                self.execute_plans_from_server(ros_req, real, T, stack=True, start_idx=num_success)
+                self.execute_plans_from_server(ros_req, real, T, stack=True, start_idx=num_success, ignore_resets=ignore_resets)
             print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
             if reset_stable:
                 print(f"Completed tower reset stable: {reset_stable}")
 
+        # Write the number of successfully stacked blocks
+        num_stack_success = min(len(tower), num_success)
+
         # If the full tower did not succeed, send out another reset plan
-        try:
-            if not (stack_stable and reset_stable):
-                if self.use_vision and not stack_stable:
-                    self._update_block_poses(find_moved=True)
-                    # TODO: Return arm to home position to help with vision.
-                self.plan_reset_parallel(original_poses, real, T)
-        except Exception as e:
-            print("Planning/execution failed during tower reset.")
-            print(e)
+        if not ignore_resets:
+            try:
+                if not (stack_stable and reset_stable):
+                    if self.use_vision and not stack_stable:
+                        self._update_block_poses(find_moved=True)
+                        # TODO: Return arm to home position to help with vision.
+                    self.plan_reset_parallel(original_poses, real, T)
+            except Exception as e:
+                print("Planning/execution failed during tower reset.")
+                print(e)
 
         # Return the final planning state
-        return success, stack_stable
+        return success, stack_stable, num_stack_success
 
 
     def plan_reset_parallel(self, original_poses, real, T):
@@ -568,7 +594,7 @@ class PandaAgent:
             return (tgt_block.readableName == plan_block)
 
 
-    def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True, start_idx=0):
+    def execute_plans_from_server(self, ros_req, real=False, T=2500, stack=True, start_idx=0, ignore_resets=False):
         """
         Executes plans received from planning server
         Returns:
@@ -578,6 +604,7 @@ class PandaAgent:
             num_success : Progress (in number of steps) of successful tasks
             fatal : Flag for whether the error was fatal (True) or recoverable (False)
             start_idx : Start index of planning (for recovering from partial plans)
+            ignore_resets : Flag for whether to stop after resets
         """
         # Initialize variables
         num_success = start_idx
@@ -651,6 +678,8 @@ class PandaAgent:
                     if stack and num_success == num_steps/2:
                         print("Completed tower stack!")
                         stack_stable = True
+                        if ignore_resets:
+                            return True, stack_stable, reset_stable, num_success, False
                     elif num_success == num_steps:
                         print("Completed tower reset!")
                         reset_stable = True
@@ -845,6 +874,7 @@ class PandaAgent:
                 return False, None
 
         return True, stable
+
 
     def check_stability(self, real, block_pddl, desired_pose, max_tries=2):
         if self.use_vision:
