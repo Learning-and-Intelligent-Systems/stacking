@@ -283,6 +283,7 @@ class ActiveExperimentLogger:
             os.makedirs(tower_path)
         if not os.path.isfile(os.path.join(tower_path, tower_file)):
             towers = {}
+            print('Saving evaluation tower to %s' % os.path.join(tower_path, tower_file))
         else:
             with open(os.path.join(tower_path, tower_file), 'rb') as f:
                 towers = pickle.load(f)

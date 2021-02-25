@@ -53,8 +53,8 @@ if __name__ == '__main__':
     parser.add_argument('--exec-mode',
                         type=str,
                         default='simple-model',
-                        choices=['simple-model', 'noisy-model', 'sim', 'real'],
-                        help='this is the method used to execute the found plan')
+                        choices=['simple-model', 'noisy-model', None],
+                        help='this is the method used to execute the found plan. If None will just save planned towers and not calculate regret')
     parser.add_argument('--planning-model',
                         type=str,
                         default='learned',
