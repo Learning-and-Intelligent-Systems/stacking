@@ -55,6 +55,7 @@ def get_validation_accuracy(logger, fname):
         start = 0
         for k in tower_keys:
             end = start + val_towers[k]['towers'].shape[0]
+            print(val_towers[k]['labels'])
             acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
             f1 = f1_score(val_towers[k]['labels'], preds[start:end] > 0.5)
             print('Acc:', tx, k, acc)
@@ -686,22 +687,33 @@ def check_validation_robustness(noise=0.001, n_attempts=10):
         print(k, ':', robust[k], '/', val_towers[k]['towers'].shape[0] )
 
 
-def tallest_tower_regret_evaluation(logger, block_set, fname, args):
+def tallest_tower_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
     def tower_height(tower):
         """
         :param tower: A vectorized version of the tower.
         """
         return np.sum(tower[:, 6])
 
-    return evaluate_planner(logger, block_set, tower_height, fname, args)
+    return evaluate_planner(logger, block_set, tower_height, fname, args, save_imgs, img_prefix='height')
 
-def longest_overhang_regret_evaluation(logger, block_set, fname, args):
+def cumulative_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
+    def horizontal_overhang(tower):
+        total_overhang = 0
+        for tx in range(1, tower.shape[0]):
+            bx = tx - 1
+            overhang = (tower[tx, 7] + tower[tx, 4]/2.) - (tower[bx, 7] + tower[bx, 4]/2.)
+            total_overhang += overhang
+        return total_overhang
+    
+    return evaluate_planner(logger, block_set, horizontal_overhang, fname, args, save_imgs, img_prefix='cumulative_overhang')
+    
+def longest_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
     def horizontal_overhang(tower):
         return (tower[-1, 7] + tower[-1, 4]/2.) - (tower[0, 7] + tower[0, 4]/2.)
     
-    return evaluate_planner(logger, block_set, horizontal_overhang, fname, args)
+    return evaluate_planner(logger, block_set, horizontal_overhang, fname, args, save_imgs, img_prefix='overhang')
     
-def min_contact_regret_evaluation(logger, block_set, fname, args):
+def min_contact_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
     def contact_area(tower):
         """
         :param tower: A vectorized version of the tower.
@@ -721,9 +733,9 @@ def min_contact_regret_evaluation(logger, block_set, fname, args):
 
         return area
 
-    return evaluate_planner(logger, block_set, contact_area, fname, args)
+    return evaluate_planner(logger, block_set, contact_area, fname, args, save_imgs, img_prefix='contact')
 
-def evaluate_planner(logger, blocks, reward_fn, fname, args):
+def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, img_prefix=''):
     tower_keys = [str(ts)+'block' for ts in args.tower_sizes]
     tp = TowerPlanner(stability_mode='contains')
     ep = EnsemblePlanner(logger)
@@ -992,7 +1004,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 300
+    logger.args.max_acquisitions = 5
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
@@ -1005,9 +1017,10 @@ if __name__ == '__main__':
 
     #inspect_validation_set('learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
 
-    # accs = get_validation_accuracy(logger,
-    #                                'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
-    # plot_val_accuracy(logger)
+    accs = get_validation_accuracy(logger,
+                                  #'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
+                                  'learning/evaluate/test_datasets/eval_blocks_test_dataset.pkl')
+    plot_val_accuracy(logger)
 
     # #analyze_collected_2block_towers(logger)
     # print(accs)
@@ -1026,7 +1039,7 @@ if __name__ == '__main__':
     #tallest_tower_regret_evaluation(logger)
     #longest_overhang_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
-    plot_regret(logger)
+    #plot_regret(logger)
     #plot_constructability_over_time(logger)
     #validate(logger, 125)
     #get_stability_composition(logger, tx=245)
