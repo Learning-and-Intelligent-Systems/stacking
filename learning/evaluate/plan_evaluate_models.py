@@ -7,14 +7,15 @@ from agents.panda_agent import PandaAgent, PandaClientAgent
 from learning.active.utils import ActiveExperimentLogger
 from block_utils import Object
 from learning.evaluate.active_evaluate_towers import tallest_tower_regret_evaluation, \
-        longest_overhang_regret_evaluation, min_contact_regret_evaluation
+        longest_overhang_regret_evaluation, min_contact_regret_evaluation, \
+        cumulative_overhang_regret_evaluation
 
 if __name__ == '__main__':
     import time
     start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--problem', 
-                        choices=['tallest', 'overhang', 'min-contact', 'deconstruct'], 
+                        choices=['tallest', 'overhang', 'min-contact', 'cumulative-overhang'], 
                         default='tallest',
                         help='planning problem/task to plan for')
     parser.add_argument('--block-set-fname', 
@@ -98,6 +99,9 @@ if __name__ == '__main__':
     elif args.problem == 'min-contact':
         fname = pre+'random_planner_min_contact_'+ts_str+'_block_towers'
         min_contact_regret_evaluation(logger, block_set, fname, args)
+    elif args.problem == 'cumulative-overhang':
+        fname = pre+'random_planner_cumu_overhang_'+ts_str+'_block_towers'
+        cumulative_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=False)
     end = time.time()
     print('Planner Runtime: %f sec' % (end - start))
     
