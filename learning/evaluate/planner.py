@@ -5,7 +5,7 @@ import pickle
 import os
 from torch.utils.data import DataLoader
 
-from block_utils import Object
+from block_utils import Object, World, Environment
 from learning.domains.towers.generate_tower_training_data import sample_random_tower
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from tower_planner import TowerPlanner
@@ -79,6 +79,7 @@ class EnsemblePlanner:
         if num_blocks is None:
             num_blocks = len(blocks)
         tower_vectors, tower_block_ids = self.get_cached_towers(args, num_blocks, blocks, n_tower)
+        #tower_vectors = None
         if tower_vectors is None:
             tower_vectors = []
             tower_block_ids = []
@@ -145,7 +146,7 @@ class EnsemblePlanner:
             p_stables = torch.cat(preds, dim=0).mean(dim=1)
             
         elif args.planning_model == 'noisy-model':
-            n_estimate = 100
+            n_estimate = 10
             p_stables = np.zeros(len(tower_vectors))
             for ti, tower_vec in enumerate(tower_vectors):
                 # estimate prob of constructability
@@ -154,7 +155,7 @@ class EnsemblePlanner:
                     noisy_tower = []
                     for block_vec in tower_vec:
                         noisy_block = deepcopy(block_vec)
-                        noisy_block[7:9] += np.random.randn(2)*args.xy_noise
+                        noisy_block[7:9] += np.random.randn(2)*args.plan_xy_noise
                         noisy_tower.append(noisy_block)
                         block_tower = [Object.from_vector(block) for block in noisy_tower]
                         if not self.tp.tower_is_constructable(block_tower):
@@ -163,11 +164,11 @@ class EnsemblePlanner:
                 p_stables[ti] = np.mean(results)
                 
         elif args.planning_model == 'simple-model':
-            p_stables = np.zeros(len(towers_vectors))
+            p_stables = np.zeros(len(tower_vectors))
             for ti, tower_vec in enumerate(tower_vectors):
                 block_tower = [Object.from_vector(block) for block in tower_vec]
                 if self.tp.tower_is_constructable(block_tower):
-                    p_stables = 1.
+                    p_stables[ti] = 1.
 
         # Step (3): Find the tallest tower of a given height.
         max_reward, max_exp_reward, max_tower, max_stable = -100, -100, None, 0

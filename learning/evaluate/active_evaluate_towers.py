@@ -743,7 +743,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
         ensemble = logger.get_ensemble(tx)
         if torch.cuda.is_available():
             ensemble = ensemble.cuda()
-
+            
         for k, size in zip(tower_keys, args.tower_sizes):
             print('Tower size', k)
             num_failures, num_pw_failures = 0, 0
@@ -764,14 +764,28 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
                                                                 args,
                                                                 num_blocks=size,
                                                                 n_tower=t)
+                                
                 block_tower = []
                 for vec_block, block_id in zip(tower, tower_block_ids):
-                    if args.exec_mode == 'noisy-model':
-                        vec_block[7:9] += np.random.randn(2)*args.xy_noise 
                     block = Object.from_vector(vec_block)
                     block.name = 'obj_%d' % block_id
-                    block_tower.append(block)
+                    block_tower.append(block)         
+                                           
+                # save tower info to /evaluation_towers
+                if args.planning_model == 'noisy-model':
+                    logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem, noise=args.plan_xy_noise)
+                else:
+                    logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem)
 
+                # perturb tower if evaluating with noisy model
+                if args.exec_mode == 'noisy-model':
+                    block_tower = []
+                    for vec_block, block_id in zip(tower, tower_block_ids):
+                        vec_block[7:9] += np.random.randn(2)*args.exec_xy_noise
+                        block = Object.from_vector(vec_block)
+                        block.name = 'obj_%d' % block_id
+                        block_tower.append(block)     
+    
                 # build found tower
                 if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
                     if not tp.tower_is_constructable(block_tower):
@@ -818,10 +832,6 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args):
                     #print(regret)
                     curr_regrets.append(regret)
                     curr_rewards.append(reward)
-                
-                elif args.exec_mode == 'sim' or args.exec_mode == 'real':
-                    # save tower info to /towers to be executed separately
-                    logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model)
 
             if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
                 regrets[k].append(curr_regrets)

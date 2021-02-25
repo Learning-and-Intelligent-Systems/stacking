@@ -271,11 +271,14 @@ class ActiveExperimentLogger:
             print('acquired_%d.pkl not found on path' % tx)
             return None, None
             
-    def save_evaluation_tower(self, tower, reward, max_reward, tx, planning_model):
-        tower_file = 'towers_%d.pkl' % tx
+    def save_evaluation_tower(self, tower, reward, max_reward, tx, planning_model, task, noise=None):
+        if noise:
+            tower_file = 'towers_%d_%f.pkl' % (tx, noise)
+        else:
+            tower_file = 'towers_%d.pkl' % tx
         tower_height = len(tower)
         tower_key = '%dblock' % tower_height
-        tower_path = os.path.join(self.exp_path, 'evaluation_towers', planning_model)
+        tower_path = os.path.join(self.exp_path, 'evaluation_towers', task, planning_model)
         if not os.path.exists(tower_path): 
             os.makedirs(tower_path)
         if not os.path.isfile(os.path.join(tower_path, tower_file)):
@@ -288,4 +291,16 @@ class ActiveExperimentLogger:
         else:
             towers[tower_key] = [(tower, reward, max_reward)]
         with open(os.path.join(tower_path, tower_file), 'wb') as f:
-            pickle.dump(towers, f)        
+            pickle.dump(towers, f)
+        print('APPENDING evaluation tower to %s' % os.path.join(tower_path, tower_file))   
+        
+    def get_evaluation_towers(self, task, planning_model, tx):
+        tower_path = os.path.join(self.exp_path, 'evaluation_towers', task, planning_model)
+        towers_data = {}
+        for file in os.listdir(tower_path):
+            if file != '.DS_Store':
+                with open(os.path.join(tower_path, file), 'rb') as f:
+                    data = pickle.load(f)
+                towers_data[os.path.join(tower_path, file)] = data
+        return towers_data
+        

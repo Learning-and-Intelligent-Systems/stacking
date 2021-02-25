@@ -44,9 +44,12 @@ if __name__ == '__main__':
                         type=int,
                         nargs='+',
                         help='number of blocks in goal tower (can do multiple)')
-    parser.add_argument('--xy-noise',
+    parser.add_argument('--exec-xy-noise',
                         type=float,
                         help='noise to add to xy position of blocks if exec-mode==noisy-model')
+    parser.add_argument('--plan-xy-noise',
+                        type=float,
+                        help='noise to add to xy position of blocks if plannnig-model==noisy-model')
     parser.add_argument('--exec-mode',
                         type=str,
                         default='simple-model',
@@ -67,8 +70,11 @@ if __name__ == '__main__':
             or ((args.max_acquisitions is None) and (args.acquisition_step is not None)), \
             'must set EITHER --aquisition-step OR --max-acquisitions'
      
-    if args.planning_model == 'noisy-model' and not args.xy_noise:
-        sys.exit('Error: If planning with noisy model, MUST set args.xy_noise')
+    if args.planning_model == 'noisy-model' and not args.plan_xy_noise:
+        sys.exit('Error: If planning with noisy model, MUST set args.plan_xy_noise')
+    
+    if args.exec_mode == 'noisy-model' and not args.exec_xy_noise:
+        sys.exit('Error: If executing with noisy model, MUST set args.exec_xy_noise')
         
     if args.planning_model == 'learned' and not args.exp_path:
         sys.exit('Error: If planning with learned model, MUST set args.exp_path')
