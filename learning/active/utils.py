@@ -260,6 +260,21 @@ class ActiveExperimentLogger:
         with open(path, 'rb') as handle:
             data = pickle.load(handle)
         return data
+        
+    def get_block_placement_data(self):
+        path = os.path.join(self.exp_path, 'block_placement_data.pkl')
+        if os.path.exists(path):
+            with open(path, 'rb') as handle:
+                block_placements = pickle.load(handle)
+            return block_placements
+        else:
+            return {}
+            
+    def save_block_placement_data(self, block_placements):
+        block_placement_data = self.get_block_placement_data()
+        block_placement_data[self.acquisition_step] = block_placements
+        with open(os.path.join(self.exp_path, 'block_placement_data.pkl'), 'wb') as handle:
+            pickle.dump(block_placement_data, handle)
     
     def load_acquisition_data(self, tx):
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
