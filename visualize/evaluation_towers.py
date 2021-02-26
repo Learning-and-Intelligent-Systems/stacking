@@ -47,9 +47,6 @@ def visualize_towers(tower_data, args):
                 w = World(tower)
                 env = Environment([w], vis_sim=True, vis_frames=True)
                 input()
-                for tx in range(240):
-                    env.step(vis_frames=True)
-                    time.sleep(1/240.)
                 env.disconnect()
     
 def plot_block_placements(args):
