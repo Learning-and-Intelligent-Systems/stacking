@@ -151,17 +151,19 @@ class EnsemblePlanner:
             for ti, tower_vec in enumerate(tower_vectors):
                 # estimate prob of constructability
                 results = np.ones(n_estimate)
+                all_stable = 1.
                 for n in range(n_estimate):
                     noisy_tower = []
                     for block_vec in tower_vec:
                         noisy_block = deepcopy(block_vec)
                         noisy_block[7:9] += np.random.randn(2)*args.plan_xy_noise
                         noisy_tower.append(noisy_block)
-                        block_tower = [Object.from_vector(block) for block in noisy_tower]
-                        if not self.tp.tower_is_constructable(block_tower):
-                            results[n] = 0.
-                            break
-                p_stables[ti] = np.mean(results)
+                    block_tower = [Object.from_vector(block) for block in noisy_tower]
+                    if not self.tp.tower_is_constructable(block_tower):
+                        results[n] = 0.
+                        all_stable = 0.
+                        break
+                p_stables[ti] = all_stable # np.mean(results)
                 
         elif args.planning_model == 'simple-model':
             p_stables = np.zeros(len(tower_vectors))
