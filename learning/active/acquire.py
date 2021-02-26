@@ -42,27 +42,32 @@ def subtower_bald(samples, ensemble, data_pred_fn):
     for k in samples.keys():
         n_blocks = int(k.strip('block'))
         data = samples[k]['towers']
+        if data.shape[0] != 0: # only score if there is data for this k
+            # predict subtower constructability with the ensemble
+            subtower_preds = []
+            subtower_scores = []
+            for i in range(2, n_blocks+1):
+                subtowers = {f'{i}block': {'towers': data[:,:i,:],
+                                           'labels': np.zeros(data.shape[0])}}
+                subtower_preds.append(data_pred_fn(subtowers, ensemble))
+                subtower_scores.append(bald(subtower_preds[-1]))
 
-        # predict subtower constructability with the ensemble
-        subtower_preds = []
-        subtower_scores = []
-        for i in range(2, n_blocks+1):
-            subtowers = {f'{i}block': {'towers': data[:,:i,:],
-                                       'labels': np.zeros(data.shape[0])}}
-            subtower_preds.append(data_pred_fn(subtowers, ensemble))
-            subtower_scores.append(bald(subtower_preds[-1]))
+            subtower_preds = torch.stack(subtower_preds)
+            subtower_scores = torch.stack(subtower_scores)
 
-        subtower_preds = torch.stack(subtower_preds)
-        subtower_scores = torch.stack(subtower_scores)
+            # to avoid being greedy, we need to consider that building risky
+            # towers might prevent us from observing every block in that tower,
+            # so we multiply the bald score for each added block by the
+            # predicted probability that the tower will reach that height
+            two_block_scores = subtower_scores[0]
+            constructability = subtower_preds.mean(axis=2)
 
-        # to avoid being greedy, we need to consider that building risky
-        # towers might prevent us from observing every block in that tower,
-        # so we multiply the bald score for each added block by the
-        # predicted probability that the tower will reach that height
-        two_block_scores = subtower_scores[0]
-        constructability = subtower_preds.mean(axis=2)
-        n_block_expected_scores = (constructability[:-1] * subtower_scores[1:]).sum(axis=0)
-        scores.append(two_block_scores + n_block_expected_scores)
+            # NOTE(izzy): this is the change Mike proposed where we need to take the product
+            # of the predicted "add-block-ability" labels for each subtower to get constuctability
+            constructability = torch.cumprod(constructability, axis=0)
+
+            n_block_expected_scores = (constructability[:-1] * subtower_scores[1:]).sum(axis=0)
+            scores.append(two_block_scores + n_block_expected_scores)
 
     return torch.cat(scores)
 
@@ -134,5 +139,8 @@ def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn
         xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
 
     logger.save_unlabeled_acquisition_data(xs)
-    new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True)
+    if strategy == 'subtower-greedy' or strategy == 'subtower':
+        new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=True)
+    else:
+        new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=False)
     return new_data, unlabeled_pool

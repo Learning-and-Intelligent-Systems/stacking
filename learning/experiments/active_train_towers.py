@@ -125,6 +125,8 @@ def run_active_towers(args):
 
     if args.strategy == 'subtower-greedy':
         data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
+    if args.strategy == 'subtower':
+        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(5, 5))
 
     #print(len(dataset), len(val_dataset)) 
     sampler = TowerSampler(dataset=dataset,

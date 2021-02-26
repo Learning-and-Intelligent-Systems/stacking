@@ -18,6 +18,8 @@ def calc_model_accuracy(logger, dataset, args, exp_path):
         eval_range = [args.single_acquisition_step]
 
     accuracies = {key: [] for key in dataset.keys()}
+    false_positives = {key: [] for key in dataset.keys()}
+    false_negatives = {key: [] for key in dataset.keys()}
     for tx in eval_range:
         print('Acquisition step '+str(tx))
         ensemble = logger.get_ensemble(tx)
@@ -31,24 +33,40 @@ def calc_model_accuracy(logger, dataset, args, exp_path):
         for ti, tower_height in enumerate(tower_heights):
             key = str(tower_height)+'block'
             n_correct = 0
+            n_tn = 0
+            n_fp = 0
+            n_fn = 0
+            n_tp = 0
             offset = ti*samples_per_height
             for li, label in enumerate(dataset[key]['labels']):
                 if preds[offset+li] == label[0]: n_correct += 1
+                if preds[offset+li] == 0 and label[0] == 1: n_fp += 1
+                if preds[offset+li] == 1 and label[0] == 0: n_fn += 1
+                if preds[offset+li] == 0 and label[0] == 0: n_tn += 1
+                if preds[offset+li] == 1 and label[0] == 1: n_tp += 1                
             accuracies[key].append(n_correct/samples_per_height)
+            fpr = 0.0 if (n_fp+n_tn) == 0.0 else n_fp/(n_fp+n_tn)
+            fnr = 0.0 if (n_fn+n_tp) == 0.0 else n_fn/(n_fn+n_tp)
+            false_positives[key].append(fpr)
+            false_negatives[key].append(fnr)
         
     # plot and save to this exp_path
+    #for result, title in zip([accuracies, false_positives, false_negatives], ['Constructability Accuracy', 'False Positive Rate', 'False Negative Rate']):
     acquisition_plot_steps = len(range(0, args.max_acquisitions, args.plot_step))
     xs = np.arange(min_towers_acq, \
                     min_towers_acq+towers_per_acq*args.plot_step*acquisition_plot_steps, \
                     towers_per_acq*args.plot_step) # number of training towers
     fig, axes = plt.subplots(4, figsize=(5,12))
-    for i, (th, th_accuracies) in enumerate(accuracies.items()):
-        axes[i].plot(xs, th_accuracies, label=exp_path)
-        axes[i].set_ylim(.5, 1.)
-        axes[i].set_ylabel('Constructability Accuracy')
-        axes[i].set_xlabel('Training Towers')
-        axes[i].set_title(str(th)+' Block Tower Constructability Accuracy')
-        axes[i].legend()
+    for ki, key in enumerate(accuracies):
+        axes[ki].plot(xs, accuracies[key], label='accuracy')
+        #axes[ki].plot(xs, false_positives[key], label='false positive rate')
+        #axes[ki].plot(xs, false_negatives[key], label='false negative rate')
+        #axes[ki].set_ylim(.0, 1.)
+        axes[ki].set_ylim(.5, 1.)
+        axes[ki].set_ylabel('Rate')
+        axes[ki].set_xlabel('Training Towers')
+        axes[ki].set_title('%s Tower Constructability Accuracy' % key)
+        axes[ki].legend()
     plt.tight_layout()
     plt_fname = 'constructability_accuracy.png'
     plt.savefig(logger.get_figure_path(plt_fname))
@@ -102,6 +120,7 @@ if __name__ == '__main__':
                         action='store_true',
                         help='set to run in debug mode')
     
+    # TODO: cannot do false positive and negative rates wit multiple exp paths
     args = parser.parse_args()
 
     if args.debug:
