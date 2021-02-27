@@ -784,10 +784,11 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                     block_tower.append(block)         
                                            
                 # save tower info to /evaluation_towers
-                if args.planning_model == 'noisy-model':
-                    logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem, noise=args.plan_xy_noise)
-                else:
-                    logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem)
+                if args.exec_mode is None:
+                    if args.planning_model == 'noisy-model':
+                        logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem, noise=args.plan_xy_noise)
+                    else:
+                        logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem)
 
                 # perturb tower if evaluating with noisy model
                 if args.exec_mode == 'noisy-model':
