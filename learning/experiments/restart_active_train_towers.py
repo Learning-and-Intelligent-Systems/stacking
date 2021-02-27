@@ -2,7 +2,7 @@ import argparse
 import pickle
 import os
 import numpy as np
-
+import torch
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
