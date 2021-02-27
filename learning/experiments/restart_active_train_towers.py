@@ -138,11 +138,11 @@ def setup_active_train(dataset,
                     # sampling new candidate towers and scoring them. therefore this strategy doesn't perfectly
                     # fit the separation of functionality that the others did, and it requires its own special case
                     unlabeled_pool = None
-                    xs = greedy_sequential_choose_acquisition_data(ensemble, n_samples, n_acquire, data_sampler_fn, \
+                    xs = greedy_sequential_choose_acquisition_data(ensemble, args.n_samples, args.n_acquire, data_sampler_fn, \
                         data_label_fn, data_pred_fn, data_subset_fn)
                 else:
-                    unlabeled_pool = data_sampler_fn(n_samples)
-                    xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
+                    unlabeled_pool = data_sampler_fn(args.n_samples)
+                    xs = choose_acquisition_data(unlabeled_pool, ensemble, args.n_acquire, args.strategy, data_pred_fn, data_subset_fn)
 
                 logger.save_unlabeled_acquisition_data(xs)
                 if strategy == 'subtower-greedy' or strategy == 'subtower':
