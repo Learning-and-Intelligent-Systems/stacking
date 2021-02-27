@@ -122,8 +122,7 @@ def setup_active_train(dataset,
             if torch.cuda.is_available():
                 ensemble = ensemble.cuda()
             if args.exec_mode == 'real':
-                acquisition_data = recover_labels(logger, args, agent)
-                logger.save_acquisition_data(acquisition_data, None, logger.acquisition_step)
+                new_data = recover_labels(logger, args, agent)
             else:
                 if args.strategy == 'subtower-greedy':
                     # NOTE(izzy): acquiring a tower by greedily adding blocks to the top requires interleaving
@@ -142,10 +141,10 @@ def setup_active_train(dataset,
                 else:
                     new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True, label_subtowers=False)
     
-                logger.save_acquisition_data(new_data, None, logger.acquisition_step)
+            logger.save_acquisition_data(new_data, None, logger.acquisition_step)
                 
             # Add to dataset.
-            train_data, val_data = split_data(acquisition_data, n_val=2)
+            train_data, val_data = split_data(new_data, n_val=2)
             dataset.add_to_dataset(train_data)
             val_dataset.add_to_dataset(val_data)
         
