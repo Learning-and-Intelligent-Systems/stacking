@@ -15,7 +15,7 @@ from learning.models.gn import FCGN, ConstructableFCGN, FCGNFC
 from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
 from learning.active.train import train
-from learning.active.acquire import choose_acquisition_data
+from learning.active.acquire import choose_acquisition_data, greedy_sequential_choose_acquisition_data
 from learning.active.active_train import split_data
 from agents.panda_agent import PandaAgent, PandaClientAgent
 from block_utils import block_conflicts
@@ -29,6 +29,15 @@ def tower_index(towers_data, tower):
             return tdi
     return None
     
+def combine_data(tower_data, new_data):
+    for tower, block_ids, label in tower_data:
+        key = '%dblock' % tower.shape[0] 
+        new_data[key]['towers'] = np.concatenate([new_data[key]['towers'], np.expand_dims(tower,0)])
+        new_data[key]['labels'] = np.concatenate([new_data[key]['labels'], np.expand_dims(label,0)])
+        if block_ids is not None:
+            new_data[key]['block_ids'] = np.concatenate([new_data[key]['block_ids'], np.expand_dims(block_ids,0)])
+    
+    return new_data
 
 def recover_labels(logger, args, agent):
     towers_data = logger.get_towers_data(logger.acquisition_step)
@@ -124,13 +133,23 @@ def setup_active_train(dataset,
                 acquisition_data = recover_labels(logger, args, agent)
                 logger.save_acquisition_data(acquisition_data, None, logger.acquisition_step)
             else:
-                tower_data = logger.get_towers_data(logger.acquisition_step)
-                n_acquire_restart = args.n_acquire - len(tower_data)
+                if args.strategy == 'subtower-greedy':
+                    # NOTE(izzy): acquiring a tower by greedily adding blocks to the top requires interleaving
+                    # sampling new candidate towers and scoring them. therefore this strategy doesn't perfectly
+                    # fit the separation of functionality that the others did, and it requires its own special case
+                    unlabeled_pool = None
+                    xs = greedy_sequential_choose_acquisition_data(ensemble, n_samples, n_acquire, data_sampler_fn, \
+                        data_label_fn, data_pred_fn, data_subset_fn)
+                else:
+                    unlabeled_pool = data_sampler_fn(n_samples)
+                    xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
+
+                logger.save_unlabeled_acquisition_data(xs)
+                if strategy == 'subtower-greedy' or strategy == 'subtower':
+                    new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=True)
+                else:
+                    new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=False)
                 
-                # acquire missing towers for this acquisition step
-                unlabeled_pool = data_sampler_fn(args.n_samples)
-                xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire_restart, args.strategy, data_pred_fn, data_subset_fn)
-                new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True)
                 combine_data(tower_data, new_data)
                 logger.save_acquisition_data(new_data, None, logger.acquisition_step)
                 
