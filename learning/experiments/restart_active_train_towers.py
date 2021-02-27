@@ -147,10 +147,10 @@ def setup_active_train(dataset,
                     xs = choose_acquisition_data(unlabeled_pool, ensemble, args.n_acquire, args.strategy, data_pred_fn, data_subset_fn)
 
                 logger.save_unlabeled_acquisition_data(xs)
-                if strategy == 'subtower-greedy' or strategy == 'subtower':
-                    new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=True)
+                if args.strategy == 'subtower-greedy' or args.strategy == 'subtower':
+                    new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True, label_subtowers=True)
                 else:
-                    new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=False)
+                    new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True, label_subtowers=False)
                 
                 combine_data(tower_data, new_data)
                 logger.save_acquisition_data(new_data, None, logger.acquisition_step)
