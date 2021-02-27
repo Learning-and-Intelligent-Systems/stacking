@@ -120,9 +120,20 @@ def setup_active_train(dataset,
         # then this won't work (but I think that scenario is highly unlikely)
         acquired_data, _ = logger.load_acquisition_data(logger.acquisition_step)
         if ensemble and not acquired_data:
-            acquisition_data = recover_labels(logger, args, agent)
-            logger.save_acquisition_data(acquisition_data, None, logger.acquisition_step)
-
+            if args.exec_mode == 'real':
+                acquisition_data = recover_labels(logger, args, agent)
+                logger.save_acquisition_data(acquisition_data, None, logger.acquisition_step)
+            else:
+                tower_data = logger.get_towers_data(logger.acquisition_step)
+                n_acquire_restart = args.n_acquire - len(tower_data)
+                
+                # acquire missing towers for this acquisition step
+                unlabeled_pool = data_sampler_fn(args.n_samples)
+                xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire_restart, args.strategy, data_pred_fn, data_subset_fn)
+                new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True)
+                combine_data(tower_data, new_data)
+                logger.save_acquisition_data(new_data, None, logger.acquisition_step)
+                
             # Add to dataset.
             train_data, val_data = split_data(acquisition_data, n_val=2)
             dataset.add_to_dataset(train_data)
