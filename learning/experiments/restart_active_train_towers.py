@@ -129,6 +129,8 @@ def setup_active_train(dataset,
         # then this won't work (but I think that scenario is highly unlikely)
         acquired_data, _ = logger.load_acquisition_data(logger.acquisition_step)
         if ensemble and not acquired_data:
+            if torch.cuda.is_available():
+                ensemble = ensemble.cuda()
             if args.exec_mode == 'real':
                 acquisition_data = recover_labels(logger, args, agent)
                 logger.save_acquisition_data(acquisition_data, None, logger.acquisition_step)
