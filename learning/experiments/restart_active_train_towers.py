@@ -212,6 +212,11 @@ def restart_active_towers(exp_path, args):
 
     if args.sampler == 'sequential':
         data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
+    if args.strategy == 'subtower-greedy':
+        data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
+    if args.strategy == 'subtower':
+        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(5, 5))
+
 
     print("Setting up dataset")
     ensemble = setup_active_train(dataset,
