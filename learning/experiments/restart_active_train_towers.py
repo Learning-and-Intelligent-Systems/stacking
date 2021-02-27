@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
 from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, \
-            get_sequential_predictions, get_predictions, get_labels, get_subset, PoolSampler
+            get_sequential_predictions, get_predictions, get_labels, get_subset, PoolSampler,sample_next_block
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.bottomup_net import BottomUpNet
