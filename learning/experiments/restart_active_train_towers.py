@@ -28,16 +28,6 @@ def tower_index(towers_data, tower):
         if np.array_equal(tower, tdi_tower):
             return tdi
     return None
-    
-def combine_data(tower_data, new_data):
-    for tower, block_ids, label in tower_data:
-        key = '%dblock' % tower.shape[0] 
-        new_data[key]['towers'] = np.concatenate([new_data[key]['towers'], np.expand_dims(tower,0)])
-        new_data[key]['labels'] = np.concatenate([new_data[key]['labels'], np.expand_dims(label,0)])
-        if block_ids is not None:
-            new_data[key]['block_ids'] = np.concatenate([new_data[key]['block_ids'], np.expand_dims(block_ids,0)])
-    
-    return new_data
 
 def recover_labels(logger, args, agent):
     towers_data = logger.get_towers_data(logger.acquisition_step)
@@ -151,8 +141,7 @@ def setup_active_train(dataset,
                     new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True, label_subtowers=True)
                 else:
                     new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True, label_subtowers=False)
-                
-                combine_data(tower_data, new_data)
+    
                 logger.save_acquisition_data(new_data, None, logger.acquisition_step)
                 
             # Add to dataset.
