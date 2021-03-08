@@ -2,12 +2,12 @@ import argparse
 import pickle
 import os
 import numpy as np
-
+import torch
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
 from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, \
-            get_sequential_predictions, get_predictions, get_labels, get_subset, PoolSampler
+            get_sequential_predictions, get_predictions, get_labels, get_subset, PoolSampler,sample_next_block
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.ensemble import Ensemble
 from learning.models.bottomup_net import BottomUpNet
@@ -15,7 +15,7 @@ from learning.models.gn import FCGN, ConstructableFCGN, FCGNFC
 from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
 from learning.active.train import train
-from learning.active.acquire import choose_acquisition_data
+from learning.active.acquire import choose_acquisition_data, greedy_sequential_choose_acquisition_data
 from learning.active.active_train import split_data
 from agents.panda_agent import PandaAgent, PandaClientAgent
 from block_utils import block_conflicts
@@ -28,7 +28,6 @@ def tower_index(towers_data, tower):
         if np.array_equal(tower, tdi_tower):
             return tdi
     return None
-    
 
 def recover_labels(logger, args, agent):
     towers_data = logger.get_towers_data(logger.acquisition_step)
@@ -120,11 +119,32 @@ def setup_active_train(dataset,
         # then this won't work (but I think that scenario is highly unlikely)
         acquired_data, _ = logger.load_acquisition_data(logger.acquisition_step)
         if ensemble and not acquired_data:
-            acquisition_data = recover_labels(logger, args, agent)
-            logger.save_acquisition_data(acquisition_data, None, logger.acquisition_step)
+            if torch.cuda.is_available():
+                ensemble = ensemble.cuda()
+            if args.exec_mode == 'real':
+                new_data = recover_labels(logger, args, agent)
+            else:
+                if args.strategy == 'subtower-greedy':
+                    # NOTE(izzy): acquiring a tower by greedily adding blocks to the top requires interleaving
+                    # sampling new candidate towers and scoring them. therefore this strategy doesn't perfectly
+                    # fit the separation of functionality that the others did, and it requires its own special case
+                    unlabeled_pool = None
+                    xs = greedy_sequential_choose_acquisition_data(ensemble, args.n_samples, args.n_acquire, data_sampler_fn, \
+                        data_label_fn, data_pred_fn, data_subset_fn)
+                else:
+                    unlabeled_pool = data_sampler_fn(args.n_samples)
+                    xs = choose_acquisition_data(unlabeled_pool, ensemble, args.n_acquire, args.strategy, data_pred_fn, data_subset_fn)
 
+                logger.save_unlabeled_acquisition_data(xs)
+                if args.strategy == 'subtower-greedy' or args.strategy == 'subtower':
+                    new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True, label_subtowers=True)
+                else:
+                    new_data = data_label_fn(xs, args.exec_mode, agent, logger, args.xy_noise, save_tower=True, label_subtowers=False)
+    
+            logger.save_acquisition_data(new_data, None, logger.acquisition_step)
+                
             # Add to dataset.
-            train_data, val_data = split_data(acquisition_data, n_val=2)
+            train_data, val_data = split_data(new_data, n_val=2)
             dataset.add_to_dataset(train_data)
             val_dataset.add_to_dataset(val_data)
         
@@ -182,6 +202,11 @@ def restart_active_towers(exp_path, args):
 
     if args.sampler == 'sequential':
         data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
+    if args.strategy == 'subtower-greedy':
+        data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
+    if args.strategy == 'subtower':
+        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(5, 5))
+
 
     print("Setting up dataset")
     ensemble = setup_active_train(dataset,
