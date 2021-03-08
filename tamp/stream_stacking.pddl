@@ -28,13 +28,13 @@
     :inputs (?o ?p ?g)
     :domain (and (Pose ?o ?p) (Grasp ?o ?g))
     :outputs (?q1 ?q2 ?t)
-    :certified (and (EndConf ?q1) (StartConf ?q2) (GraspKin ?o ?g ?q2) (PickKin ?o ?p ?g ?q1 ?q2 ?t))
+    :certified (and (EndConf ?q1) (StartConf ?q2) (PickGraspKin ?o ?g ?q2) (PickKin ?o ?p ?g ?q1 ?q2 ?t))
   )
   (:stream place-inverse-kinematics
     :inputs (?o ?p ?g)
     :domain (and (Pose ?o ?p) (Grasp ?o ?g))
     :outputs (?q1 ?q2 ?t)
-    :certified (and (Conf ?q1) (EndConf ?q1) (GraspKin ?o ?g ?q1) (Conf ?q2) (StartConf ?q2) (PlaceKin ?o ?p ?g ?q1 ?q2 ?t))
+    :certified (and (Conf ?q1) (EndConf ?q1) (PlaceGraspKin ?o ?g ?q1) (Conf ?q2) (StartConf ?q2) (PlaceKin ?o ?p ?g ?q1 ?q2 ?t))
   )
   (:stream plan-free-motion
     :inputs (?q1 ?q2)
@@ -45,7 +45,7 @@
   )
   (:stream plan-holding-motion
     :inputs (?q1 ?q2 ?o ?g)
-    :domain (and (StartConf ?q1) (EndConf ?q2) (GraspKin ?o ?g ?q1) (GraspKin ?o ?g ?q2))
+    :domain (and (StartConf ?q1) (EndConf ?q2) (PickGraspKin ?o ?g ?q1) (PlaceGraspKin ?o ?g ?q2))
     :fluents (AtPose)
     :outputs (?t)
     :certified (HoldingMotion ?q1 ?t ?q2 ?o ?g)
