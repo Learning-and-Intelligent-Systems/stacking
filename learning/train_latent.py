@@ -13,33 +13,74 @@ from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.gat import FCGAT
 
 
-class LatentModel(nn.Module):
+class LatentEnsemble(nn.Module):
     def __init__(ensemble, latents):
+        super(LatentEnsemble, self).__init__()
+
         self.ensemble = ensemble
         self.latents = latents
 
-    def forward(data, ensemble_idx=None):
+    def associate(self, samples, block_ids):
+        """ given samples from the latent space for each block in the set,
+        reorder them so they line up with blocks in towers
+
+        Arguments:
+            samples {torch.Tensor} -- [N_samples x N_blockset x latent_dim]
+            block_ids {torch.Tensor} -- [N_batch x N_blocks]
+
+        Returns:
+            torch.Tensor -- [N_batch x N_samples x N_blocks x latent_dim]
         """
-        associate latent vectors with the proper inputs to the model
-        
+        return samples[:, block_ids, :].permute(1, 0, 2, 3)
+
+    def concat_samples(self, samples, observed):
+        """ concatentate samples from the latent space for each tower
+        with the observed variables for each tower
+
+        Arguments:
+            samples {torch.Tensor} -- [N_batch x N_samples x N_blocks x latent_dim]
+            observed {torch.Tensor} -- [N_batch x N_blocks x observed_dim]
+
+        Returns:
+            torch.Tensor -- [N_batch x N_samples x N_blocks x total_dim]
+        """
+        N_batch, N_samples, N_blocks, latent_dim = samples.shape
+        observed = torch.unsqueze(observed, 1)
+        observed = torch.tile(observed, (1, N_samples, 1, 1))
+        return torch.cat([samples, observed], 3)
+
+    def forward(data, ensemble_idx=None, N_samples=1):
+        """ predict feasibility of the towers
+
+            data = {
+                'towers':   [N_batch x N_blocks x N_features]
+                'block_id': [N_batch x N_blocks]
+                'labels':   [N_batch]
+            }
+
+        Arguments:
+            data {dict} -- collection of towers, block_ids, labels
+
+        Keyword Arguments:
+            ensemble_idx {int} -- if None, average of all models (default: {None})
+            N_samples {number} -- how many times to sample the latents (default: {1})
         """
 
-        data = {
-            'block_id': block_id # [N_batch x N_blocks]
-            'towers': towers     # [N_batch x N_blocks x N_features]
-            'labels': labels     # [N_batch]
-        }
+        samples_for_each_block_in_set = latents.sample(N_samples)
+        samples_for_each_tower_in_batch = self.associate(
+            samples_for_each_block_in_set, data['block_ids'])
+        towers_with_latents = self.concat_samples(
+            samples_for_each_tower_in_batch, data['towers'])
 
-        samples_for_each_block_in_set = latents.sample(n) # [N_samples_from_latents x N_blocks_in_set]
-        samples_for_each_tower_in_batch = something # N_samples_from_latents x N_blocks]
+        N_batch, N_samples, N_blocks, total_dim = towers_with_latents.shape
 
         if ensemble_idx is None:
             # return vector of all predictions for the ensmble on the batch
-            # [N_models x N_batch x N_samples_from_latents]
-            pass 
+            # [N_models x N_batch x N_samples]
+            pass
         else:
             # forward pass of a single model in the ensemble
-            # [N_batch x N_samples_from_latents]
+            # [N_batch x N_samples]
             pass
 
 
@@ -48,7 +89,7 @@ def update_params(latent_ensemble, batches):
     1. sample ~ latents
     2. samples -(model)-> likelihood
     3. gradient descent step on model params
-    
+
     Arguments:
         model {[type]} -- [description]
         latents {[type]} -- [description]
@@ -71,7 +112,7 @@ def update_latents(latent_ensemble, batch):
     Choices:
         * either sample a single model ~ ensemble
         * take mean of likelihood under ensemble
-    
+
     Arguments:
         ensemble {[type]} -- [description]
         latents {[type]} -- [description]
