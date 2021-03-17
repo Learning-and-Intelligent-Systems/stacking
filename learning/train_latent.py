@@ -8,7 +8,6 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
-from learning.domains.towers.analyze_data import is_geometrically_stable, is_com_stable, get_geometric_thresholds
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler
 from learning.models.gat import FCGAT
 
@@ -64,24 +63,37 @@ class LatentEnsemble(nn.Module):
         Keyword Arguments:
             ensemble_idx {int} -- if None, average of all models (default: {None})
             N_samples {number} -- how many times to sample the latents (default: {1})
+
+        Returns:
+            torch.Tensor -- [N_batch]
         """
 
-        samples_for_each_block_in_set = latents.sample(N_samples)
+        # draw samples from the latent distribution
+        samples_for_each_block_in_set = self.latents.sample(N_samples)
+        # assocate those latent samples with the blocks in the towers
         samples_for_each_tower_in_batch = self.associate(
             samples_for_each_block_in_set, data['block_ids'])
         towers_with_latents = self.concat_samples(
             samples_for_each_tower_in_batch, data['towers'])
 
+        # reshape the resulting tensor so the batch dimension holds
+        # N_batch times N_samples
         N_batch, N_samples, N_blocks, total_dim = towers_with_latents.shape
+        towers_with_latents = towers_with_latents.view(-1, N_blocks, total_dim)
 
+        # forward pass of the model(s)
         if ensemble_idx is None:
-            # return vector of all predictions for the ensmble on the batch
-            # [N_models x N_batch x N_samples]
-            pass
+            # mean prediction for the ensemble
+            labels = self.ensemble.models[i].forward(towers_with_latents)
+            labels = labels.mean(axis=1)
         else:
-            # forward pass of a single model in the ensemble
-            # [N_batch x N_samples]
-            pass
+            # prediction of a single model in the ensemble
+            labels = self.ensemble.models[i].forward(towers_with_latents)
+
+        # reshape the result so we can compute the mean of the samples
+        labels = labels.view(N_batch, N_samples)
+        return labels.mean(axis=1)
+
 
 
 def update_params(latent_ensemble, batches):
