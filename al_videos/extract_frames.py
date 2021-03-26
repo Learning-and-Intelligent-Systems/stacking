@@ -32,9 +32,12 @@ if __name__ == '__main__':
         for lx, line in enumerate(handle.readlines()):
             if len(line) < 2: continue
             fname, ix = line.strip().split(',')
-            print(fname, int(ix))
-            frame = video_to_frame(fname, int(ix))
+            print(fname, float(ix))
+            frame = video_to_frame(fname, float(ix))
             #cv2.imshow('img', frame)
-            crop = frame[250:450, 200:350]
+            if 'tallest' in args.dir:
+                crop = frame[175:450, 200:375]
+            else:
+                crop = frame[200:450, 200:375]
             cv2.imwrite(os.path.join(args.dir, f'{lx}.png'), crop)
             cv2.waitKey(0)
