@@ -8,7 +8,7 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
-from learning.domains.towers.tower_data import TowerDataset, TowerSampler
+from learning.domains.towers.tower_data import TowerDataset, ParallelDataLoader
 from learning.models.gat import FCGAT
 
 
@@ -136,16 +136,18 @@ def update_latents(latent_ensemble, batch):
 
     pass
 
-def train(latent_ensemble, dataset, n_epochs=10):
+def train(latent_ensemble, train_dataset, train_loader, n_epochs=10):
 
     optimizer = optim.Adam([ensemble.parameters(), latents.parameters()])
 
     for epoch_idx in range(n_epochs):
-        for data in dataset:
-            update_latents(ensemble, latents, data)
-            update_params(ensemble, latents, data)
+        for batches in train_loader:
+            update_latents(ensemble, latents, batches)
+            update_params(ensemble, latents, batches)
 
-def test(ensemble, latents, dataset):
+    # Note (Mike): When doing active learning, add new towers to train_dataset (not train_loader).
+
+def test(ensemble, latents, test_dataset, test_loader):
     update_latents(ensemble, latents, data)
 
 
@@ -156,7 +158,18 @@ if __name__ == "__main__":
     train_dataset = TowerDataset(train_towers_dict, augment=True)
     with open("learning/data/10block_set_(x1000).pkl", 'rb') as handle:
         test_towers_dict = pickle.load(handle)
-    test_dataset = TowerDataset(test_towers_dict, augment=True)
+    test_dataset = TowerDataset(test_towers_dict, augment=False)
+
+    n_models = 7
+    train_loader = ParallelDataLoader(dataset=train_dataset,
+                                      batch_size=16,
+                                      shuffle=True,
+                                      n_dataloders=n_models)
+    test_loader = ParallelDataLoader(dataset=test_dataset,
+                                     batch_size=16,
+                                     shuffle=False,
+                                     n_dataloader=1)
+
 
     # create the model
     # NOTE: we need to specify latent dimension.
@@ -168,7 +181,7 @@ if __name__ == "__main__":
     test_latents = None
 
     # train
-    train(ensemble, train_latents, train_dataset)
+    train(ensemble, train_latents, train_dataset, train_loader)
 
     # test
-    test(ensemble, test_latents, test_dataset)
+    test(ensemble, test_latents, test_dataset, test_loader)

@@ -51,8 +51,6 @@ class TowerDataset(Dataset):
             }
         :param K_skip: Option to this the original dataset by taking every K_skip tower. Must be used with augment.
         :param augment: Whether to include augmented towers in the dataset.
-        :param n_interators: If greater than one, the dataset will return a set of batches, which are each generated from 
-            shuffling the data in a different order. This is useful for training an ensemble in parallel.
         """
         self.tower_keys = list(tower_dict.keys())
         self.tower_tensors = {}
@@ -138,18 +136,25 @@ class TowerDataset(Dataset):
 
 class TowerSampler(Sampler):
     def __init__(self, dataset, batch_size, shuffle):
+        """ Given an dataset, ensure batches consist of towers of the same size. Additionally,
+        give the option to return multiple batches from shuffling the dataset multiple times.
+        
+        :param dataset: The underlying dataset, indices are ordered sequentially by tower size.
+        :param batch_size: Number of towers to include in each batch.
+        :param shuffle: Whether or not to shuffle the data order.
+        """
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
 
     def __iter__(self):
-        # Build indices for each tower size. 
+        # Build indices for each tower size. Dictionary k: tower_size (str), v: list of indices
         indices = self.dataset.get_indices()
 
         if self.shuffle:
             for k in self.dataset.tower_keys:
                 np.random.shuffle(indices[k])
-
+        
         # Make each list an iterable of batches.
         iterators = {}
         for k in self.dataset.tower_keys:
@@ -161,10 +166,12 @@ class TowerSampler(Sampler):
         # Loop over batches until all the iterators are empty.
         valid_tower_sizes = copy.deepcopy(self.dataset.tower_keys)
         while len(valid_tower_sizes) > 0:
+            # First choose a random tower size.
             if self.shuffle:
                 key = np.random.choice(valid_tower_sizes)
             else:
                 key = valid_tower_sizes[0]
+            # Grab the next element from that batch.
             try:
                 yield next(iterators[key])
             except:
@@ -179,11 +186,48 @@ class TowerSampler(Sampler):
         return n_batches
 
 
+class ParallelDataLoader:
+    def __init__(self, dataset, batch_size, shuffle, n_dataloaders=1):
+        """ Wrap multiple dataloaders so that we iterate through the data independently and in parallel.
+        :param dataset: The underlying dataset to iterate over.
+        :param batch_size: Batch size.
+        :param shuffle: Whether to shuffle the data.
+        :param n_dataloaders: The number of underlying independent dataloaders to use.
+        """
+        # Create a custom sampler and loader so each loader uses idependently shuffled data.
+        self.loaders = []
+        for _ in range(n_dataloaders):
+            sampler = TowerSampler(dataset, 
+                           batch_size=10, 
+                           shuffle=True)
+            loader = DataLoader(dataset=dataset,
+                        batch_sampler=sampler)
+            self.loaders.append(loader)
+
+    def __iter__(self):
+        # Initialize the dataloaders (this should reshuffle the data in each).
+        loaders = [iter(l) for l in self.loaders]
+        stop = False
+        # Return a separate batch for each loader at each step.
+        while not stop:
+            batches = []
+            for loader in loaders:
+                try:
+                    batches.append(next(loader))
+                except:
+                    stop = True
+            if not stop:
+                yield batches
+    
+    def __len__(self):
+        return len(self.loaders[0])
+
+
 if __name__ == '__main__':
     #with open('learning/data/random_blocks_(x40000)_5blocks_all.pkl', 'rb') as handle:
     #   towers_dict = pickle.load(handle)
     #dataset = TowerDataset(towers_dict, augment=True, K_skip=10000)
-    with open('learning/experiments/logs/towers-con-init-random-blocks-10-20201125-123945/datasets/active_50.pkl', 'rb') as handle:
+    with open('learning/experiments/logs/robot-seq-init-sim-20210219-131924/datasets/active_20.pkl', 'rb') as handle:
         dataset = pickle.load(handle)
     
     
@@ -197,7 +241,9 @@ if __name__ == '__main__':
         print(x.shape)
 
     print('----- Test tower sampler -----')
-    sampler = TowerSampler(dataset,10, True, True)
+    sampler = TowerSampler(dataset, 
+                           batch_size=10, 
+                           shuffle=True)
     for batch_ixs in sampler:
         print(batch_ixs)
 
@@ -205,7 +251,31 @@ if __name__ == '__main__':
                         batch_sampler=sampler)
     print(len(loader))
 
-    for x, y in loader:
-        print(y)
+    print('----- Test parallel data loader -----')
+    loader = ParallelDataLoader(dataset=dataset,
+                                batch_size=10,
+                                shuffle=True,
+                                n_dataloaders=5)
+    for batches in loader:
+        print('-----')
+        for x, y in batches:
+            print(x.shape, y.shape)
+
+    from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data
+    with open('learning/domains/towers/final_block_set_10.pkl', 'rb') as f: 
+        block_set = pickle.load(f)
+    towers_dict = sample_unlabeled_data(40, block_set)
+    print(towers_dict.keys())
+    for k, val in towers_dict.items():
+        print(k, val['towers'].shape)
+    print(len(dataset), len(loader))
+    dataset.add_to_dataset(towers_dict)
+    print(len(dataset), len(loader))
+    for ix, batches in enumerate(loader):
+        for x, y in batches:        
+            if ix == len(loader) - 1:
+                print(y)
+
+
 
     
