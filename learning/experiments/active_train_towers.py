@@ -131,8 +131,7 @@ def run_active_towers(args):
     #print(len(dataset), len(val_dataset)) 
     sampler = TowerSampler(dataset=dataset,
                            batch_size=args.batch_size,
-                           shuffle=True,
-                           oversample=False)
+                           shuffle=True)
     dataloader = DataLoader(dataset,
                             batch_sampler=sampler)
     

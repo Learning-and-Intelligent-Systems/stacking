@@ -51,6 +51,8 @@ class TowerDataset(Dataset):
             }
         :param K_skip: Option to this the original dataset by taking every K_skip tower. Must be used with augment.
         :param augment: Whether to include augmented towers in the dataset.
+        :param n_interators: If greater than one, the dataset will return a set of batches, which are each generated from 
+            shuffling the data in a different order. This is useful for training an ensemble in parallel.
         """
         self.tower_keys = list(tower_dict.keys())
         self.tower_tensors = {}
@@ -135,25 +137,14 @@ class TowerDataset(Dataset):
 
 
 class TowerSampler(Sampler):
-    def __init__(self, dataset, batch_size, shuffle, oversample=False):
+    def __init__(self, dataset, batch_size, shuffle):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.oversample = oversample
 
     def __iter__(self):
         # Build indices for each tower size. 
         indices = self.dataset.get_indices()
-
-        if self.oversample: 
-            for k in self.dataset.tower_keys:
-                # Get the indices that correspond to positive/negative labels.
-                pos_indices = [ix for ix in indices[k] if self.dataset.__getitem__(ix)[1] == 1]
-                neg_indices = [ix for ix in indices[k] if self.dataset.__getitem__(ix)[1] == 0]
-                diff = len(neg_indices) - len(pos_indices)
-                if diff > 0 and len(pos_indices) > 10:
-                    # Oversample the positive cases.
-                    indices[k] = pos_indices + neg_indices + np.random.choice(pos_indices, diff, replace=True).tolist()
 
         if self.shuffle:
             for k in self.dataset.tower_keys:
