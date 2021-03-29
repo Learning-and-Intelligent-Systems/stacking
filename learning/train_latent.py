@@ -13,11 +13,19 @@ from learning.models.gat import FCGAT
 
 
 class LatentEnsemble(nn.Module):
-    def __init__(ensemble, latents):
+    def __init__(self, ensemble, n_latents, d_latents):
+        """
+        Arguments:
+            n_latents {int}: Number of blocks.
+            d_latents {int}: Dimension of each latent.
+        """
         super(LatentEnsemble, self).__init__()
 
         self.ensemble = ensemble
-        self.latents = latents
+
+        self.latent_locs = torch.Parameter(torch.zeros(n_latents, d_latents))
+        self.latent_scales = torch.Parameter(torch.ones(n_latents, d_latents))
+        self.latents = torch.distributions.normal.Normal(self.latent_locs, self.latent_scales)
 
     def associate(self, samples, block_ids):
         """ given samples from the latent space for each block in the set,
@@ -48,7 +56,7 @@ class LatentEnsemble(nn.Module):
         observed = torch.tile(observed, (1, N_samples, 1, 1))
         return torch.cat([samples, observed], 3)
 
-    def forward(towers, block_ids, ensemble_idx=None, N_samples=1):
+    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1):
         """ predict feasibility of the towers
 
         Arguments:
@@ -64,7 +72,7 @@ class LatentEnsemble(nn.Module):
         """
 
         # draw samples from the latent distribution
-        samples_for_each_block_in_set = self.latents.sample(N_samples)
+        samples_for_each_block_in_set = self.latents.rsample(N_samples)
         # assocate those latent samples with the blocks in the towers
         samples_for_each_tower_in_batch = self.associate(
             samples_for_each_block_in_set, block_ids)
@@ -103,7 +111,7 @@ def get_params_loss(latent_ensemble, batches):
     """
 
     likelihood_loss = 0
-    for i, batch in enumerate(set_of_batches):
+    for i, batch in enumerate(batches):
         towers, block_ids, labels = batch
         preds = latent_ensemble(towers, block_ids, ensemble_idx=i)
         likelihood_loss += F.binary_cross_entropy(preds, labels)
@@ -141,7 +149,7 @@ def get_latent_loss(latent_ensemble, batch):
 def train(latent_ensemble, train_loader, n_epochs=10, freeze_latents=False, freeze_ensemble=True):
 
     params_optimizer = optim.Adam([latent_ensemble.ensemble.parameters()])
-    latent_optimizer = optim.Adam([latent_ensemble.latents.parameters()])
+    latent_optimizer = optim.Adam([latent_ensemble.latent_scales, latent_enseble.latent_locs])
 
     for epoch_idx in range(n_epochs):
         for set_of_batches in train_loader:
@@ -190,15 +198,10 @@ if __name__ == "__main__":
     # NOTE: we need to specify latent dimension.
     ensemble = None
 
-    # create the latents
-    # NOTE: we need to say how many blocks
-    train_latents = None
-    test_latents = None
-
     # train
-    train_latent_ensemble = LatentEnsemble(ensemble, train_latents)
+    train_latent_ensemble = LatentEnsemble(ensemble, n_latents=10, d_latents=3)
     train(train_latent_ensemble, train_loader)
 
     # test
-    test_latent_ensemble = LatentEnsemble(ensemble, test_latents)
+    test_latent_ensemble = LatentEnsemble(ensemble, n_latents=10, d_latents=3)
     test(test_latent_ensemble, test_loader)
