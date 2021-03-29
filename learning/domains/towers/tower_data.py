@@ -101,7 +101,7 @@ class TowerDataset(Dataset):
                 break
         
         tower_ix = ix - self.start_indices[tower_size]
-        return self.tower_tensors[tower_size][tower_ix,:,:14], self.tower_labels[tower_size][tower_ix]
+        return self.tower_tensors[tower_size][tower_ix,:,:14], self.tower_block_ids[tower_size][tower_ix], self.tower_labels[tower_size][tower_ix]
         
     def __len__(self):
         """
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     print(dataset.get_indices())
     print('Iterate over dataset:')
     for ix in range(len(dataset)):
-        x, y = dataset[ix]
+        x, ids, y = dataset[ix]
         print(x.shape)
 
     print('----- Test tower sampler -----')
@@ -258,7 +258,7 @@ if __name__ == '__main__':
                                 n_dataloaders=5)
     for batches in loader:
         print('-----')
-        for x, y in batches:
+        for x, ids, y in batches:
             print(x.shape, y.shape)
 
     from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data
@@ -272,8 +272,9 @@ if __name__ == '__main__':
     dataset.add_to_dataset(towers_dict)
     print(len(dataset), len(loader))
     for ix, batches in enumerate(loader):
-        for x, y in batches:        
+        for x, ids, y in batches:        
             if ix == len(loader) - 1:
+                print(ids)
                 print(y)
 
 
