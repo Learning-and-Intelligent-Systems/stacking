@@ -48,17 +48,12 @@ class LatentEnsemble(nn.Module):
         observed = torch.tile(observed, (1, N_samples, 1, 1))
         return torch.cat([samples, observed], 3)
 
-    def forward(data, ensemble_idx=None, N_samples=1):
+    def forward(towers, block_ids, ensemble_idx=None, N_samples=1):
         """ predict feasibility of the towers
 
-            data = {
-                'towers':   [N_batch x N_blocks x N_features]
-                'block_id': [N_batch x N_blocks]
-                'labels':   [N_batch]
-            }
-
         Arguments:
-            data {dict} -- collection of towers, block_ids, labels
+            towers {torch.Tensor}   [N_batch x N_blocks x N_features]
+            block_ids {torch.Tensor}   [N_batch x N_blocks]
 
         Keyword Arguments:
             ensemble_idx {int} -- if None, average of all models (default: {None})
@@ -72,9 +67,9 @@ class LatentEnsemble(nn.Module):
         samples_for_each_block_in_set = self.latents.sample(N_samples)
         # assocate those latent samples with the blocks in the towers
         samples_for_each_tower_in_batch = self.associate(
-            samples_for_each_block_in_set, data['block_ids'])
+            samples_for_each_block_in_set, block_ids)
         towers_with_latents = self.concat_samples(
-            samples_for_each_tower_in_batch, data['towers'])
+            samples_for_each_tower_in_batch, towers)
 
         # reshape the resulting tensor so the batch dimension holds
         # N_batch times N_samples
@@ -95,8 +90,7 @@ class LatentEnsemble(nn.Module):
         return labels.mean(axis=1)
 
 
-
-def update_params(latent_ensemble, batches):
+def get_params_loss(latent_ensemble, batches):
     """
     1. sample ~ latents
     2. samples -(model)-> likelihood
@@ -105,16 +99,19 @@ def update_params(latent_ensemble, batches):
     Arguments:
         model {[type]} -- [description]
         latents {[type]} -- [description]
-        batch {[type]} -- note that each model in the ensemble gets its own batch
+        batches {[type]} -- note that each model in the ensemble gets its own batch
     """
 
     likelihood_loss = 0
     for i, batch in enumerate(set_of_batches):
-        likelihood_loss += latent_ensemble(batch, ensemble_idx=i)
+        towers, block_ids, labels = batch
+        preds = latent_ensemble(towers, block_ids, ensemble_idx=i)
+        likelihood_loss += F.binary_cross_entropy(preds, labels)
 
-    pass
+    return likelihood_loss
 
-def update_latents(latent_ensemble, batch):
+
+def get_latent_loss(latent_ensemble, batch):
     """
     [mu, sigma] -(reparam)-> [sample] -(thru ensemble)-> [likelihood]
     [mu, sigma] -> [KL]
@@ -130,25 +127,44 @@ def update_latents(latent_ensemble, batch):
         latents {[type]} -- [description]
         batch {[type]} -- [description]
     """
-
-    likelihood_loss = latent_ensemble(data) # take the mean of the ensemble
+    towers, block_ids, labels = batch
+    # NOTE(izzy): we update the params of the latent distribution using the
+    # reparametrization technique through a sample from that distribution. we may
+    # wish to draw multiple samples from the latent distribution to reduce the
+    # variance of the updates
+    preds = latent_ensemble(towers, block_ids) # take the mean of the ensemble
+    likelihood_loss = F.binary_cross_entropy(preds, labels)
     kl_loss = latent_ensemble.latents.kl() # compute divergence of latent distribution
 
     pass
 
-def train(latent_ensemble, train_dataset, train_loader, n_epochs=10):
+def train(latent_ensemble, train_loader, n_epochs=10, freeze_latents=False, freeze_ensemble=True):
 
-    optimizer = optim.Adam([ensemble.parameters(), latents.parameters()])
+    params_optimizer = optim.Adam([latent_ensemble.ensemble.parameters()])
+    latent_optimizer = optim.Adam([latent_ensemble.latents.parameters()])
 
     for epoch_idx in range(n_epochs):
-        for batches in train_loader:
-            update_latents(ensemble, latents, batches)
-            update_params(ensemble, latents, batches)
+        for set_of_batches in train_loader:
+            # update the latent distribution while holding the model parameters fixed.
+            if not freeze_latents:
+                latent_optimizer.zero_grad()
+                latent_loss = get_latent_loss(latent_ensemble, set_of_batches)
+                latent_loss.backward()
+                latent_optimizer.step()
+
+            # update the model parameters while sampling from the latent distribution.
+            if not freeze_ensemble:
+                params_optimizer.zero_grad()
+                params_loss = get_params_loss(latent_ensemble, set_of_batches[0])
+                params_loss.backward()
+                params_optimizer.step()
 
     # Note (Mike): When doing active learning, add new towers to train_dataset (not train_loader).
 
-def test(ensemble, latents, test_dataset, test_loader):
-    update_latents(ensemble, latents, data)
+def test(latent_ensemble, test_loader):
+    # estimate the latents for the test data, but without updating the model
+    # parameters
+    train(latent_ensemble, test_loader, freeze_ensemble=True)
 
 
 if __name__ == "__main__":
@@ -170,7 +186,6 @@ if __name__ == "__main__":
                                      shuffle=False,
                                      n_dataloader=1)
 
-
     # create the model
     # NOTE: we need to specify latent dimension.
     ensemble = None
@@ -181,7 +196,9 @@ if __name__ == "__main__":
     test_latents = None
 
     # train
-    train(ensemble, train_latents, train_dataset, train_loader)
+    train_latent_ensemble = LatentEnsemble(ensemble, train_latents)
+    train(train_latent_ensemble, train_loader)
 
     # test
-    test(ensemble, test_latents, test_dataset, test_loader)
+    test_latent_ensemble = LatentEnsemble(ensemble, test_latents)
+    test(test_latent_ensemble, test_loader)
