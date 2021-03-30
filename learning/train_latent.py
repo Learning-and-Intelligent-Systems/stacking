@@ -9,7 +9,8 @@ from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
 from learning.domains.towers.tower_data import TowerDataset, ParallelDataLoader
-from learning.models.gat import FCGAT
+from learning.models.gn import FCGN
+from learning.models.ensemble import Ensemble
 
 
 class LatentEnsemble(nn.Module):
@@ -23,8 +24,8 @@ class LatentEnsemble(nn.Module):
 
         self.ensemble = ensemble
 
-        self.latent_locs = torch.Parameter(torch.zeros(n_latents, d_latents))
-        self.latent_scales = torch.Parameter(torch.ones(n_latents, d_latents))
+        self.latent_locs = nn.Parameter(torch.zeros(n_latents, d_latents))
+        self.latent_scales = nn.Parameter(torch.ones(n_latents, d_latents))
         self.latents = torch.distributions.normal.Normal(self.latent_locs, self.latent_scales)
 
     def associate(self, samples, block_ids):
@@ -52,7 +53,7 @@ class LatentEnsemble(nn.Module):
             torch.Tensor -- [N_batch x N_samples x N_blocks x total_dim]
         """
         N_batch, N_samples, N_blocks, latent_dim = samples.shape
-        observed = torch.unsqueze(observed, 1)
+        observed = torch.unsqueeze(observed, 1)
         observed = torch.tile(observed, (1, N_samples, 1, 1))
         return torch.cat([samples, observed], 3)
 
@@ -71,8 +72,8 @@ class LatentEnsemble(nn.Module):
             torch.Tensor -- [N_batch]
         """
 
-        # draw samples from the latent distribution
-        samples_for_each_block_in_set = self.latents.rsample(N_samples)
+        # draw samples from the latent distribution [N_samples x N_blockset x latent_dim]
+        samples_for_each_block_in_set = self.latents.rsample(sample_shape=[N_samples])
         # assocate those latent samples with the blocks in the towers
         samples_for_each_tower_in_batch = self.associate(
             samples_for_each_block_in_set, block_ids)
@@ -87,11 +88,11 @@ class LatentEnsemble(nn.Module):
         # forward pass of the model(s)
         if ensemble_idx is None:
             # mean prediction for the ensemble
-            labels = self.ensemble.models[i].forward(towers_with_latents)
+            labels = self.ensemble.forward(towers_with_latents)
             labels = labels.mean(axis=1)
         else:
             # prediction of a single model in the ensemble
-            labels = self.ensemble.models[i].forward(towers_with_latents)
+            labels = self.ensemble.models[ensemble_idx].forward(towers_with_latents)
 
         # reshape the result so we can compute the mean of the samples
         labels = labels.view(N_batch, N_samples)
@@ -113,7 +114,7 @@ def get_params_loss(latent_ensemble, batches):
     likelihood_loss = 0
     for i, batch in enumerate(batches):
         towers, block_ids, labels = batch
-        preds = latent_ensemble(towers, block_ids, ensemble_idx=i)
+        preds = latent_ensemble(towers, block_ids.long(), ensemble_idx=i)
         likelihood_loss += F.binary_cross_entropy(preds, labels)
 
     return likelihood_loss
@@ -140,30 +141,33 @@ def get_latent_loss(latent_ensemble, batch):
     # reparametrization technique through a sample from that distribution. we may
     # wish to draw multiple samples from the latent distribution to reduce the
     # variance of the updates
-    preds = latent_ensemble(towers, block_ids) # take the mean of the ensemble
+    preds = latent_ensemble(towers, block_ids.long()) # take the mean of the ensemble
     likelihood_loss = F.binary_cross_entropy(preds, labels)
-    kl_loss = latent_ensemble.latents.kl() # compute divergence of latent distribution
+    # and compute the kl divergence
+    q_z = latent_ensemble.latents
+    p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
+    kl_loss = torch.distributions.kl_divergence(q_z, p_z).sum()
 
-    pass
+    return likelihood_loss + kl_loss
 
 def train(latent_ensemble, train_loader, n_epochs=10, freeze_latents=False, freeze_ensemble=True):
 
-    params_optimizer = optim.Adam([latent_ensemble.ensemble.parameters()])
-    latent_optimizer = optim.Adam([latent_ensemble.latent_scales, latent_enseble.latent_locs])
+    params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters())
+    latent_optimizer = optim.Adam([latent_ensemble.latent_scales, latent_ensemble.latent_locs])
 
     for epoch_idx in range(n_epochs):
         for set_of_batches in train_loader:
             # update the latent distribution while holding the model parameters fixed.
             if not freeze_latents:
                 latent_optimizer.zero_grad()
-                latent_loss = get_latent_loss(latent_ensemble, set_of_batches)
+                latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0])
                 latent_loss.backward()
                 latent_optimizer.step()
 
             # update the model parameters while sampling from the latent distribution.
             if not freeze_ensemble:
                 params_optimizer.zero_grad()
-                params_loss = get_params_loss(latent_ensemble, set_of_batches[0])
+                params_loss = get_params_loss(latent_ensemble, set_of_batches)
                 params_loss.backward()
                 params_optimizer.step()
 
@@ -176,30 +180,38 @@ def test(latent_ensemble, test_loader):
 
 
 if __name__ == "__main__":
+    # NOTE(izzy): d_latents corresponds to the number of unique objects in the
+    # dataset. at some point we should write a function that figures that out
+    # from the loaded data-dict
+    n_models = 7
+    d_latents = 5
+    n_latents = 10
+
     # load data
-    with open("learning/data/10block_set_(x10000).pkl", 'rb') as handle:
+    # train_data_filename = "learning/data/10block_set_(x10000).pkl"
+    train_data_filename = "learning/experiments/logs/exp-20210223-141347/datasets/active_1.pkl"
+    with open(train_data_filename, 'rb') as handle:
         train_towers_dict = pickle.load(handle)
-    train_dataset = TowerDataset(train_towers_dict, augment=True)
     with open("learning/data/10block_set_(x1000).pkl", 'rb') as handle:
         test_towers_dict = pickle.load(handle)
-    test_dataset = TowerDataset(test_towers_dict, augment=False)
 
-    n_models = 7
-    train_loader = ParallelDataLoader(dataset=train_dataset,
+    train_loader = ParallelDataLoader(dataset=train_towers_dict,
                                       batch_size=16,
                                       shuffle=True,
-                                      n_dataloders=n_models)
-    test_loader = ParallelDataLoader(dataset=test_dataset,
+                                      n_dataloaders=n_models)
+    test_loader = ParallelDataLoader(dataset=test_towers_dict,
                                      batch_size=16,
                                      shuffle=False,
-                                     n_dataloader=1)
+                                     n_dataloaders=1)
 
     # create the model
     # NOTE: we need to specify latent dimension.
-    ensemble = None
+    ensemble = Ensemble(base_model=FCGN,
+                        base_args={'n_hidden': 32, 'n_in': 14 + d_latents},
+                        n_models=n_models)
 
     # train
-    train_latent_ensemble = LatentEnsemble(ensemble, n_latents=10, d_latents=3)
+    train_latent_ensemble = LatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
     train(train_latent_ensemble, train_loader)
 
     # test
