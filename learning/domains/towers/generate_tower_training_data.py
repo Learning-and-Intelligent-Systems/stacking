@@ -24,7 +24,7 @@ def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=Fal
 
     # select blocks in this tower
     blocks = np.random.choice(blocks, num_blocks, replace=False)
-    
+
     # pick random orientations for the blocks
     orns = sample_with_replacement(QUATERNIONS, k=num_blocks)
     #orns = [Quaternion(*orn.as_quat()) for orn in orns]
@@ -83,7 +83,7 @@ def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, c
     :param pairwise_stable: The stability between two consecutive blocks in the tower.
     :param cog_stable: If the tower is stable just by looking at the CoG.
     """
-   
+
     # init a tower planner for checking stability
     tp = TowerPlanner(stability_mode='contains')
 
@@ -106,18 +106,18 @@ def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, c
         if not stable is None:
             if tp.tower_is_stable(rotated_tower) == stable and \
             tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
-            tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
+            tp.tower_is_cog_stable(rotated_tower) == cog_stable:
                 return rotated_tower
         elif not constructable is None:
             if tp.tower_is_constructable(rotated_tower) == constructable and \
             tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
-            tp.tower_is_cog_stable(rotated_tower) == cog_stable: 
+            tp.tower_is_cog_stable(rotated_tower) == cog_stable:
                 return rotated_tower
 
     return None
 
 # NOTE(caris): I think we should use the size of the dataset in the filename, not
-# num_towers as sometimes 
+# num_towers as sometimes
 # sum([len(dataset[num_blocks]['towers']) for num_blocks in dataset.keys()]) < num_towers
 def get_filename(num_towers, use_block_set, block_set_size, suffix):
     # create a filename for the generated data based on the configuration
@@ -135,13 +135,13 @@ def generate_training_images(world):
         x = scale*(pixel[0]-pixel_origin[0])
         y = scale*(pixel_origin[1]-pixel[1])
         return np.array([x, y])
-        
+
         # TODD, test xy_in_obj()
     def world_to_pixel(point):
         x = pixel_origin[0] + point[0]/scale
         y = pixel_origin[1] - point[1]/scale
         return np.array([x, y])
-        
+
     def xy_in_obj(xy, object):
         endpoints_obj = [[-object.dimensions.x/2, -object.dimensions.y/2],
                         [-object.dimensions.x/2, +object.dimensions.y/2],
@@ -159,12 +159,12 @@ def generate_training_images(world):
             else:
                 inside = inside and False
         return inside
-        
+
     def get_object_training_image(object):
         image = np.zeros((width, height)) #(black)
         image_xs = np.linspace(0, width, width+1).astype(np.uint32)
         image_ys = np.linspace(0, height, height+1).astype(np.uint32)
-        
+
         # draw object (white)
         found_obj = False
         for pixel_x in image_xs:
@@ -216,16 +216,10 @@ def main(args, vis_tower=False):
     num_towers = num_towers_per_cat * 4 * 2
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
-    use_block_set = False
-    # the number of blocks in the finite set of blocks
-    block_set_size = 1000
+    use_block_set = args.block_set_size > 0
     # generate the finite set of blocks
     if use_block_set:
-        block_set = [Object.random(f'obj_{i}') for i in range(block_set_size)]
-
-    # use_block_set = True
-    # with open('learning/data/block_set_10.pkl', 'rb') as handle:
-    #     block_set = pickle.load(handle)
+        block_set = [Object.random(f'obj_{i}') for i in range(args.block_set_size)]
 
     # create a vector of stability labels where half are unstable and half are stable
     stability_labels = np.zeros(num_towers, dtype=int)
@@ -234,7 +228,7 @@ def main(args, vis_tower=False):
     dataset = {}
     for num_blocks in range(2, args.max_blocks+1):
         vectorized_towers = []
-        block_names = []
+        block_ids = []
         images = []
 
         for stable in [0, 1]:
@@ -263,21 +257,21 @@ def main(args, vis_tower=False):
 
                     # generate a random tower
                     if args.criteria == 'stable':
-                        tower = build_tower(blocks, 
-                                            stable=stable, 
-                                            pairwise_stable=pw_stable, 
+                        tower = build_tower(blocks,
+                                            stable=stable,
+                                            pairwise_stable=pw_stable,
                                             cog_stable=cog_stable)
                     elif args.criteria == 'constructable':
-                        tower = build_tower(blocks, 
-                                            constructable=stable, 
-                                            pairwise_stable=pw_stable, 
+                        tower = build_tower(blocks,
+                                            constructable=stable,
+                                            pairwise_stable=pw_stable,
                                             cog_stable=cog_stable)
                     else:
                         raise NotImplementedError()
-                    
+
                     if tower is None:
                         continue
-                    
+
                     # NOTE: this has to be done before the sim is run or else
                     # the images will be of the object final positions
                     if args.save_images:
@@ -297,7 +291,8 @@ def main(args, vis_tower=False):
                     count += 1
                     # append the tower to the list
                     vectorized_towers.append(vectorize(tower))
-                    block_names.append([b.name for b in blocks])
+                    block_ids.append([int(b.name.strip('obj_')) for b in blocks])
+
         if num_blocks == 2 or args.criteria == 'constructable':
             stability_labels = np.zeros(num_towers//2, dtype=int)
             stability_labels[num_towers // 4:] = 1
@@ -307,17 +302,18 @@ def main(args, vis_tower=False):
         data = {
             'towers': np.array(vectorized_towers),
             'labels': stability_labels,
-            'images': images
         }
         if use_block_set:
-            data['block_names'] = block_names
+            data['block_ids'] = np.array(block_ids)
+        if args.save_images:
+            data['images']: images
 
         dataset[f'{num_blocks}block'] = data
 
     # save the generate data
     if args.criteria == 'constructable':
         num_towers /= 2
-    filename = get_filename(num_towers, use_block_set, block_set_size, args.suffix)
+    filename = get_filename(num_towers, use_block_set, args.block_set_size, args.suffix)
     print('Saving to', filename)
     with open(filename, 'wb') as f:
         pickle.dump(dataset, f)
@@ -329,6 +325,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-blocks', type=int, required=True)
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--save-images', action='store_true')
+    parser.add_argument('--block-set-size', type=int, default=0)
     parser.add_argument('--criteria', default='constructable', choices=['stable', 'constructible'])
     args = parser.parse_args()
 
