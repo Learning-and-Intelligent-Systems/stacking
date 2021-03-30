@@ -140,10 +140,7 @@ if __name__ == '__main__':
             if problem in args.problems:
                 regret_fname = 'random_planner_%s_%d_block_towers_regrets.pkl' % (problem, args.tower_size)
                 reward_fname = 'random_planner_%s_%d_block_towers_rewards.pkl' % (problem, args.tower_size)
-                if label == 'random': # this is a non-curious method and just gets the same y value plotted along the x axis
-                    _, plot_data = plot_planner_performance(loggers, args, y_axis, label, regret_fname, reward_fname, single_value=True)
-                else:
-                    xs, plot_data = plot_planner_performance(loggers, args, y_axis, label, regret_fname, reward_fname)
+                xs, plot_data = plot_planner_performance(loggers, args, y_axis, label, regret_fname, reward_fname)
                 task_plot_data[label] = plot_data
 
     tasks = ['Tallest Tower', 'Maximum Unsupported Area', 'Longest Overhang']
