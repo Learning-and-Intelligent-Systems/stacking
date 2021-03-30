@@ -27,7 +27,7 @@ def preprocess(towers):
 def unprocess(towers):
     towers[:,:,1:4] *= 0.01 #towers[:,:,4:7]
     towers[:,:,7:9] *= 0.01 #towers[:,:,4:6]
-    towers[:,:,4:7] = towers[:,:,4:7]*0.01 + 0.1 
+    towers[:,:,4:7] = towers[:,:,4:7]*0.01 + 0.1
     towers[:,:,0] = (towers[:,:,0] + 0.55)
     return towers
 
@@ -57,7 +57,7 @@ class TowerDataset(Dataset):
         self.tower_labels = {}
         self.tower_block_ids = {}
 
-        # First augment the given towers with rotations. 
+        # First augment the given towers with rotations.
         if augment:
             augmented_towers = augment_towers(tower_dict, K_skip, mirror=False)
         else:
@@ -70,8 +70,8 @@ class TowerDataset(Dataset):
             self.tower_labels[key] = labels
             if 'block_ids' in tower_dict[key].keys():
                 self.tower_block_ids[key] = augmented_towers[key]['block_ids']
-        
-        # Same order as 
+
+        # Same order as
         self.start_indices = {}
         self.get_indices()
 
@@ -89,7 +89,7 @@ class TowerDataset(Dataset):
 
     def __getitem__(self, ix):
         """ Translates index to appropriate tower size.
-        :param ix: 
+        :param ix:
         """
         for kx, key in enumerate(self.tower_keys):
             if kx == len(self.tower_keys)-1:
@@ -99,15 +99,15 @@ class TowerDataset(Dataset):
             if ix >= self.start_indices[key] and  ix < self.start_indices[next_key]:
                 tower_size = key
                 break
-        
+
         tower_ix = ix - self.start_indices[tower_size]
         return self.tower_tensors[tower_size][tower_ix,:,:14], self.tower_block_ids[tower_size][tower_ix], self.tower_labels[tower_size][tower_ix]
-        
+
     def __len__(self):
         """
         The total number of towers in the entire dataset.
         """
-        return sum(self.tower_tensors[k].shape[0] for k in self.tower_keys)     
+        return sum(self.tower_tensors[k].shape[0] for k in self.tower_keys)
 
     def add_to_dataset(self, tower_dict):
         """
@@ -120,10 +120,10 @@ class TowerDataset(Dataset):
                 new_towers = torch.Tensor(augmented_towers[k]['towers'])
                 new_towers = preprocess(new_towers)
                 new_labels = torch.Tensor(augmented_towers[k]['labels'])
-                
+
                 self.tower_tensors[k] = torch.cat([self.tower_tensors[k], new_towers], dim=0)
                 self.tower_labels[k] = torch.cat([self.tower_labels[k], new_labels], dim=0)
-            
+
                 if 'block_ids' in augmented_towers[k].keys():
                     new_block_ids = augmented_towers[k]['block_ids']
                     if self.tower_block_ids[k].shape[0] == 0:
@@ -138,7 +138,7 @@ class TowerSampler(Sampler):
     def __init__(self, dataset, batch_size, shuffle):
         """ Given an dataset, ensure batches consist of towers of the same size. Additionally,
         give the option to return multiple batches from shuffling the dataset multiple times.
-        
+
         :param dataset: The underlying dataset, indices are ordered sequentially by tower size.
         :param batch_size: Number of towers to include in each batch.
         :param shuffle: Whether or not to shuffle the data order.
@@ -154,7 +154,7 @@ class TowerSampler(Sampler):
         if self.shuffle:
             for k in self.dataset.tower_keys:
                 np.random.shuffle(indices[k])
-        
+
         # Make each list an iterable of batches.
         iterators = {}
         for k in self.dataset.tower_keys:
@@ -176,7 +176,7 @@ class TowerSampler(Sampler):
                 yield next(iterators[key])
             except:
                 valid_tower_sizes.remove(key)
-            
+
     def __len__(self):
         """ Return the number of batches in the data loader. """
         n_batches = 0
@@ -197,8 +197,8 @@ class ParallelDataLoader:
         # Create a custom sampler and loader so each loader uses idependently shuffled data.
         self.loaders = []
         for _ in range(n_dataloaders):
-            sampler = TowerSampler(dataset, 
-                           batch_size=10, 
+            sampler = TowerSampler(dataset,
+                           batch_size=batch_size,
                            shuffle=True)
             loader = DataLoader(dataset=dataset,
                         batch_sampler=sampler)
@@ -215,10 +215,11 @@ class ParallelDataLoader:
                 try:
                     batches.append(next(loader))
                 except:
+                    print('[ParallelDataLoader] Warning: failed to get batch from all loaders.')
                     stop = True
             if not stop:
                 yield batches
-    
+
     def __len__(self):
         return len(self.loaders[0])
 
@@ -227,10 +228,10 @@ if __name__ == '__main__':
     #with open('learning/data/random_blocks_(x40000)_5blocks_all.pkl', 'rb') as handle:
     #   towers_dict = pickle.load(handle)
     #dataset = TowerDataset(towers_dict, augment=True, K_skip=10000)
-    with open('learning/experiments/logs/robot-seq-init-sim-20210219-131924/datasets/active_20.pkl', 'rb') as handle:
+    with open('learning/experiments/logs/exp-20210223-141347/datasets/active_1.pkl', 'rb') as handle:
         dataset = pickle.load(handle)
-    
-    
+
+
     print('----- Load dataset from file -----')
     print('Num Towers:', len(dataset))
     print('Indices per category:')
@@ -241,8 +242,8 @@ if __name__ == '__main__':
         print(x.shape)
 
     print('----- Test tower sampler -----')
-    sampler = TowerSampler(dataset, 
-                           batch_size=10, 
+    sampler = TowerSampler(dataset,
+                           batch_size=10,
                            shuffle=True)
     for batch_ixs in sampler:
         print(batch_ixs)
@@ -262,7 +263,7 @@ if __name__ == '__main__':
             print(x.shape, y.shape)
 
     from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data
-    with open('learning/domains/towers/final_block_set_10.pkl', 'rb') as f: 
+    with open('learning/domains/towers/final_block_set_10.pkl', 'rb') as f:
         block_set = pickle.load(f)
     towers_dict = sample_unlabeled_data(40, block_set)
     print(towers_dict.keys())
@@ -272,11 +273,11 @@ if __name__ == '__main__':
     dataset.add_to_dataset(towers_dict)
     print(len(dataset), len(loader))
     for ix, batches in enumerate(loader):
-        for x, ids, y in batches:        
+        for x, ids, y in batches:
             if ix == len(loader) - 1:
                 print(ids)
                 print(y)
 
 
 
-    
+
