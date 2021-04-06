@@ -34,7 +34,6 @@ RUN rosdep init \
  && echo "source /opt/ros/melodic/setup.bash" >> ~/.bashrc
  
 # Install other packages as needed
-# RUN sudo apt-get remove -y python3.6
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     cmake \
@@ -49,8 +48,6 @@ RUN apt-get update \
     python-catkin-pkg-modules \
     python-catkin-tools \
     python-wstool \
-    python3.7 \
-    python3.7-dev \
     python3-catkin-pkg-modules \
     python3-rospkg-modules \
     python3-dev \
@@ -63,9 +60,9 @@ SHELL ["/bin/bash", "-c"]
 
 # Install Python3 packages 
 ENV ROS_PYTHON_VERSION 3
-RUN python3.7 -m pip install --upgrade pip setuptools
-RUN python3.7 -m pip install wheel
-RUN python3.7 -m pip install \
+RUN python3 -m pip install --upgrade pip setuptools
+RUN python3 -m pip install wheel
+RUN python3 -m pip install \
   catkin_pkg \
   dill \
   empy \
@@ -81,7 +78,7 @@ RUN python3.7 -m pip install \
   rospy-message-converter \
   scipy \
   sklearn
-RUN python3.7 -m pip install git+https://github.com/mike-n-7/tsr.git
+RUN python3 -m pip install git+https://github.com/mike-n-7/tsr.git
 
 # Create a Catkin workspace, clone packages, and build using Python 3
 RUN source /opt/ros/melodic/setup.bash \
@@ -89,29 +86,10 @@ RUN source /opt/ros/melodic/setup.bash \
  && cd /catkin_ws \
  && catkin_init_workspace
 
-### DANGER ZONE ###
-# Install Boost from source against Python 3
-# https://askubuntu.com/questions/944035/installing-libboost-python-dev-for-python3-without-installing-python2-7
-#RUN apt-get install -y wget libgtest-dev
-#RUN cd /usr/src && \
-# wget --no-verbose https://dl.bintray.com/boostorg/release/1.65.1/source/#boost_1_65_1.tar.gz && \
-# tar xzf boost_1_65_1.tar.gz && \
-# cd boost_1_65_1 && \
-# ./bootstrap.sh --with-python=$(which python3) && \
-# ./b2 install && \
-# ldconfig && \
-# cd / && rm -rf /usr/src/*
-
-# Install MoveIt! from source
-#RUN source /opt/ros/melodic/setup.bash \
-# && cd /catkin_ws \
-# && git clone -b melodic-devel https://github.com/ros-planning/moveit.git src/moveit \
-# && rosdep install --from-paths src --ignore-src --rosdistro melodic -y \
-# && catkin build -j4 -DPYTHON_EXECUTABLE=/usr/bin/python3 -DCMAKE_BUILD_TYPE=Release
-### DANGER ZONE ###
-
 # Install franka packages and TF in the Catkin workspace
-RUN apt-get install ros-melodic-libfranka
+RUN apt-get install -y \
+  ros-melodic-libfranka \
+  ros-melodic-panda-moveit-config
 RUN source /opt/ros/melodic/setup.bash \
  && cd /catkin_ws \
  && git clone -b melodic-devel https://github.com/ros/geometry.git src/geometry \
@@ -121,7 +99,6 @@ RUN source /opt/ros/melodic/setup.bash \
  && git checkout tags/0.7.1 -b v0.7.1 \
  && cd ../.. \
  && rosdep install --from-paths src --ignore-src --rosdistro melodic -y
-# && catkin build -DPYTHON_EXECUTABLE=/usr/bin/python3.7
 
 # Set up PDDLStream
 RUN mkdir -p /external
@@ -134,7 +111,7 @@ RUN cd /external \
 # Set up stacking repo
 RUN git clone https://github.com/Learning-and-Intelligent-Systems/stacking.git \
  && cd stacking \
- && python3.7 -m pip install --ignore-installed -r requirements.txt 
+ && python3 -m pip install --ignore-installed -r requirements.txt 
 
 # Set up pb_robot
 # NOTE: You may need to rebuild from this step if there are updates to the repo
@@ -142,7 +119,7 @@ RUN source /opt/ros/melodic/setup.bash \
  && cd /external \
  && git clone https://github.com/mike-n-7/pb_robot.git \
  && cd pb_robot/src/pb_robot/ikfast/franka_panda \
- && python3.7 setup.py build \
+ && python3 setup.py build \
  && cd /external/pb_robot/src/pb_robot/models \
  && touch CATKIN_IGNORE
 
@@ -162,7 +139,7 @@ RUN printf "\
 if [ ! -f /catkin_ws/devel/setup.bash ]; then \n\
   pushd /catkin_ws \n\
   catkin clean -y \n\
-  catkin build -DPYTHON_EXECUTABLE=$(which python3.7) \n\
+  catkin build -DPYTHON_EXECUTABLE=$(which python3) \n\
   popd \n\
 fi \n\
 source /catkin_ws/devel/setup.bash \n\

@@ -9,7 +9,7 @@ First, ensure this package is in a Catkin workspace (e.g. `/catkin_ws/src/stacki
 Now, build the Catkin workspace
 
 ```
-catkin_build -DCPYTHON_EXECUTABLE=$(which python3.7)
+catkin_build -DCPYTHON_EXECUTABLE=$(which python3)
 ```
 
 Ensure that this Catkin workspace is being sourced:
@@ -31,7 +31,7 @@ rosmsg list | grep stacking
 First, start up a Panda agent that communicates with the planning server. For example,
 
 ```
-python3.7 -m run_towers --use-action-server --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
+python3 -m run_towers --use-action-server --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
 ```
 
 The `scripts/planning_server.py` file contains the planning server that will feed plans to the Panda agent. To run this, you have a few options.
@@ -50,7 +50,7 @@ export PYTHONPATH=$PYTHONPATH:/catkin_ws/src/stacking
 First, go to the top-level folder of the `stacking` repository. Then,
 
 ```
-python3.7 stacking_ros/scripts/planning_server.py --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
+python3 stacking_ros/scripts/planning_server.py --blocks-file learning/domains/towers/final_block_set.pkl --num-blocks 10
 
 ```
 
@@ -72,5 +72,5 @@ rosrun stacking_ros panda_agent_server.py --blocks-file learning/domains/towers/
 Finally, start active learning.
 
 ```
-python3.7 -m learning.experiments.active_train_towers --exec-mode sim --use-panda-server --block-set-fname learning/domains/towers/final_block_set.pkl
+python3 -m learning.experiments.active_train_towers --exec-mode sim --use-panda-server --block-set-fname learning/domains/towers/final_block_set.pkl
 ```
