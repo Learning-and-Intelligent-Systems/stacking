@@ -53,7 +53,7 @@ if __name__ == '__main__':
                         help='noise to add to xy position of blocks if plannnig-model==noisy-model')
     parser.add_argument('--exec-mode',
                         type=str,
-                        default='simple-model',
+                        default=None,
                         choices=['simple-model', 'noisy-model', None],
                         help='this is the method used to execute the found plan. If None will just save planned towers and not calculate regret')
     parser.add_argument('--planning-model',

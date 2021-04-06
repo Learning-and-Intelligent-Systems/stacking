@@ -274,6 +274,7 @@ class PandaAgent:
         print('Initial configuration:', conf.configuration)
         init = [('CanMove',),
                 ('Conf', conf),
+                ('StartConf', conf),
                 ('AtConf', conf),
                 ('HandEmpty',)]
 
@@ -764,7 +765,7 @@ class PandaAgent:
         self.pddl_info = get_pddlstream_info(self.robot,
                                              fixed_objs,
                                              self.pddl_blocks,
-                                             add_slanted_grasps=False,
+                                             add_slanted_grasps=True,
                                              approach_frame='global',
                                              use_vision=self.use_vision)
 
@@ -1023,7 +1024,9 @@ class PandaAgent:
                                 success_cost=numpy.inf,
                                 max_skeletons=2,
                                 search_sample_ratio=search_sample_ratio,
-                                max_time=max_time)
+                                max_time=max_time,
+                                verbose=False)
+
         duration = time.time() - start
         print('Planning Complete: Time %f seconds' % duration)
         # TODO: Try planner= argument https://github.com/caelan/pddlstream/blob/stable/pddlstream/algorithms/downward.py

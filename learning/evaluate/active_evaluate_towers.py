@@ -784,10 +784,11 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                     block_tower.append(block)         
                                            
                 # save tower info to /evaluation_towers
-                if args.planning_model == 'noisy-model':
-                    logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem, noise=args.plan_xy_noise)
-                else:
-                    logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem)
+                if args.exec_mode is None:
+                    if args.planning_model == 'noisy-model':
+                        logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem, noise=args.plan_xy_noise)
+                    else:
+                        logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem)
 
                 # perturb tower if evaluating with noisy model
                 if args.exec_mode == 'noisy-model':
@@ -849,13 +850,12 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                 regrets[k].append(curr_regrets)
                 rewards[k].append(curr_rewards)
 
-        if args.max_acquisitions is not None:
-            if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-                with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
-                    pickle.dump(regrets, handle)
-                    
-                with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
-                    pickle.dump(rewards, handle)
+        if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
+            with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
+                pickle.dump(regrets, handle)
+                
+            with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
+                pickle.dump(rewards, handle)
             
     # if just ran for one acquisition step, output final regret and reward
     if args.acquisition_step is not None:

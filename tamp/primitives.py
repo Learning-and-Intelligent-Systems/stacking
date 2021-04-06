@@ -209,12 +209,15 @@ def get_ik_fn(robot, fixed=[], num_attempts=4, approach_frame='gripper', backoff
             conf_backoff = pb_robot.vobj.BodyConf(robot, q_backoff)
 
             path_approach = robot.arm.snap.PlanToConfiguration(robot.arm, q_approach, q_grasp, obstacles=obstacles)
+            if path_approach is None:
+                if DEBUG_FAILURE: input('Approach motion failed')
+                continue
             if backoff_frame == 'global':
                 path_backoff = robot.arm.snap.PlanToConfiguration(robot.arm, q_grasp, q_backoff, obstacles=obstacles, check_upwards=True)
             else:
                 path_backoff = robot.arm.snap.PlanToConfiguration(robot.arm, q_grasp, q_backoff, obstacles=obstacles, check_upwards=False)
-            if path_approach is None or path_backoff is None:
-                if DEBUG_FAILURE: input('Approach motion failed')
+            if path_backoff is None:
+                if DEBUG_FAILURE: input('Backoff motion failed')
                 continue
 
             # If the grasp is valid, check that it is robust (i.e., also valid under pose estimation error).

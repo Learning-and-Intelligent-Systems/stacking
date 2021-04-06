@@ -7,11 +7,11 @@ import torch
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.towers.active_utils import get_sequential_predictions
 
-tower_heights = [2, 3, 4, 5]
+tower_heights = [2, 3, 4, 5, 6, 7]
 min_towers_acq = 40         # number of towers in initial dataset
 towers_per_acq = 10         # number of towers acquired between each trained model
                 
-def calc_model_accuracy(logger, dataset, args, exp_path):
+def calc_model_accuracy(logger, dataset, args, exp_path, save_local_fig=True):
     if args.max_acquisitions is not None: 
         eval_range = range(0, args.max_acquisitions, args.plot_step)
     elif args.single_acquisition_step is not None: 
@@ -28,7 +28,7 @@ def calc_model_accuracy(logger, dataset, args, exp_path):
         preds = get_sequential_predictions(dataset, ensemble)
         preds = preds.mean(axis=1).round()
         
-        samples_per_height = int(preds.shape[0]/4) # all preds are in a 1D array
+        samples_per_height = int(preds.shape[0]/len(tower_heights)) # all preds are in a 1D array
     
         for ti, tower_height in enumerate(tower_heights):
             key = str(tower_height)+'block'
@@ -52,25 +52,26 @@ def calc_model_accuracy(logger, dataset, args, exp_path):
         
     # plot and save to this exp_path
     #for result, title in zip([accuracies, false_positives, false_negatives], ['Constructability Accuracy', 'False Positive Rate', 'False Negative Rate']):
-    acquisition_plot_steps = len(range(0, args.max_acquisitions, args.plot_step))
-    xs = np.arange(min_towers_acq, \
-                    min_towers_acq+towers_per_acq*args.plot_step*acquisition_plot_steps, \
-                    towers_per_acq*args.plot_step) # number of training towers
-    fig, axes = plt.subplots(4, figsize=(5,12))
-    for ki, key in enumerate(accuracies):
-        axes[ki].plot(xs, accuracies[key], label='accuracy')
-        #axes[ki].plot(xs, false_positives[key], label='false positive rate')
-        #axes[ki].plot(xs, false_negatives[key], label='false negative rate')
-        #axes[ki].set_ylim(.0, 1.)
-        axes[ki].set_ylim(.5, 1.)
-        axes[ki].set_ylabel('Rate')
-        axes[ki].set_xlabel('Training Towers')
-        axes[ki].set_title('%s Tower Constructability Accuracy' % key)
-        axes[ki].legend()
-    plt.tight_layout()
-    plt_fname = 'constructability_accuracy.png'
-    plt.savefig(logger.get_figure_path(plt_fname))
-    plt.close()
+    if save_local_fig:
+        acquisition_plot_steps = len(range(0, args.max_acquisitions, args.plot_step))
+        xs = np.arange(min_towers_acq, \
+                        min_towers_acq+towers_per_acq*args.plot_step*acquisition_plot_steps, \
+                        towers_per_acq*args.plot_step) # number of training towers
+        fig, axes = plt.subplots(4, figsize=(5,12))
+        for ki, key in enumerate(accuracies):
+            axes[ki].plot(xs, accuracies[key], label='accuracy')
+            #axes[ki].plot(xs, false_positives[key], label='false positive rate')
+            #axes[ki].plot(xs, false_negatives[key], label='false negative rate')
+            #axes[ki].set_ylim(.0, 1.)
+            axes[ki].set_ylim(.5, 1.)
+            axes[ki].set_ylabel('Rate')
+            axes[ki].set_xlabel('Training Towers')
+            axes[ki].set_title('%s Tower Constructability Accuracy' % key)
+            axes[ki].legend()
+        plt.tight_layout()
+        plt_fname = 'constructability_accuracy.png'
+        plt.savefig(logger.get_figure_path(plt_fname))
+        plt.close()
     return accuracies
     
 def plot_all_model_accuracies(all_model_accuracies):
