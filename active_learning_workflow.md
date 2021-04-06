@@ -75,3 +75,13 @@ python -m learning.experiments.fix_tower_label --exp-path <path> --acquisition-s
 
 ## Video collection laptop setup
 FFMpeg magic command
+
+## Evaluation Workflow
+
+1. Start franka interface on RTK machine
+2. Start vision on RTK machine 
+3. Start planning server on GPU machine (use the learning/domains/towers/eval_block_set_9.pkl)
+4. Run the following to start evaluating where ```model-type``` in [learned, noisy-model, simple-model]
+```
+python -m learning.experiments.run_towers_evaluation --real --use-vision --blocks-file learning/domains/towers/eval_block_set_9.pkl --towers-file learning/experiments/logs/robot-seq-init-sim-20210219-131924/evaluation_towers/cumulative-overhang/<model-type>/towers_40.pkl
+```
