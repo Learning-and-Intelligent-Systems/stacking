@@ -53,8 +53,7 @@ class LatentEnsemble(nn.Module):
             torch.Tensor -- [N_batch x N_samples x N_blocks x total_dim]
         """
         N_batch, N_samples, N_blocks, latent_dim = samples.shape
-        observed = torch.unsqueeze(observed, 1)
-        observed = torch.tile(observed, (1, N_samples, 1, 1))
+        observed = observed.unsqueeze(1).expand(-1, N_samples, -1, -1)
         return torch.cat([samples, observed], 3)
 
     def forward(self, towers, block_ids, ensemble_idx=None, N_samples=10):
