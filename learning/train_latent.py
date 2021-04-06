@@ -57,7 +57,7 @@ class LatentEnsemble(nn.Module):
         observed = torch.tile(observed, (1, N_samples, 1, 1))
         return torch.cat([samples, observed], 3)
 
-    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=10):
+    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1):
         """ predict feasibility of the towers
 
         Arguments:
@@ -151,33 +151,35 @@ def get_latent_loss(latent_ensemble, batch):
     # towers, mass and COM xyz. I'm not sure if this is the best place to
     # do that because it it is still in the datast. It should probably be a
     # flag in the TowerDataset?
-    preds = latent_ensemble(towers[:,:,4:], block_ids.long()) # take the mean of the ensemble
+    preds = latent_ensemble(towers[:,:,4:], block_ids.long())#, np.random.randint(0, len(latent_ensemble.ensemble.models))) # take the mean of the ensemble
     likelihood_loss = F.binary_cross_entropy(preds, labels, reduction='sum')
     # and compute the kl divergence
     q_z = latent_ensemble.latents
     p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
     kl_loss = torch.distributions.kl_divergence(q_z, p_z).sum()
 
-    return likelihood_loss + kl_loss
+    return likelihood_loss #+ kl_loss
 
-def train(latent_ensemble, train_loader, n_epochs=3, freeze_latents=False, freeze_ensemble=False):
+def train(latent_ensemble, train_loader, n_epochs=100, freeze_latents=False, freeze_ensemble=False):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
+    # TODO: Check if learning rate should be different for the latents.
     latent_optimizer = optim.Adam([latent_ensemble.latent_scales, latent_ensemble.latent_locs], lr=1e-3)
 
     losses = []
-
     for epoch_idx in range(n_epochs):
         print(f'Epoch {epoch_idx}')
+        accs = []
         for batch_idx, set_of_batches in enumerate(train_loader):
             batch_loss = 0
             # update the latent distribution while holding the model parameters fixed.
             if not freeze_latents:
                 latent_optimizer.zero_grad()
+
                 latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0])
                 latent_loss.backward()
                 latent_optimizer.step()
-                batch_loss += latent_loss.item()
+                #batch_loss += latent_loss.item()
 
             # update the model parameters while sampling from the latent distribution.
             if not freeze_ensemble:
@@ -186,9 +188,23 @@ def train(latent_ensemble, train_loader, n_epochs=3, freeze_latents=False, freez
                 params_loss.backward()
                 params_optimizer.step()
                 batch_loss += params_loss.item()
+            #print(latent_ensemble.latent_locs)
 
             print(f'Epoch {epoch_idx} batch {batch_idx} loss:\t{batch_loss}')
             losses.append(batch_loss)
+
+            if batch_idx % 50 == 0:
+                accs = {2: [], 3:[], 4:[], 5:[]}
+                for val_batches in train_loader:
+                    towers, block_ids, labels = val_batches[0] 
+                    preds = latent_ensemble(towers[:,:,4:], block_ids.long())
+                    acc = ((preds > 0.5) == labels).float().mean()
+                    accs[towers.shape[1]].append(acc)
+                print('Train Accuracy:')
+                for k, v in accs.items():
+                    print(k, np.mean(v))
+
+                print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
 
     return losses
 
