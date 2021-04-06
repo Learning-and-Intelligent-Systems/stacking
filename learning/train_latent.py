@@ -73,6 +73,8 @@ class LatentEnsemble(nn.Module):
 
         # draw samples from the latent distribution [N_samples x N_blockset x latent_dim]
         samples_for_each_block_in_set = self.latents.rsample(sample_shape=[N_samples])
+        if torch.cuda.is_available():
+            samples_for_each_block_in_set = samples_for_each_block_in_set.cuda()
         # assocate those latent samples with the blocks in the towers
         samples_for_each_tower_in_batch = self.associate(
             samples_for_each_block_in_set, block_ids)
@@ -113,6 +115,10 @@ def get_params_loss(latent_ensemble, batches):
     likelihood_loss = 0
     for i, batch in enumerate(batches):
         towers, block_ids, labels = batch
+        if torch.cuda.is_available():
+            towers = towers.cuda()
+            block_ids = block_ids.cuda()
+            labels = labels.cuda()
         # TODO(izzy): I'm dropping the first four elements from the vectorized
         # towers, mass and COM xyz. I'm not sure if this is the best place to
         # do that because it it is still in the datast. It should probably be a
@@ -142,6 +148,10 @@ def get_latent_loss(latent_ensemble, batch):
         batch {[type]} -- [description]
     """
     towers, block_ids, labels = batch
+    if torch.cuda.is_available():
+        towers = towers.cuda()
+        block_ids = block_ids.cuda()
+        labels = labels.cuda()
     # NOTE(izzy): we update the params of the latent distribution using the
     # reparametrization technique through a sample from that distribution. we may
     # wish to draw multiple samples from the latent distribution to reduce the
@@ -237,6 +247,8 @@ if __name__ == "__main__":
     ensemble = Ensemble(base_model=FCGN,
                         base_args={'n_hidden': 32, 'n_in': 10 + d_latents},
                         n_models=n_models)
+    if torch.cuda.is_available():
+        ensemble = ensemble.cuda()
 
     # train
     train_latent_ensemble = LatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
