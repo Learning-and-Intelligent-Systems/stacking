@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3
 """
 Runs a PandaAgent as a server for multi-machine active learning
 """

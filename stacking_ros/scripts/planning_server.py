@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3
 """
 ROS Server for PDDLStream Planning
 
@@ -12,9 +12,7 @@ import dill
 import time
 import numpy
 import rospy
-import pickle
 import psutil
-import actionlib
 import argparse
 import pb_robot
 import pybullet as pb
@@ -25,8 +23,9 @@ from pddlstream.utils import INF
 from stacking_ros.msg import TaskPlanAction, TaskPlanResult, TaskAction
 from stacking_ros.srv import (GetPlan, GetPlanResponse, 
     SetPlanningState, SetPlanningStateResponse)
-from tamp.misc import (get_pddl_block_lookup, get_pddlstream_info,
-    print_planning_problem, setup_panda_world, ExecuteActions, load_blocks)
+from tamp.misc import (get_pddl_block_lookup, print_planning_problem, 
+                       setup_panda_world, ExecuteActions, load_blocks)
+from tamp.pddlstream_utils import get_pddlstream_info
 from tamp.ros_utils import (pose_to_transform, ros_to_pose,
     ros_to_transform, task_plan_to_ros)
 from tf.transformations import quaternion_multiply
@@ -40,7 +39,7 @@ class PlanningServer():
 
         # Start up a robot simulation for planning
         self._planning_client_id = pb_robot.utils.connect(use_gui=False)
-        self.plan()
+        self.set_pybullet_client()
         pb_robot.utils.set_default_camera()
         self.robot = pb_robot.panda.Panda()
         self.robot.arm.hand.Open()
@@ -75,15 +74,26 @@ class PlanningServer():
             "/get_latest_plan", GetPlan, self.get_latest_plan)
         self.reset_service = rospy.Service(
             "/reset_planning", SetPlanningState, self.reset_planning)
-        # self.planning_service = actionlib.SimpleActionServer(
-        #     "/get_plan", TaskPlanAction,
-        #     execute_cb=self.find_plan, auto_start=False)
-        # self.planning_service.start()
         print("Planning server ready!")
 
 
-    def plan(self):
-        self.state = 'plan'
+    def run_planning_loop(self):
+        """ Starts main planning loop """
+        while not rospy.is_shutdown():
+
+            # If no planning has been received, just keep waiting
+            if not self.cancel_planning and \
+              (not self.planning_active or (self.planning_active and self.plan_complete)):
+                # print("Waiting for client ...")
+                rospy.sleep(1)
+            # Otherwise, plan until failure or cancellation
+            else:
+                self.reset_planning_state()
+                self.plan_from_goals()
+
+
+    def set_pybullet_client(self):
+        """ Sets PyBullet client to this planning server """
         pb_robot.aabb.set_client(self._planning_client_id)
         pb_robot.body.set_client(self._planning_client_id)
         pb_robot.collisions.set_client(self._planning_client_id)
@@ -110,6 +120,7 @@ class PlanningServer():
         print('Initial config:', robot_config)
         init = [('CanMove',),
                 ('Conf', conf),
+                ('StartConf', conf),
                 ('AtConf', conf)]
 
         # Get the grasp state
@@ -138,142 +149,6 @@ class PlanningServer():
             init += [('Block', self.platform_table)]
         init += [('Table', self.table)]
         return init
-
-
-    def unpack_goal(self, ros_goal):
-        """
-        Convert TaskPlanGoal ROS message to PDDLStream compliant
-        initial conditions and goal specification (DEPRECATED)
-        """
-        pddl_goal = ["and",]
-        fixed_objs = [f for f in self.fixed]
-
-        # Unpack block initial poses
-        if ros_goal.reset:
-            for elem in ros_goal.blocks:
-                if not elem.is_rel_pose:
-                    blk = self.pddl_block_lookup[elem.name]
-                    pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
-                    orn = [elem.pose.orientation.x, elem.pose.orientation.y,
-                        elem.pose.orientation.z, elem.pose.orientation.w]
-                    blk.set_base_link_pose((pos, orn))
-                    if elem.fixed:
-                        fixed_objs.append(blk)
-
-        # Unpack initial robot configuration
-        conf = pb_robot.vobj.BodyConf(self.robot, ros_goal.robot_config.angles)
-
-        # Create the initial PDDL state
-        pddl_init = self.get_initial_pddl_state()
-
-        # Reset case -- start PDDL initial specifications from scratch
-        if ros_goal.reset:
-            # Finally unpack the goal information
-            additional_init = []
-            for elem in ros_goal.goal:
-                blk = self.pddl_block_lookup[elem.target_obj]
-                # Add to the goal specification
-                if elem.type == "AtPose":
-                    blk_pose = ros_to_pose(elem.pose, blk)
-                    pddl_goal.append((elem.type, blk, blk_pose))
-                elif elem.type == "On":
-                    try:
-                        base = self.pddl_block_lookup[elem.base_obj]
-                    except:
-                        base = self.table
-                    pddl_goal.append((elem.type, blk, base))
-
-                # Add to the initial condition
-                if ros_goal.reset:
-                    pos = [elem.pose.position.x, elem.pose.position.y, elem.pose.position.z]
-                    orn = [elem.pose.orientation.x, elem.pose.orientation.y,
-                        elem.pose.orientation.z, elem.pose.orientation.w]
-                    additional_init.extend([
-                        ("Pose", blk, blk_pose),
-                        ("Supported", blk, blk_pose, self.table, self.table_pose)
-                    ])
-            pddl_init.extend(additional_init)
-
-        # No reset case -- simply add the extra init and goal terms
-        else:
-            for elem in ros_goal.blocks:
-                blk = self.pddl_block_lookup[elem.name]
-                if elem.fixed:
-                    fixed_objs.append(blk)
-                if elem.is_rel_pose:
-                    try:
-                        base = self.pddl_block_lookup[elem.base_obj]
-                    except:
-                        base = self.table
-                    tform = ros_to_transform(elem.pose)
-                    pddl_init.append(("RelPose", blk, base, tform))
-
-            for elem in ros_goal.goal:
-                blk = self.pddl_block_lookup[elem.target_obj]
-                base_blk = self.pddl_block_lookup[elem.base_obj]
-                if elem.type == "On":
-                    pddl_goal.append((elem.type, blk, base_blk))
-
-        return pddl_init, tuple(pddl_goal), fixed_objs
-
-
-    def find_plan(self, ros_goal):
-        """ Main PDDLStream planning function (DEPRECATED)"""
-        print("Planning...")
-        self.plan()
-        self.robot.arm.hand.Open()
-
-        # Get the initial conditions and goal specification
-        init, goal, fixed_objs = self.unpack_goal(ros_goal)
-        print_planning_problem(init, goal, fixed_objs)
-        saved_world = pb_robot.utils.WorldSaver()
-
-        # Get PDDLStream planning information 
-        pddl_info = get_pddlstream_info(self.robot,
-                                        self.pddl_blocks,
-                                        add_slanted_grasps=False,
-                                        approach_frame='global')
-
-        # Run PDDLStream focused solver
-        start = time.time()
-        pddlstream_problem = tuple([*pddl_info, init, goal])
-        plan, _, _ = solve_focused(pddlstream_problem,
-                                success_cost=numpy.inf,
-                                max_skeletons=2,
-                                max_failures=3,
-                                search_sample_ratio=1.,
-                                max_time=INF)
-        duration = time.time() - start
-        saved_world.restore()
-        print('Planning Complete: Time %f seconds' % duration)
-        print(f"\nFINAL PLAN\n{plan}\n")
-
-        # Package and return the result
-        result = TaskPlanResult()
-        result.success = (plan is not None)
-        result.plan = task_plan_to_ros(plan)
-        # print(result)
-        self.planning_service.set_succeeded(result, text="Planning complete")
-
-        # Update the planning domain
-        if result.success:
-            self.plan()
-            ExecuteActions(plan, real=False, pause=False, wait=False, prompt=False)
-
-
-    def planning_loop(self):
-
-        while not rospy.is_shutdown():
-
-            # If no planning has been received, just keep waiting
-            if not self.cancel_planning and \
-              (not self.planning_active or (self.planning_active and self.plan_complete)):
-                # print("Waiting for client ...")
-                rospy.sleep(1)
-            # Otherwise, plan until failure or cancellation
-            else:
-                self.reset_planning_state()
-                self.plan_from_goals()
 
 
     def plan_from_goals(self):
@@ -333,7 +208,6 @@ class PlanningServer():
             else:
                 ret_dict = {}
                 plan = self.pddlstream_plan(ret_dict, init, goal, fixed_objs, self.max_tries)
-                #plan = ret_dict["plan"]
 
             if self.cancel_planning:
                 print("Discarding latest plan")
@@ -456,7 +330,7 @@ class PlanningServer():
                 pddl_info = get_pddlstream_info(self.robot,
                                                 fixed_objs,
                                                 self.pddl_blocks,
-                                                add_slanted_grasps=False,
+                                                add_slanted_grasps=True,
                                                 approach_frame="global",
                                                 use_vision=self.use_vision,
                                                 home_poses=self.home_poses)
@@ -465,11 +339,11 @@ class PlanningServer():
                 pddlstream_problem = tuple([*pddl_info, init, goal])
                 try:
                     plan, cost, _ = solve_focused(pddlstream_problem,
-                                        planner="dijkstra",
+                                        # planner="dijkstra",
                                         unit_costs=True,
                                         max_skeletons=2,
                                         search_sample_ratio=1.0,
-                                        success_cost=8.0,
+                                        # success_cost=8.0,
                                         max_time=INF,
                                         verbose=False)
                 except Exception as e:
@@ -494,7 +368,7 @@ class PlanningServer():
         """ Simulates an action plan """
         if plan is None:
             return
-        self.plan()
+        self.set_pybullet_client()
         self.robot.arm.hand.Open()
         ExecuteActions(plan, real=False, pause=True, wait=False, prompt=False)
         print("Plan simulated")
@@ -520,4 +394,4 @@ if __name__=="__main__":
                        use_vision=args.use_vision, 
                        alternate_orientations=args.alternate_orientations,
                        sim_failure_prob=args.sim_failure_prob)
-    s.planning_loop()
+    s.run_planning_loop()

@@ -4,12 +4,7 @@ import os
 import pickle
 import shutil
 import time
-
-import tamp.primitives as primitives
-
 from block_utils import object_to_urdf, Object, Pose, Position, all_rotations, Quaternion, get_rotated_block
-from pddlstream.language.generator import from_gen_fn, from_list_fn, from_fn, from_test , BoundedGenerator
-from pddlstream.utils import read
 
 
 class ExecutionFailure(Exception):
@@ -244,28 +239,6 @@ def setup_panda_world(robot, blocks, xy_poses=None, use_platform=True):
         pddl_leg = None
 
     return pddl_blocks, pddl_platform, pddl_leg, pddl_table, pddl_frame, pddl_wall
-
-
-def get_pddlstream_info(robot, fixed, movable, add_slanted_grasps, approach_frame, use_vision, home_poses=None):
-    domain_pddl = read('tamp/domain_stacking.pddl')
-    stream_pddl = read('tamp/stream_stacking.pddl')
-    constant_map = {}
-
-    fixed = [f for f in fixed if f is not None]
-    stream_map = {
-        'sample-pose-table': from_list_fn(primitives.get_stable_gen_table(fixed)),
-        'sample-pose-home': from_list_fn(primitives.get_stable_gen_home(home_poses, fixed)),
-        'sample-pose-block': from_fn(primitives.get_stable_gen_block(fixed)),
-        'sample-grasp': from_list_fn(primitives.get_grasp_gen(robot, add_slanted_grasps=True, add_orthogonal_grasps=False)),
-        # 'sample-grasp': from_gen_fn(primitives.get_grasp_gen(robot, add_slanted_grasps=True, add_orthogonal_grasps=False)),
-        'pick-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='gripper', backoff_frame='global', use_wrist_camera=use_vision)),
-        'place-inverse-kinematics': from_fn(primitives.get_ik_fn(robot, fixed, approach_frame='global', backoff_frame='gripper', use_wrist_camera=False)),
-        'plan-free-motion': from_fn(primitives.get_free_motion_gen(robot, fixed)),
-        'plan-holding-motion': from_fn(primitives.get_holding_motion_gen(robot, fixed)),
-    }
-
-    return domain_pddl, constant_map, stream_pddl, stream_map
-
 
 def get_pddl_block_lookup(blocks, pddl_blocks):
     """ Unrotate all blocks and build a map to PDDL. (i.e., use the block.rotation for orn) """

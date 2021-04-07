@@ -1,13 +1,10 @@
-import numpy
-import pybullet as p
 import sys
 import time
-
-from copy import deepcopy
-
-import pyquaternion
+import numpy
 import pb_robot
-import tamp.primitives
+import pyquaternion
+import pybullet as p
+from copy import deepcopy
 
 from actions import PlaceAction, make_platform_world
 from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
@@ -18,15 +15,16 @@ from pddlstream.algorithms.focused import solve_focused
 from pddlstream.language.stream import StreamInfo
 from pddlstream.utils import INF
 from pybullet_utils import transformation
+import tamp.primitives
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
-                      get_pddlstream_info, print_planning_problem, \
-                      ExecuteActions, ExecutionFailure
+                      print_planning_problem, ExecuteActions, ExecutionFailure
+from tamp.pddlstream_utils import get_pddlstream_info
 
 
 class PandaAgent:
     def __init__(self, blocks, noise=0.00005, block_init_xy_poses=None,
                  teleport=False, use_platform=False, use_vision=False, real=False,
-                 use_action_server=False, use_learning_server=False):
+                 use_planning_server=False, use_learning_server=False):
         """
         Build the Panda world in PyBullet and set up the PDDLStream solver.
         The Panda world should in include the given blocks as well as a
@@ -36,8 +34,8 @@ class PandaAgent:
         :param use_platform: Boolean stating whether to include the platform to
                              push blocks off of or not.
         :param use_vision: Boolean stating whether to use vision to detect blocks.
-        :param use_action_server: Boolean stating whether to use the separate
-                                  ROS action server to do planning.
+        :param use_planning_server: Boolean stating whether to use the separate
+                                    ROS planning service server.
         :param use_learning_server: Boolean stating whether to host a ROS service
                                     server to drive planning from active learning script.
 
@@ -47,7 +45,7 @@ class PandaAgent:
         self.real = real
         self.use_vision = use_vision
         self.use_platform = use_platform
-        self.use_action_server = use_action_server
+        self.use_planning_server = use_planning_server
         self.use_learning_server = use_learning_server
 
         # Setup PyBullet instance to run in the background and handle planning/collision checking.
@@ -78,7 +76,7 @@ class PandaAgent:
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
         # Set up ROS plumbing if using features that require it
-        if self.use_vision or self.use_action_server or real:
+        if self.use_vision or self.use_planning_server or real:
             import rospy
             try:
                 rospy.init_node("panda_agent")
@@ -107,7 +105,7 @@ class PandaAgent:
 
         # Start ROS clients and servers as needed
         self.last_obj_held = None
-        if self.use_action_server:
+        if self.use_planning_server:
             from stacking_ros.srv import GetPlan, SetPlanningState, PlanTower
             from tamp.ros_utils import goal_to_ros, ros_to_task_plan
 
@@ -124,8 +122,6 @@ class PandaAgent:
                     "/plan_tower", PlanTower, self.plan_and_execute_tower)
                 print("Learning server started!")
             print("Done!")
-        else:
-            self.planning_client = None
 
         self.pddl_info = get_pddlstream_info(self.robot,
                                              self.fixed,
@@ -139,11 +135,13 @@ class PandaAgent:
         self.txt_id = None
         self.plan()
 
+
     def _add_text(self, txt):
         self.execute()
         pb_robot.viz.remove_all_debug()
         self.txt_id = pb_robot.viz.add_text(txt, position=(0, 0.25, 0.75), size=2)
         self.plan()
+
 
     def execute(self):
         self.state = 'execute'
@@ -159,8 +157,9 @@ class PandaAgent:
         pb_robot.utils.set_client(self._execution_client_id)
         pb_robot.viz.set_client(self._execution_client_id)
 
+
     def plan(self):
-        if self.use_action_server:
+        if self.use_planning_server:
             return
         self.state = 'plan'
         pb_robot.aabb.set_client(self._planning_client_id)
@@ -175,6 +174,7 @@ class PandaAgent:
         pb_robot.utils.set_client(self._planning_client_id)
         pb_robot.viz.set_client(self._planning_client_id)
 
+
     def reset_world(self):
         """ Resets the planning world to its original configuration """
         print("Resetting world")
@@ -185,6 +185,46 @@ class PandaAgent:
         for bx, b in enumerate(self.pddl_blocks):
             b.set_base_link_pose(self.orig_block_poses[bx])
         print("Done")
+
+
+    def _get_initial_pddl_state(self):
+        """
+        Get the PDDL representation of the world between experiments. This
+        method assumes that all blocks are on the table. We will always "clean
+        up" an experiment by moving blocks away from the platform after an
+        experiment.
+        """
+        fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
+        conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
+        print('Initial configuration:', conf.configuration)
+        init = [('CanMove',),
+                ('Conf', conf),
+                ('StartConf', conf),
+                ('AtConf', conf),
+                ('HandEmpty',)]
+
+        self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
+        init += [('Pose', self.table, self.table_pose), 
+                 ('AtPose', self.table, self.table_pose)]
+
+        for body in self.pddl_blocks:
+            print(type(body), body)
+            pose = pb_robot.vobj.BodyPose(body, body.get_base_link_pose())
+            init += [('Graspable', body),
+                    ('Pose', body, pose),
+                    ('AtPose', body, pose),
+                    ('Block', body),
+                    ('On', body, self.table),
+                    ('Supported', body, pose, self.table, self.table_pose)]
+
+        if not self.platform_table is None:
+            platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
+            init += [('Pose', self.platform_table, platform_pose), 
+                    ('AtPose', self.platform_table, platform_pose)]
+            init += [('Block', self.platform_table)]
+        init += [('Table', self.table)]
+        return init
+
 
     def _update_block_poses(self, find_moved=False):
         """ Use the global world cameras to update the positions of the blocks """
@@ -209,7 +249,7 @@ class PandaAgent:
                     orientation = (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w)
                     self.execute()
                     pddl_block.set_base_link_pose((position, orientation))
-                    if not self.use_action_server:
+                    if not self.use_planning_server:
                         self.plan()
                         pddl_block.set_base_link_pose((position, orientation))
 
@@ -256,42 +296,6 @@ class PandaAgent:
                     self.plan()
                     top_block.set_base_link_pose((position, orientation))
 
-
-    def _get_initial_pddl_state(self):
-        """
-        Get the PDDL representation of the world between experiments. This
-        method assumes that all blocks are on the table. We will always "clean
-        up" an experiment by moving blocks away from the platform after an
-        experiment.
-        """
-        fixed = [self.table, self.platform_table, self.platform_leg, self.frame]
-        conf = pb_robot.vobj.BodyConf(self.robot, self.robot.arm.GetJointValues())
-        print('Initial configuration:', conf.configuration)
-        init = [('CanMove',),
-                ('Conf', conf),
-                ('StartConf', conf),
-                ('AtConf', conf),
-                ('HandEmpty',)]
-
-        self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
-        init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
-
-        for body in self.pddl_blocks:
-            print(type(body), body)
-            pose = pb_robot.vobj.BodyPose(body, body.get_base_link_pose())
-            init += [('Graspable', body),
-                    ('Pose', body, pose),
-                    ('AtPose', body, pose),
-                    ('Block', body),
-                    ('On', body, self.table),
-                    ('Supported', body, pose, self.table, self.table_pose)]
-
-        if not self.platform_table is None:
-            self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
-            init += [('Pose', self.platform_table, self.platform_pose), ('AtPose', self.platform_table, self.platform_pose)]
-            init += [('Block', self.platform_table)]
-        init += [('Table', self.table)]
-        return init
 
     def simulate_action(self, action, block_ix, T=50, vis_sim=False, vis_placement=False):
         """
@@ -763,7 +767,7 @@ class PandaAgent:
         # remove the redundancy. this should get a refactor sometime soon tho
         def _solve_and_execute_pddl_subroutine(init, goal_terms, real, fixed_objs, reset=True):
             goal = tuple(['and'] + goal_terms)
-            if not self.use_action_server:
+            if not self.use_planning_server:
                 plan_found = self._solve_and_execute_pddl(init, goal, real=real, search_sample_ratio=1.)
                 if not plan_found: return False
             else:
@@ -1033,24 +1037,6 @@ class PandaAgent:
             self.plan()
             ExecuteActions(plan, real=False, pause=False, wait=False, obstacles=[f for f in self.fixed if f is not None])
             return True
-
-
-    def _request_plan_from_server(self, init, goal, fixed_objs, reset=True, real=False):
-        print('Requesting block placement plan from server...')
-        # Package up the ROS action goal
-        ros_goal = self.goal_to_ros(init, goal, fixed_objs)
-        ros_goal.reset = reset
-        print_planning_problem(init, goal, fixed_objs)
-
-        # Call the planning action server
-        self.planning_client.send_goal(ros_goal)
-        self.planning_client.wait_for_result() # TODO: Blocking for now
-        result = self.planning_client.get_result()
-        # print(result)
-
-        # Unpack the ROS message
-        plan = self.ros_to_task_plan(result, self.execution_robot, self.pddl_block_lookup)
-        return plan
 
 
     # TODO: Try this again.
