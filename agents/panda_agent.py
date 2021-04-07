@@ -640,7 +640,7 @@ class PandaAgent:
             goal_terms = []
             if base == self.table:
                 blk_pose = pb_robot.vobj.BodyPose(blk, pose)
-                if not stack and self.alternate_orientations:
+                if (not stack or num_success >= num_steps/2) and self.alternate_orientations:
                     init += [("Reset",)]
                     goal_terms.append(("AtHome", blk))
                 else:
@@ -653,6 +653,11 @@ class PandaAgent:
                 goal_terms.append(('On', blk, base))
             goal = tuple(['and'] + goal_terms)
             
+            if self.alternate_orientations and not stack:
+                home_poses = {blk.get_name(), pose}
+            else:
+                home_poses = None
+            
             # PLAN
             fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != blk]
             pddl_info = get_pddlstream_info(self.robot,
@@ -660,7 +665,8 @@ class PandaAgent:
                                             self.pddl_blocks,
                                             add_slanted_grasps=True,
                                             approach_frame='global',
-                                            use_vision=self.use_vision)
+                                            use_vision=self.use_vision,
+                                            home_poses=home_poses)
             plan, cost = pddlstream_plan(pddl_info, init, goal, search_sample_ratio, max_time)
 
             # EXECUTE
