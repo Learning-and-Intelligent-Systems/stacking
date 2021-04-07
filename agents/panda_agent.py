@@ -10,15 +10,12 @@ from actions import PlaceAction, make_platform_world
 from block_utils import get_adversarial_blocks, rotation_group, ZERO_POS, \
                         Quaternion, get_rotated_block, Pose, add_noise, \
                         Environment, Position, World
-from pddlstream.algorithms.constraints import PlanConstraints, WILD
-from pddlstream.algorithms.focused import solve_focused
-from pddlstream.language.stream import StreamInfo
 from pddlstream.utils import INF
 from pybullet_utils import transformation
 import tamp.primitives
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
                       print_planning_problem, ExecuteActions, ExecutionFailure
-from tamp.pddlstream_utils import get_pddlstream_info
+from tamp.pddlstream_utils import get_pddlstream_info, pddlstream_plan
 
 
 class PandaAgent:
@@ -411,6 +408,7 @@ class PandaAgent:
             self.teleport_block(pddl_block, original_pose)
 
         return observation
+
 
     def teleport_block(self, block, pose):
         self.execute()
@@ -1012,29 +1010,14 @@ class PandaAgent:
         return end_pose
 
     def _solve_and_execute_pddl(self, init, goal, real=False, max_time=INF, search_sample_ratio=0.):
+        # PLAN
         self._add_text('Planning block placement')
+        self.plan()
         self.robot.arm.hand.Open()
         saved_world = pb_robot.utils.WorldSaver()
+        plan, cost = pddlstream_plan(self.pddl_info, init, goal, search_sample_ratio, max_time)
 
-        self.plan()
-        start = time.time()
-
-        constraints = PlanConstraints(skeletons=self._get_regrasp_skeleton(),
-                                  exact=True)
-
-        pddlstream_problem = tuple([*self.pddl_info, init, goal])
-        plan, _, _ = solve_focused(pddlstream_problem,
-                                #constraints=constraints,
-                                success_cost=numpy.inf,
-                                max_skeletons=2,
-                                search_sample_ratio=search_sample_ratio,
-                                max_time=max_time,
-                                verbose=False)
-
-        duration = time.time() - start
-        print('Planning Complete: Time %f seconds' % duration)
-        # TODO: Try planner= argument https://github.com/caelan/pddlstream/blob/stable/pddlstream/algorithms/downward.py
-
+        # EXECUTE
         self._add_text('Executing block placement')
         # Execute the PDDLStream solution to setup the world.
         if plan is None:
@@ -1047,27 +1030,6 @@ class PandaAgent:
             self.plan()
             ExecuteActions(plan, real=False, pause=False, wait=False, obstacles=[f for f in self.fixed if f is not None])
             return True
-
-
-    # TODO: Try this again.
-    def _get_regrasp_skeleton(self):
-        no_regrasp = []
-        no_regrasp += [('move_free', [WILD, '?q0', WILD])]
-        no_regrasp += [('pick', ['?b0', WILD, WILD, '?g0', '?q0', '?q1', WILD])]
-        no_regrasp += [('move_holding', ['?q1', '?q2', '?b0', '?g0', WILD])]
-        no_regrasp += [('place', ['?b0', WILD, WILD, WILD, '?g0', '?q2', WILD, WILD])]
-
-        regrasp = []
-        regrasp += [('move_free', [WILD, '?rq0', WILD])]
-        regrasp += [('pick', ['?rb0', WILD, WILD, '?rg0', '?rq0', '?rq1', WILD])]
-        regrasp += [('move_holding', ['?rq1', '?rq2', '?rb0', '?rg0', WILD])]
-        regrasp += [('place', ['?rb0', WILD, WILD, WILD, '?rg0', '?rq2', '?rq3', WILD])]
-        regrasp += [('move_free', ['?rq3', '?rq4', WILD])]
-        regrasp += [('pick', ['?rb0', WILD, WILD, '?rg1', '?rq4', '?rq5', WILD])]
-        regrasp += [('move_holding', ['?rq5', '?rq6', '?rb0', '?rg1', WILD])]
-        regrasp += [('place', ['?rb0', WILD, WILD, WILD, '?rg1', '?rq6', WILD, WILD])]
-
-        return [no_regrasp, regrasp]
 
 
 class PandaClientAgent:

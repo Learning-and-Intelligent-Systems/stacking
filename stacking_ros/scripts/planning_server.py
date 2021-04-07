@@ -25,7 +25,7 @@ from stacking_ros.srv import (GetPlan, GetPlanResponse,
     SetPlanningState, SetPlanningStateResponse)
 from tamp.misc import (get_pddl_block_lookup, print_planning_problem, 
                        setup_panda_world, ExecuteActions, load_blocks)
-from tamp.pddlstream_utils import get_pddlstream_info
+from tamp.pddlstream_utils import get_pddlstream_info, pddlstream_plan
 from tamp.ros_utils import (pose_to_transform, ros_to_pose,
     ros_to_transform, task_plan_to_ros)
 from tf.transformations import quaternion_multiply
@@ -130,7 +130,8 @@ class PlanningServer():
             init += [('AtGrasp', self.latest_body_grasp.body, self.latest_body_grasp)]
 
         self.table_pose = pb_robot.vobj.BodyPose(self.table, self.table.get_base_link_pose())
-        init += [('Pose', self.table, self.table_pose), ('AtPose', self.table, self.table_pose)]
+        init += [('Pose', self.table, self.table_pose), 
+                 ('AtPose', self.table, self.table_pose)]
 
         for body in self.pddl_blocks:
             print(type(body), body)
@@ -145,7 +146,8 @@ class PlanningServer():
 
         if not self.platform_table is None:
             self.platform_pose = pb_robot.vobj.BodyPose(self.platform_table, self.platform_table.get_base_link_pose())
-            init += [('Pose', self.platform_table, self.platform_pose), ('AtPose', self.platform_table, self.platform_pose)]
+            init += [('Pose', self.platform_table, self.platform_pose), 
+                     ('AtPose', self.platform_table, self.platform_pose)]
             init += [('Block', self.platform_table)]
         init += [('Table', self.table)]
         return init
@@ -336,16 +338,9 @@ class PlanningServer():
                                                 home_poses=self.home_poses)
         
                 # Run PDDLStream focused solver
-                pddlstream_problem = tuple([*pddl_info, init, goal])
                 try:
-                    plan, cost, _ = solve_focused(pddlstream_problem,
-                                        # planner="dijkstra",
-                                        unit_costs=True,
-                                        max_skeletons=2,
-                                        search_sample_ratio=1.0,
-                                        # success_cost=8.0,
-                                        max_time=INF,
-                                        verbose=False)
+                    plan, cost = pddlstream_plan(pddl_info, init, goal, 
+                                                 search_sample_ratio=1.0, max_time=INF)
                 except Exception as e:
                     print("Failed planning")
                     print(e)
@@ -357,7 +352,6 @@ class PlanningServer():
             num_tries += 1
             saved_world.restore()
 
-        print('Planning Complete: Time %f seconds' % duration)
         print(f"\nFINAL PLAN:\n{plan}\nCOST: {cost}\n")
         if self.multiprocessing:
             return_dict["plan"] = dill.dumps(plan)
