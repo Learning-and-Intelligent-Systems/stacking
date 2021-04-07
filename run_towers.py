@@ -28,8 +28,8 @@ def main(args):
         blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
     agent = PandaAgent(blocks, NOISE,
-        use_platform=False, teleport=False,
         use_planning_server=args.use_planning_server,
+        alternate_orientations=args.alternate_orientations,
         use_vision=args.use_vision,
         real=args.real)
 
@@ -47,21 +47,11 @@ def main(args):
 
         # and execute the resulting plan.
         print(f"Starting tower {tx}")
-        if args.use_planning_server:
-            agent.simulate_tower_parallel(tower,
-                                          real=args.real,
-                                          base_xy=(0.5, -0.3),
-                                          vis=True,
-                                          T=2500)
-        else:
-            success, stable = agent.simulate_tower(tower,
-                                real=args.real,
-                                base_xy=(0.5, -0.3),
-                                vis=True,
-                                T=2500,
-                                save_tower=args.save_tower)
-            if not success:
-                print('Planner failed.')
+        agent.simulate_tower(tower,
+                             real=args.real,
+                             base_xy=(0.5, -0.3),
+                             vis=True,
+                             T=2500)
         print(f"Finished tower {tx}")
 
 
@@ -73,6 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-towers', type=int, default=100)
     parser.add_argument('--save-tower', action='store_true')
     parser.add_argument('--use-planning-server', action='store_true')
+    parser.add_argument('--alternate-orientations', action='store_true')
     parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
     parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/final_block_set_10.pkl')
     parser.add_argument('--real', action='store_true', help='run on real robot')
