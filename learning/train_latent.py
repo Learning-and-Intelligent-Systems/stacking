@@ -131,7 +131,7 @@ def get_params_loss(latent_ensemble, batches):
     return likelihood_loss/len(batches)
 
 
-def get_latent_loss(latent_ensemble, batch):
+def get_latent_loss(latent_ensemble, batch, beta=1):
     """
     [mu, sigma] -(reparam)-> [sample] -(thru ensemble)-> [likelihood]
     [mu, sigma] -> [KL]
@@ -167,13 +167,17 @@ def get_latent_loss(latent_ensemble, batch):
     p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
     kl_loss = torch.distributions.kl_divergence(q_z, p_z).sum()
 
-    return likelihood_loss #+ kl_loss
+    return likelihood_loss + beta * kl_loss
 
-def train(latent_ensemble, train_loader, n_epochs=100, freeze_latents=False, freeze_ensemble=False):
+def train(latent_ensemble, train_loader, n_epochs=50, freeze_latents=False, freeze_ensemble=False):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     # TODO: Check if learning rate should be different for the latents.
     latent_optimizer = optim.Adam([latent_ensemble.latent_scales, latent_ensemble.latent_locs], lr=1e-3)
+
+    # NOTE(izzy): we should be computing the KL divergence + likelihood of entire dataset.
+    # so for each batch we need to divide by the number of batches
+    beta = 1./len(train_loader)
 
     losses = []
     for epoch_idx in range(n_epochs):
@@ -184,8 +188,7 @@ def train(latent_ensemble, train_loader, n_epochs=100, freeze_latents=False, fre
             # update the latent distribution while holding the model parameters fixed.
             if not freeze_latents:
                 latent_optimizer.zero_grad()
-
-                latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0])
+                latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0], beta=beta)
                 latent_loss.backward()
                 latent_optimizer.step()
                 #batch_loss += latent_loss.item()
@@ -199,21 +202,24 @@ def train(latent_ensemble, train_loader, n_epochs=100, freeze_latents=False, fre
                 batch_loss += params_loss.item()
             #print(latent_ensemble.latent_locs)
 
-            print(f'Epoch {epoch_idx} batch {batch_idx} loss:\t{batch_loss}')
-            losses.append(batch_loss)
+            # print(f'Epoch {epoch_idx} batch {batch_idx} loss:\t{batch_loss}')
+            # losses.append(batch_loss)
 
-            if batch_idx % 50 == 0:
-                accs = {2: [], 3:[], 4:[], 5:[]}
-                for val_batches in train_loader:
-                    towers, block_ids, labels = val_batches[0] 
-                    preds = latent_ensemble(towers[:,:,4:], block_ids.long())
-                    acc = ((preds > 0.5) == labels).float().mean()
-                    accs[towers.shape[1]].append(acc)
-                print('Train Accuracy:')
-                for k, v in accs.items():
-                    print(k, np.mean(v))
+        accs = {2: [], 3:[], 4:[], 5:[]}
+        for val_batches in train_loader:
+            towers, block_ids, labels = val_batches[0]
+            if torch.cuda.is_available():
+                towers = towers.cuda()
+                block_ids = block_ids.cuda()
+                labels = labels.cuda()
+            preds = latent_ensemble(towers[:,:,4:], block_ids.long())
+            acc = ((preds > 0.5) == labels).float().mean().item()
+            accs[towers.shape[1]].append(acc)
+        print('Train Accuracy:')
+        for k, v in accs.items():
+            print(k, np.mean(v))
 
-                print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
+        print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
 
     return losses
 

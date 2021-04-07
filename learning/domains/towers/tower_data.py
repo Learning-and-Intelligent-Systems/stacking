@@ -215,7 +215,7 @@ class ParallelDataLoader:
                 try:
                     batches.append(next(loader))
                 except:
-                    print('[ParallelDataLoader] Warning: failed to get batch from all loaders.')
+                    # print('[ParallelDataLoader] Warning: failed to get batch from all loaders.')
                     stop = True
             if not stop:
                 yield batches
