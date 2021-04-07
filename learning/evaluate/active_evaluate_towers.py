@@ -701,7 +701,7 @@ def cumulative_overhang_regret_evaluation(logger, block_set, fname, args, save_i
         total_overhang = 0
         for tx in range(1, tower.shape[0]):
             bx = tx - 1
-            overhang = (tower[tx, 7] + tower[tx, 4]/2.) - (tower[bx, 7] + tower[bx, 4]/2.)
+            overhang = (tower[tx, 8] + tower[tx, 5]/2.) - (tower[bx, 8] + tower[bx, 5]/2.)
             total_overhang += overhang
         return total_overhang
     
@@ -709,7 +709,7 @@ def cumulative_overhang_regret_evaluation(logger, block_set, fname, args, save_i
     
 def longest_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
     def horizontal_overhang(tower):
-        return (tower[-1, 7] + tower[-1, 4]/2.) - (tower[0, 7] + tower[0, 4]/2.)
+        return (tower[-1, 8] + tower[-1, 5]/2.) - (tower[0, 8] + tower[0, 5]/2.)
     
     return evaluate_planner(logger, block_set, horizontal_overhang, fname, args, save_imgs, img_prefix='overhang')
     

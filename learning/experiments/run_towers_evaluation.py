@@ -4,6 +4,7 @@ import pickle
 import argparse
 from agents.panda_agent import PandaAgent
 from tamp.misc import load_blocks
+import time
 
 def main(args):
 
