@@ -19,13 +19,10 @@ import pb_robot
 def main(args):
     NOISE=0.00005
 
-    # get a bunch of random blocks
-    # if args.use_vision:
-    if True:
-        blocks = load_blocks(fname=args.blocks_file,
-                             num_blocks=args.num_blocks)
-    else:
-        blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
+    # Load blocks
+    blocks = load_blocks(fname=args.blocks_file,
+                         num_blocks=args.num_blocks)
+    # blocks = get_adversarial_blocks(num_blocks=args.num_blocks)
 
     agent = PandaAgent(blocks, NOISE,
         use_planning_server=args.use_planning_server,
@@ -35,7 +32,7 @@ def main(args):
 
     if args.show_frames:
         agent.step_simulation(T=1, vis_frames=True, lifeTime=0.)
-        input('Start building?')
+        input("Start building?")
         p.removeAllUserDebugItems()
 
     for tx in range(0, args.num_towers):
@@ -45,14 +42,14 @@ def main(args):
         tower = sample_random_tower(tower_blocks)
         #tower = build_tower(tower_blocks, constructable=True, max_attempts=50000)
 
-        # and execute the resulting plan.
-        print(f"Starting tower {tx}")
+        # Plan and execute the resulting plan.
+        print(f"\nStarting tower {tx} with {len(tower)} blocks\n")
         agent.simulate_tower(tower,
                              real=args.real,
                              base_xy=(0.5, -0.3),
                              vis=True,
                              T=2500)
-        print(f"Finished tower {tx}")
+        print(f"\nFinished tower {tx}\n")
 
 
 if __name__ == '__main__':
