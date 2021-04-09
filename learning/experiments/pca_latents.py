@@ -2,42 +2,45 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse
 
-def pca_gaussians(locs, scales, return_diagonal_cov=True):
-    m = locs.mean(axis=0)
-    s = locs.std(axis=0)
 
-    locs_normalized = (locs - m)/s
-
-    cov = np.cov(locs_normalized.T)
+def pca(X, d=2):
+    m = X.mean(axis=0)
+    s = X.std(axis=0)
+    X = (X - m)/s
+    cov = np.cov(X.T)
     vals, vecs = np.linalg.eig(cov)
-    a = vecs[:, np.argsort(vals)[-2:]]
+    return vecs[:, np.argsort(vals)[-d:]]
 
-    locs_proj = locs @ a
+def project_gaussians(A, locs, scales, return_diagonal_cov=True):
+    locs_proj = locs @ A
     if return_diagonal_cov: 
-        scales_proj = scales @ a
+        scales_proj = scales @ A
     else:
         # vectorized version np.diag
         scales = np.eye(scales.shape[1])[None, ...] * scales[..., None]
         # if cov(x) = S, then cov(Ax) = A S A^T
-        scales_proj = a.T @ scales @ a
+        scales_proj = A.T @ scales @ A
 
     return locs_proj, scales_proj
 
-def plot_gaussians(locs, scales):
-    
-    ax = plt.gca()
-    for l, s in zip(locs_proj, scales_proj):
-        c = np.random.rand(3)
-        plt.scatter(*l, c = c)
+def pca_gaussians(locs, scales, return_diagonal_cov=True):
+    A = pca(locs)
+    return project_gaussians(A,locs, scales,
+        return_diagonal_cov=return_diagonal_cov)
+
+def plot_gaussians(locs, scales, ax=None, colors=None, alpha=1, show=True):
+    if ax is None: ax = plt.gca()
+    for i, (l, s) in enumerate(zip(locs, scales)):
+        c = np.random.rand(3) if colors is None else colors[i]
+        ax.scatter(*l, color=c, alpha=alpha)
         if s.ndim == 1:
-            ax.add_patch(Ellipse(l, *s, fill=False, color=c))
+            ax.add_patch(Ellipse(l, *s, fill=False, color=c, alpha=alpha))
         else:
             vals, vecs = np.linalg.eig(s)
             long_axis = vecs[:, np.argmax(vals)]
             angle = np.arctan2(long_axis[1], long_axis[0])
-            ax.add_patch(Ellipse(l, *vals, fill=False, color=c))
-    plt.title('Latent Variables without Prior.')
-    plt.show()
+            ax.add_patch(Ellipse(l, *vals, fill=False, color=c, alpha=alpha))
+    if show: plt.show()
 
 
 if __name__ == '__main__':
@@ -63,28 +66,17 @@ if __name__ == '__main__':
     #                    [0.3235, 0.1955, 0.3585, 0.2812, 0.2036],
     #                    [0.3167, 0.1881, 0.2241, 0.2705, 0.2029]])
 
+    # locs_proj, scales_proj = pca_gaussians(locs, scales, return_diagonal_cov=False)
+    # plot_gaussians(locs_proj, scales_proj)
 
-    # without KL
-    locs = np.array([[ 0.2029,  0.5111, -0.5805,  1.2011,  1.8219],
-                     [-1.0448, -1.1561, -0.5019,  1.2886,  1.2775],
-                     [-1.9459, -1.3801,  0.8102, -1.7601,  0.8340],
-                     [ 1.7771,  0.0574,  1.4843, -1.4482,  0.7797],
-                     [ 0.3809, -1.2340,  2.4344,  0.3318,  0.3907],
-                     [ 0.6981,  0.9217, -1.2412, -0.2512, -0.5549],
-                     [ 0.2590,  0.9800,  0.5843,  0.7152, -0.2053],
-                     [ 1.8302, -2.4050, -0.9263,  0.2050, -2.2238],
-                     [ 0.2432,  0.7225, -1.0038, -1.3842, -0.1806],
-                     [ 0.1655, -2.2277,  0.1689,  2.0739,  2.3224]])
-    scales = np.array([[ 0.0218,  0.0107,  0.0126, -0.0165, -0.0096],
-                       [ 0.0259,  0.0090,  0.0205, -0.0238,  0.0429],
-                       [ 0.0250, -0.0211,  0.0427,  0.0041, -0.0257],
-                       [-0.0200,  0.0243,  0.0097,  0.0093,  0.0472],
-                       [ 0.0177, -0.0027,  0.0206, -0.0166, -0.0123],
-                       [ 0.0375,  0.0122, -0.0077, -0.0060,  0.0374],
-                       [ 0.0363, -0.0166,  0.0400, -0.0040,  0.0046],
-                       [ 0.0091,  0.0142, -0.0155,  0.0029, -0.0095],
-                       [ 0.0327, -0.0089,  0.0115, -0.0027, -0.0340],
-                       [-0.0067, -0.0507,  0.0305, -0.0006, -0.0017]])
-
-    locs_proj, scales_proj = pca_gaussians(locs, scales, return_diagonal_cov=False)
-    plot_gaussians(locs_proj, scales_proj)
+    # plot the latents over time
+    data = np.load('learning/experiments/logs/latents/fit_during_test.npy')[:50]
+    locs, scales = np.split(data, 2, axis=2)
+    A = pca(locs[-1])
+    ax = plt.gca()
+    colors = np.random.rand(10,3)
+    alphas = np.linspace(0.2, 0.2, locs.shape[0])
+    for i, (l, s) in enumerate(zip(locs, scales)):
+        l, s = project_gaussians(A, l, s)
+        plot_gaussians(l, s, colors=colors, alpha=alphas[i], show=False)
+    plt.show()
