@@ -22,11 +22,16 @@ class LatentEnsemble(nn.Module):
         """
         super(LatentEnsemble, self).__init__()
 
-        self.ensemble = ensemble
+        self.ensemble = ensemble\
 
         self.latent_locs = nn.Parameter(torch.zeros(n_latents, d_latents))
         self.latent_scales = nn.Parameter(torch.ones(n_latents, d_latents))
         self.latents = torch.distributions.normal.Normal(self.latent_locs, self.latent_scales)
+
+    def reset_latents(self):
+        with torch.no_grad():
+            self.latent_locs.data[:] = 0
+            self.latent_scales.data[:] = 1
 
     def associate(self, samples, block_ids):
         """ given samples from the latent space for each block in the set,
@@ -56,7 +61,7 @@ class LatentEnsemble(nn.Module):
         observed = observed.unsqueeze(1).expand(-1, N_samples, -1, -1)
         return torch.cat([samples, observed], 3)
 
-    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1):
+    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=10):
         """ predict feasibility of the towers
 
         Arguments:
@@ -73,8 +78,6 @@ class LatentEnsemble(nn.Module):
 
         # draw samples from the latent distribution [N_samples x N_blockset x latent_dim]
         samples_for_each_block_in_set = self.latents.rsample(sample_shape=[N_samples])
-        if torch.cuda.is_available():
-            samples_for_each_block_in_set = samples_for_each_block_in_set.cuda()
         # assocate those latent samples with the blocks in the towers
         samples_for_each_tower_in_batch = self.associate(
             samples_for_each_block_in_set, block_ids)
@@ -166,20 +169,20 @@ def get_latent_loss(latent_ensemble, batch, beta=1):
     q_z = latent_ensemble.latents
     p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
     kl_loss = torch.distributions.kl_divergence(q_z, p_z).sum()
-
     return likelihood_loss + beta * kl_loss
 
-def train(latent_ensemble, train_loader, n_epochs=50, freeze_latents=False, freeze_ensemble=False):
+def train(latent_ensemble, train_loader, n_epochs=100, freeze_latents=False, freeze_ensemble=False, print_accuracy=True):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     # TODO: Check if learning rate should be different for the latents.
-    latent_optimizer = optim.Adam([latent_ensemble.latent_scales, latent_ensemble.latent_locs], lr=1e-3)
+    latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_scales], lr=1e-3)
 
     # NOTE(izzy): we should be computing the KL divergence + likelihood of entire dataset.
     # so for each batch we need to divide by the number of batches
     beta = 1./len(train_loader)
 
     losses = []
+    latents = []
     for epoch_idx in range(n_epochs):
         print(f'Epoch {epoch_idx}')
         accs = []
@@ -191,7 +194,7 @@ def train(latent_ensemble, train_loader, n_epochs=50, freeze_latents=False, free
                 latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0], beta=beta)
                 latent_loss.backward()
                 latent_optimizer.step()
-                #batch_loss += latent_loss.item()
+                batch_loss += latent_loss.item()
 
             # update the model parameters while sampling from the latent distribution.
             if not freeze_ensemble:
@@ -200,13 +203,25 @@ def train(latent_ensemble, train_loader, n_epochs=50, freeze_latents=False, free
                 params_loss.backward()
                 params_optimizer.step()
                 batch_loss += params_loss.item()
-            #print(latent_ensemble.latent_locs)
 
-            # print(f'Epoch {epoch_idx} batch {batch_idx} loss:\t{batch_loss}')
-            # losses.append(batch_loss)
+            losses.append(batch_loss)
 
+        if print_accuracy:
+            print('Train Accuracy:')
+            for k, v in compute_accuracies(latent_ensemble, train_loader).items():
+                print(k, np.mean(v))
+        # print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
+        latents.append(np.hstack([latent_ensemble.latent_locs.cpu().detach().numpy(),
+                                  latent_ensemble.latent_scales.cpu().detach().numpy()]))
+
+    return latents
+
+    # Note (Mike): When doing active learning, add new towers to train_dataset (not train_loader).
+
+def compute_accuracies(latent_ensemble, data_loader):
+    with torch.no_grad():
         accs = {2: [], 3:[], 4:[], 5:[]}
-        for val_batches in train_loader:
+        for val_batches in data_loader:
             towers, block_ids, labels = val_batches[0]
             if torch.cuda.is_available():
                 towers = towers.cuda()
@@ -215,25 +230,34 @@ def train(latent_ensemble, train_loader, n_epochs=50, freeze_latents=False, free
             preds = latent_ensemble(towers[:,:,4:], block_ids.long())
             acc = ((preds > 0.5) == labels).float().mean().item()
             accs[towers.shape[1]].append(acc)
-        print('Train Accuracy:')
-        for k, v in accs.items():
-            print(k, np.mean(v))
 
-        print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
-
-    return losses
-
-    # Note (Mike): When doing active learning, add new towers to train_dataset (not train_loader).
+    return accs
 
 def test(latent_ensemble, test_loader):
+    latent_ensemble.reset_latents()
+
+    print('Test Accuracy with prior latents:')
+    for k, v in compute_accuracies(latent_ensemble, test_loader).items():
+        print(k, np.mean(v))
+    print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
+
     # estimate the latents for the test data, but without updating the model
     # parameters
-    train(latent_ensemble, test_loader, freeze_ensemble=True)
+    latents = train(latent_ensemble, test_loader, freeze_ensemble=True, print_accuracy=False)
+    np.save('learning/experiments/logs/latents/fit_during_test.npy', latents)
+
+
+    print('Test Accuracy with posterior latents:')
+    for k, v in compute_accuracies(latent_ensemble, test_loader).items():
+        print(k, np.mean(v))
+    print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
 
 
 if __name__ == "__main__":
     # sample_unlabeled to generate dataset. 50/50 class split. using 10 blocks
     # sample_sequential
+
+    model_path = 'learning/models/pretrained/latent_ensemble_1.pt'
 
 
     # NOTE(izzy): d_latents corresponds to the number of unique objects in the
@@ -258,7 +282,7 @@ if __name__ == "__main__":
                                       shuffle=True,
                                       n_dataloaders=n_models)
     test_loader = ParallelDataLoader(dataset=test_dataset,
-                                     batch_size=64,
+                                     batch_size=32,
                                      shuffle=False,
                                      n_dataloaders=1)
 
@@ -269,13 +293,16 @@ if __name__ == "__main__":
     ensemble = Ensemble(base_model=FCGN,
                         base_args={'n_hidden': 32, 'n_in': 10 + d_latents},
                         n_models=n_models)
+    latent_ensemble = LatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
     if torch.cuda.is_available():
-        ensemble = ensemble.cuda()
+        latent_ensemble = latent_ensemble.cuda()
 
     # train
-    train_latent_ensemble = LatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
-    train_losses = train(train_latent_ensemble, train_loader)
+    latents = train(latent_ensemble, train_loader, print_accuracy=False)
+    torch.save(latent_ensemble.state_dict(), model_path)
+    np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
+
 
     # test
-    test_latent_ensemble = LatentEnsemble(ensemble, n_latents=10, d_latents=3)
-    test(test_latent_ensemble, test_loader)
+    latent_ensemble.load_state_dict(torch.load(model_path))
+    test(latent_ensemble, test_loader)
