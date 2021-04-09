@@ -492,7 +492,7 @@ class PandaAgent:
                     planning_prob.held_block.name = self.last_obj_held.body.readableName
                     transform_to_ros(self.last_obj_held.grasp_objF, planning_prob.held_block.pose)
             success, stack_stable, reset_stable, num_success, fatal = \
-                planning_fn(planning_prob, real, T, stack=True, start_idx=num_success, ignore_resets=ignore_resets)
+                self.plan_and_execute(planning_prob, real, T, stack=True, start_idx=num_success, ignore_resets=ignore_resets)
             print(f"Completed tower stack with success: {success}, stable: {stack_stable}")
             if reset_stable:
                 print(f"Completed tower reset stable: {reset_stable}")
@@ -611,7 +611,7 @@ class PandaAgent:
                     goal = tuple(['and'] + goal_terms)
                     
                     if self.alternate_orientations and not stack:
-                        home_poses = {blk.get_name(), pose}
+                        home_poses = {blk.get_name() : pose}
                     else:
                         home_poses = None
 
