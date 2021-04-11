@@ -217,9 +217,20 @@ def main(args, vis_tower=False):
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
     use_block_set = args.block_set_size > 0
-    # generate the finite set of blocks
-    if use_block_set:
-        block_set = [Object.random(f'obj_{i}') for i in range(args.block_set_size)]
+
+
+    try:
+        block_set = [Object.from_vector(v, name=f'obj_{i}') for i,v in enumerate(np.load(args.block_set))][:20]
+        args.block_set_size = len(block_set)
+        use_block_set = True
+        print(f'Successfully loaded {args.block_set_size} blocks from {args.block_set}')
+    except:
+        # generate the finite set of blocks
+        if use_block_set:
+            block_set = [Object.random(f'obj_{i}') for i in range(args.block_set_size)]
+            print(f'Generating {args.block_set_size} blocks.')
+        else:
+            print('Using random blocks.')
 
     # create a vector of stability labels where half are unstable and half are stable
     stability_labels = np.zeros(num_towers, dtype=int)
@@ -327,6 +338,7 @@ if __name__ == '__main__':
     parser.add_argument('--save-images', action='store_true')
     parser.add_argument('--block-set-size', type=int, default=0)
     parser.add_argument('--criteria', default='constructable', choices=['stable', 'constructible'])
+    parser.add_argument('--block-set', type=str, default='')
     args = parser.parse_args()
 
     main(args, vis_tower=False)

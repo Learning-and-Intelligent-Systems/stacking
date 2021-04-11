@@ -58,6 +58,7 @@ class Object:
         self.id = None                  # int (set later)
         self.com_filter = None          # ParticleDistribution (set later)
         self.pb_id = None
+        self.rotation = ZERO_ROT
 
     def set_pose(self, pose):
         self.pose = pose
@@ -91,12 +92,12 @@ class Object:
       return v
     
     @staticmethod
-    def from_vector(vblock):
+    def from_vector(vblock, name=None):
         if len(vblock) <= 18:
             color = [1,0,0]
         else:
             color = vblock[18:21].tolist()
-        block = Object('from_vec', 
+        block = Object('from_vec' if name is None else name,
                        dimensions=Dimensions(*vblock[4:7].tolist()), 
                        mass=vblock[0], 
                        com=Position(*vblock[1:4].tolist()), 
