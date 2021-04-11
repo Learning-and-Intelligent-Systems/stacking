@@ -7,17 +7,32 @@ TODO: CSV to block set
 ---
 
 ## Running Tower Stacking
-TODO: Run options (sim vs. hardware, use vision, ROS planning server, etc.)
+The `run_towers.py` file allows you to run randomly generated towers from a set of blocks. This will help you verify that all the planning and execution tools work, without yet running any of the active learning pipeline.
+
+To run the most basic form of tower stacking in simulation:
 
 ```
 python3 -m run_towers --blocks-file learning/domains/towers/final_block_set_10.pkl --num-blocks 10
 ```
 
-With planning server:
+To enable placing blocks in their home position, you can use the `--alternate_orientations` flag:
+
+```
+python3 -m run_towers --blocks-file learning/domains/towers/final_block_set_10.pkl --num-blocks 10 --alternate-orientations
+```
+
+You can also build towers on the real robot and/or by detecting blocks using the RealSense cameras using the `--real` and `--use-vision` flags, respectively:
+
+```
+python3 -m run_towers --blocks-file learning/domains/towers/final_block_set_10.pkl --num-blocks 10 --real --use-vision
+```
+
+Finally, you can separate planning and execution using the ROS planning server, which is enabled by the `--use-planning-server` flag. In two separate terminals, run the following:
 
 ```
 python3 -m run_towers --blocks-file learning/domains/towers/final_block_set_10.pkl --num-blocks 10 --use-planning-server
-python3 stacking_ros/scripts/planning_server.py --blocks-file learning/domains/towers/final_block_set_10.pkl --num-blocks 10 --alternate-orientations --max-tries 2 
+
+python3 stacking_ros/scripts/planning_server.py --blocks-file learning/domains/towers/final_block_set_10.pkl --num-blocks 10 --alternate-orientations 
 ```
 
 ---
@@ -55,6 +70,8 @@ python3 -m learning.experiments.run_towers_evaluation --real --use-vision --bloc
 ---
 
 ## Find COM, solve for stable tower, find and execute plan to build tower
+TODO: This is old and was in the original README. Does this still hold, and if so, where should it go?
+
 The following command will find the COM of the given blocks, find the tallest stable tower, and plan and execute the construction of that tower.
 ```
 cd stacking
@@ -63,4 +80,3 @@ python3 -m run
 Arguments:
   - ```--num-blocks (int)```: Number of blocks to use
   - ```--agent ([teleport or panda])```: ```panda``` to have the robot plan and execute actions, ```teleport``` for no agent
-

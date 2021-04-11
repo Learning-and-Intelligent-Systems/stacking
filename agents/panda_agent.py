@@ -593,6 +593,7 @@ class PandaAgent:
                     self.robot.arm.hand.Open()
                     
                     # Unpack initial conditions
+                    fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != blk]
                     init = self._get_initial_pddl_state()
                     goal_terms = []
                     if base == self.table:
@@ -604,18 +605,11 @@ class PandaAgent:
                             init += [('Pose', blk, blk_pose),
                                     ('Supported', blk, blk_pose, self.table, self.table_pose)]
                             goal_terms.append(('AtPose', blk, blk_pose))
-                        goal_terms.append(('On', blk, self.table))
+                            goal_terms.append(('On', blk, self.table))
                     else:
                         init += [('RelPose', blk, base, pose)]
                         goal_terms.append(('On', blk, base))
                     goal = tuple(['and'] + goal_terms)
-                    
-                    if self.alternate_orientations and not stack:
-                        home_poses = {blk.get_name() : pose}
-                    else:
-                        home_poses = None
-
-                    fixed_objs = self.fixed + [b for b in self.pddl_blocks if b != blk]
                     
                     # Plan with PDDLStream
                     pddl_info = get_pddlstream_info(self.robot,
@@ -624,7 +618,7 @@ class PandaAgent:
                                                     add_slanted_grasps=True,
                                                     approach_frame='global',
                                                     use_vision=self.use_vision,
-                                                    home_poses=home_poses)
+                                                    home_pose=pose)
                     plan, cost = pddlstream_plan(pddl_info, init, goal, 
                                                  search_sample_ratio=1.0, 
                                                  max_time=INF)
@@ -677,6 +671,7 @@ class PandaAgent:
                     if stack and num_success == num_steps/2:
                         print("Completed tower stack!")
                         stack_stable = True
+                        stack = False
                         if ignore_resets:
                             return True, stack_stable, reset_stable, num_success, False
                     elif num_success == num_steps:

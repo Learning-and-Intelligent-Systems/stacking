@@ -155,14 +155,9 @@ class PlanningServer():
 
     def plan_from_goals(self):
         """ Executes plan for a set of goal states """
-        # Get the home poses
-        self.home_poses = {}
-        for blk, base, pose, stack in self.goal_block_states:
-            if not stack:
-                self.home_poses[blk.get_name()] = pose
-
         # Plan for all goals sequentially
         for blk, base, pose, stack in self.goal_block_states:
+            self.home_pose = pose
             if self.cancel_planning:
                 return
 
@@ -176,13 +171,12 @@ class PlanningServer():
 
                 if not stack and self.alternate_orientations:
                     init += [("Reset",)]
-                    pose_goal = ("AtHome", blk)
+                    goal = ("and", ("AtHome", blk))
                 else:
                     init += [("Pose", blk, pose_obj),
                              ("Supported", blk, pose_obj, self.table, self.table_pose)]
-                    pose_goal = ("AtPose", blk, pose_obj)
-
-                goal = ("and", ("On", blk, self.table), pose_goal)
+                    goal = ("and", ("On", blk, self.table), 
+                                   ("AtPose", blk, pose_obj))
             else:
                 rel_tform = pose_to_transform(pose)
                 init += [("RelPose", blk, base, rel_tform)]
@@ -335,7 +329,7 @@ class PlanningServer():
                                                 add_slanted_grasps=True,
                                                 approach_frame="global",
                                                 use_vision=self.use_vision,
-                                                home_poses=self.home_poses)
+                                                home_pose=self.home_pose)
         
                 # Run PDDLStream focused solver
                 try:

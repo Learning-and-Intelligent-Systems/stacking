@@ -43,11 +43,13 @@ def get_grasp_gen(robot, add_slanted_grasps=True, add_orthogonal_grasps=True):
 def get_stable_gen_table(fixed=[]):
     def gen(body, surface, surface_pos, protation=None):
         """
-        Generate a random pose (possibly rotated) on a surface. Rotation
-        can be specified for debugging.
+        Generate a random pose (possibly rotated) on a surface. 
+        Rotation can be specified for debugging.
+
+        These poses are useful for regrasping. 
+        Poses are more useful for grasping if they are upright.
         """
-        # These poses are useful for regrasping. Poses are more useful for grasping
-        # if they are upright.
+        # 
         dims = body.get_dimensions()
 
         poses = []
@@ -76,18 +78,22 @@ def get_stable_gen_table(fixed=[]):
     return gen
 
 
-def get_stable_gen_home(home_poses, fixed=[]):
+def get_stable_gen_home(home_pose, fixed=[]):
     def gen(body, surface, surface_pos, protation=None):
         """
-        Generate a random pose (possibly rotated) on a surface. Rotation
-        can be specified for debugging.
+        Generate a random pose (possibly rotated) at a specified home pose. 
+        Rotation can be specified for debugging.
+
+        These poses are useful for replacing blocks at their home position, 
+        but not necessarily at their home orientation.
         """
-        # These poses are useful for regrasping. Poses are more useful for grasping
-        # if they are upright.
         dims = body.get_dimensions()
 
         poses = []
-        home_pose = home_poses[body.get_name()]
+        if home_pose is None:
+            print("[get_stable_gen_home] Warning: No home pose specified!")
+            return poses
+
         np.random.shuffle(rotations)
         for rotation in rotations:
             start_pose = body.get_base_link_pose()
