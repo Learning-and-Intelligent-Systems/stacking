@@ -36,7 +36,7 @@ taskset --cpu-list 10,11 roslaunch panda_vision vision.launch
 Starting the Panda agent server
 
 ```
-taskset --cpu-list 4,5,8,9 rosrun stacking_ros panda_agent_server.py --num-blocks 10 --real --use-vision
+taskset --cpu-list 4,5,8,9 rosrun stacking_ros panda_agent_server.py --num-blocks 10 --real --use-vision --use-planning-server
 ```
 
 ## Desktop Setup

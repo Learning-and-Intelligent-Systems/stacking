@@ -20,6 +20,8 @@ See the full installation steps in [the installation README](./doc/installation.
 ## Hardware Setup
 For information on our hardware configuration, refer to [our hardware setup README](./doc/hardware.md).
 
+For specific information on the blocks used for our experiments, refer to [our blocks README](./doc/blocks.md).
+
 ---
 
 ## Running Examples

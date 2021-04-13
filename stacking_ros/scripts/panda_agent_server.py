@@ -13,6 +13,7 @@ if __name__=="__main__":
     parser.add_argument('--num-blocks', type=int, default=4)
     parser.add_argument('--real', default=False, action='store_true')
     parser.add_argument('--use-vision', default=False, action='store_true')
+    parser.add_argument('--use-planning-server', default=False, action='store_true')
     parser.add_argument('--blocks-file', default='learning/domains/towers/final_block_set_10.pkl', type=str)
     args = parser.parse_args()
 
@@ -25,7 +26,7 @@ if __name__=="__main__":
     agent = PandaAgent(blocks,
                        use_vision=args.use_vision,
                        real=args.real,
-                       use_action_server=True,
+                       use_planning_server=args.use_planning_server,
                        use_learning_server=True)
     print("Panda agent server ready!")
     rospy.spin()

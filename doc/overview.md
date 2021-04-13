@@ -14,3 +14,9 @@ TODO: Add more specifics on concepts and folder structure
 ## Task and Motion Planning
 
 The `tamp` folder has the two key pddl files. `domain_stacking.pddl` defines the predicates and the actions. `stream_stacking.pddl` defines the streams, which generate values to satify the actions. The various streams are implemented in `tamp/primitives.py`. Within these streams, for this pick and place example, we opt to define grasp sets via TSRs and execute path planning with a bi-directional RRT. These are not significant (truly, they were made out of convenience) and thus could be swapped with any grasp set definition and path planner.  
+
+## Planning and Learning ROS Servers
+
+The `stacking_ros` folder contains a ROS package with utilities to help split up active learning, task and motion planning, and execution into separate software nodes. These could be run on different terminals or even across different machines provided they are on the same network.
+
+Refer to [the `stacking_ros` README](../stacking_ros/README.md) for more information.

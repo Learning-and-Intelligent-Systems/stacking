@@ -75,7 +75,7 @@ class PandaAgent:
         setup_panda_world(self.execution_robot, blocks, poses, use_platform=use_platform)
 
         # Set up ROS plumbing if using features that require it
-        if self.use_vision or self.use_planning_server or real:
+        if self.use_vision or self.use_planning_server or self.use_learning_server or real:
             import rospy
             try:
                 rospy.init_node("panda_agent")
@@ -105,7 +105,7 @@ class PandaAgent:
         # Start ROS clients and servers as needed
         self.last_obj_held = None
         if self.use_planning_server:
-            from stacking_ros.srv import GetPlan, SetPlanningState, PlanTower
+            from stacking_ros.srv import GetPlan, SetPlanningState
             from tamp.ros_utils import goal_to_ros, ros_to_task_plan
 
             print("Waiting for planning server...")
@@ -116,11 +116,12 @@ class PandaAgent:
                 "/reset_planning", SetPlanningState)
             self.get_plan_client = rospy.ServiceProxy(
                 "/get_latest_plan", GetPlan)
-            if self.use_learning_server:
-                self.learning_server = rospy.Service(
-                    "/plan_tower", PlanTower, self.learning_server_callback)
-                print("Learning server started!")
             print("Done!")
+        if self.use_learning_server:
+            from stacking_ros.srv import PlanTower
+            self.learning_server = rospy.Service(
+                "/plan_tower", PlanTower, self.learning_server_callback)
+            print("Learning server started!")
 
         self.pddl_info = get_pddlstream_info(self.robot,
                                              self.fixed,
