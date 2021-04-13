@@ -8,3 +8,4 @@ BodyInfo[] tower_info
 # RESPONSE: Labels for active learning
 bool success
 float32 stable
+int32 num_stack_stable

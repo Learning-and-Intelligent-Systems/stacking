@@ -783,10 +783,12 @@ class PandaAgent:
         from stacking_ros.srv import PlanTowerResponse
         from tamp.ros_utils import ros_to_tower
         tower = ros_to_tower(ros_req.tower_info)
-        success, stable = self.simulate_tower(tower, True, real=self.real, base_xy=base_xy)
+        success, stable, num_stack_stable = self.simulate_tower(
+            tower, True, real=self.real, base_xy=base_xy)
         resp = PlanTowerResponse()
         resp.success = success
         resp.stable = stable
+        resp.num_stack_stable = num_stack_stable
         return resp
 
 
@@ -939,7 +941,14 @@ class PandaClientAgent:
 
 
     def simulate_tower(self, tower, vis, real=False):
-        """ Call the PandaAgent server """
+        """ 
+        Call the PandaAgent server's `simulate_tower` method to plan and execute a tower.
+
+        Returns:
+          success : Flag indicating success of execution (True/False)
+          stable : Flag indicating (0 or 1)
+          num_stack_success : Number of blocks successfully stacked
+        """
         from stacking_ros.srv import PlanTowerRequest
         from tamp.ros_utils import tower_to_ros, ros_to_tower
         request = PlanTowerRequest()
@@ -960,4 +969,4 @@ class PandaClientAgent:
         if vis:
             env.disconnect()
 
-        return response.success, response.stable
+        return response.success, response.stable, response.num_stack_stable

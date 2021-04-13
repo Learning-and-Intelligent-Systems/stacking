@@ -399,8 +399,8 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False, la
                 real = (exec_mode == 'real')
                 # if planning fails, reset and try again
                 while not success:
-                    success, label = agent.simulate_tower(block_tower, vis, real=real)
-                    print(f"Received success: {success}, label: {label}")
+                    success, label, num_stack_stable = agent.simulate_tower(block_tower, vis, real=real)
+                    print(f"Received success: {success}, label: {label}, number stable: {num_stack_stable}")
                     if not success:
                         if real:
                             input('Resolve conflict causing planning to fail, then press \
