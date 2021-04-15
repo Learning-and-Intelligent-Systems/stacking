@@ -175,7 +175,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--suffix", type=str, default="")
+    parser.add_argument("--suffix", type=str, default="sequential")
     parser.add_argument("--block-set-size", type=int, default=10)
     parser.add_argument("--block-set", type=str, default="")
     parser.add_argument("--num-towers", type=int, default=1000)
