@@ -57,16 +57,8 @@ def choose_rotations_in_tower(height):
     return QUATERNIONS[idxs]
 
 
-def check_last_block_label(rotated_tower):
-    tp = TowerPlanner(stability_mode="contains")
-    # the base is always stable. the last block determines the label
-    if tp.tower_is_constructable(rotated_tower[:-1]):
-        return tp.tower_is_constructable(rotated_tower)
-    else:
-        return False
-
-
 def build_tower(blocks, rotations, label, max_attempts=250):
+    tp = TowerPlanner(stability_mode="contains")
     # pre-rotate each object to compute its dimensions in the tower
     dimensions = np.array([b.dimensions for b in blocks])
     rotated_dimensions = R.from_quat(rotations).apply(dimensions)
@@ -101,8 +93,11 @@ def build_tower(blocks, rotations, label, max_attempts=250):
         for b, p, q in zip(blocks, pos_xyz, rotations):
             b.set_pose(Pose(Position(*p), Quaternion(*q)))
             rotated_tower.append(get_rotated_block(b))
-        # check if the tower falls over
-        if label == check_last_block_label(rotated_tower):
+
+        # check if the base is stable and the top block matches the label
+        if tp.tower_is_constructable(rotated_tower[:-1]) and (
+            label == tp.tower_is_constructable(rotated_tower)
+        ):
             return blocks
 
     return None
@@ -175,11 +170,26 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--suffix", type=str, default="sequential", help="Add to filename.")
-    parser.add_argument("--block-set-size", type=int, default=10, help="Only used if block-set not specified.")
-    parser.add_argument("--block-set", type=str, default="", help="Path to .npy vectorized block-set.")
-    parser.add_argument("--num-towers", type=int, default=1000, help="Total number to generate.")
-    parser.add_argument("--save-dataset-object", action="store_true", help="Create and save TowerDataset.")
+    parser.add_argument(
+        "--suffix", type=str, default="sequential", help="Add to filename."
+    )
+    parser.add_argument(
+        "--block-set-size",
+        type=int,
+        default=10,
+        help="Only used if block-set not specified.",
+    )
+    parser.add_argument(
+        "--block-set", type=str, default="", help="Path to .npy vectorized block-set."
+    )
+    parser.add_argument(
+        "--num-towers", type=int, default=1000, help="Total number to generate."
+    )
+    parser.add_argument(
+        "--save-dataset-object",
+        action="store_true",
+        help="Create and save TowerDataset.",
+    )
     args = parser.parse_args()
 
     main(args)
