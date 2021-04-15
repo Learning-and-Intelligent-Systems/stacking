@@ -178,10 +178,15 @@ class PandaAgent:
     def reset_world(self):
         """ Resets the planning world to its original configuration """
         print("Resetting world")
+
+        if self.real:
+            angles = self.real_arm.convertToList(self.real_arm.joint_angles())
+        else:
+            angles = self.orig_joint_angles
         self.plan()
-        self.robot.arm.SetJointValues(self.orig_joint_angles)
+        self.robot.arm.SetJointValues(angles)
         self.execute()
-        self.execution_robot.arm.SetJointValues(self.orig_joint_angles)
+        self.execution_robot.arm.SetJointValues(angles)
         for bx, b in enumerate(self.pddl_blocks):
             b.set_base_link_pose(self.orig_block_poses[bx])
         print("Done")
@@ -668,6 +673,11 @@ class PandaAgent:
                     stable = self.check_stability(real, query_block, desired_pose)
                 else:
                     stable = True # Don't care about stability on reset
+
+                if stable == 0.:
+                    prompt = input('Tower NOT stable. Is this true? [y: Unstable / n: Stable]')
+                    if prompt == 'n':
+                        stable = 1.
                 #input('Continue?')
 
                 # Manage the success status of the plan
