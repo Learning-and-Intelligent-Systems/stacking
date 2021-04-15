@@ -220,7 +220,7 @@ def main(args, vis_tower=False):
 
 
     try:
-        block_set = [Object.from_vector(v, name=f'obj_{i}') for i,v in enumerate(np.load(args.block_set))][:20]
+        block_set = [Object.from_vector(v, name=f'obj_{i}') for i,v in enumerate(np.load(args.block_set))]
         args.block_set_size = len(block_set)
         use_block_set = True
         print(f'Successfully loaded {args.block_set_size} blocks from {args.block_set}')
