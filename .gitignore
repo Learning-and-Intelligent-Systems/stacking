@@ -21,3 +21,4 @@ tower-*
 *.npy
 scratch/
 paper_results/
+learning/experiments/logs
