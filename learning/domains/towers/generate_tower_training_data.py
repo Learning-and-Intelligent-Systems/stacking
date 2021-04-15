@@ -107,12 +107,12 @@ def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, c
             if tp.tower_is_stable(rotated_tower) == stable and \
             tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
             tp.tower_is_cog_stable(rotated_tower) == cog_stable:
-                return rotated_tower
+                return tower
         elif not constructable is None:
             if tp.tower_is_constructable(rotated_tower) == constructable and \
             tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
             tp.tower_is_cog_stable(rotated_tower) == cog_stable:
-                return rotated_tower
+                return tower
 
     return None
 
@@ -218,13 +218,14 @@ def main(args, vis_tower=False):
     # for each tower
     use_block_set = args.block_set_size > 0
 
-
     try:
-        block_set = [Object.from_vector(v, name=f'obj_{i}') for i,v in enumerate(np.load(args.block_set))][:20]
+        #block_set = [Object.from_vector(v, name=f'obj_{i}') for i,v in enumerate(np.load(args.block_set))][:20]
+        with open(args.block_set, 'rb') as handle:
+            block_set = pickle.load(handle)
         args.block_set_size = len(block_set)
         use_block_set = True
         print(f'Successfully loaded {args.block_set_size} blocks from {args.block_set}')
-    except:
+    except Exception as e:
         # generate the finite set of blocks
         if use_block_set:
             block_set = [Object.random(f'obj_{i}') for i in range(args.block_set_size)]
@@ -302,7 +303,7 @@ def main(args, vis_tower=False):
                     count += 1
                     # append the tower to the list
                     vectorized_towers.append(vectorize(tower))
-                    block_ids.append([int(b.name.strip('obj_')) for b in blocks])
+                    block_ids.append([int(b.name.strip('obj_')) for b in tower])
 
         if num_blocks == 2 or args.criteria == 'constructable':
             stability_labels = np.zeros(num_towers//2, dtype=int)
