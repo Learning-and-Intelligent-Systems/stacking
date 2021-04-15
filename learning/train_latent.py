@@ -22,7 +22,7 @@ class LatentEnsemble(nn.Module):
         """
         super(LatentEnsemble, self).__init__()
 
-        self.ensemble = ensemble\
+        self.ensemble = ensemble
 
         self.latent_locs = nn.Parameter(torch.zeros(n_latents, d_latents))
         self.latent_scales = nn.Parameter(torch.ones(n_latents, d_latents))
@@ -61,7 +61,7 @@ class LatentEnsemble(nn.Module):
         observed = observed.unsqueeze(1).expand(-1, N_samples, -1, -1)
         return torch.cat([samples, observed], 3)
 
-    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=10):
+    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1):
         """ predict feasibility of the towers
 
         Arguments:
@@ -75,7 +75,6 @@ class LatentEnsemble(nn.Module):
         Returns:
             torch.Tensor -- [N_batch]
         """
-
         # draw samples from the latent distribution [N_samples x N_blockset x latent_dim]
         samples_for_each_block_in_set = self.latents.rsample(sample_shape=[N_samples])
         # assocate those latent samples with the blocks in the towers
@@ -246,7 +245,6 @@ def test(latent_ensemble, test_loader):
     latents = train(latent_ensemble, test_loader, freeze_ensemble=True, print_accuracy=False)
     np.save('learning/experiments/logs/latents/fit_during_test.npy', latents)
 
-
     print('Test Accuracy with posterior latents:')
     for k, v in compute_accuracies(latent_ensemble, test_loader).items():
         print(k, np.mean(v))
@@ -263,7 +261,7 @@ if __name__ == "__main__":
     # NOTE(izzy): d_latents corresponds to the number of unique objects in the
     # dataset. at some point we should write a function that figures that out
     # from the loaded data-dict
-    n_models = 7
+    n_models = 1
     d_latents = 5
     n_latents = 10
 
@@ -271,38 +269,57 @@ if __name__ == "__main__":
     # python -m learning.domains.towers.generate_tower_training_data --block-set-size=10 --suffix=test_joint --max-blocks=5
 
     # load data
-    train_data_filename = "learning/data/10block_set_(x1000.0)_train_joint_dataset.pkl"
+    train_data_filename = "learning/data/10block_set_(x1000.0)_train_10.pkl"
     with open(train_data_filename, 'rb') as handle:
-        train_dataset = pickle.load(handle)
-    with open("learning/data/10block_set_(x200.0)_test_joint_dataset.pkl", 'rb') as handle:
-        test_dataset = pickle.load(handle)
+        train_dict = pickle.load(handle)
+    test_tower_filename = "learning/data/10block_set_(x1000.0)_train_10_towers.pkl"
+    with open(test_tower_filename, 'rb') as handle:
+        test_tower_dict = pickle.load(handle)
+    test_block_filename = "learning/data/10block_set_(x1000.0)_test_10_blocks.pkl"
+    with open(test_block_filename, 'rb') as handle:
+        test_block_dict = pickle.load(handle)
+    
+    train_dataset = TowerDataset(train_dict, augment=False)
+    test_tower_dataset = TowerDataset(test_tower_dict, augment=False)
+    test_block_dataset = TowerDataset(test_block_dict, augment=False)
 
     train_loader = ParallelDataLoader(dataset=train_dataset,
                                       batch_size=64,
                                       shuffle=True,
                                       n_dataloaders=n_models)
-    test_loader = ParallelDataLoader(dataset=test_dataset,
-                                     batch_size=32,
-                                     shuffle=False,
-                                     n_dataloaders=1)
+    test_tower_loader = ParallelDataLoader(dataset=test_tower_dataset,
+                                           batch_size=64,
+                                           shuffle=True,
+                                           n_dataloaders=n_models)
+    test_blocks_loader = ParallelDataLoader(dataset=test_block_dataset,
+                                            batch_size=32,
+                                            shuffle=False,
+                                            n_dataloaders=1)
 
 
 
     # create the model
     # NOTE: we need to specify latent dimension.
     ensemble = Ensemble(base_model=FCGN,
-                        base_args={'n_hidden': 32, 'n_in': 10 + d_latents},
+                        base_args={'n_hidden': 16, 'n_in': 10 + d_latents},
                         n_models=n_models)
     latent_ensemble = LatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
     if torch.cuda.is_available():
         latent_ensemble = latent_ensemble.cuda()
 
     # train
-    latents = train(latent_ensemble, train_loader, print_accuracy=False)
+    latents = train(latent_ensemble, train_loader, n_epochs=200, print_accuracy=True)
     torch.save(latent_ensemble.state_dict(), model_path)
     np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
 
-
     # test
+    print('Testing with training blocks on new towers')
     latent_ensemble.load_state_dict(torch.load(model_path))
-    test(latent_ensemble, test_loader)
+    test(latent_ensemble, test_tower_loader)
+
+    print('Testing with test blocks ')
+    latent_ensemble.load_state_dict(torch.load(model_path))
+    test(latent_ensemble, test_blocks_loader)
+
+    
+    
