@@ -175,11 +175,11 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--suffix", type=str, default="sequential")
-    parser.add_argument("--block-set-size", type=int, default=10)
-    parser.add_argument("--block-set", type=str, default="")
-    parser.add_argument("--num-towers", type=int, default=1000)
-    parser.add_argument("--save-dataset-object", action="store_true")
+    parser.add_argument("--suffix", type=str, default="sequential", help="Add to filename.")
+    parser.add_argument("--block-set-size", type=int, default=10, help="Only used if block-set not specified.")
+    parser.add_argument("--block-set", type=str, default="", help="Path to .npy vectorized block-set.")
+    parser.add_argument("--num-towers", type=int, default=1000, help="Total number to generate.")
+    parser.add_argument("--save-dataset-object", action="store_true", help="Create and save TowerDataset.")
     args = parser.parse_args()
 
     main(args)
