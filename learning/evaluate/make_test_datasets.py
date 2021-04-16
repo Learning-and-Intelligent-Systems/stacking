@@ -11,7 +11,7 @@ from block_utils import Object, get_rotated_block
 # from given block_set
 def make_test_dataset(blocks, args):
     dataset = {}
-    num_blocks = [2, 3, 4, 5]
+    num_blocks = [2, 3, 4, 5, 6, 7]
     tp = TowerPlanner()
     
     for k in num_blocks:
