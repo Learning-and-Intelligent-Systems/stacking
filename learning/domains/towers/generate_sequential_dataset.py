@@ -11,6 +11,7 @@ from block_utils import (
     Pose,
     Object,
     get_rotated_block,
+    World, Environment
 )
 from learning.domains.towers.tower_data import TowerDataset
 from tower_planner import TowerPlanner
@@ -57,16 +58,15 @@ def choose_rotations_in_tower(height):
     return QUATERNIONS[idxs]
 
 
-def build_tower(blocks, rotations, label, max_attempts=250):
+def build_tower(blocks, rotations, label, max_attempts=250, prerotate=False):
     tp = TowerPlanner(stability_mode="contains")
     # pre-rotate each object to compute its dimensions in the tower
     dimensions = np.array([b.dimensions for b in blocks])
-    rotated_dimensions = R.from_quat(rotations).apply(dimensions)
-
+    rotated_dimensions = np.abs(R.from_quat(rotations).apply(dimensions))
     # get the maximum relative displacement of each block:
     # how far each block can be moved w/ losing contact w/ the block below
     max_displacements_xy = (
-        rotated_dimensions[1:, :2] + rotated_dimensions[:1, :2]
+        rotated_dimensions[1:, :2] + rotated_dimensions[:-1, :2]
     ) / 2.0
 
     # calculate the z-position of each block in the tower
@@ -94,22 +94,32 @@ def build_tower(blocks, rotations, label, max_attempts=250):
             b.set_pose(Pose(Position(*p), Quaternion(*q)))
             rotated_tower.append(get_rotated_block(b))
 
+        # worlds = [World(rotated_tower), World(blocks)]
+        # env = Environment(worlds, vis_sim=True, vis_frames=True)
+        # env.step(vis_frames=True)
+        # input('Next?')
+
+        #env.disconnect()
+
         # check if the base is stable and the top block matches the label
         if tp.tower_is_constructable(rotated_tower[:-1]) and (
             label == tp.tower_is_constructable(rotated_tower)
         ):
-            return blocks
+            if prerotate:
+                return rotated_tower
+            else:
+                return blocks
 
     return None
 
 
-def get_tower(block_set, height, label):
+def get_tower(block_set, height, label, prerotate):
     blocks = choose_blocks_in_tower(block_set, height)
     rotations = choose_rotations_in_tower(height)
-    return build_tower(blocks, rotations, label)
+    return build_tower(blocks, rotations, label, prerotate=prerotate)
 
 
-def get_sub_dataset(block_set, height, num_towers_per_cat):
+def get_sub_dataset(block_set, height, num_towers_per_cat, prerotate):
     block_ids = []
     towers = []
     labels = []
@@ -120,7 +130,7 @@ def get_sub_dataset(block_set, height, num_towers_per_cat):
             # generate a new tower
             label_string = "stable" if label else "unstable"
             print(f"{count}/{num_towers_per_cat}\t{label_string} {height}-block tower")
-            tower = get_tower(block_set, height, label)
+            tower = get_tower(block_set, height, label, prerotate)
             if tower is None:
                 continue
             # if we successfully generate a tower, save it
@@ -136,11 +146,14 @@ def get_sub_dataset(block_set, height, num_towers_per_cat):
     return sub_dataset
 
 
-def get_filename(num_towers, use_block_set, block_set_size, suffix):
+def get_filename(num_towers, use_block_set, block_set_size, suffix, prerotate):
     # create a filename for the generated data based on the configuration
     block_set_string = (
         f"{block_set_size}block_set" if use_block_set else "random_blocks"
     )
+    if prerotate:
+        suffix += '_prerotated'
+    
     return f"learning/data/{block_set_string}_(x{num_towers})_{suffix}_dict.pkl"
 
 
@@ -151,11 +164,11 @@ def main(args):
 
     for height in range(2, 6):
         dataset[f"{height}block"] = get_sub_dataset(
-            block_set, height, num_towers_per_cat
+            block_set, height, num_towers_per_cat, args.prerotate
         )
 
     filename = get_filename(
-        args.num_towers, block_set != None, args.block_set_size, args.suffix
+        args.num_towers, block_set != None, args.block_set_size, args.suffix, args.prerotate
     )
     print("Saving to", filename)
     with open(filename, "wb") as f:
@@ -183,13 +196,17 @@ if __name__ == "__main__":
         "--block-set", type=str, default="", help="Path to .npy vectorized block-set."
     )
     parser.add_argument(
-        "--num-towers", type=int, default=1000, help="Total number to generate."
+        "--num-towers", type=int, default=4000, help="Total number to generate."
     )
     parser.add_argument(
         "--save-dataset-object",
         action="store_true",
         help="Create and save TowerDataset.",
     )
+    parser.add_argument(
+        "--prerotate",
+        action="store_true",
+        help="Rotate the blocks before saving the dataset."
+    )
     args = parser.parse_args()
-
     main(args)

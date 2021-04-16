@@ -9,7 +9,7 @@ from block_utils import World, Environment, Dimensions, Object, Quaternion, Pose
 from scipy.spatial.transform import Rotation as R
 
 
-def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
+def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False, prerotated=False):
     datasets = {}
     for k_block in all_data.keys():
         num_blocks = int(k_block.strip('block'))
@@ -43,20 +43,34 @@ def augment(all_data, K_skip, translate=False, mirror=False, vis_tower=False):
                 # rotate each block in the tower and add the new tower to the dataset
                 rot_poses = rot.apply(np.array([b.pose.pos for b in original_tower]))
                 rot_tower = []
-                for bx in range(num_blocks):
-                    rot_block = deepcopy(original_tower[bx])
-                    new_pose = Pose(Position(*rot_poses[bx,:].tolist()),
-                                    Quaternion(*rot.as_quat().tolist()))
-                    # new_pose = Pose(Position(*rot.apply(block.pose.pos)),
-                    #                 Quaternion(*rot.as_quat().tolist()))
-                    rot_block.set_pose(new_pose)
-                    orig_rot = R.from_quat(rot_block.rotation)
-                    rot_block = get_rotated_block(rot_block)
-                    rot_block.rotation = (rot*orig_rot).as_quat().tolist()
-                    rot_tower.append(rot_block)
-                    augmented_towers[tower_multiplier*ix + kx, bx, :] = rot_tower[bx].vectorize()            
 
-                rot_towers.append(rot_tower)
+                new_tower = deepcopy(original_tower)
+                for bx in range(num_blocks):
+                    if prerotated:
+                        rot_block = deepcopy(original_tower[bx])
+                        new_pose = Pose(Position(*rot_poses[bx,:].tolist()),
+                                        Quaternion(*rot.as_quat().tolist()))
+                        # new_pose = Pose(Position(*rot.apply(block.pose.pos)),
+                        #                 Quaternion(*rot.as_quat().tolist()))
+                        
+                        rot_block.set_pose(new_pose)
+                        orig_rot = R.from_quat(rot_block.rotation)
+                        rot_block = get_rotated_block(rot_block)
+                        rot_block.rotation = (rot*orig_rot).as_quat().tolist()
+                        rot_tower.append(rot_block)
+                        augmented_towers[tower_multiplier*ix + kx, bx, :] = rot_tower[bx].vectorize()            
+                    else:
+                        orig_rot = R.from_quat(new_tower[bx].pose.orn)
+                        new_pose = Pose(Position(*rot_poses[bx,:].tolist()),
+                                                Quaternion(*(rot*orig_rot).as_quat().tolist()))
+                        new_tower[bx].set_pose(new_pose)
+                        augmented_towers[tower_multiplier*ix + kx, bx, :] = new_tower[bx].vectorize()       
+                    
+                if prerotated:
+                    rot_towers.append(rot_tower)
+                else:
+                    rot_towers.append(new_tower)
+
                 augmented_labels[tower_multiplier*ix + kx] = labels[ix]
                 if 'block_ids' in data.keys():
                     augmented_block_ids[tower_multiplier*ix + kx, :] = block_ids[ix, :]

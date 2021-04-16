@@ -48,7 +48,7 @@ def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=Fal
         # get the x and y dimensions of each block (after the rotation)
         dims_xy = np.array([rb.dimensions for rb in rotated_blocks])[:,:2]
         # figure out how far each block can be moved w/ losing contact w/ the block below
-        max_displacements_xy = (dims_xy[1:] + dims_xy[:1])/2.
+        max_displacements_xy = (dims_xy[1:] + dims_xy[:-1])/2.
         # sample unscaled noise (clip bceause random normal can exceed -1, 1)
         noise_xy = np.clip(0.5*np.random.randn(num_blocks-1, 2), -0.95, 0.95)
         # and scale the noise by the max allowed displacement
@@ -76,7 +76,7 @@ def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=Fal
 
     return blocks
 
-def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250):
+def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, cog_stable=True, vis=False, max_attempts=250, rotate=False):
     """ Build a tower with the specified stability properties.
     :param blocks: if this is a list of blocks, use those blocks. if int, generate that many new blocks
     :param stable: Overall tower stability.
@@ -107,12 +107,18 @@ def build_tower(blocks, constructable=None, stable=None, pairwise_stable=True, c
             if tp.tower_is_stable(rotated_tower) == stable and \
             tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
             tp.tower_is_cog_stable(rotated_tower) == cog_stable:
-                return tower
+                if rotate:
+                    return rotated_tower
+                else:
+                    return tower
         elif not constructable is None:
             if tp.tower_is_constructable(rotated_tower) == constructable and \
             tp.tower_is_pairwise_stable(rotated_tower) == pairwise_stable and \
             tp.tower_is_cog_stable(rotated_tower) == cog_stable:
-                return tower
+                if rotate:
+                    return rotated_tower
+                else:
+                    return tower
 
     return None
 
@@ -212,7 +218,7 @@ def main(args, vis_tower=False):
     }
 
     # specify the number of towers to generate
-    num_towers_per_cat = 250
+    num_towers_per_cat = 1000#250
     num_towers = num_towers_per_cat * 4 * 2
     # specify whether to use a finite set of blocks, or to generate new blocks
     # for each tower
@@ -272,12 +278,14 @@ def main(args, vis_tower=False):
                         tower = build_tower(blocks,
                                             stable=stable,
                                             pairwise_stable=pw_stable,
-                                            cog_stable=cog_stable)
+                                            cog_stable=cog_stable,
+                                            rotate=args.prerotate)
                     elif args.criteria == 'constructable':
                         tower = build_tower(blocks,
                                             constructable=stable,
                                             pairwise_stable=pw_stable,
-                                            cog_stable=cog_stable)
+                                            cog_stable=cog_stable,
+                                            rotate=args.prerotate)
                     else:
                         raise NotImplementedError()
 
@@ -338,8 +346,9 @@ if __name__ == '__main__':
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--save-images', action='store_true')
     parser.add_argument('--block-set-size', type=int, default=0)
-    parser.add_argument('--criteria', default='constructable', choices=['stable', 'constructible'])
+    parser.add_argument('--criteria', default='constructable', choices=['stable', 'constructable'])
     parser.add_argument('--block-set', type=str, default='')
+    parser.add_argument('--prerotate', action='store_true', default=False)
     args = parser.parse_args()
 
     main(args, vis_tower=False)

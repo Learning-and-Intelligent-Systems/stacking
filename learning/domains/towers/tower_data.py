@@ -38,7 +38,7 @@ def add_placement_noise(towers):
     return towers
 
 class TowerDataset(Dataset):
-    def __init__(self, tower_dict, K_skip=1, augment=True):
+    def __init__(self, tower_dict, K_skip=1, augment=True, prerotated=False):
         """ This class assumes the initial dataset contains at least some towers of each size.
         :param tower_dict: A dictionary containing vectorized towers sorted by size.
             {
@@ -59,7 +59,7 @@ class TowerDataset(Dataset):
 
         # First augment the given towers with rotations.
         if augment:
-            augmented_towers = augment_towers(tower_dict, K_skip, mirror=False)
+            augmented_towers = augment_towers(tower_dict, K_skip, mirror=False, prerotated=prerotated)
         else:
             augmented_towers = tower_dict
 
@@ -198,10 +198,10 @@ class ParallelDataLoader:
         self.loaders = []
         for _ in range(n_dataloaders):
             sampler = TowerSampler(dataset,
-                           batch_size=batch_size,
-                           shuffle=True)
+                                   batch_size=batch_size,
+                                   shuffle=shuffle)
             loader = DataLoader(dataset=dataset,
-                        batch_sampler=sampler)
+                                batch_sampler=sampler)
             self.loaders.append(loader)
 
     def __iter__(self):
