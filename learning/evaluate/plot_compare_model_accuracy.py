@@ -41,7 +41,7 @@ def plot_all_model_accuracies(all_model_accuracies, all_min_accuracies, all_max_
                 ax.set_title(str(th)+' Block Tower Constructability Accuracy\nAveraged Over 5 Models')
                 for k in [10*10+40, 20*10+40, 30*10+40]:
                     ax.plot([k, k], [.5, 1], 'k--')
-            
+
         #plt.tight_layout()
         fig0.savefig(args.output_fname+'2')
         fig1.savefig(args.output_fname+'3')
@@ -49,7 +49,7 @@ def plot_all_model_accuracies(all_model_accuracies, all_min_accuracies, all_max_
         fig3.savefig(args.output_fname+'5')
         plt.close()
     else:
-        axes_map = {0:(0,0), 1:(0,1), 2:(1,0), 3:(1,1), 4:(2,0), 5:(2,1)}
+        axes_map = {0:(0,0), 1:(0,1), 2:(1,0), 3:(1,1), 4:(2,0), 5:(2,1), 6:(3,0), 7:(3,1)}
         fig, axes = plt.subplots(int(len(tower_heights)/2),2, sharex=True, sharey=True)#, figsize=(8,12))
         for type in all_model_accuracies:
             accuracies = all_model_accuracies[type]
@@ -117,40 +117,37 @@ if __name__ == '__main__':
         dataset = pickle.load(f)
         
     # model architecture comparison
-    
-    map_new_name = {'subtower-sequential-fcgn': 'sequential TGN',
-                    'subtower-sequential-fcgn-fc': 'sequential FCGN',
-                    'subtower-sequential-lstm': 'sequential LSTM'}
-                    
-    exp_paths = [['subtower-sequential-fcgn-0-20210223-223622',
-                'subtower-sequential-fcgn-1-20210227-085527',
-                'subtower-sequential-fcgn-2-20210227-043159'],
-                ['subtower-sequential-fcgn-fc-0-20210225-235513',
-                'subtower-sequential-fcgn-fc-1-20210227-003015',
-                'subtower-sequential-fcgn-fc-2-20210227-185408'],
-                ['subtower-sequential-lstm-0-20210225-235514',
-                'subtower-sequential-lstm-1-20210227-033252',
-                'subtower-sequential-lstm-2-20210227-185647']]
+    exp_paths = {'sequential TGN': 
+                    ['paper_results_02232021/subtower-sequential-fcgn-0-20210223-223622',
+                    'paper_results_02232021/subtower-sequential-fcgn-1-20210227-085527',
+                    'paper_results_02232021/subtower-sequential-fcgn-2-20210227-043159'],
+                'sequential FCGN': 
+                    ['paper_results_02232021/subtower-sequential-fcgn-fc-0-20210225-235513',
+                    'paper_results_02232021/subtower-sequential-fcgn-fc-1-20210227-003015',
+                    'paper_results_02232021/subtower-sequential-fcgn-fc-2-20210227-185408'],
+                'sequential LSTM': 
+                    ['paper_results_02232021/subtower-sequential-lstm-0-20210225-235514',
+                    'paper_results_02232021/subtower-sequential-lstm-1-20210227-033252',
+                    'paper_results_02232021/subtower-sequential-lstm-2-20210227-185647']}
     
     all_accuracies = {}
     min_accuracies = {}
     max_accuracies = {}
-    for exp_path_set in exp_paths:
+    for set_type, exp_path_set in exp_paths.items():
         num_models = len(exp_path_set)
         n_xs = len(list(range(0, args.max_acquisitions, args.plot_step)))
         exp_path_set_accuracies = np.zeros((len(tower_heights), num_models, n_xs))
-        for i, exp_path in enumerate(exp_path_set):
-            full_exp_path = 'paper_results_02232021/'+exp_path
+        for i, full_exp_path in enumerate(exp_path_set):
             logger = ActiveExperimentLogger(full_exp_path)
             model_accuracies = calc_model_accuracy(logger, dataset, args, full_exp_path, save_local_fig=False)
             #print(model_accuracies)
             for ti, (tower_height, height_accuracies) in enumerate(model_accuracies.items()):
-                exp_path_set_accuracies[ti,i,:] = model_accuracies[tower_height]
+                if tower_height in dataset:
+                    exp_path_set_accuracies[ti,i,:] = model_accuracies[tower_height]
         exp_path_set_avg_accuracies = exp_path_set_accuracies.mean(axis=1)
         exp_path_set_min_accuracies = exp_path_set_accuracies.min(axis=1)
         exp_path_set_max_accuracies = exp_path_set_accuracies.max(axis=1)
         #print(exp_path_set_avg_accuracies)
-        set_type = map_new_name[exp_path[:-18]]
         all_accuracies[set_type] = exp_path_set_avg_accuracies
         min_accuracies[set_type] = exp_path_set_min_accuracies
         max_accuracies[set_type] = exp_path_set_max_accuracies
