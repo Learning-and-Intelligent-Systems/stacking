@@ -10,7 +10,9 @@ from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
 from learning.domains.towers.tower_data import TowerDataset, ParallelDataLoader
-from learning.models.gn import FCGN
+from learning.models.gn import FCGN, FCGNFC
+from learning.models.gated_gn import GatedGN
+from learning.models.lstm import TowerLSTM
 from learning.models.ensemble import Ensemble
 
 
@@ -110,7 +112,7 @@ class LatentEnsemble(nn.Module):
         # assocate those latent samples with the blocks in the towers
         samples_for_each_tower_in_batch = self.associate(
             samples_for_each_block_in_set, block_ids)
-        # samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
+        #samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
         towers_with_latents = self.concat_samples(
             samples_for_each_tower_in_batch, towers)
 
@@ -164,7 +166,7 @@ def get_params_loss(latent_ensemble, batches, disable_latents):
 
     # we sum the likelihoods for every input in the batch, but we want the
     # expected likelihood under the ensemble which means we take the mean
-    return likelihood_loss/len(batches)
+    return likelihood_loss#/len(batches)
 
 
 def get_latent_loss(latent_ensemble, batch, beta=1):
@@ -292,6 +294,7 @@ def test(latent_ensemble, test_loader, disable_latents):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--disable-latents', action='store_true', default=False)
+    parser.add_argument('--use-onehot', action='store_true', default=False)
     args = parser.parse_args()
     # print(args)
 
@@ -314,21 +317,21 @@ if __name__ == "__main__":
     # python -m learning.domains.towers.generate_tower_training_data --block-set-size=10 --suffix=test_joint --max-blocks=5
 
     # load data
-    #train_data_filename = "learning/data/10block_set_(x4000.0)_train_10_prerotated.pkl"
-    train_data_filename = "learning/data/10block_set_(x1000)_cubes_train_seq1_dict.pkl"
+    train_data_filename = "learning/data/10block_set_(x1000)_train_seq_dict.pkl"
+    #train_data_filename = "learning/data/10block_set_(x1000)_cubes_train_seq1_dict.pkl"
     with open(train_data_filename, 'rb') as handle:
         train_dict = pickle.load(handle)
-    #test_tower_filename = "learning/data/10block_set_(x1000.0)_train_10_towers_prerotated.pkl"
-    test_tower_filename = "learning/data/10block_set_(x1000)_cubes_train_seq2_dict.pkl"
+    test_tower_filename = "learning/data/10block_set_(x1000)_train_seq2_dict.pkl"
+    #test_tower_filename = "learning/data/10block_set_(x1000)_cubes_train_seq2_dict.pkl"
     with open(test_tower_filename, 'rb') as handle:
         test_tower_dict = pickle.load(handle)
-    test_block_filename = "learning/data/10block_set_(x1000)_cubes_test_seq1_dict.pkl"
+    test_block_filename = "learning/data/10block_set_(x1000)_test_seq_dict.pkl"
     with open(test_block_filename, 'rb') as handle:
         test_block_dict = pickle.load(handle)
     
-    train_dataset = TowerDataset(train_dict, augment=False, prerotated=False)
-    test_tower_dataset = TowerDataset(test_tower_dict, augment=False, prerotated=False)
-    test_block_dataset = TowerDataset(test_block_dict, augment=False, prerotated=False)
+    train_dataset = TowerDataset(train_dict, augment=True, prerotated=False, use_onehot=args.use_onehot)
+    test_tower_dataset = TowerDataset(test_tower_dict, augment=False, prerotated=False, use_onehot=args.use_onehot, onehot_lookup=train_dataset.onehot_lookup)
+    test_block_dataset = TowerDataset(test_block_dict, augment=False, prerotated=False, use_onehot=args.use_onehot, onehot_lookup=train_dataset.onehot_lookup)
 
     train_loader = ParallelDataLoader(dataset=train_dataset,
                                       batch_size=16,
@@ -349,8 +352,12 @@ if __name__ == "__main__":
 
     # create the model
     # NOTE: we need to specify latent dimension.
+    d_feat = 10
+    if args.use_onehot:
+        d_feat = 30
+
     ensemble = Ensemble(base_model=FCGN,
-                        base_args={'n_hidden': 64, 'n_in': 10 + d_latents},
+                        base_args={'n_hidden': 64, 'n_in': d_feat + d_latents},
                         n_models=n_models)
     latent_ensemble = LatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
     if torch.cuda.is_available():

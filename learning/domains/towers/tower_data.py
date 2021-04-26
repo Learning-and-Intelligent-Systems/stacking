@@ -38,7 +38,7 @@ def add_placement_noise(towers):
     return towers
 
 class TowerDataset(Dataset):
-    def __init__(self, tower_dict, K_skip=1, augment=True, prerotated=False):
+    def __init__(self, tower_dict, K_skip=1, augment=True, prerotated=False, use_onehot=False, onehot_lookup=None):
         """ This class assumes the initial dataset contains at least some towers of each size.
         :param tower_dict: A dictionary containing vectorized towers sorted by size.
             {
@@ -56,6 +56,7 @@ class TowerDataset(Dataset):
         self.tower_tensors = {}
         self.tower_labels = {}
         self.tower_block_ids = {}
+        self.use_onehot = use_onehot
 
         # First augment the given towers with rotations.
         if augment:
@@ -71,9 +72,51 @@ class TowerDataset(Dataset):
             if 'block_ids' in tower_dict[key].keys():
                 self.tower_block_ids[key] = augmented_towers[key]['block_ids']
 
+            if use_onehot:
+                self.tower_tensors[key] = self.convert_quat_to_onehot(self.tower_tensors[key], onehot_lookup)
+            else:
+                self.onehot_lookup = None
+        
         # Same order as
         self.start_indices = {}
         self.get_indices()
+    
+    def convert_quat_to_onehot(self, towers, onehot_lookup):
+        def q_to_str(q_quat):
+            s = '/'.join(['%.2f' % x for x in q_quat])
+            s = s.replace('-0.00', '0.00')
+            return s
+
+        if onehot_lookup is None:
+            quat = towers[..., 10:14].view(-1, 4)
+            unique_qs = set()
+            for q in quat:
+                neg_q = -1*q
+                if (q_to_str(q) not in unique_qs) and (q_to_str(neg_q) not in unique_qs):
+                    unique_qs.add(q_to_str(q))
+            print(len(unique_qs), 'unique quaternions')
+            onehot_lookup = {}
+            for ix, q in enumerate(unique_qs):
+                onehot_lookup[q] = ix
+            # for q in unique_qs:
+            #     print(q)
+
+
+        self.onehot_lookup = onehot_lookup    
+
+        new_tensors = torch.zeros(towers.shape[0], towers.shape[1], 10 + len(onehot_lookup))    
+        new_tensors[:, :, 0:10] = towers[: , :, 0:10]
+        for tx in range(0, towers.shape[0]):
+            for bx in range(0, towers.shape[1]):
+                q = towers[tx, bx, 10:14]
+                q_str = q_to_str(q)
+                if q_str not in self.onehot_lookup:
+                    q_str = q_to_str(-q)
+                
+                q_ix = self.onehot_lookup[q_str]
+                new_tensors[tx, bx, 10+q_ix] = 1.
+        print(new_tensors.shape)
+        return new_tensors
 
     def get_indices(self):
         """
@@ -101,7 +144,10 @@ class TowerDataset(Dataset):
                 break
 
         tower_ix = ix - self.start_indices[tower_size]
-        return self.tower_tensors[tower_size][tower_ix,:,:14], self.tower_block_ids[tower_size][tower_ix], self.tower_labels[tower_size][tower_ix]
+        if self.use_onehot:
+            return self.tower_tensors[tower_size][tower_ix,:,:], self.tower_block_ids[tower_size][tower_ix], self.tower_labels[tower_size][tower_ix]
+        else:
+            return self.tower_tensors[tower_size][tower_ix,:,:14], self.tower_block_ids[tower_size][tower_ix], self.tower_labels[tower_size][tower_ix]
 
     def __len__(self):
         """

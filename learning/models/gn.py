@@ -13,10 +13,9 @@ class FCGN(nn.Module):
         # Note (Mike): When tuning, keep this shallow as it helps to compare 
         # the untransformed features for the edges.
         self.E = nn.Sequential(nn.Linear(n_in, n_hidden))
-                               #nn.ReLU())
 
         # Message function that compute relation between two nodes and outputs a message vector.
-        self.M = nn.Sequential(nn.Linear(2*n_in, n_hidden),
+        self.M = nn.Sequential(nn.Linear(2*n_hidden, n_hidden),
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden),
                                nn.ReLU(),
@@ -24,9 +23,9 @@ class FCGN(nn.Module):
                                nn.ReLU())
 
         # Update function that updates a node based on the sum of its messages.
-        self.U = nn.Sequential(nn.Linear(n_in+n_hidden, n_hidden),            
-                               #nn.ReLU(),
-                               #nn.Linear(n_hidden, n_hidden),
+        self.U = nn.Sequential(nn.Linear(n_hidden+n_hidden, n_hidden),            
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
                                nn.ReLU())
 
         # Output function that predicts stability.
@@ -44,10 +43,10 @@ class FCGN(nn.Module):
 
         # Get features between all node. 
         # xx.shape = (N, K, K, 2*n_in)
-        x = towers 
-        x = x[:, :, None, :].expand(N, K, K, self.n_in)
+        x = h 
+        x = x[:, :, None, :].expand(N, K, K, self.n_hidden)
         xx = torch.cat([x, x.transpose(1, 2)], dim=3)
-        xx = xx.view(-1, 2*self.n_in)
+        xx = xx.view(-1, 2*self.n_hidden)
 
         # Calculate the edge features for each node 
         # all_edges.shape = (N, K, K, n_hidden)
@@ -76,8 +75,8 @@ class FCGN(nn.Module):
 
         # Concatenate all relevant inputs.
         #x = torch.cat([h, e], dim=2)
-        x = torch.cat([towers, e], dim=2)
-        x = x.view(-1, self.n_hidden+self.n_in)
+        x = torch.cat([h, e], dim=2)
+        x = x.view(-1, self.n_hidden+self.n_hidden)
 
         # Calculate the updated node features.
         x = self.U(x)
@@ -94,6 +93,7 @@ class FCGN(nn.Module):
         # Initialize hidden state for each node.
         #h = self.init.expand(N, K, self.n_hidden)
         h0 = self.E(towers.reshape(-1, self.n_in)).reshape(N, K, self.n_hidden)
+
         h = h0
         for kx in range(k):
             # Calculate edge updates for each node: (N, K, n_hidden) 
