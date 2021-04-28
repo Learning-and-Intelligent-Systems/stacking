@@ -29,10 +29,14 @@ class LatentEnsemble(nn.Module):
         self.latent_scales = nn.Parameter(torch.ones(n_latents, d_latents))
         self.latents = torch.distributions.normal.Normal(self.latent_locs, self.latent_scales)
 
-    def reset_latents(self):
+    def reset_latents(self, random=False):
         with torch.no_grad():
-            self.latent_locs.data[:] = 0.
-            self.latent_scales.data[:] = 1.
+            if random:
+                self.latent_locs[:] = torch.randn_like(self.latent_locs)
+                self.latent_scales[:] = torch.rand_like(self.latent_scales) + 1e-2
+            else:
+                self.latent_locs.data[:] = 0.
+                self.latent_scales.data[:] = 1.
 
     def associate(self, samples, block_ids):
         """ given samples from the latent space for each block in the set,
@@ -105,12 +109,25 @@ class LatentEnsemble(nn.Module):
             torch.Tensor -- [N_batch]
         """
         # draw samples from the latent distribution [N_samples x N_blockset x latent_dim]
+
+        # OPTION 1: draw one sample for each block across all towers
         # samples_for_each_block_in_set = self.latents.rsample(sample_shape=[N_samples])
-        samples_for_each_block_in_set = self.latent_locs.unsqueeze(0).expand(N_samples, -1, -1)
         # assocate those latent samples with the blocks in the towers
-        samples_for_each_tower_in_batch = self.associate(
-            samples_for_each_block_in_set, block_ids)
-        # samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
+        # samples_for_each_tower_in_batch = self.associate(
+        #     samples_for_each_block_in_set, block_ids)
+
+        # OPTION 2: use the mean
+        # samples_for_each_block_in_set = self.latent_locs.unsqueeze(0).expand(N_samples, -1, -1)
+
+        # OPTION 3: draw one sample for each block each time it appears in a tower
+        q_z = torch.distributions.normal.Normal(self.latents.loc[block_ids],
+                                                 self.latents.scale[block_ids])
+        samples_for_each_tower_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2, 3)
+
+
+
+
+        samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
         towers_with_latents = self.concat_samples(
             samples_for_each_tower_in_batch, towers)
 
@@ -213,7 +230,7 @@ def train(latent_ensemble, train_loader, n_epochs=30, freeze_latents=False, free
     # NOTE(izzy): we should be computing the KL divergence + likelihood of entire dataset.
     # so for each batch we need to divide by the number of batches
     # beta = 1./len(train_loader)
-    beta = 0.0
+    beta = 0.01
 
     losses = []
     latents = []
@@ -271,7 +288,7 @@ def compute_accuracies(latent_ensemble, data_loader, disable_latents):
     return accs
 
 def test(latent_ensemble, test_loader, disable_latents):
-    latent_ensemble.reset_latents()
+    latent_ensemble.reset_latents(random=True)
 
     print('Test Accuracy with prior latents:')
     for k, v in compute_accuracies(latent_ensemble, test_loader, disable_latents=disable_latents).items():
@@ -357,6 +374,7 @@ if __name__ == "__main__":
         latent_ensemble = latent_ensemble.cuda()
 
     # train
+    latent_ensemble.reset_latents(random=True)
     latents = train(latent_ensemble, train_loader, print_accuracy=True, disable_latents=args.disable_latents)
     torch.save(latent_ensemble.state_dict(), model_path)
     np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
