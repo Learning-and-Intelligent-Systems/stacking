@@ -43,10 +43,11 @@ def plot_all_task_performance(xs, plot_task_data, args, task, y_axis, color_map)
                 axes[ai].legend()
             
     fig.suptitle('%d Block %s Towers' % (args.tower_size, task))
-    plot_dir = 'learning/experiments/logs/paper_plots/compare_methods/'
-    if not os.path.exists(plot_dir): os.makedirs(plot_dir)
+    plot_dir = 'figures'
+    if not os.path.exists('figures'):
+        os.makedirs('figures')
     timestamp = datetime.now().strftime("%d-%m-%H-%M-%S")
-    plt.savefig('%s_%s.pdf' % (os.path.join(plot_dir, task), timestamp))
+    plt.savefig('%s_%s.pdf' % (os.path.join('figures', task), timestamp))
     plt.close()
     
 if __name__ == '__main__':
@@ -61,9 +62,6 @@ if __name__ == '__main__':
     parser.add_argument('--problems',
                         default=['tallest', 'min_contact', 'max_overhang'],
                         nargs='+')
-    parser.add_argument('--runs',
-                        nargs='+',
-                        default=[0, 1, 2, 3, 4])
     parser.add_argument('--max-acquisitions',
                         type=int, 
                         help='evaluate from 0 to this acquisition step (use either this or --acquisition-step)')
@@ -118,22 +116,24 @@ if __name__ == '__main__':
     labels = ['incremental', 'greedy', 'random']
     color_map = {'incremental': '#d62728', 'greedy': '#ff7f0e', 'random': '#1f77b4'}
     '''
-    local_exp_paths = [['paper_results_02232021/bald-sequential-fcgn-0-20210223-234054',
+    exp_paths = {'incremental':
+                        ['paper_results_02232021/bald-sequential-fcgn-0-20210223-234054',
                          'paper_results_02232021/bald-sequential-fcgn-1-20210226-230742',
                          'paper_results_02232021/bald-sequential-fcgn-2-20210227-183002'],
+                'greedy':        
                         ['paper_results_02232021/subtower-greedy-sequential-fcgn-0-20210223-223607',
                          'paper_results_02232021/subtower-greedy-sequential-fcgn-1-20210226-232246',
                          'paper_results_02232021/subtower-greedy-sequential-fcgn-2-20210227-043159'],
+                'random':        
                         ['paper_results_02232021/random-random-fcgn-0-20210329-184050',
                          'paper_results_02232021/random-random-fcgn-1-20210329-184050',
-                         'paper_results_02232021/random-random-fcgn-2-20210329-184052']]
-    labels = ['incremental', 'greedy', 'random']
+                         'paper_results_02232021/random-random-fcgn-2-20210329-184052']}
     color_map = {'incremental': '#d62728', 'greedy': '#ff7f0e', 'random': '#1f77b4'}
 
     all_problems = ['tallest', 'min_contact', 'max_overhang']
-    for same_local_exp_paths, label in zip(local_exp_paths, labels):
+    for label, same_exp_paths in exp_paths.items():
         loggers = []
-        for exp_path in same_local_exp_paths:
+        for exp_path in same_exp_paths:
             loggers.append(ActiveExperimentLogger(exp_path))
 
         for problem, task_plot_data in zip(all_problems, all_plot_data):

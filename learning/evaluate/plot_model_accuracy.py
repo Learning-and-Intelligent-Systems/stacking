@@ -28,28 +28,29 @@ def calc_model_accuracy(logger, dataset, args, exp_path, save_local_fig=True):
         preds = get_sequential_predictions(dataset, ensemble)
         preds = preds.mean(axis=1).round()
         
-        samples_per_height = int(preds.shape[0]/len(tower_heights)) # all preds are in a 1D array
-    
+        samples_per_height = dataset[list(dataset.keys())[0]]['towers'].shape[0]
+        
         for ti, tower_height in enumerate(tower_heights):
             key = str(tower_height)+'block'
-            n_correct = 0
-            n_tn = 0
-            n_fp = 0
-            n_fn = 0
-            n_tp = 0
-            offset = ti*samples_per_height
-            for li, label in enumerate(dataset[key]['labels']):
-                if preds[offset+li] == label[0]: n_correct += 1
-                if preds[offset+li] == 0 and label[0] == 1: n_fp += 1
-                if preds[offset+li] == 1 and label[0] == 0: n_fn += 1
-                if preds[offset+li] == 0 and label[0] == 0: n_tn += 1
-                if preds[offset+li] == 1 and label[0] == 1: n_tp += 1                
-            accuracies[key].append(n_correct/samples_per_height)
-            fpr = 0.0 if (n_fp+n_tn) == 0.0 else n_fp/(n_fp+n_tn)
-            fnr = 0.0 if (n_fn+n_tp) == 0.0 else n_fn/(n_fn+n_tp)
-            false_positives[key].append(fpr)
-            false_negatives[key].append(fnr)
-        
+            if key in dataset:
+                n_correct = 0
+                n_tn = 0
+                n_fp = 0
+                n_fn = 0
+                n_tp = 0
+                offset = ti*samples_per_height
+                for li, label in enumerate(dataset[key]['labels']):
+                    if preds[offset+li] == label[0]: n_correct += 1
+                    if preds[offset+li] == 0 and label[0] == 1: n_fp += 1
+                    if preds[offset+li] == 1 and label[0] == 0: n_fn += 1
+                    if preds[offset+li] == 0 and label[0] == 0: n_tn += 1
+                    if preds[offset+li] == 1 and label[0] == 1: n_tp += 1                
+                accuracies[key].append(n_correct/samples_per_height)
+                fpr = 0.0 if (n_fp+n_tn) == 0.0 else n_fp/(n_fp+n_tn)
+                fnr = 0.0 if (n_fn+n_tp) == 0.0 else n_fn/(n_fn+n_tp)
+                false_positives[key].append(fpr)
+                false_negatives[key].append(fnr)
+                
     # plot and save to this exp_path
     #for result, title in zip([accuracies, false_positives, false_negatives], ['Constructability Accuracy', 'False Positive Rate', 'False Negative Rate']):
     if save_local_fig:
@@ -84,12 +85,14 @@ def plot_all_model_accuracies(all_model_accuracies):
 
     for pi, th in enumerate(tower_heights):
         for model_accuracies in all_model_accuracies:
-            pi_accuracies = model_accuracies[str(th)+'block']
-            axes[pi].plot(xs, pi_accuracies)
-            axes[pi].set_ylim(.5, 1.)
-            axes[pi].set_ylabel('Constructability Accuracy')
-            axes[pi].set_xlabel('Training Towers')
-            axes[pi].set_title(str(th)+' Block Tower Constructability Accuracy')
+            key = str(th)+'block'
+            if key in model_accuracies:
+                pi_accuracies = model_accuracies[key]
+                axes[pi].plot(xs, pi_accuracies)
+                axes[pi].set_ylim(.5, 1.)
+                axes[pi].set_ylabel('Constructability Accuracy')
+                axes[pi].set_xlabel('Training Towers')
+                axes[pi].set_title(str(th)+' Block Tower Constructability Accuracy')
         
     plt.tight_layout()
     plt.savefig(args.output_fname)
