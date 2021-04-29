@@ -58,7 +58,7 @@ def choose_rotations_in_tower(height):
     return QUATERNIONS[idxs]
 
 
-def build_tower(blocks, rotations, label, max_attempts=250, prerotate=False):
+def build_tower(blocks, rotations, label, max_attempts=250, prerotate=False, fixed_positions=False):
     tp = TowerPlanner(stability_mode="contains")
     # pre-rotate each object to compute its dimensions in the tower
     dimensions = np.array([b.dimensions for b in blocks])
@@ -80,7 +80,12 @@ def build_tower(blocks, rotations, label, max_attempts=250, prerotate=False):
             0.5 * np.random.randn(*max_displacements_xy.shape), -0.95, 0.95
         )
         # and scale the noise by the max allowed displacement
-        rel_xy = max_displacements_xy * noise_xy
+        if not fixed_positions:
+            rel_xy = max_displacements_xy * noise_xy
+        else:
+            rel_xy = np.zeros(max_displacements_xy.shape)
+            rel_xy[::2, 0] = 0.035
+            rel_xy[1::2, 0] = -0.035
         # place the first block at the origin
         rel_xy = np.vstack([np.zeros([1, 2]), rel_xy])
         # and get the actual positions by cumsum of the relative positions
@@ -99,7 +104,7 @@ def build_tower(blocks, rotations, label, max_attempts=250, prerotate=False):
         # env.step(vis_frames=True)
         # input('Next?')
 
-        #env.disconnect()
+        # env.disconnect()
 
         # check if the base is stable and the top block matches the label
         if tp.tower_is_constructable(rotated_tower[:-1]) and (
@@ -113,13 +118,13 @@ def build_tower(blocks, rotations, label, max_attempts=250, prerotate=False):
     return None
 
 
-def get_tower(block_set, height, label, prerotate):
+def get_tower(block_set, height, label, prerotate, fixed_positions):
     blocks = choose_blocks_in_tower(block_set, height)
     rotations = choose_rotations_in_tower(height)
-    return build_tower(blocks, rotations, label, prerotate=prerotate)
+    return build_tower(blocks, rotations, label, prerotate=prerotate, fixed_positions=fixed_positions)
 
 
-def get_sub_dataset(block_set, height, num_towers_per_cat, prerotate):
+def get_sub_dataset(block_set, height, num_towers_per_cat, prerotate, fixed_positions):
     block_ids = []
     towers = []
     labels = []
@@ -130,9 +135,10 @@ def get_sub_dataset(block_set, height, num_towers_per_cat, prerotate):
             # generate a new tower
             label_string = "stable" if label else "unstable"
             print(f"{count}/{num_towers_per_cat}\t{label_string} {height}-block tower")
-            tower = get_tower(block_set, height, label, prerotate)
+            tower = get_tower(block_set, height, label, prerotate, fixed_positions)
             if tower is None:
                 continue
+            
             # if we successfully generate a tower, save it
             block_ids.append([int(b.name.strip("obj_")) for b in tower])
             towers.append([b.vectorize() for b in tower])
@@ -164,7 +170,7 @@ def main(args):
 
     for height in range(2, 6):
         dataset[f"{height}block"] = get_sub_dataset(
-            block_set, height, num_towers_per_cat, args.prerotate
+            block_set, height, num_towers_per_cat, args.prerotate, args.fixed_positions
         )
 
     filename = get_filename(
@@ -208,5 +214,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Rotate the blocks before saving the dataset."
     )
+    parser.add_argument(
+        "--fixed-positions",
+        action="store_true",
+        help="Don't vary relative positions of the blocks."
+    )
+
     args = parser.parse_args()
     main(args)
