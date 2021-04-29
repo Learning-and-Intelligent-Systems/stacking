@@ -12,7 +12,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from learning.domains.towers.tower_data import TowerDataset, ParallelDataLoader
 from learning.models.gn import FCGN
 from learning.models.ensemble import Ensemble
-
+from learning.viz_latents import viz_latents
 
 class LatentEnsemble(nn.Module):
     def __init__(self, ensemble, n_latents, d_latents):
@@ -30,6 +30,7 @@ class LatentEnsemble(nn.Module):
         self.latents = torch.distributions.normal.Normal(self.latent_locs, self.latent_scales)
 
     def reset_latents(self, random=False):
+        random = False
         with torch.no_grad():
             if random:
                 self.latent_locs[:] = torch.randn_like(self.latent_locs)
@@ -118,13 +119,13 @@ class LatentEnsemble(nn.Module):
 
         # OPTION 2: use the mean
         # samples_for_each_block_in_set = self.latent_locs.unsqueeze(0).expand(N_samples, -1, -1)
+        # samples_for_each_tower_in_batch = self.associate(
+        #     samples_for_each_block_in_set, block_ids)
 
         # OPTION 3: draw one sample for each block each time it appears in a tower
         q_z = torch.distributions.normal.Normal(self.latents.loc[block_ids],
                                                  self.latents.scale[block_ids])
         samples_for_each_tower_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2, 3)
-
-
 
 
         samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
@@ -216,9 +217,19 @@ def get_latent_loss(latent_ensemble, batch, beta=1):
     preds = latent_ensemble(towers[:,:,4:], block_ids.long())#, np.random.randint(0, len(latent_ensemble.ensemble.models))) # take the mean of the ensemble
     likelihood_loss = F.binary_cross_entropy(preds, labels, reduction='sum')
     # and compute the kl divergence
-    q_z = latent_ensemble.latents
+
+    # Option 1: Calculate KL for every latent in each batch.
+    # q_z = latent_ensemble.latents
+    # p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
+
+    # Option 2: Calculate KL only when it appears in a batch (multiple times if necessary)
+    used_blocks = block_ids.long().flatten()
+    q_z = torch.distributions.normal.Normal(latent_ensemble.latents.loc[used_blocks],
+                                           latent_ensemble.latents.scale[used_blocks])
     p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
+
     kl_loss = torch.distributions.kl_divergence(q_z, p_z).sum()
+
     return likelihood_loss + beta * kl_loss
 
 def train(latent_ensemble, train_loader, n_epochs=30, freeze_latents=False, freeze_ensemble=False, print_accuracy=True, disable_latents=False):
@@ -298,12 +309,14 @@ def test(latent_ensemble, test_loader, disable_latents):
     # estimate the latents for the test data, but without updating the model
     # parameters
     latents = train(latent_ensemble, test_loader, freeze_ensemble=True, print_accuracy=False, disable_latents=disable_latents)
+    with torch.no_grad():
+        viz_latents(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
     # np.save('learning/experiments/logs/latents/fit_during_test.npy', latents)
 
     print('Test Accuracy with posterior latents:')
     for k, v in compute_accuracies(latent_ensemble, test_loader, disable_latents=disable_latents).items():
         print(k, np.mean(v))
-    print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
+    #print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
 
 
 if __name__ == "__main__":
@@ -331,15 +344,27 @@ if __name__ == "__main__":
     # python -m learning.domains.towers.generate_tower_training_data --block-set-size=10 --suffix=test_joint --max-blocks=5
 
     # load data
+    # train_data_filename = 'learning/data/10block_set_(x1000)_train_cube1_dict.pkl'
+    # test_tower_filename = 'learning/data/10block_set_(x1000)_train_cube2_dict.pkl'
+    # test_block_filename = 'learning/data/10block_set_(x1000)_test_cube_dict.pkl' 
+
+    train_data_filename = 'learning/data/10block_set_(x1000)_train_seq_dict.pkl'
+    test_tower_filename = 'learning/data/10block_set_(x1000)_train_seq2_dict.pkl'
+    test_block_filename = 'learning/data/10block_set_(x1000)_test_seq_dict.pkl'
+
+    # train_data_filename = 'learning/data/10block_set_(x1000)_train_fixed_cube1_dict.pkl'
+    # test_tower_filename = 'learning/data/10block_set_(x1000)_train_fixed_cube2_dict.pkl'
+    # test_block_filename = 'learning/data/10block_set_(x1000)_test_fixed_cube_dict.pkl' 
+
     #train_data_filename = "learning/data/10block_set_(x4000.0)_train_10_prerotated.pkl"
-    train_data_filename = "learning/data/10block_set_(x1000)_cubes_train_seq1_dict.pkl"
+    #train_data_filename = "learning/data/10block_set_(x1000)_cubes_train_seq1_dict.pkl"
     with open(train_data_filename, 'rb') as handle:
         train_dict = pickle.load(handle)
     #test_tower_filename = "learning/data/10block_set_(x1000.0)_train_10_towers_prerotated.pkl"
-    test_tower_filename = "learning/data/10block_set_(x1000)_cubes_train_seq2_dict.pkl"
+    #test_tower_filename = "learning/data/10block_set_(x1000)_cubes_train_seq2_dict.pkl"
     with open(test_tower_filename, 'rb') as handle:
         test_tower_dict = pickle.load(handle)
-    test_block_filename = "learning/data/10block_set_(x1000)_cubes_test_seq1_dict.pkl"
+    #test_block_filename = "learning/data/10block_set_(x1000)_cubes_test_seq1_dict.pkl"
     with open(test_block_filename, 'rb') as handle:
         test_block_dict = pickle.load(handle)
     
@@ -375,7 +400,7 @@ if __name__ == "__main__":
 
     # train
     latent_ensemble.reset_latents(random=True)
-    latents = train(latent_ensemble, train_loader, print_accuracy=True, disable_latents=args.disable_latents)
+    latents = train(latent_ensemble, train_loader, n_epochs=50, print_accuracy=True, disable_latents=args.disable_latents)
     torch.save(latent_ensemble.state_dict(), model_path)
     np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
     print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
