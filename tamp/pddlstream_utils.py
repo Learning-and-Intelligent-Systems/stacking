@@ -40,7 +40,7 @@ def pddlstream_plan(pddl_info, init, goal, search_sample_ratio=1.0, max_time=INF
     start = time.time()
     plan, cost, _ = solve_focused(pddlstream_problem,
                             #constraints=constraints,
-                            unit_costs=True,
+                            # unit_costs=True,
                             success_cost=INF,
                             max_skeletons=2,
                             search_sample_ratio=search_sample_ratio,

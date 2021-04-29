@@ -39,6 +39,15 @@ Speficially, we use ROS Melodic. For more detailed instructions, look at the [`s
 
 To run Docker containers with graphics (Gazebo, RViz, GPU support, etc.), first install the [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-docker).
 
+We recommend creating a top-level folder and cloning this repo inside of it. For example:
+
+```
+mkdir my_project
+cd my_project
+git clone https://github.com/Learning-and-Intelligent-Systems/stacking.git
+cd stacking
+```
+
 To build the Docker image, run 
 
 ``` 
@@ -55,6 +64,13 @@ Once the image is built, you can start the container with
 
 ```
 make term
+```
+
+Note that this Docker image will mount the Catkin generated build files to `build`, `devel`, and `logs` folders on your host so you don't need to rebuild the Catkin workspace every time and you can modify the Python code from your host machine. If at some point you need to do a clean rebuild, ensure to remove these folders.
+
+```
+cd ..
+sudo rm -r build/ devel/ logs/
 ```
 
 Refer to the [`Makefile`](../Makefile) and [`Dockerfile`](../Dockerfile) for more information or to modify things as necessary.
