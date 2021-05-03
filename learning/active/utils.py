@@ -71,10 +71,11 @@ class ExperimentLogger:
 
 class ActiveExperimentLogger:
 
-    def __init__(self, exp_path):
+    def __init__(self, exp_path, use_latents=False):
         self.exp_path = exp_path
         self.acquisition_step = 0
         self.tower_counter = 0
+        self.use_latents = use_latents
 
         with open(os.path.join(self.exp_path, 'args.pkl'), 'rb') as handle:
             self.args = pickle.load(handle)
@@ -124,7 +125,7 @@ class ActiveExperimentLogger:
         with open(os.path.join(exp_path, 'args.pkl'), 'wb') as handle:
             pickle.dump(args, handle)
 
-        return ActiveExperimentLogger(exp_path)
+        return ActiveExperimentLogger(exp_path, use_latents=args.use_latents)
 
     def save_dataset(self, dataset, tx):
         fname = 'active_%d.pkl' % tx
@@ -178,6 +179,10 @@ class ActiveExperimentLogger:
         ensemble = Ensemble(base_model=metadata['base_model'],
                             base_args=metadata['base_args'],
                             n_models=metadata['n_models'])
+        if self.use_latents:
+            ensemble = LatentEnsemble(ensemble,
+                n_latents=metadata['n_latents'],
+                d_latents=metadata['d_latents'])
 
         # Load ensemble weights.
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
@@ -188,6 +193,8 @@ class ActiveExperimentLogger:
             print('ensemble_%d.pkl not found on path' % tx)
             return None
 
+
+
     def save_ensemble(self, ensemble, tx):
         """ Save an ensemble within the logging directory. The weights
         will be saved to <exp_name>/models/ensemble_<tx>.pt. Model metadata that
@@ -197,6 +204,10 @@ class ActiveExperimentLogger:
         :ensemble: A learning.model.Ensemble object.
         :tx: The active learning timestep these models represent.
         """
+        if self.use_latents:
+            self.save_latent_ensemble(ensemble, tx)
+            return
+
         # Save ensemble metadata.
         metadata = {'base_model': ensemble.base_model,
                     'base_args': ensemble.base_args,
@@ -208,6 +219,20 @@ class ActiveExperimentLogger:
         # Save ensemble weights.
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
         torch.save(ensemble.state_dict(), os.path.join(path))
+
+    def save_latent_ensemble(self, latent_ensemble, tx):
+        metadata = {'base_model': latent_ensemble.ensemble.base_model,
+                    'base_args': latent_ensemble.ensemble.base_args,
+                    'n_models': latent_ensemble.ensemble.n_models,
+                    'n_latents': latent_ensemble.n_latents,
+                    'd_latents': latent_ensemble.d_latents}
+        path = os.path.join(self.exp_path, 'models', 'metadata.pkl')
+        with open(path, 'wb') as handle:
+            pickle.dump(metadata, handle)
+
+        # Save ensemble weights.
+        path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
+        torch.save(latent_ensemble.state_dict(), os.path.join(path))
 
     def get_towers_data(self, tx):
         # Get all tower files at the current acquisition step, in sorted order

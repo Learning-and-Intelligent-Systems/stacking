@@ -540,7 +540,8 @@ def rotation_group():
             yield R.from_euler('zyx', v)
 
 ROTATIONS = list(all_rotations())
-QUATERNIONS = np.array([Quaternion(*o.as_quat()) for o in ROTATIONS])
+QUATERNIONS = [Quaternion(*o.as_quat()) for o in ROTATIONS]
+# QUATERNIONS = np.array([Quaternion(*o.as_quat()) for o in ROTATIONS])
 
 def get_adversarial_blocks(num_blocks=4):
     b1 = Object(name='obj_0',

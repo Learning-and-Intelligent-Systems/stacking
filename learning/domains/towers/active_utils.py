@@ -303,7 +303,7 @@ def get_sequential_predictions(dataset, ensemble):
         #print(preds[-1].shape)
     return torch.cat(preds, dim=0)
 
-def get_predictions(dataset, ensemble):
+def get_predictions(dataset, ensemble, use_latents=False, N_samples=10):
     """
     :param dataset: A tower_dict structure.
     :param ensemble: The Ensemble model which to use for predictions.
@@ -320,13 +320,17 @@ def get_predictions(dataset, ensemble):
                               batch_sampler=tower_sampler)
 
     # Iterate through dataset, getting predictions for each.
-    for tensor, _ in tower_loader:
+    for tensor, block_ids, labels in tower_loader:
+        N_batch = tensor.shape[0]
         if torch.cuda.is_available():
             tensor = tensor.cuda()
         with torch.no_grad():
-            preds.append(ensemble.forward(tensor))
+            if use_latents:
+                preds.append(ensemble.forward(
+                    tensor[...,4:], block_ids, N_samples=N_samples).view(N_batch, -1))
+            else:
+                preds.append(ensemble.forward(tensor))
     return torch.cat(preds, dim=0)
-
 
 def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False, label_subtowers=False):
     """ Takes as input a dictionary from the get_subset function. 

@@ -24,10 +24,16 @@ class LatentEnsemble(nn.Module):
         super(LatentEnsemble, self).__init__()
 
         self.ensemble = ensemble
+        self.n_latents = n_latents
+        self.d_latents = d_latents
 
         self.latent_locs = nn.Parameter(torch.zeros(n_latents, d_latents))
         self.latent_scales = nn.Parameter(torch.ones(n_latents, d_latents))
         self.latents = torch.distributions.normal.Normal(self.latent_locs, self.latent_scales)
+
+    def reset(self):
+        self.reset_latents()
+        self.ensemble.reset()
 
     def reset_latents(self, random=False):
         random = False
@@ -95,7 +101,7 @@ class LatentEnsemble(nn.Module):
         return samples
 
 
-    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1):
+    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True):
         """ predict feasibility of the towers
 
         Arguments:
@@ -139,16 +145,22 @@ class LatentEnsemble(nn.Module):
 
         # forward pass of the model(s)
         if ensemble_idx is None:
-            # mean prediction for the ensemble
+            # prediction for each model in the ensemble ensemble
+            # [(N_batch*N_samples) x N_ensemble]
             labels = self.ensemble.forward(towers_with_latents)
-            labels = labels.mean(axis=1)
+            labels = labels.view(N_batch, N_samples, -1).permute(0, 2, 1)
         else:
             # prediction of a single model in the ensemble
             labels = self.ensemble.models[ensemble_idx].forward(towers_with_latents)
+            labels = labels[:, None, :]
 
-        # reshape the result so we can compute the mean of the samples
-        labels = labels.view(N_batch, N_samples)
-        return labels.mean(axis=1)
+        # N_batch x N_ensemble x N_samples
+        if collapse_ensemble:
+            labels = labels.mean(axis=1, keepdim=True)
+        if collapse_latents:
+            labels = labels.mean(axis=2, keepdim=True)
+
+        return labels
 
 
 def get_params_loss(latent_ensemble, batches, disable_latents):
@@ -177,8 +189,8 @@ def get_params_loss(latent_ensemble, batches, disable_latents):
         if disable_latents:
             preds = latent_ensemble.ensemble.models[i].forward(towers).squeeze()
         else:
-            preds = latent_ensemble(towers[:,:,4:], block_ids.long(), ensemble_idx=i)
-        likelihood_loss += F.binary_cross_entropy(preds, labels)#, reduction='sum')
+            preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, ensemble_idx=i)
+        likelihood_loss += F.binary_cross_entropy(preds.squeeze(), labels)#, reduction='sum')
 
     # we sum the likelihoods for every input in the batch, but we want the
     # expected likelihood under the ensemble which means we take the mean
@@ -214,8 +226,8 @@ def get_latent_loss(latent_ensemble, batch, beta=1):
     # towers, mass and COM xyz. I'm not sure if this is the best place to
     # do that because it it is still in the datast. It should probably be a
     # flag in the TowerDataset?
-    preds = latent_ensemble(towers[:,:,4:], block_ids.long())#, np.random.randint(0, len(latent_ensemble.ensemble.models))) # take the mean of the ensemble
-    likelihood_loss = F.binary_cross_entropy(preds, labels, reduction='sum')
+    preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, collapse_ensemble=True)#, np.random.randint(0, len(latent_ensemble.ensemble.models))) # take the mean of the ensemble
+    likelihood_loss = F.binary_cross_entropy(preds.squeeze(), labels, reduction='sum')
     # and compute the kl divergence
 
     # Option 1: Calculate KL for every latent in each batch.
@@ -232,7 +244,7 @@ def get_latent_loss(latent_ensemble, batch, beta=1):
 
     return likelihood_loss + beta * kl_loss
 
-def train(latent_ensemble, train_loader, n_epochs=30, freeze_latents=False, freeze_ensemble=False, print_accuracy=True, disable_latents=False):
+def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30, freeze_latents=False, freeze_ensemble=False, print_accuracy=True, disable_latents=False):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     # TODO: Check if learning rate should be different for the latents.
@@ -240,7 +252,7 @@ def train(latent_ensemble, train_loader, n_epochs=30, freeze_latents=False, free
 
     # NOTE(izzy): we should be computing the KL divergence + likelihood of entire dataset.
     # so for each batch we need to divide by the number of batches
-    # beta = 1./len(train_loader)
+    # beta = 1./len(dataloader)
     beta = 0.01
 
     losses = []
@@ -248,7 +260,7 @@ def train(latent_ensemble, train_loader, n_epochs=30, freeze_latents=False, free
     for epoch_idx in range(n_epochs):
         if print_accuracy: print(f'Epoch {epoch_idx}')
         accs = []
-        for batch_idx, set_of_batches in enumerate(train_loader):
+        for batch_idx, set_of_batches in enumerate(dataloader):
             batch_loss = 0
             # update the latent distribution while holding the model parameters fixed.
             if (not freeze_latents) and (not disable_latents):
@@ -270,13 +282,13 @@ def train(latent_ensemble, train_loader, n_epochs=30, freeze_latents=False, free
 
         if print_accuracy:
             print('Train Accuracy:')
-            for k, v in compute_accuracies(latent_ensemble, train_loader, disable_latents=disable_latents).items():
+            for k, v in compute_accuracies(latent_ensemble, val_dataloader, disable_latents=disable_latents).items():
                 print(k, np.mean(v))
         # print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
         latents.append(np.hstack([latent_ensemble.latent_locs.cpu().detach().numpy(),
                                   latent_ensemble.latent_scales.cpu().detach().numpy()]))
 
-    return latents
+    return latent_ensemble
 
     # Note (Mike): When doing active learning, add new towers to train_dataset (not train_loader).
 
@@ -308,7 +320,7 @@ def test(latent_ensemble, test_loader, disable_latents):
 
     # estimate the latents for the test data, but without updating the model
     # parameters
-    latents = train(latent_ensemble, test_loader, freeze_ensemble=True, print_accuracy=False, disable_latents=disable_latents)
+    latents = train(test_loader, test_loader, latent_ensemble, freeze_ensemble=True, print_accuracy=False, disable_latents=disable_latents)
     with torch.no_grad():
         viz_latents(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
     # np.save('learning/experiments/logs/latents/fit_during_test.npy', latents)
@@ -400,7 +412,7 @@ if __name__ == "__main__":
 
     # train
     latent_ensemble.reset_latents(random=True)
-    latents = train(latent_ensemble, train_loader, n_epochs=50, print_accuracy=True, disable_latents=args.disable_latents)
+    latents = train(train_loader, train_loader, latent_ensemble, n_epochs=50, print_accuracy=True, disable_latents=args.disable_latents)
     torch.save(latent_ensemble.state_dict(), model_path)
     np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
     print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)

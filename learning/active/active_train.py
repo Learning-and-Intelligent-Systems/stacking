@@ -5,6 +5,7 @@ import time
 
 from learning.active.acquire import acquire_datapoints
 from learning.active.train import train
+from learning.train_latent import train as train_latent
 from learning.active.utils import ActiveExperimentLogger
 
 
@@ -67,8 +68,11 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
         # Initialize and train models.
         print('Training ensemble....')
         ensemble.reset()
-        for model in ensemble.models:
-            train(dataloader, val_dataloader, model, args.n_epochs)
+        if args.use_latents:
+            train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs)
+        else:
+            for model in ensemble.models:
+                train(dataloader, val_dataloader, model, args.n_epochs)
         print('Done training.')
 
         logger.save_ensemble(ensemble, tx)
