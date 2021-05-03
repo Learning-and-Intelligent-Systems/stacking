@@ -68,6 +68,7 @@ class TowerDataset(Dataset):
         self.tower_tensors = {}
         self.tower_labels = {}
         self.tower_block_ids = {}
+        self.use_augment = augment
 
         # First augment the given towers with rotations.
         if augment:
@@ -126,7 +127,10 @@ class TowerDataset(Dataset):
         :param tower_dict: A dictionary of the same format as was passed in initially with
         the towers to add to the dataset.
         """
-        augmented_towers = augment_towers(tower_dict, 1, mirror=False)
+        if self.use_augment:
+            augmented_towers = augment_towers(tower_dict, 1, mirror=False)
+        else:
+            augmented_towers = tower_dict
         for k in augmented_towers.keys():
             if augmented_towers[k]['towers'].shape[0] > 0:
                 new_towers = torch.Tensor(augmented_towers[k]['towers'])
