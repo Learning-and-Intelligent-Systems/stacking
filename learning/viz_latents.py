@@ -24,7 +24,6 @@ def viz_latents(locs, scales, lim=2):
             y = locs[ix, 2] + scales[ix, 2] * np.outer(np.sin(u), np.sin(v))
             z = locs[ix, 3] + scales[ix, 3] * np.outer(np.ones(np.size(u)), np.cos(v))
 
-            print(type(x), x.shape)
             ax.plot_surface(x.numpy(), y.numpy(), z.numpy(), color='b', alpha=0.05)
 
     ax.set_xlim(-lim, lim)
@@ -34,5 +33,6 @@ def viz_latents(locs, scales, lim=2):
 
 
 if __name__ == '__main__':
-    blocks = np.load('learning/data/10_cubes_block_set2.npy')
-    viz_latents(blocks[:, 0:4], blocks[:, 0:4], lim=0.035)
+    blocks = np.load('learning/data/10_random_block_set_1.npy')
+    #blocks = np.load('learning/data/10_cubes_block_set2.npy')
+    viz_latents(blocks[:, 0:4], blocks[:, 0:4], lim=0.05)
