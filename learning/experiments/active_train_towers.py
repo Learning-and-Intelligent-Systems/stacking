@@ -1,6 +1,6 @@
 import argparse
 import pickle
-
+import torch
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
@@ -35,7 +35,7 @@ def run_active_towers(args):
             agent = PandaClientAgent()
         else:
             block_set = load_blocks(fname=args.block_set_fname,
-                                    num_blocks=10) 
+                                    num_blocks=10)
             agent = PandaAgent(block_set)
 
     # Initialize ensemble.
@@ -90,25 +90,26 @@ def run_active_towers(args):
     if args.use_latents:
         ensemble = LatentEnsemble(ensemble, len(block_set), d_latents=4)
 
+    # send to GPU if needed
+    if torch.cuda.is_available():
+        ensemble = ensemble.cuda()
+
     # Sample initial dataset.
     if len(args.init_data_fname) > 0:
         print(f'Loading an initial dataset from {args.init_data_fname}')
         # A good dataset to use is learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl
         with open(args.init_data_fname, 'rb') as handle:
             towers_dict = pickle.load(handle)
-        dataset = TowerDataset(towers_dict,
-                               augment=True,
-                               K_skip=4) # From this dataset, this means we start with 10 towers/size (before augmentation).
-        with open('learning/data/random_blocks_(x1000.0)_constructable_val.pkl', 'rb') as handle:
+        dataset = TowerDataset(towers_dict, augment=False) # From this dataset, this means we start with 10 towers/size (before augmentation).
+        with open(args.val_data_fname, 'rb') as handle:
             val_dict = pickle.load(handle)
-        val_dataset = TowerDataset(val_dict,
-                                   augment=True,
-                                   K_skip=10)
+        val_dataset = TowerDataset(val_dict, augment=False)
+
     elif args.sampler == 'sequential':
         print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
         towers_dict = sample_sequential_data(block_set, None, 40)
         towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
-        dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
+        dataset = TowerDataset(towers_dict, augment=False, K_skip=1)
 
         val_towers_dict = sample_sequential_data(block_set, None, 40)
         val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
@@ -190,8 +191,8 @@ if __name__ == '__main__':
     parser.add_argument('--n-hidden', type=int, default=64)
     parser.add_argument('--n-epochs', type=int, default=50)
     parser.add_argument('--init-data-fname', type=str, default='')
+    parser.add_argument('--val-data-fname', type=str, default='')
     parser.add_argument('--block-set-fname', type=str, default='', help='File containing a list of AT LEAST 5 blocks (block_utils.Object) where the block.name is formatted obj_#')
-    parser.add_argument('--n-train-init', type=int, default=100) # NOTE: I don't think this is being used anywhere?
     parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')

@@ -34,6 +34,9 @@ class LatentEnsemble(nn.Module):
     def reset(self, random_latents=False):
         self.reset_latents(random=random_latents)
         self.ensemble.reset()
+        # send to GPU if needed
+        if torch.cuda.is_available():
+            self.ensemble = self.ensemble.cuda()
 
     def reset_latents(self, random=False):
         with torch.no_grad():
@@ -189,7 +192,7 @@ def get_params_loss(latent_ensemble, batches, disable_latents):
             preds = latent_ensemble.ensemble.models[i].forward(towers).squeeze()
         else:
             preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, ensemble_idx=i)
-        likelihood_loss += F.binary_cross_entropy(preds.squeeze(), labels)#, reduction='sum')
+        likelihood_loss += F.binary_cross_entropy(preds.squeeze(), labels.squeeze())#, reduction='sum')
 
     # we sum the likelihoods for every input in the batch, but we want the
     # expected likelihood under the ensemble which means we take the mean
@@ -226,7 +229,7 @@ def get_latent_loss(latent_ensemble, batch, beta=1):
     # do that because it it is still in the datast. It should probably be a
     # flag in the TowerDataset?
     preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, collapse_ensemble=True)#, np.random.randint(0, len(latent_ensemble.ensemble.models))) # take the mean of the ensemble
-    likelihood_loss = F.binary_cross_entropy(preds.squeeze(), labels, reduction='sum')
+    likelihood_loss = F.binary_cross_entropy(preds.squeeze(), labels.squeeze(), reduction='sum')
     # and compute the kl divergence
 
     # Option 1: Calculate KL for every latent in each batch.
@@ -322,11 +325,11 @@ def test(latent_ensemble, test_loader, disable_latents):
     print('Test Accuracy with prior latents:')
     for k, v in compute_accuracies(latent_ensemble, test_loader, disable_latents=disable_latents).items():
         print(k, np.mean(v))
-    print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
+    # print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
 
     # estimate the latents for the test data, but without updating the model
     # parameters
-    _, losses, latents = train(test_loader, None, latent_ensemble, freeze_ensemble=True, disable_latents=disable_latents, return_logs=True)
+    latent_ensemble, losses, latents = train(test_loader, None, latent_ensemble, freeze_ensemble=True, disable_latents=disable_latents, return_logs=True)
     # with torch.no_grad():
     #     viz_latents(latent_ensemble.latent_locs.cpu(), latent_ensemble.latent_scales.cpu())
     # np.save('learning/experiments/logs/latents/fit_during_test.npy', latents)
@@ -334,7 +337,7 @@ def test(latent_ensemble, test_loader, disable_latents):
     print('Test Accuracy with posterior latents:')
     for k, v in compute_accuracies(latent_ensemble, test_loader, disable_latents=disable_latents).items():
         print(k, np.mean(v))
-    print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
+    # print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
 
 
 if __name__ == "__main__":
@@ -374,9 +377,13 @@ if __name__ == "__main__":
     # test_tower_filename = 'learning/data/10block_set_(x1000)_train_fixed_cube2_dict.pkl'
     # test_block_filename = 'learning/data/10block_set_(x1000)_test_fixed_cube_dict.pkl'
 
-    train_data_filename = 'learning/data/10block_set_(x1000)_cubes_train_seq1_dict.pkl'
-    test_tower_filename = 'learning/data/10block_set_(x1000)_cubes_train_seq2_dict.pkl'
-    test_block_filename = 'learning/data/10block_set_(x1000)_cubes_test_seq1_dict.pkl'
+    # train_data_filename = 'learning/data/10block_set_(x1000)_cubes_train_seq1_dict.pkl'
+    # test_tower_filename = 'learning/data/10block_set_(x1000)_cubes_train_seq2_dict.pkl'
+    # test_block_filename = 'learning/data/10block_set_(x1000)_cubes_test_seq1_dict.pkl'
+
+    train_data_filename = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
+    test_tower_filename = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
+    test_block_filename = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
 
     #train_data_filename = "learning/data/10block_set_(x4000.0)_train_10_prerotated.pkl"
     #test_tower_filename = "learning/data/10block_set_(x1000.0)_train_10_towers_prerotated.pkl"
@@ -415,7 +422,7 @@ if __name__ == "__main__":
 
     # train
     latent_ensemble.reset_latents(random=True)
-    _, losses, latents = train(train_loader, train_loader, latent_ensemble, n_epochs=50, disable_latents=args.disable_latents, return_logs=True)
+    latent_ensemble, losses, latents = train(train_loader, train_loader, latent_ensemble, n_epochs=50, disable_latents=args.disable_latents, return_logs=True)
     torch.save(latent_ensemble.state_dict(), model_path)
     np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
     print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
