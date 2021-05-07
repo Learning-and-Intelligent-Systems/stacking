@@ -20,7 +20,7 @@ def evaluate(loader, model, val_metric='f1'):
     
     preds = []
     labels = []
-    for x, y in loader:
+    for x, ids, y in loader:
         if torch.cuda.is_available():
             x = x.cuda()
             y = y.cuda()
@@ -58,14 +58,14 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     for ex in range(n_epochs):
         #print('Epoch', ex)
         acc = []
-        for x, y in dataloader:
+        for x, ids, y in dataloader:
             if torch.cuda.is_available():
                 x = x.cuda()
                 y = y.cuda()
             optimizer.zero_grad()
             
             pred = model.forward(x).squeeze()
-            loss = F.binary_cross_entropy(pred, y)
+            loss = F.binary_cross_entropy(pred, y.squeeze())
             loss.backward()
 
             optimizer.step()
@@ -83,6 +83,8 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             #print(np.mean(acc), val_loss, loss)
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
+
+    print('Final Validation accuracy:', acc[-1])
     return model
 
 if __name__ == '__main__':
