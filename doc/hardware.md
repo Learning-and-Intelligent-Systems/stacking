@@ -99,6 +99,7 @@ Since the Franka Control Interface (FCI) relies on a real-time kernel, additiona
 
 * Make sure that your RTK is set to "Performance" mode using the toolbar icon on your OS.
 * Ensure that you have no additional processes running on the RTK workstation. In particular, close your Web browsers after connecting to your robot, especially if you are using Google Chrome.
+* If the `franka_interface` throws an error, for example a communications error, you can often clear it without restarting in the Franka interactive shell by typing `arm.resetErrors()`.
 * Use the [`taskset`](https://man7.org/linux/man-pages/man1/taskset.1.html) utility to constrain other ROS nodes (i.e., vision and Panda agent server) to use a specific subset of processor cores. For example:
 
 ```
