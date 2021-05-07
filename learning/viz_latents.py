@@ -24,6 +24,10 @@ def viz_latents(locs, scales, lim=2):
             y = locs[ix, 2] + scales[ix, 2] * np.outer(np.sin(u), np.sin(v))
             z = locs[ix, 3] + scales[ix, 3] * np.outer(np.ones(np.size(u)), np.cos(v))
 
+<<<<<<< HEAD
+=======
+            # print(type(x), x.shape)
+>>>>>>> 0a5c7e73c3fd1f6b646894ffba1f9c023b237b30
             ax.plot_surface(x.numpy(), y.numpy(), z.numpy(), color='b', alpha=0.05)
 
     ax.set_xlim(-lim, lim)

@@ -5,7 +5,7 @@ from random import choices
 from scipy.spatial.transform import Rotation as R
 
 from block_utils import (
-    QUATERNIONS,
+    all_rotations,
     Position,
     Quaternion,
     Pose,
@@ -16,6 +16,7 @@ from block_utils import (
 from learning.domains.towers.tower_data import TowerDataset
 from tower_planner import TowerPlanner
 
+QUATERNIONS = np.array([Quaternion(*o.as_quat()) for o in all_rotations()])
 
 def get_block_set(args):
     if args.block_set != "":
