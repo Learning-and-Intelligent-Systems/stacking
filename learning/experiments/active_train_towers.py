@@ -159,7 +159,7 @@ def run_active_towers(args):
     # and collapse the N_samples and N_models dimension into one
     if args.use_latents:
         data_pred_fn = lambda dataset, ensemble: get_predictions(
-            dataset, ensemble, N_samples=10, use_latents=True)
+            dataset, ensemble, N_samples=100, use_latents=True)
     else:
         data_pred_fn = get_predictions
 

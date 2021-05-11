@@ -327,7 +327,7 @@ def get_predictions(dataset, ensemble, use_latents=False, N_samples=10):
         with torch.no_grad():
             if use_latents:
                 preds.append(ensemble.forward(
-                    tensor[...,4:], block_ids, N_samples=N_samples).view(N_batch, -1))
+                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=False, collapse_latents=False).reshape(N_batch, -1))
             else:
                 preds.append(ensemble.forward(tensor))
     return torch.cat(preds, dim=0)
