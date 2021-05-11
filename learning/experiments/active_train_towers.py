@@ -105,6 +105,10 @@ def run_active_towers(args):
             val_dict = pickle.load(handle)
         val_dataset = TowerDataset(val_dict, augment=False)
 
+        if args.sampler == 'sequential':
+            data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
+        else:
+            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
     elif args.sampler == 'sequential':
         print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
         towers_dict = sample_sequential_data(block_set, None, 40)

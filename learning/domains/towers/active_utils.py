@@ -138,7 +138,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
             sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
     return sampled_towers
 
-def sample_unlabeled_data(n_samples, block_set=None, range_n_blocks=(2, 5)):
+def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_blocks=(2, 5)):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
@@ -147,7 +147,7 @@ def sample_unlabeled_data(n_samples, block_set=None, range_n_blocks=(2, 5)):
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
     # initialize a dictionary of lists to store the generated data
-
+    print('Generating data randomly...')
     sampled_towers = {}
     for i in range(range_n_blocks[0], range_n_blocks[1]+1):
         k = f'{i}block'
@@ -173,7 +173,10 @@ def sample_unlabeled_data(n_samples, block_set=None, range_n_blocks=(2, 5)):
         tower = sample_random_tower(blocks)
         rotated_tower = [get_rotated_block(b) for b in tower]
         # and save that tower in the sampled_towers dict
-        sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(rotated_tower))
+        if prerotate:
+            sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(rotated_tower))
+        else:
+            sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(tower))
         if block_set is not None:
             block_ids = [block.get_id() for block in rotated_tower]
             sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
