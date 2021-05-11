@@ -41,6 +41,15 @@ def unprocess(towers):
     towers[:,:,7:9] *= 0.01 #towers[:,:,4:6]
     towers[:,:,4:7] = towers[:,:,4:7]*0.01 + 0.1
     towers[:,:,0] = (towers[:,:,0] + 0.55)
+
+    # Undo the rotation.
+    N, K, D = towers.shape
+    quats = towers[..., 10:14].reshape(-1, 4)
+    r = Rotation.from_quat(quats).inv()
+    dims = towers[..., 4:7].reshape(-1, 3)
+    rot_dims = r.apply(dims)
+    towers[..., 4:7] = np.abs(rot_dims).reshape(N, K, 3)
+
     return towers
 
 def add_placement_noise(towers):

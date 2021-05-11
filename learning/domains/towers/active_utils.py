@@ -15,7 +15,7 @@ from tower_planner import TowerPlanner
 from agents.panda_agent import PandaClientAgent
 
 
-def sample_sequential_data(block_set, dataset, n_samples):
+def sample_sequential_data(block_set, dataset, n_samples, prerotate=False):
     """ Generate n_samples random towers. Each tower has the property that its
     base (the tower until the last block) is stable. To ensure this, we start
     with all the stable towers plus base cases of single block towers.
@@ -45,7 +45,11 @@ def sample_sequential_data(block_set, dataset, n_samples):
             new_block.pose = Pose(ZERO_POS, orn)
             rot_block = get_rotated_block(new_block)
             rot_block.pose = Pose((0., 0., rot_block.dimensions.z/2.), (0, 0, 0, 1))
-            stable_towers.append([rot_block])
+            new_block.pose = Pose((0., 0., rot_block.dimensions.z/2.), new_block.pose.orn)
+            if prerotate:
+                stable_towers.append([rot_block])
+            else:
+                stable_towers.append([new_block])
 
     # Get all stable towers from the dataset.
     for k in keys[:3]:
@@ -74,7 +78,7 @@ def sample_sequential_data(block_set, dataset, n_samples):
         # Choose a stable base.
         tower_ix = np.random.choice(np.arange(0, len(stable_towers)))
         base_tower = stable_towers[tower_ix]
-
+        base_rotated = [get_rotated_block(b) for b in base_tower]
         # Choose a block that's not already in the tower.
         remaining_blocks = {}
         for k in block_lookup:
@@ -97,24 +101,29 @@ def sample_sequential_data(block_set, dataset, n_samples):
         rot_block = get_rotated_block(new_block)
         
         # Sample a displacement.
-        base_dims = np.array(base_tower[-1].dimensions)[:2]
+        base_dims = np.array(base_rotated[-1].dimensions)[:2]
         new_dims = np.array(rot_block.dimensions)[:2]
         max_displacements_xy = (base_dims+new_dims)/2.
         noise_xy = np.clip(0.5*np.random.randn(2), -0.95, 0.95)
         rel_xy = max_displacements_xy*noise_xy
 
         # Calculate the new pose.
-        base_pos = np.array(base_tower[-1].pose.pos)[:2]
+        base_pos = np.array(base_rotated[-1].pose.pos)[:2]
         pos_xy = base_pos + rel_xy
-        pos_z = np.sum([b.dimensions.z for b in base_tower]) + rot_block.dimensions.z/2.
+        pos_z = np.sum([b.dimensions.z for b in base_rotated]) + rot_block.dimensions.z/2.
         rot_block.pose = Pose((pos_xy[0], pos_xy[1], pos_z), (0, 0, 0, 1))
+        new_block.pose = Pose((pos_xy[0], pos_xy[1], pos_z), new_block.pose.orn)
         
         # Add block to tower.
-        new_tower = base_tower + [rot_block]
+        if prerotate:
+            new_tower = base_rotated + [rot_block]
+        else:
+            new_tower = base_tower + [new_block]
 
         if False:
-            w = World(new_tower)
-            env = Environment([w], vis_sim=True, vis_frames=True)
+            w1 = World(base_rotated + [rot_block])
+            w2 = World(base_tower + [new_block])
+            env = Environment([w1, w2], vis_sim=True, vis_frames=True)
             for tx in range(240):
                 env.step(vis_frames=True)
                 time.sleep(1/240.)
