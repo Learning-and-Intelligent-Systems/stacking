@@ -42,12 +42,14 @@ def subtower_bald(samples, ensemble, data_pred_fn):
     for k in samples.keys():
         n_blocks = int(k.strip('block'))
         data = samples[k]['towers']
+        block_ids = samples[k]['block_ids']
         if data.shape[0] != 0: # only score if there is data for this k
             # predict subtower constructability with the ensemble
             subtower_preds = []
             subtower_scores = []
             for i in range(2, n_blocks+1):
                 subtowers = {f'{i}block': {'towers': data[:,:i,:],
+                                           'block_ids': block_ids[:, :i], 
                                            'labels': np.zeros(data.shape[0])}}
                 subtower_preds.append(data_pred_fn(subtowers, ensemble))
                 subtower_scores.append(bald(subtower_preds[-1]))
