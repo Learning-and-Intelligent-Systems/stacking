@@ -14,6 +14,7 @@ from learning.domains.towers.active_utils import get_sequential_predictions, get
 from learning.domains.towers.generate_tower_training_data import sample_random_tower
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler, add_placement_noise, unprocess
 from learning.evaluate.planner import EnsemblePlanner
+from learning.train_latent import LatentEnsemble
 
 from tower_planner import TowerPlanner
 
@@ -43,14 +44,16 @@ def get_validation_accuracy(logger, fname):
     with open(fname, 'rb') as handle:
         val_towers = pickle.load(handle)
 
+
     for tx in range(0, logger.args.max_acquisitions):
         if tx % 10 == 0:
             print('Eval timestep, ', tx)
         ensemble = logger.get_ensemble(tx)
+        use_latents = isinstance(ensemble, LatentEnsemble)
         if hasattr(logger.args, 'sampler') and logger.args.sampler == 'sequential':
-            preds = get_sequential_predictions(val_towers, ensemble).mean(1).numpy()
+            preds = get_sequential_predictions(val_towers, ensemble, use_latents=use_latents).mean(1).numpy()
         else:
-            preds = get_predictions(val_towers, ensemble).mean(1).numpy()
+            preds = get_predictions(val_towers, ensemble, use_latents=use_latents).mean(1).numpy()
 
         start = 0
         for k in tower_keys:
@@ -74,7 +77,7 @@ def get_validation_accuracy(logger, fname):
         pickle.dump(accs, handle)
     return accs
 
-def plot_val_accuracy(logger):
+def plot_val_accuracy(logger, init_dataset_size=100, n_acquire=10):
     with open(logger.get_figure_path('val_accuracies.pkl'), 'rb') as handle:
         accs = pickle.load(handle)
 
@@ -86,8 +89,8 @@ def plot_val_accuracy(logger):
     fig, axes = plt.subplots(4, figsize=(10, 20))
     for ix, ax in enumerate(axes):
         k = tower_keys[ix]
-        max_x = 40 + 10*len(accs[k])
-        xs = np.arange(40, max_x, 10)
+        max_x = init_dataset_size + n_acquire*len(accs[k])
+        xs = np.arange(init_dataset_size, max_x, n_acquire)
 
         ax.plot(xs, accs[k], label=k)
         #ax.plot([400, 4500], [ref_acc[k]]*2)
@@ -1004,8 +1007,8 @@ if __name__ == '__main__':
     parser.add_argument('--exp-path', type=str, required=True)
     args = parser.parse_args()
     
-    logger = ActiveExperimentLogger(args.exp_path)
-    logger.args.max_acquisitions = 5
+    logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
+    logger.args.max_acquisitions = 75
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
     #analyze_bald_scores(logger)
@@ -1019,8 +1022,8 @@ if __name__ == '__main__':
     #inspect_validation_set('learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
 
     accs = get_validation_accuracy(logger,
-                                  #'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
-                                  'learning/evaluate/test_datasets/eval_blocks_test_dataset.pkl')
+                                  # 'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
+                                  '/Users/izzy/projects/stacking/learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl')
     plot_val_accuracy(logger)
 
     # #analyze_collected_2block_towers(logger)

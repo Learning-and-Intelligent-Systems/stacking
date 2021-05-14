@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 
 from learning.models.ensemble import Ensemble
 from learning.models.mlp_dropout import MLP
+from learning.train_latent import LatentEnsemble
 
 
 class ExperimentLogger:

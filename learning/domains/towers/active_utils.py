@@ -283,7 +283,7 @@ def sample_next_block(n_samples, bases={}, block_set=None):
 
         return {f'{base_n_blocks+1}block': new_samples}
 
-def get_sequential_predictions(dataset, ensemble):
+def get_sequential_predictions(dataset, ensemble, use_latents=False):
     """
     Make a separate prediction for each of the sub-towers in a tower.
     Return stable only if all sub-towers are stable. This is for the
@@ -299,14 +299,17 @@ def get_sequential_predictions(dataset, ensemble):
                               batch_sampler=tower_sampler)
 
     # Iterate through dataset, getting predictions for each.
-    for tensor, _ in tower_loader:
+    for tensor, block_ids, _ in tower_loader:
         sub_tower_preds = []
         #print(tensor.shape)
         for n_blocks in range(2, tensor.shape[1]+1):
             if torch.cuda.is_available():
                 tensor = tensor.cuda()
             with torch.no_grad():
-                sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
+                if use_latents:
+                    sub_tower_preds.append(ensemble.forward(tensor[...,4:], block_ids).squeeze(dim=-1))
+                else:
+                    sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
         sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
         #print('SubTowerPreds:', sub_tower_preds.shape)
         #preds.append(sub_tower_preds[-1,:,:])
@@ -338,8 +341,18 @@ def get_predictions(dataset, ensemble, use_latents=False, N_samples=10):
             tensor = tensor.cuda()
         with torch.no_grad():
             if use_latents:
+                # take samples from the ensemble and the latents separately, to approximate computing MI
+                # I(y ; theta) and I(y ; z) separately
+                # latent_samples = ensemble.forward(
+                #     tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=True, collapse_latents=False).reshape(N_batch, -1)
+                # ensemble_samples = ensemble.forward(
+                #     tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=False, collapse_latents=True).reshape(N_batch, -1)
+                # pred_samples = torch.cat([latent_samples, ensemble_samples], axis=1)
+                # preds.append(pred_samples)
+
+                # takes samples from the joint distribution from the joint distribution to compute I(y ; theta, z)
                 preds.append(ensemble.forward(
-                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=False, collapse_latents=False).reshape(N_batch, -1))
+                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=False, collapse_latents=True).reshape(N_batch, -1))
             else:
                 preds.append(ensemble.forward(tensor))
     return torch.cat(preds, dim=0)
