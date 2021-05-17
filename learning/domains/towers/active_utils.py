@@ -396,7 +396,8 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False, la
                 # iterate through each subtower until it falls (is not constructable)
                 subtowers = [block_tower[:k_sub] for k_sub in list(range(2,len(block_tower)+1))]
                 for k_sub, subtower in enumerate(subtowers, 2):
-                    if tp.tower_is_constructable(subtower):
+                    rot_subtower = [get_rotated_block(b) for b in subtower]
+                    if tp.tower_is_constructable(rot_subtower):
                         label = 1.0
                     else:
                         label = 0.0
