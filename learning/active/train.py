@@ -91,6 +91,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
     fig, ax = plt.subplots()
     ax.plot(all_accs, label='accuracy')
     ax.plot(all_losses, label='loss')
+    ax.legend()
     
     return model
 
