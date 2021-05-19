@@ -22,3 +22,4 @@ tower-*
 scratch/
 paper_results/
 learning/experiments/logs
+figures/*
