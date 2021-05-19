@@ -100,7 +100,7 @@ def run_active_towers(args):
         # A good dataset to use is learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl
         with open(args.init_data_fname, 'rb') as handle:
             towers_dict = pickle.load(handle)
-        dataset = TowerDataset(towers_dict, augment=False) # From this dataset, this means we start with 10 towers/size (before augmentation).
+        dataset = TowerDataset(towers_dict, augment=True) # From this dataset, this means we start with 10 towers/size (before augmentation).
         with open(args.val_data_fname, 'rb') as handle:
             val_dict = pickle.load(handle)
         val_dataset = TowerDataset(val_dict, augment=False)
@@ -144,7 +144,7 @@ def run_active_towers(args):
         dataloader = ParallelDataLoader(dataset,
             batch_size=args.batch_size, shuffle=True, n_dataloaders=args.n_models)
         val_dataloader = ParallelDataLoader(val_dataset,
-            batch_size=args.batch_size, shuffle=True, n_dataloaders=1)
+            batch_size=args.batch_size, shuffle=False, n_dataloaders=1)
 
     else:
         sampler = TowerSampler(dataset=dataset,
@@ -163,7 +163,7 @@ def run_active_towers(args):
     # and collapse the N_samples and N_models dimension into one
     if args.use_latents:
         data_pred_fn = lambda dataset, ensemble: get_predictions(
-            dataset, ensemble, N_samples=20, use_latents=True)
+            dataset, ensemble, N_samples=10, use_latents=True)
     else:
         data_pred_fn = get_predictions
 

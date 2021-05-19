@@ -5,9 +5,11 @@ import pickle
 from random import shuffle
 from scipy.spatial.transform import Rotation
 import torch
+import copy
 from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
+from sklearn.metrics import f1_score
 
 from learning.domains.towers.tower_data import TowerDataset, ParallelDataLoader
 from learning.models.gn import FCGN
@@ -165,7 +167,7 @@ class LatentEnsemble(nn.Module):
         return labels
 
 
-def get_params_loss(latent_ensemble, batches, disable_latents):
+def get_params_loss(latent_ensemble, batches, disable_latents, N):
     """
     1. sample ~ latents
     2. samples -(model)-> likelihood
@@ -196,10 +198,10 @@ def get_params_loss(latent_ensemble, batches, disable_latents):
 
     # we sum the likelihoods for every input in the batch, but we want the
     # expected likelihood under the ensemble which means we take the mean
-    return likelihood_loss/len(batches)
+    return N*likelihood_loss#/len(batches)
 
 
-def get_latent_loss(latent_ensemble, batch, beta=1):
+def get_latent_loss(latent_ensemble, batch, N, beta=1):
     """
     [mu, sigma] -(reparam)-> [sample] -(thru ensemble)-> [likelihood]
     [mu, sigma] -> [KL]
@@ -233,18 +235,18 @@ def get_latent_loss(latent_ensemble, batch, beta=1):
     # and compute the kl divergence
 
     # Option 1: Calculate KL for every latent in each batch.
-    # q_z = latent_ensemble.latents
-    # p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
+    q_z = latent_ensemble.latents
+    p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
 
     # Option 2: Calculate KL only when it appears in a batch (multiple times if necessary)
-    used_blocks = block_ids.long().flatten()
-    q_z = torch.distributions.normal.Normal(latent_ensemble.latents.loc[used_blocks],
-                                           latent_ensemble.latents.scale[used_blocks])
-    p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
+    # used_blocks = block_ids.long().flatten()
+    # q_z = torch.distributions.normal.Normal(latent_ensemble.latents.loc[used_blocks],
+    #                                        latent_ensemble.latents.scale[used_blocks])
+    # p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
 
     kl_loss = torch.distributions.kl_divergence(q_z, p_z).sum()
 
-    return likelihood_loss + beta * kl_loss
+    return (kl_loss + N*likelihood_loss)/towers.shape[0]
 
 def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     freeze_latents=False,
@@ -263,6 +265,9 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 
     losses = []
     latents = []
+
+    best_weights = None
+    best_loss = 1000
     for epoch_idx in range(n_epochs):
         accs = []
         for batch_idx, set_of_batches in enumerate(dataloader):
@@ -270,7 +275,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
             # update the latent distribution while holding the model parameters fixed.
             if (not freeze_latents) and (not disable_latents):
                 latent_optimizer.zero_grad()
-                latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0], beta=beta)
+                latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0], N=len(dataloader.loaders[0].dataset), beta=beta)
                 latent_loss.backward()
                 latent_optimizer.step()
                 batch_loss += latent_loss.item()
@@ -278,15 +283,24 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
             # update the model parameters while sampling from the latent distribution.
             if not freeze_ensemble:
                 params_optimizer.zero_grad()
-                params_loss = get_params_loss(latent_ensemble, set_of_batches, disable_latents)
+                params_loss = get_params_loss(latent_ensemble, set_of_batches, disable_latents, N=len(dataloader.loaders[0].dataset))
                 params_loss.backward()
                 params_optimizer.step()
                 batch_loss += params_loss.item()
 
             losses.append(batch_loss)
 
+        #TODO: Check for early stopping.
         if val_dataloader is not None:
+            val_loss = evaluate(latent_ensemble, val_dataloader, disable_latents=disable_latents)
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_weights = copy.deepcopy(latent_ensemble.state_dict())
+                print('Saved.')
             print(f'Epoch {epoch_idx}')
+            # print('Train Accuracy:')
+            # for k, v in compute_accuracies(latent_ensemble, dataloader, disable_latents=disable_latents).items():
+            #     print(k, np.mean(v))
             print('Val Accuracy:')
             for k, v in compute_accuracies(latent_ensemble, val_dataloader, disable_latents=disable_latents).items():
                 print(k, np.mean(v))
@@ -294,12 +308,44 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
         latents.append(np.hstack([latent_ensemble.latent_locs.cpu().detach().numpy(),
                                   latent_ensemble.latent_scales.cpu().detach().numpy()]))
 
+    if val_dataloader is not None:
+        latent_ensemble.load_state_dict(best_weights)
     if return_logs:
         return latent_ensemble, losses, latents
     else:
         return latent_ensemble
 
     # Note (Mike): When doing active learning, add new towers to train_dataset (not train_loader).
+
+def evaluate(latent_ensemble, data_loader, disable_latents, val_metric='f1'):
+    acc = []
+    losses = []
+    
+    preds = []
+    labels = []
+    for val_batches in data_loader:
+        towers, block_ids, label = val_batches[0]
+        if torch.cuda.is_available():
+            towers = towers.cuda()
+            block_ids = block_ids.cuda()
+            labels = labels.cuda()
+        if disable_latents:
+            pred = latent_ensemble.ensemble.forward(towers).squeeze()
+        else:
+            pred = latent_ensemble(towers[:,:,4:], block_ids.long()).squeeze()
+        if len(pred.shape) == 0: pred = pred.unsqueeze(-1)
+        loss = F.binary_cross_entropy(pred, label)
+     
+        with torch.no_grad():
+            preds += (pred > 0.5).cpu().float().numpy().tolist()
+            labels += label.cpu().numpy().tolist()
+    if val_metric == 'loss':
+        score = np.mean(losses)
+    else:
+        score = -f1_score(labels, preds)
+
+
+    return score
 
 def compute_accuracies(latent_ensemble, data_loader, disable_latents):
     with torch.no_grad():
@@ -330,8 +376,8 @@ def test(latent_ensemble, test_loader, disable_latents):
     # estimate the latents for the test data, but without updating the model
     # parameters
     latent_ensemble, losses, latents = train(test_loader, None, latent_ensemble, freeze_ensemble=True, disable_latents=disable_latents, return_logs=True)
-    # with torch.no_grad():
-    #     viz_latents(latent_ensemble.latent_locs.cpu(), latent_ensemble.latent_scales.cpu())
+    with torch.no_grad():
+        viz_latents(latent_ensemble.latent_locs.cpu(), latent_ensemble.latent_scales.cpu())
     # np.save('learning/experiments/logs/latents/fit_during_test.npy', latents)
 
     print('Test Accuracy with posterior latents:')
@@ -381,7 +427,7 @@ if __name__ == "__main__":
     # test_tower_filename = 'learning/data/10block_set_(x1000)_cubes_train_seq2_dict.pkl'
     # test_block_filename = 'learning/data/10block_set_(x1000)_cubes_test_seq1_dict.pkl'
 
-    train_data_filename = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
+    train_data_filename = 'learning/data/may_cubes/towers/10block_set_(x104)_seq_a_dict.pkl'
     test_tower_filename = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
     test_block_filename = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
 
@@ -394,6 +440,17 @@ if __name__ == "__main__":
         test_tower_dict = pickle.load(handle)
     with open(test_block_filename, 'rb') as handle:
         test_block_dict = pickle.load(handle)
+
+    # for k in train_dict.keys():
+    #     train_dict[k] = {
+    #         'towers': train_dict[k]['towers'][::10, ...],
+    #         'labels': train_dict[k]['labels'][::10, ...],
+    #         'block_ids': train_dict[k]['block_ids'][::10, ...],
+    #     }
+
+
+    # with open('learning/experiments/logs/exp-20210518-181538/datasets/active_34.pkl', 'rb') as handle:
+    #     train_dataset = pickle.load(handle)    
 
     train_dataset = TowerDataset(train_dict, augment=True, prerotated=False)
     test_tower_dataset = TowerDataset(test_tower_dict, augment=False, prerotated=False)
@@ -422,7 +479,7 @@ if __name__ == "__main__":
 
     # train
     latent_ensemble.reset_latents(random=True)
-    latent_ensemble, losses, latents = train(train_loader, train_loader, latent_ensemble, n_epochs=50, disable_latents=args.disable_latents, return_logs=True)
+    latent_ensemble, losses, latents = train(train_loader, train_loader, latent_ensemble, n_epochs=30, disable_latents=args.disable_latents, return_logs=True)
     torch.save(latent_ensemble.state_dict(), model_path)
     np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
     print(latent_ensemble.latent_locs, latent_ensemble.latent_scales)
