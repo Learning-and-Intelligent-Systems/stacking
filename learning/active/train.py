@@ -57,11 +57,10 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
     best_loss = 1000
     best_weights = None
     it = 0
-    epoch_accs = []
+    all_accs = []
+    all_losses = []
     for ex in range(n_epochs):
         #print('Epoch', ex)
-        acc = []
-        all_accs = np.array([])
         for x, y in dataloader:
             if torch.cuda.is_available():
                 x = x.cuda()
@@ -74,10 +73,11 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
 
             optimizer.step()
 
+            # TODO: change accuracy calculation for non binary tasks
             accuracy = ((pred>0.5) == y).float().mean()
-            all_accs = np.concatenate([all_accs, ((pred>0.5) == y).float().mean(dim=(1,2))])
-            acc.append(accuracy.item())
-
+            
+            all_accs.append(accuracy.item())
+            all_losses.append(loss.item())
             it += 1
         if val_dataloader is not None:
             val_loss = evaluate(val_dataloader, model)
@@ -85,12 +85,13 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
                 best_loss = val_loss
                 best_weights = copy.deepcopy(model.state_dict())
                 #print('Saved')    
-        epoch_accs.append(np.mean(all_accs))
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
     
-    #plt.plot(epoch_accs)
-    #plt.show()
+    fig, ax = plt.subplots()
+    ax.plot(all_accs, label='accuracy')
+    ax.plot(all_losses, label='loss')
+    
     return model
 
 if __name__ == '__main__':
