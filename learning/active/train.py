@@ -3,7 +3,9 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
+import matplotlib
+matplotlib.use("TkAgg")
+    
 from sklearn.metrics import f1_score # TODO: remove this dependency
 from torch.nn import functional as F
 from torch.optim import Adam
@@ -43,7 +45,7 @@ def evaluate(loader, model, val_metric='f1'):
     return score
 
 
-def train(dataloader, val_dataloader, model, n_epochs=20):
+def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross_entropy):
     """
     :param val_dataloader: If a validation set is given, will return the model
     with the lowest validation loss.
@@ -55,9 +57,11 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     best_loss = 1000
     best_weights = None
     it = 0
+    epoch_accs = []
     for ex in range(n_epochs):
         #print('Epoch', ex)
         acc = []
+        all_accs = np.array([])
         for x, y in dataloader:
             if torch.cuda.is_available():
                 x = x.cuda()
@@ -65,12 +69,13 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             optimizer.zero_grad()
             
             pred = model.forward(x).squeeze()
-            loss = F.binary_cross_entropy(pred, y)
+            loss = loss_fn(pred, y)
             loss.backward()
 
             optimizer.step()
 
             accuracy = ((pred>0.5) == y).float().mean()
+            all_accs = np.concatenate([all_accs, ((pred>0.5) == y).float().mean(dim=(1,2))])
             acc.append(accuracy.item())
 
             it += 1
@@ -80,9 +85,12 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
                 best_loss = val_loss
                 best_weights = copy.deepcopy(model.state_dict())
                 #print('Saved')    
-            #print(np.mean(acc), val_loss, loss)
+        epoch_accs.append(np.mean(all_accs))
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
+    
+    #plt.plot(epoch_accs)
+    #plt.show()
     return model
 
 if __name__ == '__main__':
