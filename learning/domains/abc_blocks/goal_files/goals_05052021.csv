@@ -1,0 +1,17 @@
+On,2,table
+On,3,table
+On,4,table
+On,5,table
+On,6,table
+On,3,2
+On,4,3
+On,5,4
+On,6,5
+On,3,*
+On,4,*
+On,5,*
+On,6,*
+On,*,2
+On,*,3
+On,*,4
+On,*,5
