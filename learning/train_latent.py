@@ -43,7 +43,7 @@ class LatentEnsemble(nn.Module):
         with torch.no_grad():
             if random:
                 self.latent_locs[:] = torch.randn_like(self.latent_locs)
-                self.latent_logscales[:] = torch.randn_like(self.latent_scales)
+                self.latent_logscales[:] = torch.randn_like(self.latent_logscales)
             else:
                 self.latent_locs[:] = 0.
                 self.latent_logscales[:] = 0.
@@ -308,7 +308,7 @@ def evaluate(latent_ensemble, data_loader, disable_latents, val_metric='f1'):
         if torch.cuda.is_available():
             towers = towers.cuda()
             block_ids = block_ids.cuda()
-            labels = labels.cuda()
+            label = label.cuda()
         if disable_latents:
             pred = latent_ensemble.ensemble.forward(towers).squeeze()
         else:
@@ -357,7 +357,7 @@ def test(latent_ensemble, train_loader, test_loader, disable_latents, n_epochs=5
     # parameters
     latent_ensemble, losses, latents = train(train_loader, None, latent_ensemble, n_epochs=n_epochs, freeze_ensemble=True, disable_latents=disable_latents, return_logs=True)
     with torch.no_grad():
-        viz_latents(latent_ensemble.latent_locs.cpu(), torch.exp(latent_ensemble.latent_logscales).cpu())
+        viz_latents(latent_ensemble.latent_locs.cpu().detach(), torch.exp(latent_ensemble.latent_logscales).cpu().detach())
     # np.save('learning/experiments/logs/latents/fit_during_test.npy', latents)
 
     print('Test Accuracy with posterior latents:')
@@ -424,18 +424,18 @@ if __name__ == "__main__":
     # test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_2_dict.pkl'
 
     # Datasets for cubes with fixed poses.
-    train_block_train_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_a_1_dict.pkl'
-    train_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_a_2_dict.pkl'
-    train_block_test_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_a_3_dict.pkl'
-    test_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_b_1_dict.pkl'
-    test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_b_2_dict.pkl'
+    # train_block_train_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_a_1_dict.pkl'
+    # train_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_a_2_dict.pkl'
+    # train_block_test_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_a_3_dict.pkl'
+    # test_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_b_1_dict.pkl'
+    # test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_b_2_dict.pkl'
 
     # Datasets for cubes with dynamic poses.
-    # train_block_train_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
-    # train_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
-    # train_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_3_dict.pkl'
-    # test_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
-    # test_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
+    train_block_train_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x104)_seq_a_dict.pkl'
+    train_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
+    train_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_3_dict.pkl'
+    test_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
+    test_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
 
     #train_data_filename = "learning/data/10block_set_(x4000.0)_train_10_prerotated.pkl"
     #test_tower_filename = "learning/data/10block_set_(x1000.0)_train_10_towers_prerotated.pkl"
