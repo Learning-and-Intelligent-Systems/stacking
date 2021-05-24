@@ -238,7 +238,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     # TODO: Check if learning rate should be different for the latents.
-    latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
+    latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-2)
 
     # NOTE(izzy): we should be computing the KL divergence + likelihood of entire dataset.
     # so for each batch we need to divide by the number of batches
