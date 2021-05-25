@@ -50,11 +50,16 @@ def run_goal_directed_train(args, plot=True):
         trans_model = TransitionGNN()
         print('Training with %i datapoints' % len(trans_dataset))
         n_datapoints.append(len(trans_dataset))
-        train(trans_dataloader, None, trans_model, n_epochs=100, loss_fn=F.mse_loss)
-        trans_error_rate = calc_trans_error_rate(test_trans_dataset, trans_model)
+        if args.pred_type == 'delta_state':
+            loss_fn = F.mse_loss
+        elif args.pred_type == 'full_state':
+            loss_fn = F.binary_cross_entropy
+        train(trans_dataloader, None, trans_model, n_epochs=100, loss_fn=loss_fn)
+        # TODO: fix calculation
+        trans_error_rate = calc_trans_error_rate(args, test_trans_dataset, trans_model)
         trans_error_rates.append(trans_error_rate)
-        print('Forward Prediction Error Rate: %f' % trans_error_rate)
-        calc_successful_action_error_rate(test_trans_dataset, trans_model)
+        #print('Forward Prediction Error Rate: %f' % trans_error_rate)
+        calc_successful_action_error_rate(args, test_trans_dataset, trans_model)
         if plot:
             vis_trans_errors(test_trans_dataset, trans_model)
             vis_trans_dataset_grid(trans_dataset, 'Frequency of Edges seen in Training Dataset')
@@ -105,6 +110,10 @@ if __name__ == '__main__':
                         type=int,
                         default=10,
                         help='max number of actions in a sequence')
+    parser.add_argument('--pred-type',
+                        type=str,
+                        choices=['delta_state', 'full_state'],
+                        required=True)
     parser.add_argument('--exp-name',
                         type=str,
                         required=True,

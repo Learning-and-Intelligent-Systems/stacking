@@ -5,33 +5,49 @@ import matplotlib
 matplotlib.use("TkAgg")
 
 
-def calc_trans_error_rate(trans_dataset, model):
+def calc_trans_error_rate(args, trans_dataset, model):
     n = len(trans_dataset)
     xs, ys = trans_dataset[:]
     preds = model(xs)
     
     # on average how many edges are predicted incorrectly per datapoint
-    error_rate = ((preds>0.5) != ys).sum(dim=(1,2)).float().mean()
+    if args.pred_type == 'full_state':
+        # wrong predictions out of all possible predictions
+        error_rate = ((preds>0.5) != ys).sum(dim=(1,2)).float().mean()
+    elif args.pred_type == 'delta_state':
+        # wrong predictions about of possible predictions
+        # TODO: this is not correct
+        error_rate = 0
+        #error_rate = (preds[i].round() != delta_state).sum().float().mean()
     return error_rate
     
-def calc_successful_action_error_rate(trans_dataset, trans_model):
+def calc_successful_action_error_rate(args, trans_dataset, trans_model):
     xs, ys = trans_dataset[:]
     preds = trans_model(xs)
-    ## for full next state prediction
-    #action_errors = []
-    #for i, ((state, action), next_state) in enumerate(trans_dataset):
-        #if (state != next_state).any(): 
-            #action_errors.append(((preds[i]>0.5) != next_state).sum().float())
-    ## for delta_state prediction
-    actions, action_errors = 0, 0
-    for i, ((state, action), delta_state) in enumerate(trans_dataset):
-        num_edge_changes = delta_state.abs().sum()
-        if num_edge_changes != 0:
-            actions += num_edge_changes
-            action_errors += (preds[i].round() != delta_state).sum().float()
-            print(preds[i])
-    print('%i/%i datapoints consisted of transtitions.' % (actions, len(trans_dataset)))
-    print('%i/%i transitions were incorrectly predicted' % (action_errors, actions))
+    if args.pred_type == 'full_state':
+        action_errors = 0
+        successful_actions = 0
+        for i, ((state, action), next_state) in enumerate(trans_dataset):
+            if (state != next_state).any(): 
+                successful_actions += 1
+                if ((preds[i]>0.5) != next_state).sum().float() > 0.:
+                    action_errors += 1
+                print(preds[i], next_state)
+                #action_errors.append(((preds[i]>0.5) != next_state).sum().float())
+        print('%i/%i datapoints consisted of transtitions.' % (successful_actions, len(trans_dataset)))
+        print('%i/%i transitions were incorrectly predicted' % (action_errors, successful_actions))
+    elif args.pred_type == 'delta_state':
+        actions, action_errors = 0, 0
+        for i, ((state, action), delta_state) in enumerate(trans_dataset):
+            num_edge_changes = delta_state.abs().sum()
+            if num_edge_changes != 0:
+                actions += 1
+                if (preds[i].round() != delta_state).sum().float() > 0.:
+                    action_errors += 1
+                #action_errors += (preds[i].round() != delta_state).sum().float()
+                #print(preds[i])
+        print('%i/%i datapoints consisted of transtitions.' % (actions, len(trans_dataset)))
+        print('%i/%i transitions were incorrectly predicted' % (action_errors, actions))
     
 def calc_heur_error_rate(heur_dataset, model):
     n = len(heur_dataset)

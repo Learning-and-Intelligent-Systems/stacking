@@ -42,6 +42,10 @@ if __name__ == '__main__':
                         type=int,
                         default=10,
                         help='max number of actions in a sequence')
+    parser.add_argument('--pred-type',
+                        type=str,
+                        choices=['delta_state', 'full_state'],
+                        required=True)
     parser.add_argument('--exp-name',
                         type=str,
                         required=True,
