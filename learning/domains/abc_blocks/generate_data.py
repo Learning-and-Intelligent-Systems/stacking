@@ -11,7 +11,7 @@ def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
     for i in range(args.max_seq_attempts):
         world.reset()
         action_sequence = []
-        for _ in range(args.max_action_attempts):
+        for j in range(args.max_action_attempts):
             state = world.get_state()
             #if subset(goal, state):
             #    action_sequence.append((state, NONACTION))
@@ -36,11 +36,11 @@ def add_sequence_to_dataset(trans_dataset, heur_dataset, action_sequence, goal, 
                 vec_next_state = get_vectorized_state(next_state)
                 # NOTE: this results in -1 when edges should be deleted
                 # so can't use for binary cross entropy
-                #delta_state = vec_next_state-vec_state
+                delta_state = vec_next_state-vec_state
                 #if delta_state.sum() != 0:
                 #    print(delta_state)
-                #trans_dataset.add_to_dataset(vec_state, action, delta_state)
-                trans_dataset.add_to_dataset(vec_state, action, vec_next_state)
+                trans_dataset.add_to_dataset(vec_state, action, delta_state)
+                #trans_dataset.add_to_dataset(vec_state, action, vec_next_state)
             
                 
     # if given goal was reached, add to dataset

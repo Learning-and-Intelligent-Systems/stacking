@@ -3,7 +3,7 @@ from torch import nn
 
         
 class HeuristicGNN(nn.Module):
-    def __init__(self, n_in=1, n_hidden=1):
+    def __init__(self, n_in=7, n_hidden=1):
         """ This network is given an input of size (N, K, K).
         N is the batch size, K is the number of objects (including a * object).
         The model is one interation of message passing in a GNN
@@ -97,9 +97,10 @@ class HeuristicGNN(nn.Module):
         
         # TODO: don't hard code all object properties
         # object_states.shape = (N, K, n_in)
-        object_states = torch.arange(7, dtype=torch.float64, requires_grad=True)
-        object_states = object_states.repeat(N,1)
-        object_states = torch.unsqueeze(object_states, axis=2)
+        # object_states = torch.arange(K, dtype=torch.float64, requires_grad=True)
+        # object_states = object_states.unsqueeze(dim=1)
+        object_states = torch.eye(K, dtype=torch.float64, requires_grad=True)
+        object_states = object_states.repeat(N, 1, 1)
         
         h_state = self.encode_state(object_states, state_edge_mask)
         h_goal = self.encode_state(object_states, goal_edge_mask)
@@ -108,9 +109,10 @@ class HeuristicGNN(nn.Module):
         return pred
 
 class TransitionGNN(nn.Module):
-    def __init__(self, n_in=1, n_hidden=1):
+    def __init__(self, n_in=7, n_hidden=1):
         """ This network is given three inputs of size (N, K, K), (N, 1), and (N, K, K).
         N is the batch size, K is the number of objects (including a * object)
+        :param n_in: Dimensionality of object state and action (one-hot encodings)
         :param n_hidden: Number of hidden units used throughout the network.
         """
         super(TransitionGNN, self).__init__()
@@ -118,7 +120,7 @@ class TransitionGNN(nn.Module):
         torch.set_default_dtype(torch.float64) # my data was float64 and model params were float32
         
         # Message function that compute relation between two nodes and outputs a message vector.
-        self.E1 = nn.Sequential(nn.Linear(2*n_in+1, n_hidden),
+        self.E1 = nn.Sequential(nn.Linear(3*n_in, n_hidden),
                                nn.ReLU())
         self.E2 = nn.Sequential(nn.Linear(2*n_hidden, 1),
                                nn.ReLU())
@@ -139,17 +141,17 @@ class TransitionGNN(nn.Module):
         edge_mask = edge_mask[:, :, :, None].expand(N, K, K, 1)
 
         # Get features between all node. 
-        # action.shape = (N)
-        # object_state.shape = (N, K, n_in)
-        # a.shape = (N, K, K, 1)
+        # action.shape = (N, n_in)
+        # object_states.shape = (N, K, n_in)
+        # a.shape = (N, K, K, n_in)
         # x.shape = (N, K, K, n_in)
         # xx.shape = (N, K, K, 2*n_in)
-        # xxa.shape = (N, K, K, 2*n_in+1) --> (N*K*K, 2*n_in+1)
-        a = action[:, None, None, None].expand(-1, K, K, 1)
+        # xxa.shape = (N, K, K, 3*n_in) --> (N*K*K, 3*n_in)
+        a = action[:, None, None, :].expand(-1, K, K, -1)
         x = object_states[:, :, None, :].expand(N, K, K, self.n_in)
         xx = torch.cat([x, x.transpose(1, 2)], dim=3)
         xxa = torch.cat([xx, a], dim=3)
-        xxa = xxa.view(-1, 2*self.n_in+1)
+        xxa = xxa.view(-1, 3*self.n_in)
         
         # Calculate the edge features for each node 
         # all_edges.shape = (N, K, K, n_hidden)
@@ -207,7 +209,8 @@ class TransitionGNN(nn.Module):
         if torch.cuda.is_available():
             edge_mask = edge_mask.cuda()
         #all_edges = all_edges*edge_mask
-        all_edges = torch.sigmoid(all_edges).squeeze(-1)
+        #all_edges = torch.sigmoid(all_edges).squeeze(-1)
+        all_edges = all_edges.squeeze(-1)
         return all_edges
 
     def forward(self, x):
@@ -222,9 +225,10 @@ class TransitionGNN(nn.Module):
         
         # TODO: don't hard code all object properties
         # object_states.shape = (N, K, n_in)
-        object_states = torch.arange(7, dtype=torch.float64, requires_grad=True)
-        object_states = object_states.repeat(N,1)
-        object_states = torch.unsqueeze(object_states, axis=2)
+        # object_states = torch.arange(K, dtype=torch.float64, requires_grad=True)
+        # object_states = object_states.unsqueeze(dim=1)
+        object_states = torch.eye(K, dtype=torch.float64, requires_grad=True)
+        object_states = object_states.repeat(N, 1, 1)
 
         # Calculate edge updates for each node with action as input
         he1 = self.action_edge_fn(object_states, edge_mask, action)

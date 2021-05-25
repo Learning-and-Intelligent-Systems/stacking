@@ -59,31 +59,29 @@ class ABCBlocksWorld:
         self._stacked_blocks = []
 
     def transition(self, action):
-        if action != NONACTION:
-            if len(self._stacked_blocks) == 0:
-                self._stacked_blocks.append(self._blocks[action])
-            else:
-                if action == self._stacked_blocks[-1].num+1:
-                    self._stacked_blocks.append(self._blocks[action])
+        if action.sum() != 0.:
+            block_num = int(np.where(action == 1.)[0])
+            if len(self._stacked_blocks) == 0 or block_num == self._stacked_blocks[-1].num+1:
+                self._stacked_blocks.append(self._blocks[block_num])
         
     def random_policy(self):
+        action = np.zeros(MAXBLOCK+1)
         remaining_blocks = list(set(self._blocks.values()).difference(set(self._stacked_blocks)))
         if len(remaining_blocks) > 0:
-            action = random.choice(remaining_blocks).num
-            return action
-        else:
-            return NONACTION
+            block_num = random.choice(remaining_blocks).num
+            action[block_num] = 1.
+        return action
             
     def expert_policy(self):
+        action = np.zeros(MAXBLOCK+1)
         if len(self._stacked_blocks) > 0:
             top = self._stacked_blocks[-1]
             if top.num != MAXBLOCK:
-                return top.num+1
-            else:
-                return NONACTION
+                action[top.num+1] = 1.
         else:
             random_block = random.choice(list(self._blocks.values()))
-            return random_block.num
+            action[random_block.num] = 1.
+        return action
             
     def get_state(self):
         state = []

@@ -67,7 +67,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
                 y = y.cuda()
             optimizer.zero_grad()
             
-            pred = model.forward(x).squeeze()
+            pred = model.forward(x)
             loss = loss_fn(pred, y)
             loss.backward()
 
@@ -89,10 +89,12 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
         model.load_state_dict(best_weights)
     
     fig, ax = plt.subplots()
-    ax.plot(all_accs, label='accuracy')
+    #ax.plot(all_accs, label='accuracy')
     ax.plot(all_losses, label='loss')
+    ax.set_xlabel('Batch Number (%i Epochs)' % n_epochs)
+    ax.set_title('Loss and Accuracy on Training Dataset')
     ax.legend()
-    
+    plt.show()
     return model
 
 if __name__ == '__main__':
