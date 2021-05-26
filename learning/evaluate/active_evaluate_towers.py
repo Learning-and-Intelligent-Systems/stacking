@@ -12,9 +12,8 @@ from learning.active.acquire import bald
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.towers.active_utils import get_sequential_predictions, get_predictions, sample_unlabeled_data, get_labels, sample_sequential_data
 from learning.domains.towers.generate_tower_training_data import sample_random_tower
-from learning.domains.towers.tower_data import TowerDataset, TowerSampler, add_placement_noise, unprocess
+from learning.domains.towers.tower_data import TowerDataset, TowerSampler, add_placement_noise, unprocess, recover_dict_from_tower_dataset
 from learning.evaluate.planner import EnsemblePlanner
-from learning.train_latent import LatentEnsemble
 
 from tower_planner import TowerPlanner
 
@@ -36,6 +35,63 @@ def inspect_validation_set(fname):
             tower = [Object.from_vector(tower_vec[bx, :]) for bx in range(0, tower_vec.shape[0])]
             print(tp.tower_is_constructable(tower[:1]))
 
+def plot_train_accuracy(logger):
+    tower_keys = ['2block', '3block', '4block', '5block']
+    accs = {k: [] for k in tower_keys}
+
+    # go through each acqisition step
+    for tx in range(0, logger.args.max_acquisitions):
+        print('Eval timestep, ', tx)
+
+        # load the dataset and ensemble from that timestep
+        ensemble = logger.get_ensemble(tx)
+        train_dict = recover_dict_from_tower_dataset(logger.load_dataset(tx))
+
+        # make a prediction for each item in the dataset
+        if hasattr(logger.args, 'sampler') and logger.args.sampler == 'sequential':
+            preds = get_sequential_predictions(train_dict, ensemble, use_latents=logger.use_latents).mean(1).numpy()
+        else:
+            preds = get_predictions(train_dict, ensemble, use_latents=logger.use_latents).mean(1).numpy()
+
+        # compute accuracy for each tower size
+        start = 0
+        for k in tower_keys:
+            end = start + train_dict[k]['towers'].shape[0]
+            acc = ((preds[start:end]>0.5) == train_dict[k]['labels']).mean()
+            accs[k].append(acc)
+            start = end
+
+    # now plot the accuracy for each tower height
+    for k in tower_keys:
+        plt.plot(accs[k], label=k)
+
+    plt.xlabel('Acquisition Step')
+    plt.ylabel('Train Accuracy')
+    plt.title('Train accuracy during active learning')
+    plt.legend()
+    plt.savefig(logger.get_figure_path('train_accuracy.png'))
+    plt.clf()
+
+
+def plot_latent_uncertainty(logger):
+    scales = []
+
+    # go through each acqisition step
+    for tx in range(0, logger.args.max_acquisitions):
+        print('Eval timestep, ', tx)
+
+        # load the dataset and ensemble from that timestep
+        ensemble = logger.get_ensemble(tx)
+        scales.append(torch.exp(ensemble.latent_logscales).mean(axis=0).detach().numpy())
+
+    plt.plot(np.array(scales))
+
+    plt.xlabel('Acquisition Step')
+    plt.ylabel('Mean Latent Scale')
+    plt.title('Variance along each latent dimension')
+    plt.savefig(logger.get_figure_path('latent_scale.png'))
+    plt.clf()
+
 
 def get_validation_accuracy(logger, fname):
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -49,11 +105,10 @@ def get_validation_accuracy(logger, fname):
         if tx % 10 == 0:
             print('Eval timestep, ', tx)
         ensemble = logger.get_ensemble(tx)
-        use_latents = isinstance(ensemble, LatentEnsemble)
         if hasattr(logger.args, 'sampler') and logger.args.sampler == 'sequential':
-            preds = get_sequential_predictions(val_towers, ensemble, use_latents=use_latents).mean(1).numpy()
+            preds = get_sequential_predictions(val_towers, ensemble, use_latents=logger.use_latents).mean(1).numpy()
         else:
-            preds = get_predictions(val_towers, ensemble, use_latents=use_latents).mean(1).numpy()
+            preds = get_predictions(val_towers, ensemble, use_latents=logger.use_latents).mean(1).numpy()
 
         start = 0
         for k in tower_keys:
@@ -77,7 +132,7 @@ def get_validation_accuracy(logger, fname):
         pickle.dump(accs, handle)
     return accs
 
-def plot_val_accuracy(logger, init_dataset_size=100, n_acquire=10):
+def plot_val_accuracy(logger, init_dataset_size=100, n_acquire=10, separate_axs=False):
     with open(logger.get_figure_path('val_accuracies.pkl'), 'rb') as handle:
         accs = pickle.load(handle)
 
@@ -85,20 +140,33 @@ def plot_val_accuracy(logger, init_dataset_size=100, n_acquire=10):
 
     ref_acc = {'2block': .955, '3block': .925, '4block': .912, '5block': .913}
     
-    plt.clf()
-    fig, axes = plt.subplots(4, figsize=(10, 20))
-    for ix, ax in enumerate(axes):
-        k = tower_keys[ix]
-        max_x = init_dataset_size + n_acquire*len(accs[k])
-        xs = np.arange(init_dataset_size, max_x, n_acquire)
 
-        ax.plot(xs, accs[k], label=k)
-        #ax.plot([400, 4500], [ref_acc[k]]*2)
-        #ax.axvline(x=4375)
-        ax.set_xlabel('Number of Towers')
-        ax.set_ylabel('Val Accuracy')
-        ax.legend()
+    if separate_axs:
+        plt.clf()
+        fig, axes = plt.subplots(4, figsize=(10, 20))
+        for ix, ax in enumerate(axes):
+            k = tower_keys[ix]
+            max_x = init_dataset_size + n_acquire*len(accs[k])
+            xs = np.arange(init_dataset_size, max_x, n_acquire)
+
+            ax.plot(xs, accs[k], label=k)
+            #ax.plot([400, 4500], [ref_acc[k]]*2)
+            #ax.axvline(x=4375)
+            ax.set_xlabel('Number of Towers')
+            ax.set_ylabel('Val Accuracy')
+            ax.legend()
+    else:
+        for k in tower_keys:
+            max_x = init_dataset_size + n_acquire*len(accs[k])
+            xs = np.arange(init_dataset_size, max_x, n_acquire)
+            plt.plot(xs, accs[k], label=k)
+        plt.xlabel('Number of Towers')
+        plt.ylabel('Val Accuracy')
+        plt.legend()
+
+    plt.title('Validation Accuracy throughout active learning')
     plt.savefig(logger.get_figure_path('val_accuracy.png'))
+    plt.clf()
 
 def get_dataset_statistics(logger):
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -202,18 +270,15 @@ def analyze_single_dataset(logger):
         print(k, '+', pos, '-', neg)
 
 
-
 def analyze_bald_scores(logger):
     tower_keys = ['2block', '3block', '4block', '5block']
 
-    tx = 60
+    tx = 10
     acquired, unlabeled = logger.load_acquisition_data(tx)
     ensemble = logger.get_ensemble(tx)
-
-    preds = get_predictions(unlabeled, ensemble)
+    preds = get_predictions(unlabeled, ensemble, use_latents=logger.use_latents)
     bald_scores = bald(preds).numpy()
     acquire_indices = np.argsort(bald_scores)[::-1][:10]
-    print(acquire_indices)
     start = 0
     for k in tower_keys:
         end = start + unlabeled[k]['towers'].shape[0]
@@ -234,7 +299,7 @@ def get_acquisition_scores_over_time(logger):
         _, unlabeled = logger.load_acquisition_data(tx)
         ensemble = logger.get_ensemble(tx)
 
-        preds = get_predictions(unlabeled, ensemble)
+        preds = get_predictions(unlabeled, ensemble, use_latents=logger.use_latents)
         bald_scores = bald(preds).numpy()
         # Get the max score per tower_height.
         start = 0
@@ -261,7 +326,7 @@ def plot_acquisition_scores_over_time(logger):
     plt.savefig(logger.get_figure_path('acquisition_over_time.png'))
 
 
-def analyze_acquisition_histogram(logger):
+def analyze_acquisition_histogram(logger, block_set_fname='learning/data/block_set_10.pkl'):
     """ When we generate unlabeled samples, we do so hoping to find informative
     towers (based on the BALD acquisition function). However, it is unclear how 
     many samples are needed.
@@ -276,7 +341,7 @@ def analyze_acquisition_histogram(logger):
     overall_data = {}
     
     for n_samples in [100000]:
-        with open('learning/data/block_set_10.pkl', 'rb') as handle:
+        with open(block_set_fname, 'rb') as handle:
             block_set = pickle.load(handle)
 
         unlabeled_data = [sample_unlabeled_data(n_samples, block_set) for _ in range(n_repeats)]
@@ -298,7 +363,7 @@ def analyze_acquisition_histogram(logger):
                 #noisy = noisy_data[ux]
                 # with open('learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl', 'rb') as handle:
                 #     unlabeled = pickle.load(handle)
-                preds = get_predictions(unlabeled, ensemble)[:,:]
+                preds = get_predictions(unlabeled, ensemble, use_latents=logger.use_latents)[:,:]
                 #noisy_preds = get_predictions(noisy, ensemble)
                 labels = get_labels(unlabeled)
                 bald_scores = bald(preds).numpy()
@@ -391,7 +456,7 @@ def analyze_acquisition_value_with_sampling_size(logger):
             for ux in range(n_repeats):
                 unlabeled = unlabeled_data[ux]
 
-                preds = get_predictions(unlabeled, ensemble)[:,:]
+                preds = get_predictions(unlabeled, ensemble, use_latents=logger.use_latents)[:,:]
                 bald_scores = bald(preds).numpy()
                 # Get the max score per tower_height.
                 start = 0
@@ -457,7 +522,7 @@ def analyze_sample_efficiency(logger, tx):
             #     unlabeled[k]['labels'] = unlabeled['5block']['labels'][:1000,...].copy()
             # for k in tower_keys:
             #     print(k, unlabeled[k]['towers'].shape)
-            preds = get_predictions(unlabeled, ensemble)
+            preds = get_predictions(unlabeled, ensemble, use_latents=logger.use_latents)
             bald_scores = bald(preds).numpy()
 
             # Get the max score per tower_height.
@@ -550,7 +615,7 @@ def inspect_2block_towers(logger):
     #ensemble = logger.get_ensemble(10)
     ensemble = logger.get_ensemble(logger.args.max_acquisitions - 1)
     unlabeled = sample_unlabeled_data(10000)
-    preds = get_predictions(unlabeled, ensemble)
+    preds = get_predictions(unlabeled, ensemble, use_latents=logger.use_latents)
     bald_scores = bald(preds).numpy()
     print('Best BALD')
     ixs = np.argsort(bald_scores)[::-1][:10]
@@ -571,7 +636,7 @@ def inspect_2block_towers(logger):
 
     for ix in acquire_indices:
         unlabeled['2block']['towers'][ix,1,7:8] += 0.0
-    new_preds = get_predictions(unlabeled, ensemble)
+    new_preds = get_predictions(unlabeled, ensemble, use_latents=logger.use_latents)
     print('-----')
     for ix in acquire_indices:
         d = decision_distance(unlabeled['2block']['towers'][ix,:,:])
@@ -590,7 +655,7 @@ def inspect_2block_towers(logger):
     with open('learning/data/random_blocks_(x2000)_5blocks_uniform_mass.pkl', 'rb') as handle:
         val_towers = pickle.load(handle)
 
-    preds = get_predictions(val_towers, ensemble).mean(1).numpy()
+    preds = get_predictions(val_towers, ensemble, use_latents=logger.use_latents).mean(1).numpy()
     dists = []
     for ix in range(0, val_towers['2block']['towers'].shape[0]):
         d = decision_distance(val_towers['2block']['towers'][ix,:,:])
@@ -627,7 +692,7 @@ def single_2block_tower_analysis(logger):
     print(displacements.shape, unlabeled['2block']['towers'][:,1,7:8].shape)
     unlabeled['2block']['towers'][:,1:2,7:8] += displacements
 
-    preds = get_predictions(unlabeled, ensemble)[:1000,...]
+    preds = get_predictions(unlabeled, ensemble, use_latents=logger.use_latents)[:1000,...]
 
     for ix in range(1000):
         dim_x = unlabeled['2block']['towers'][ix, 0, 4]/2.
@@ -923,7 +988,7 @@ def get_percent_stable(logger):
     tower_keys = ['2block', '3block', '4block', '5block']
 
     for k in tower_keys:
-        print(k, dataset.tower_labels)
+        print(k, dataset.tower_labels[k].mean())
 
 
 def save_collected_tower_images(logger):
@@ -1008,22 +1073,27 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-    logger.args.max_acquisitions = 75
+    logger.args.max_acquisitions = 50
+
+    plot_train_accuracy(logger)
+    plot_latent_uncertainty(logger)
+
+
     #plot_sample_efficiency(logger)
     #analyze_sample_efficiency(logger, 340)
-    #analyze_bald_scores(logger)
-    #get_acquisition_scores_over_time(logger)
-    #plot_acquisition_scores_over_time(logger)
+    # analyze_bald_scores(logger)
+    # get_acquisition_scores_over_time(logger)
+    # plot_acquisition_scores_over_time(logger)
     #analyze_single_dataset(logger)
     
     #check_stable_bases(logger)
-    #get_dataset_statistics(logger)
+    # get_dataset_statistics(logger)
 
     #inspect_validation_set('learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
 
     accs = get_validation_accuracy(logger,
                                   # 'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
-                                  '/Users/izzy/projects/stacking/learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl')
+                                  '/home/izzy/projects/stacking/learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl')
     plot_val_accuracy(logger)
 
     # #analyze_collected_2block_towers(logger)
@@ -1033,7 +1103,7 @@ if __name__ == '__main__':
     #plot_acquisition_value_with_sampling_size(logger)
 
     #check_redundancy(logger)
-    #analyze_acquisition_histogram(logger)
+    # analyze_acquisition_histogram(logger, block_set_fname='learning/data/may_cubes/blocks/set_a.pkl')
     #single_2block_tower_analysis(logger)
     #inspect_2block_towers(logger)
 
@@ -1044,11 +1114,11 @@ if __name__ == '__main__':
     #longest_overhang_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
     #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
     #plot_regret(logger)
-    #plot_constructability_over_time(logger)
+    # plot_constructability_over_time(logger)
     #validate(logger, 125)
     #get_stability_composition(logger, tx=245)
     #validate_by_stability_type(logger, tx=85)
-    #get_percent_stable(logger)
+    # get_percent_stable(logger)
 
     #save_collected_tower_images(logger)
 

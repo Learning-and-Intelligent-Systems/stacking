@@ -249,6 +249,17 @@ class ParallelDataLoader:
         return len(self.loaders[0])
 
 
+def recover_dict_from_tower_dataset(dataset):
+    d = {}
+    for k in dataset.tower_keys:
+        d[k] = {
+            'towers': dataset.tower_tensors[k].numpy(),
+            'block_ids': dataset.tower_block_ids[k],  # these are already ndarray
+            'labels': dataset.tower_labels[k].numpy()
+        }
+
+    return d
+
 if __name__ == '__main__':
     #with open('learning/data/random_blocks_(x40000)_5blocks_all.pkl', 'rb') as handle:
     #   towers_dict = pickle.load(handle)

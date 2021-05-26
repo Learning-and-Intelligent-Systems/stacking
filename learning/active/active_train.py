@@ -70,6 +70,7 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
         ensemble.reset()
         if args.use_latents:
             train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs)
+            print(ensemble.latent_locs.detach().numpy(), np.exp(ensemble.latent_logscales.detach().numpy()))
         else:
             for model in ensemble.models:
                 train(dataloader, val_dataloader, model, args.n_epochs)
