@@ -15,7 +15,7 @@ from learning.active.utils import ActiveExperimentLogger
 from agents.panda_agent import PandaAgent, PandaClientAgent
 from tamp.misc import load_blocks
 
-def inititalize_model(args):
+def initialize_model(args, n_blocks):
     if args.model == 'fcgn':
         base_model = FCGN
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
@@ -40,56 +40,16 @@ def inititalize_model(args):
     ensemble = Ensemble(base_model=base_model,
                         base_args=base_args,
                         n_models=args.n_models)
-    return ensemble
-
-
-def run_active_towers(args):
-    logger = ActiveExperimentLogger.setup_experiment_directory(args)
-
-    # Initialize agent with supplied blocks (only works with args.block_set_fname set)
-    if args.block_set_fname is not '':
-        with open(args.block_set_fname, 'rb') as f:
-            block_set = pickle.load(f)
-    else:
-        raise NotImplementedError()
-
-    if args.exec_mode == 'simple-model' or args.exec_mode == 'noisy-model':
-        agent = None
-    elif args.exec_mode == 'sim' or args.exec_mode == 'real':
-        if args.use_panda_server:
-            agent = PandaClientAgent()
-        else:
-            block_set = load_blocks(fname=args.block_set_fname,
-                                    num_blocks=10)
-            agent = PandaAgent(block_set)
-
-    # Initialize ensemble.
-    ensemble = initialize_model(args)
-    
-    # Choose a sampler and check if we are limiting the blocks to work with.
-    block_set = None
-    if args.block_set_fname is not '':
-        data_subset_fn = get_subset
-        with open(args.block_set_fname, 'rb') as f:
-            # TODO: Unify block loading
-            block_set = pickle.load(f)
-            if args.exec_mode == "sim" or args.exec_mode == "real":
-                block_set = load_blocks(fname=args.block_set_fname,
-                                        num_blocks=10)
-        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
-    else:
-        data_subset_fn = get_subset
-        data_sampler_fn = sample_unlabeled_data
 
     # wrap the ensemble with latents
     if args.use_latents:
-        ensemble = LatentEnsemble(ensemble, len(block_set), d_latents=4)
+        ensemble = LatentEnsemble(ensemble, n_blocks, d_latents=4)
 
-    # send to GPU if needed
-    if torch.cuda.is_available():
-        ensemble = ensemble.cuda()
+    return ensemble
 
-    # Sample initial dataset.
+
+def get_initial_dataset(args, block_set, agent, logger):
+    # Sample initial dataset. 
     if len(args.init_data_fname) > 0:
         print(f'Loading an initial dataset from {args.init_data_fname}')
         # A good dataset to use is learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl
@@ -99,41 +59,31 @@ def run_active_towers(args):
         with open(args.val_data_fname, 'rb') as handle:
             val_dict = pickle.load(handle)
         val_dataset = TowerDataset(val_dict, augment=False)
-
-        if args.sampler == 'sequential':
-            data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
-        else:
-            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
-    elif args.sampler == 'sequential':
-        print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
-        towers_dict = sample_sequential_data(block_set, None, 40)
-        towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
-        dataset = TowerDataset(towers_dict, augment=False, K_skip=1)
-
-        val_towers_dict = sample_sequential_data(block_set, None, 40)
-        val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
-        val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
-
-        if block_set is None:
-            raise NotImplementedError()
-
-        data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
     else:
-        print('Sampling initial dataset randomly.')
-        towers_dict = sample_unlabeled_data(40, block_set=block_set)
-        towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger, args.xy_noise)
-        dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
+        # If an initial dataset isn't given, sample one based on the sampler type.
+        if args.sampler == 'sequential':
+            print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
+            towers_dict = sample_sequential_data(block_set, None, 40)
+            towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
+            dataset = TowerDataset(towers_dict, augment=False, K_skip=1)
 
-        val_towers_dict = sample_unlabeled_data(40, block_set=block_set)
-        val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger, args.xy_noise)
-        val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
+            val_towers_dict = sample_sequential_data(block_set, None, 40)
+            val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
+            val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)            
+        else:
+            print('Sampling initial dataset randomly.')
+            towers_dict = sample_unlabeled_data(40, block_set=block_set)
+            towers_dict = get_labels(towers_dict, args.exec_mode, agent, logger, args.xy_noise)
+            dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
+
+            val_towers_dict = sample_unlabeled_data(40, block_set=block_set)
+            val_towers_dict = get_labels(val_towers_dict, args.exec_mode, agent, logger, args.xy_noise)
+            val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)
+    
+    return dataset, val_dataset
 
 
-    if args.strategy == 'subtower-greedy':
-        data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
-    if args.strategy == 'subtower':
-        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(5, 5))
-
+def get_dataloaders(args, dataset, val_dataset):
     #print(len(dataset), len(val_dataset))
     if args.use_latents:
         dataloader = ParallelDataLoader(dataset,
@@ -153,15 +103,68 @@ def run_active_towers(args):
                                    shuffle=False)
         val_dataloader = DataLoader(val_dataset,
                                     batch_sampler=val_sampler)
+    return dataloader, val_dataloader
 
+
+def get_sampler_fn(args, block_set):
+    if args.n_samples < 100000:
+        print('[WARNING] Running with fewer than 100k unlabeled samples.')
+    # Certain strategies require specific data-sampler functions.
+    if args.strategy == 'subtower-greedy':
+        data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
+    elif args.strategy == 'subtower':
+        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(5, 5))
+    else:
+        # Otherwise we defaul to whatever --sampler was directly specified.
+        if args.sampler == 'sequential':
+            data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
+        else:
+            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
+    return data_sampler_fn
+
+
+def run_active_towers(args):
+    logger = ActiveExperimentLogger.setup_experiment_directory(args)
+
+    # Initialize agent with supplied blocks (only works with args.block_set_fname set)
+    if args.block_set_fname is not '':
+        with open(args.block_set_fname, 'rb') as f:
+            block_set = pickle.load(f)
+    else:
+        raise NotImplementedError()
+
+    # Set the agent used to get labels/perform experiments.
+    if args.exec_mode == 'simple-model' or args.exec_mode == 'noisy-model':
+        agent = None
+    elif args.exec_mode == 'sim' or args.exec_mode == 'real':
+        if args.use_panda_server:
+            agent = PandaClientAgent()
+        else:
+            block_set = load_blocks(fname=args.block_set_fname,
+                                    num_blocks=10)
+            agent = PandaAgent(block_set)
+
+    # Initialize ensemble.
+    ensemble = initialize_model(args, len(block_set))    
+    if torch.cuda.is_available():
+        ensemble = ensemble.cuda()
+
+    # Get an initial dataset.
+    dataset, val_dataset = get_initial_dataset(args, block_set, agent, logger)
+    dataloader, val_dataloader = get_dataloaders(args, dataset, val_dataset)
+
+    # Get active learning helper functions.
+    data_subset_fn = get_subset
+    data_sampler_fn = get_sampler_fn(args, block_set)
     # tell the "forward pass" of the latent ensemble to sample from the latents
     # and collapse the N_samples and N_models dimension into one
     if args.use_latents:
         data_pred_fn = lambda dataset, ensemble: get_predictions(
-            dataset, ensemble, N_samples=20, use_latents=True)
+            dataset, ensemble, N_samples=10, use_latents=True)
     else:
-        data_pred_fn = get_predictions
+        data_pred_fn = get_predictions    
 
+    # Start training.
     print('Starting training from scratch.')
     if args.exec_mode == 'real':
         input('Press enter to confirm you want to start training from scratch.')
