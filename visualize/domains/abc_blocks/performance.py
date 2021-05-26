@@ -27,23 +27,24 @@ def calc_successful_action_error_rate(args, trans_dataset, trans_model):
     if args.pred_type == 'full_state':
         action_errors = 0
         successful_actions = 0
-        for i, ((state, action), next_state) in enumerate(trans_dataset):
-            if (state != next_state).any(): 
+        for i, ((object_features, edge_features, action), next_edge_features) in enumerate(trans_dataset):
+            if (edge_features != next_edge_features).any(): 
                 successful_actions += 1
-                if ((preds[i]>0.5) != next_state).sum().float() > 0.:
+                if ((preds[i]>0.5) != next_edge_features).sum().float() > 0.:
                     action_errors += 1
-                print(preds[i], next_state)
+                print(preds[i,:,:,0], next_edge_features[:,:,0])
                 #action_errors.append(((preds[i]>0.5) != next_state).sum().float())
         print('%i/%i datapoints consisted of transtitions.' % (successful_actions, len(trans_dataset)))
         print('%i/%i transitions were incorrectly predicted' % (action_errors, successful_actions))
     elif args.pred_type == 'delta_state':
         actions, action_errors = 0, 0
-        for i, ((state, action), delta_state) in enumerate(trans_dataset):
-            num_edge_changes = delta_state.abs().sum()
+        for i, ((object_features, edge_features, action), delta_edge_features) in enumerate(trans_dataset):
+            num_edge_changes = delta_edge_features.abs().sum()
             if num_edge_changes != 0:
                 actions += 1
-                if (preds[i].round() != delta_state).sum().float() > 0.:
+                if (preds[i].round() != delta_edge_features).sum().float() > 0.:
                     action_errors += 1
+                print(preds[i,:,:,0])
                 #action_errors += (preds[i].round() != delta_state).sum().float()
                 #print(preds[i])
         print('%i/%i datapoints consisted of transtitions.' % (actions, len(trans_dataset)))

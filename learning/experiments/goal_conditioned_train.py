@@ -43,12 +43,12 @@ def run_goal_directed_train(args, plot=True):
     trans_error_rates = []
     heur_error_rates = []
     train_policy = world.expert_policy
-    for i, max_additional_seq_attempts in enumerate([200]):#[1, 4, 5, 10, 30, 50]):
+    for i, max_additional_seq_attempts in enumerate([20]):#[1, 4, 5, 10, 30, 50]):
         print('Adding to training dataset.')
         args.max_seq_attempts = max_additional_seq_attempts
         generate_dataset(args, world, logger, trans_dataset, heur_dataset, train_policy)
         preprocess(args, trans_dataset)
-        trans_model = TransitionGNN(args, n_hidden=16)
+        trans_model = TransitionGNN(args, n_hidden=7)
         print('Training with %i datapoints' % len(trans_dataset))
         n_datapoints.append(len(trans_dataset))
         if args.pred_type == 'delta_state':

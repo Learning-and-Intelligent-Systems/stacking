@@ -10,14 +10,16 @@ features:
     0: * object
     1: Table
     2-6: Blocks and Place block action
-    7: non action
-    
 '''
+N_OBJECTS=7 # must be 3 or greater
 STAR=0
 TABLE=1
 MINBLOCK=2
-MAXBLOCK=6
-NONACTION=7
+MAXBLOCK=N_OBJECTS-1
+
+# NOTE: all object properties are currently static
+#       one-hot encoding of the index of the object
+object_features = np.eye(N_OBJECTS)
 
 def get_vectorized_state(state):
     def get_int_object(object):
@@ -27,12 +29,12 @@ def get_vectorized_state(state):
             return object.num
         elif object == '*':
             return STAR
-    edges = np.zeros((7,7))
+    edge_features = np.zeros((N_OBJECTS, N_OBJECTS, 1))
     for fluent in state:
         bottom_i = get_int_object(fluent.bottom)
         top_i = get_int_object(fluent.top)
-        edges[bottom_i, top_i] = 1
-    return edges
+        edge_features[bottom_i, top_i, :] = 1.
+    return object_features, edge_features
     
 class Block:
     def __init__(self, num):

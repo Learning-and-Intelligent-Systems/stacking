@@ -1,7 +1,7 @@
 import torch
 
 from tamp.logic import subset
-from learning.domains.abc_blocks.world import get_vectorized_state, NONACTION
+from learning.domains.abc_blocks.world import get_vectorized_state
 
 # TODO: generate validation dataset too!!
 def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
@@ -26,19 +26,20 @@ def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger):
     def helper(sequence, seq_goal):
         n = len(sequence)
-        vec_goal = get_vectorized_state(seq_goal)
+        goal_object_features, goal_edge_features = get_vectorized_state(seq_goal)
         for i in range(n):
             state, action = sequence[i]
-            vec_state = get_vectorized_state(state)
-            heur_dataset.add_to_dataset(vec_state, vec_goal, n-i-1)
+            object_features, edge_features = get_vectorized_state(state)
+            heur_dataset.add_to_dataset(object_features, edge_features, goal_edge_features, n-i-1)
             if i < n-1: # training transition model doesn't require last action in sequence
                 next_state, _ = sequence[i+1]
-                vec_next_state = get_vectorized_state(next_state)
+                next_object_features, next_edge_features = get_vectorized_state(next_state)
                 if args.pred_type == 'delta_state':
-                    state_to_add = vec_next_state-vec_state
+                    edge_features_to_add = next_edge_features-edge_features
                 elif args.pred_type == 'full_state':
-                    state_to_add = vec_next_state
-                trans_dataset.add_to_dataset(vec_state, action, state_to_add)
+                    edge_features_to_add = next_edge_features
+                trans_dataset.add_to_dataset(object_features, edge_features, 
+                                            action, edge_features_to_add)
                 
     # if given goal was reached, add to dataset
     #if subset(goal, action_sequence[-1][0]):
@@ -52,8 +53,8 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
 def preprocess(args, dataset):
     xs, ys = dataset[:]
     remove_list = []
-    for i, ((state, action), next_state) in enumerate(dataset):
-        if (args.pred_type == 'full_state' and (state == next_state).all()) or \
-            (args.pred_type == 'delta_state' and (next_state.abs().sum() == 0)):
+    for i, ((object_features, edge_features, action), next_edge_features) in enumerate(dataset):
+        if (args.pred_type == 'full_state' and (edge_features == next_edge_features).all()) or \
+            (args.pred_type == 'delta_state' and (next_edge_features.abs().sum() == 0)):
             remove_list.append(i)
     dataset.remove_elements(remove_list)
