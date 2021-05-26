@@ -362,38 +362,39 @@ def get_predictions(dataset, ensemble, use_latents=False, N_samples=10):
                 preds.append(ensemble.forward(tensor))
     return torch.cat(preds, dim=0)
 
-def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False, label_subtowers=False):
+def get_labels(dataset, exec_mode, agent, logger, xy_noise, save_tower=False, label_subtowers=False):
     """ Takes as input a dictionary from the get_subset function. 
     Augment it with stability labels. 
-    :param samples:
+    :param dataset:
     :param exec_mode: str in ['simple-model', 'noisy-model', 'sim', 'real']
     :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
     :return:
     """
-    labeled_samples = {'%dblock' % k : {} for k in [2,3,4,5]}
-    for k in labeled_samples:
-        labeled_samples[k]['towers'] = []
-        labeled_samples[k]['block_ids'] = []
-        labeled_samples[k]['labels'] = []
+    subtower_dataset = {'%dblock' % k : {} for k in [2,3,4,5]}
+    for k in subtower_dataset:
+        subtower_dataset[k]['towers'] = []
+        subtower_dataset[k]['block_ids'] = []
+        subtower_dataset[k]['labels'] = []
         
     block_placements = 0
         
     tp = TowerPlanner(stability_mode='contains')
-    for k in samples.keys():
-        n_towers, n_blocks, _ = samples[k]['towers'].shape
+    for k in dataset.keys():
+        n_towers, n_blocks, _ = dataset[k]['towers'].shape
         labels = np.ones((n_towers,))
 
-        for ix in range(0, n_towers):
-            print(f'Collecting tower {ix+1}/{n_towers} for {k} towers...')
-            # Add noise to blocks and convert tower to Block representation.
+        for tower_ix in range(0, n_towers):
+            print(f'Collecting tower {tower_ix+1}/{n_towers} for {k} towers...')
+            # convert tower to Block representation.
             block_tower = []
-            for jx in range(n_blocks): 
-                vec_block = deepcopy(samples[k]['towers'][ix, jx, :])
+            for block_jx in range(n_blocks): 
+                vec_block = deepcopy(dataset[k]['towers'][tower_ix, block_jx, :])
+                # only add noise if we are using the noisy-model exec_mode
                 if exec_mode == 'noisy-model':
                     vec_block[7:9] += np.random.randn(2)*xy_noise
                 block = Object.from_vector(vec_block) # block is already rotated
-                if 'block_ids' in samples[k].keys():
-                    block.name = 'obj_'+str(samples[k]['block_ids'][ix, jx])
+                if 'block_ids' in dataset[k].keys():
+                    block.name = 'obj_'+str(dataset[k]['block_ids'][tower_ix, block_jx])
                 block_tower.append(block)
             #  Use tp to check for stability.
             if exec_mode == 'simple-model' or exec_mode == 'noisy-model':
@@ -402,31 +403,28 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False, la
                 subtowers = [block_tower[:k_sub] for k_sub in list(range(2,len(block_tower)+1))]
                 for k_sub, subtower in enumerate(subtowers, 2):
                     rot_subtower = [get_rotated_block(b) for b in subtower]
-                    if tp.tower_is_constructable(rot_subtower):
-                        label = 1.0
-                    else:
-                        label = 0.0
+                    label = float(tp.tower_is_constructable(rot_subtower))
                     
-                    # add to labeled samples    
-                    labeled_samples['%dblock' % k_sub]['towers'].append(samples[k]['towers'][ix, :k_sub, :])
-                    if 'block_ids' in labeled_samples['%dblock' % k_sub]:
-                        labeled_samples['%dblock' % k_sub]['block_ids'].append(samples[k]['block_ids'][ix, :k_sub])
-                    labeled_samples['%dblock' % k_sub]['labels'].append(label)
+                    # add to labeled dataset    
+                    subtower_dataset['%dblock' % k_sub]['towers'].append(dataset[k]['towers'][tower_ix, :k_sub, :])
+                    if 'block_ids' in subtower_dataset['%dblock' % k_sub]:
+                        subtower_dataset['%dblock' % k_sub]['block_ids'].append(dataset[k]['block_ids'][tower_ix, :k_sub])
+                    subtower_dataset['%dblock' % k_sub]['labels'].append(label)
                     
                     # save tower file
                     if save_tower:
-                        if 'block_ids' in samples[k].keys():
-                            logger.save_towers_data(samples[k]['towers'][ix, :k_sub, :], 
-                                                    samples[k]['block_ids'][ix, :k_sub],
+                        if 'block_ids' in dataset[k].keys():
+                            logger.save_towers_data(dataset[k]['towers'][tower_ix, :k_sub, :], 
+                                                    dataset[k]['block_ids'][tower_ix, :k_sub],
                                                     label)
                         else:
-                            logger.save_towers_data(samples[k]['towers'][ix, :k_sub, :], 
+                            logger.save_towers_data(dataset[k]['towers'][tower_ix, :k_sub, :], 
                                                     None,
                                                     label)
                     # stop when tower falls
                     if label == 0.0:
                         block_placements += k_sub
-                        labels[ix] = 0.0
+                        labels[tower_ix] = 0.0
                         break
             else:
                 vis = True
@@ -444,34 +442,34 @@ def get_labels(samples, exec_mode, agent, logger, xy_noise, save_tower=False, la
                                 agent.restart_services()
                         else: # in sim
                             input('Should reset sim. Not yet handled. Exit and restart training.')
-                labels[ix] = label
-                if 'block_ids' in samples[k].keys():
-                    logger.save_towers_data(samples[k]['towers'][ix, :, :], 
-                                            samples[k]['block_ids'][ix, :],
-                                            labels[ix])
+                labels[tower_ix] = label
+                if 'block_ids' in dataset[k].keys():
+                    logger.save_towers_data(dataset[k]['towers'][tower_ix, :, :], 
+                                            dataset[k]['block_ids'][tower_ix, :],
+                                            labels[tower_ix])
                 else:
-                    logger.save_towers_data(samples[k]['towers'][ix, :, :], 
+                    logger.save_towers_data(dataset[k]['towers'][tower_ix, :, :], 
                                             None,
-                                            labels[ix])
-        samples[k]['labels'] = labels
+                                            labels[tower_ix])
+        dataset[k]['labels'] = labels
     
     if save_tower:
         # save block placement data
         logger.save_block_placement_data(block_placements)
         
     if label_subtowers:
-        # vectorize labeled samples and return
-        for ki, k in enumerate(labeled_samples, 2):
-            if labeled_samples[k]['towers'] == []:
-                labeled_samples[k]['towers'] = np.zeros((0,ki,21))
-                labeled_samples[k]['block_ids'] = np.zeros((0,ki))
-                labeled_samples[k]['labels'] = np.zeros(0)
-            labeled_samples[k]['towers'] = np.array(labeled_samples[k]['towers'])
-            labeled_samples[k]['block_ids'] = np.array(labeled_samples[k]['block_ids'])
-            labeled_samples[k]['labels'] = np.array(labeled_samples[k]['labels'])
-        return labeled_samples
+        # vectorize labeled dataset and return
+        for ki, k in enumerate(subtower_dataset, start=2):
+            if subtower_dataset[k]['towers'] == []:
+                subtower_dataset[k]['towers'] = np.zeros((0,ki,21))
+                subtower_dataset[k]['block_ids'] = np.zeros((0,ki))
+                subtower_dataset[k]['labels'] = np.zeros(0)
+            subtower_dataset[k]['towers'] = np.array(subtower_dataset[k]['towers'])
+            subtower_dataset[k]['block_ids'] = np.array(subtower_dataset[k]['block_ids'])
+            subtower_dataset[k]['labels'] = np.array(subtower_dataset[k]['labels'])
+        return subtower_dataset
     else:
-        return samples
+        return dataset
 
 
 def get_subset(samples, indices):
