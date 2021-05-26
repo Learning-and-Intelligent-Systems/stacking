@@ -47,3 +47,13 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
     # for all other reached states, make them goals (hindsight experience replay)
     for goal_i, (hindsight_goal, _) in enumerate(action_sequence):
         helper(action_sequence[:goal_i+1], hindsight_goal)
+        
+# for testing, only keep samples with successful actions/edge changes
+def preprocess(args, dataset):
+    xs, ys = dataset[:]
+    remove_list = []
+    for i, ((state, action), next_state) in enumerate(dataset):
+        if (args.pred_type == 'full_state' and (state == next_state).all()) or \
+            (args.pred_type == 'delta_state' and (next_state.abs().sum() == 0)):
+            remove_list.append(i)
+    dataset.remove_elements(remove_list)

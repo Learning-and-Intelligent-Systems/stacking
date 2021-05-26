@@ -109,7 +109,7 @@ class HeuristicGNN(nn.Module):
         return pred
 
 class TransitionGNN(nn.Module):
-    def __init__(self, n_in=7, n_hidden=1):
+    def __init__(self, args, n_in=7, n_hidden=1):
         """ This network is given three inputs of size (N, K, K), (N, 1), and (N, K, K).
         N is the batch size, K is the number of objects (including a * object)
         :param n_in: Dimensionality of object state and action (one-hot encodings)
@@ -130,6 +130,8 @@ class TransitionGNN(nn.Module):
                                nn.ReLU())
 
         self.n_in, self.n_hidden = n_in, n_hidden
+        
+        self.pred_type = args.pred_type
 
     def action_edge_fn(self, object_states, edge_mask, action):
         """
@@ -209,7 +211,9 @@ class TransitionGNN(nn.Module):
         if torch.cuda.is_available():
             edge_mask = edge_mask.cuda()
         #all_edges = all_edges*edge_mask
-        #all_edges = torch.sigmoid(all_edges).squeeze(-1)
+        
+        if self.pred_type == 'full_state':
+            all_edges = torch.sigmoid(all_edges)
         all_edges = all_edges.squeeze(-1)
         return all_edges
 

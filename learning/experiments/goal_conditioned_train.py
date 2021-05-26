@@ -12,7 +12,7 @@ from learning.domains.abc_blocks.world import ABCBlocksWorld
 from learning.active.utils import ActiveExperimentLogger
 from learning.models.goal_conditioned import TransitionGNN, HeuristicGNN
 from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset, ABCBlocksHeurDataset
-from learning.domains.abc_blocks.generate_data import generate_dataset
+from learning.domains.abc_blocks.generate_data import generate_dataset, preprocess
 from visualize.domains.abc_blocks.performance import calc_trans_error_rate, calc_heur_error_rate, \
                                                         vis_trans_errors, vis_trans_dataset_grid, \
                                                         vis_trans_dataset_hist, \
@@ -43,11 +43,12 @@ def run_goal_directed_train(args, plot=True):
     trans_error_rates = []
     heur_error_rates = []
     train_policy = world.expert_policy
-    for i, max_additional_seq_attempts in enumerate([30]):#[1, 4, 5, 10, 30, 50]):
+    for i, max_additional_seq_attempts in enumerate([200]):#[1, 4, 5, 10, 30, 50]):
+        print('Adding to training dataset.')
         args.max_seq_attempts = max_additional_seq_attempts
         generate_dataset(args, world, logger, trans_dataset, heur_dataset, train_policy)
-        
-        trans_model = TransitionGNN()
+        preprocess(args, trans_dataset)
+        trans_model = TransitionGNN(args, n_hidden=16)
         print('Training with %i datapoints' % len(trans_dataset))
         n_datapoints.append(len(trans_dataset))
         if args.pred_type == 'delta_state':

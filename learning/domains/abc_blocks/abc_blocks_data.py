@@ -23,6 +23,13 @@ class ABCBlocksTransDataset(Dataset):
         """
         return len(self.states)    
 
+    def remove_elements(self, remove_list):
+        mask = np.ones(len(self.states), dtype=bool)
+        mask[remove_list] = False
+        self.states = self.states[mask]
+        self.actions = self.actions[mask]
+        self.next_states = self.next_states[mask]
+
     def add_to_dataset(self, state, action, next_state):
         self.states = torch.cat([self.states, torch.tensor([state])])
         self.actions = torch.cat([self.actions, torch.tensor([action])])
