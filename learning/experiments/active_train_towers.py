@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
-from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, get_predictions, get_labels, get_subset, PoolSampler, sample_next_block
+from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, get_predictions, get_labels, get_subset, sample_next_block
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler, ParallelDataLoader
 from learning.models.ensemble import Ensemble
 from learning.models.bottomup_net import BottomUpNet
@@ -15,30 +15,7 @@ from learning.active.utils import ActiveExperimentLogger
 from agents.panda_agent import PandaAgent, PandaClientAgent
 from tamp.misc import load_blocks
 
-
-def run_active_towers(args):
-    logger = ActiveExperimentLogger.setup_experiment_directory(args)
-
-    # Initialize agent with supplied blocks (only works with args.block_set_fname set)
-    if len(args.pool_fname) > 0:
-        raise NotImplementedError()
-    elif args.block_set_fname is not '':
-        with open(args.block_set_fname, 'rb') as f:
-            block_set = pickle.load(f)
-    else:
-        raise NotImplementedError()
-
-    if args.exec_mode == 'simple-model' or args.exec_mode == 'noisy-model':
-        agent = None
-    elif args.exec_mode == 'sim' or args.exec_mode == 'real':
-        if args.use_panda_server:
-            agent = PandaClientAgent()
-        else:
-            block_set = load_blocks(fname=args.block_set_fname,
-                                    num_blocks=10)
-            agent = PandaAgent(block_set)
-
-    # Initialize ensemble.
+def inititalize_model(args):
     if args.model == 'fcgn':
         base_model = FCGN
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
@@ -57,23 +34,41 @@ def run_active_towers(args):
     elif args.model == 'bottomup-unshared':
         base_model = BottomUpNet
         base_args = {'n_hidden': args.n_hidden, 'n_in': 14, 'share_weights': False, 'max_blocks': 5}
-
     else:
         raise NotImplementedError()
 
     ensemble = Ensemble(base_model=base_model,
                         base_args=base_args,
                         n_models=args.n_models)
+    return ensemble
 
 
+def run_active_towers(args):
+    logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
+    # Initialize agent with supplied blocks (only works with args.block_set_fname set)
+    if args.block_set_fname is not '':
+        with open(args.block_set_fname, 'rb') as f:
+            block_set = pickle.load(f)
+    else:
+        raise NotImplementedError()
+
+    if args.exec_mode == 'simple-model' or args.exec_mode == 'noisy-model':
+        agent = None
+    elif args.exec_mode == 'sim' or args.exec_mode == 'real':
+        if args.use_panda_server:
+            agent = PandaClientAgent()
+        else:
+            block_set = load_blocks(fname=args.block_set_fname,
+                                    num_blocks=10)
+            agent = PandaAgent(block_set)
+
+    # Initialize ensemble.
+    ensemble = initialize_model(args)
+    
     # Choose a sampler and check if we are limiting the blocks to work with.
     block_set = None
-    if len(args.pool_fname) > 0:
-        pool_sampler = PoolSampler(args.pool_fname)
-        data_subset_fn = pool_sampler.get_subset
-        data_sampler_fn = pool_sampler.sample_unlabeled_data
-    elif args.block_set_fname is not '':
+    if args.block_set_fname is not '':
         data_subset_fn = get_subset
         with open(args.block_set_fname, 'rb') as f:
             # TODO: Unify block loading
@@ -202,7 +197,6 @@ if __name__ == '__main__':
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--strategy', choices=['random', 'bald', 'subtower', 'subtower-greedy'], default='bald', help='[random] chooses towers randomly. [bald] scores each tower with the BALD score. [subtower-greedy] chooses a tower by adding blocks one at a time and keeping towers with the highest bald score [subtower] is similar to subtower-greedy, but we multiply the bald score of each tower by the probabiliy that the tower is constructible.')
     parser.add_argument('--sampler', choices=['random', 'sequential'], default='random', help='Choose how the unlabeled pool will be generated. Sequential assumes every tower has a stable base.')
-    parser.add_argument('--pool-fname', type=str, default='')
     parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-fc', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])
     # simple-model: does not perturb the blocks, uses TowerPlanner to check constructability
     # noisy-model: perturbs the blocks, uses TowerPlanner to check constructability
