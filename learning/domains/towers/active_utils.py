@@ -308,7 +308,7 @@ def get_sequential_predictions(dataset, ensemble, use_latents=False):
             with torch.no_grad():
                 if use_latents:
                     sub_tower_preds.append(ensemble.forward(
-                        tensor[:, :n_blocks, 4:], block_ids[:, :n_blocks]).squeeze(dim=-1))
+                        tensor[:, :n_blocks, 4:], block_ids[:, :n_blocks], N_samples=10, collapse_ensemble=True, collapse_latents=True).squeeze(dim=-1))
                 else:
                     sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
         sub_tower_preds = torch.stack(sub_tower_preds, dim=0)

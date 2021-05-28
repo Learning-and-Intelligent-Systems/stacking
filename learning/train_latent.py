@@ -11,148 +11,12 @@ from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.metrics import f1_score
 
+from learning.active.utils import ActiveExperimentLogger
 from learning.domains.towers.tower_data import TowerDataset, ParallelDataLoader
 from learning.models.gn import FCGN
 from learning.models.ensemble import Ensemble
+from learning.models.latent_ensemble import LatentEnsemble
 from learning.viz_latents import viz_latents
-
-class LatentEnsemble(nn.Module):
-    def __init__(self, ensemble, n_latents, d_latents):
-        """
-        Arguments:
-            n_latents {int}: Number of blocks.
-            d_latents {int}: Dimension of each latent.
-        """
-        super(LatentEnsemble, self).__init__()
-
-        self.ensemble = ensemble
-        self.n_latents = n_latents
-        self.d_latents = d_latents
-
-        self.latent_locs = nn.Parameter(torch.zeros(n_latents, d_latents))
-        self.latent_logscales = nn.Parameter(torch.zeros(n_latents, d_latents))
-
-    def reset(self, random_latents=False):
-        self.reset_latents(random=random_latents)
-        self.ensemble.reset()
-        # send to GPU if needed
-        if torch.cuda.is_available():
-            self.ensemble = self.ensemble.cuda()
-
-    def reset_latents(self, random=False):
-        with torch.no_grad():
-            if random:
-                self.latent_locs[:] = torch.randn_like(self.latent_locs)
-                self.latent_logscales[:] = torch.randn_like(self.latent_logscales)
-            else:
-                self.latent_locs[:] = 0.
-                self.latent_logscales[:] = 0.
-
-    def associate(self, samples, block_ids):
-        """ given samples from the latent space for each block in the set,
-        reorder them so they line up with blocks in towers
-
-        Arguments:
-            samples {torch.Tensor} -- [N_samples x N_blockset x latent_dim]
-            block_ids {torch.Tensor} -- [N_batch x N_blocks]
-
-        Returns:
-            torch.Tensor -- [N_batch x N_samples x N_blocks x latent_dim]
-        """
-        return samples[:, block_ids, :].permute(1, 0, 2, 3)
-
-    def concat_samples(self, samples, observed):
-        """ concatentate samples from the latent space for each tower
-        with the observed variables for each tower
-
-        Arguments:
-            samples {torch.Tensor} -- [N_batch x N_samples x N_blocks x latent_dim]
-            observed {torch.Tensor} -- [N_batch x N_blocks x observed_dim]
-
-        Returns:
-            torch.Tensor -- [N_batch x N_samples x N_blocks x total_dim]
-        """
-        N_batch, N_samples, N_blocks, latent_dim = samples.shape
-        observed = observed.unsqueeze(1).expand(-1, N_samples, -1, -1)
-        return torch.cat([samples, observed], 3)
-
-    def prerotate_latent_samples(self, towers, samples):
-        """ concatentate samples from the latent space for each tower
-        with the observed variables for each tower
-
-        Arguments:
-            samples {torch.Tensor} -- [N_batch x N_samples x N_blocks x latent_dim]
-            towers {torch.Tensor}   [N_batch x N_blocks x N_features]
-
-        Returns:
-            torch.Tensor -- [N_batch x N_samples x N_blocks x latent_dim]
-        """
-        N_batch, N_samples, N_blocks, latent_dim = samples.shape
-
-        # pull out the quaternions for each block, and flatten the batch+block dims
-        quats = towers[..., -4:].view(-1, 4)
-        # create rotation matrices from the quaternions
-        r = Rotation.from_quat(quats.cpu()).as_matrix()
-        r = torch.Tensor(r)
-        if torch.cuda.is_available(): r = r.cuda()
-        # unflatten the batch+block dims and expand the sample dimension
-        # now it should be [N_batch x N_samples x N_blocks x 3 x 3]
-        r = r.view(N_batch, N_blocks, 3, 3).unsqueeze(1).expand(-1, N_samples, -1, -1, -1)
-        # apply the rotation to the last three dimensions of the samples
-        samples[...,-3:] = torch.einsum('asoij, asoj -> asoi', r, samples[...,-3:])
-        # and return the result
-        return samples
-
-
-    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True):
-        """ predict feasibility of the towers
-
-        Arguments:
-            towers {torch.Tensor}   [N_batch x N_blocks x N_features]
-            block_ids {torch.Tensor}   [N_batch x N_blocks]
-
-        Keyword Arguments:
-            ensemble_idx {int} -- if None, average of all models (default: {None})
-            N_samples {number} -- how many times to sample the latents (default: {1})
-
-        Returns:
-            torch.Tensor -- [N_batch]
-        """
-
-        # samples_for_each_tower_in_batch will be [N_batch x N_samples x tower_height x latent_dim]
-
-        # Draw one sample for each block each time it appears in a tower
-        q_z = torch.distributions.normal.Normal(self.latent_locs[block_ids],
-                                                torch.exp(self.latent_logscales[block_ids]))
-        samples_for_each_tower_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2, 3)
-
-        samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
-        towers_with_latents = self.concat_samples(
-            samples_for_each_tower_in_batch, towers)
-
-        # reshape the resulting tensor so the batch dimension holds
-        # N_batch times N_samples
-        N_batch, N_samples, N_blocks, total_dim = towers_with_latents.shape
-        towers_with_latents = towers_with_latents.view(-1, N_blocks, total_dim)
-
-        # forward pass of the model(s)
-        if ensemble_idx is None:
-            # prediction for each model in the ensemble ensemble
-            # [(N_batch*N_samples) x N_ensemble]
-            labels = self.ensemble.forward(towers_with_latents)
-            labels = labels.view(N_batch, N_samples, -1).permute(0, 2, 1)
-        else:
-            # prediction of a single model in the ensemble
-            labels = self.ensemble.models[ensemble_idx].forward(towers_with_latents)
-            labels = labels[:, None, :]
-
-        # N_batch x N_ensemble x N_samples
-        if collapse_ensemble:
-            labels = labels.mean(axis=1, keepdim=True)
-        if collapse_latents:
-            labels = labels.mean(axis=2, keepdim=True)
-
-        return labels
 
 
 def get_params_loss(latent_ensemble, batches, disable_latents, N):
@@ -378,8 +242,12 @@ def shrink_dict(tower_dict, skip):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--disable-latents', action='store_true', default=False)
+    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     args = parser.parse_args()
-    # print(args)
+    args.exp_name = 'pretrained_latents'
+    args.use_latents = not args.disable_latents
+    
+    logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
     # sample_unlabeled to generate dataset. 50/50 class split. using 10 blocks
     # sample_sequential
@@ -417,14 +285,14 @@ if __name__ == "__main__":
     # test_block_filename = 'learning/data/10block_set_(x1000)_cubes_test_seq1_dict.pkl'
 
     # Datasets for blocks with dynamic poses.
-    #train_block_train_tower_fname = 'learning/data/10block_set_(x1000)_blocks_a_1_dict.pkl'
+    train_block_train_tower_fname = 'learning/data/10block_set_(x1000)_blocks_a_1_dict.pkl'
     #train_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_blocks_a_2_dict.pkl'
     #train_block_test_tower_fname = 'learning/data/10block_set_(x1000)_blocks_a_3_dict.pkl'
-    # train_block_train_tower_fname = 'learning/data/may_blocks/towers/100block_set_(x10000)_nblocks_a_1_dict.pkl'
-    # train_block_fit_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_2_dict.pkl'
-    # train_block_test_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_3_dict.pkl'
-    # test_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_1_dict.pkl'
-    # test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_2_dict.pkl'
+    #train_block_train_tower_fname = 'learning/data/may_blocks/towers/100block_set_(x10000)_nblocks_a_1_dict.pkl'
+    train_block_fit_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_2_dict.pkl'
+    train_block_test_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_3_dict.pkl'
+    test_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_1_dict.pkl'
+    test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_2_dict.pkl'
 
     # Datasets for cubes with fixed poses.
     # train_block_train_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_a_1_dict.pkl'
@@ -434,11 +302,11 @@ if __name__ == "__main__":
     # test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_b_2_dict.pkl'
 
     # Datasets for cubes with dynamic poses.
-    train_block_train_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
-    train_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
-    train_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_3_dict.pkl'
-    test_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
-    test_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
+    # train_block_train_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
+    # train_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
+    # train_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_3_dict.pkl'
+    # test_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
+    # test_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
 
     #train_data_filename = "learning/data/10block_set_(x4000.0)_train_10_prerotated.pkl"
     #test_tower_filename = "learning/data/10block_set_(x1000.0)_train_10_towers_prerotated.pkl"
@@ -454,17 +322,20 @@ if __name__ == "__main__":
     with open(test_block_test_tower_fname, 'rb') as handle:
         test_block_test_tower_dict = pickle.load(handle)
 
-    train_block_fit_tower_dict = shrink_dict(train_block_fit_tower_dict, 2)
-    test_block_fit_tower_dict = shrink_dict(test_block_fit_tower_dict, 2)
+    train_block_fit_tower_dict = shrink_dict(train_block_fit_tower_dict, 100)
+    test_block_fit_tower_dict = shrink_dict(test_block_fit_tower_dict, 100)
     
     # with open('learning/experiments/logs/exp-20210518-181538/datasets/active_34.pkl', 'rb') as handle:
     #     train_dataset = pickle.load(handle)    
 
     train_block_train_tower_dataset = TowerDataset(train_block_train_tower_dict, augment=True, prerotated=False)
-    train_block_fit_tower_dataset = TowerDataset(train_block_fit_tower_dict, augment=False, prerotated=False)
+    train_block_fit_tower_dataset = TowerDataset(train_block_fit_tower_dict, augment=True, prerotated=False)
     train_block_test_tower_dataset = TowerDataset(train_block_test_tower_dict, augment=False, prerotated=False)
-    test_block_fit_tower_dataset = TowerDataset(test_block_fit_tower_dict, augment=False, prerotated=False)
+    test_block_fit_tower_dataset = TowerDataset(test_block_fit_tower_dict, augment=True, prerotated=False)
     test_block_test_tower_dataset = TowerDataset(test_block_test_tower_dict, augment=False, prerotated=False)
+
+    logger.save_dataset(train_block_train_tower_dataset, 0)
+    logger.save_val_dataset(train_block_fit_tower_dataset, 0)
 
     train_block_train_tower_loader = ParallelDataLoader(dataset=train_block_train_tower_dataset,
                                       batch_size=16,
@@ -497,6 +368,7 @@ if __name__ == "__main__":
     # train
     latent_ensemble.reset_latents(random=False)
     latent_ensemble, losses, latents = train(train_block_train_tower_loader, train_block_train_tower_loader, latent_ensemble, n_epochs=30, disable_latents=args.disable_latents, return_logs=True)
+    logger.save_ensemble(latent_ensemble, 0)
     torch.save(latent_ensemble.state_dict(), model_path)
     np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
     print(latent_ensemble.latent_locs, torch.exp(latent_ensemble.latent_logscales))
@@ -506,13 +378,13 @@ if __name__ == "__main__":
     latent_ensemble.load_state_dict(torch.load(model_path))
     test(latent_ensemble, train_block_train_tower_loader, train_block_train_tower_loader, disable_latents=args.disable_latents, n_epochs=10)
 
-    print('\nTesting with training blocks on new towers', tx)
+    print('\nTesting with training blocks on new towers')
     latent_ensemble.load_state_dict(torch.load(model_path))
-    test(latent_ensemble, train_block_fit_tower_loader, train_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=1000)
+    test(latent_ensemble, train_block_fit_tower_loader, train_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=100)
 
-    print('\nTesting with test blocks', tx)
+    print('\nTesting with test blocks')
     latent_ensemble.load_state_dict(torch.load(model_path))
-    test(latent_ensemble, test_block_fit_tower_loader, test_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=1000)
+    test(latent_ensemble, test_block_fit_tower_loader, test_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=100)
     
 
 

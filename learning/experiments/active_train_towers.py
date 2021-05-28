@@ -7,6 +7,7 @@ from learning.active.active_train import active_train
 from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, get_predictions, get_labels, get_subset, sample_next_block
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler, ParallelDataLoader
 from learning.models.ensemble import Ensemble
+from learning.models.latent_ensemble import LatentEnsemble
 from learning.models.bottomup_net import BottomUpNet
 from learning.models.gn import FCGN, ConstructableFCGN, FCGNFC
 from learning.models.lstm import TowerLSTM
@@ -48,7 +49,25 @@ def initialize_model(args, n_blocks):
     return ensemble
 
 
+def load_latent_ensemble(args):
+    assert(args.use_latents and len(args.latent_ensemble_exp_path) > 0 and args.latent_ensemble_tx >= 0)
+    logger = ActiveExperimentLogger.get_experiments_logger(args.latent_ensemble_exp_path, args)
+    ensemble = logger.get_ensemble(args.latent_ensemble_tx)
+    return ensemble
+
+
 def get_initial_dataset(args, block_set, agent, logger):
+    # If we are fitting the latents, start with an empty dataset.
+    if args.fit_latents:
+        towers_dict = sample_sequential_data(block_set, None, 0)
+        towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
+        dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
+
+        val_towers_dict = sample_sequential_data(block_set, None, 0)
+        val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
+        val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)    
+        return dataset, val_dataset
+
     # Sample initial dataset. 
     if len(args.init_data_fname) > 0:
         print(f'Loading an initial dataset from {args.init_data_fname}')
@@ -145,13 +164,18 @@ def run_active_towers(args):
             agent = PandaAgent(block_set)
 
     # Initialize ensemble.
-    ensemble = initialize_model(args, len(block_set))    
+    if args.fit_latents:
+        ensemble = load_latent_ensemble(args)
+    else:
+        ensemble = initialize_model(args, len(block_set))    
     if torch.cuda.is_available():
         ensemble = ensemble.cuda()
 
     # Get an initial dataset.
     dataset, val_dataset = get_initial_dataset(args, block_set, agent, logger)
     dataloader, val_dataloader = get_dataloaders(args, dataset, val_dataset)
+    if args.fit_latents:
+        val_dataset, val_dataloader = None, None
 
     # Get active learning helper functions.
     data_subset_fn = get_subset
@@ -208,8 +232,12 @@ if __name__ == '__main__':
     parser.add_argument('--exec-mode', default='noisy-model', choices=['simple-model', 'noisy-model', 'sim', 'real'])
     parser.add_argument('--xy-noise', default=0.003, type=float, help='Variance in the normally distributed noise in block placements (used when args.exec-mode==noisy-model)')
     parser.add_argument('--use-panda-server', action='store_true')
-    parser.add_argument('--debug', action='store_true'),
+    parser.add_argument('--debug', action='store_true')
     parser.add_argument('--use-latents', action='store_true')
+    # The following arguments are used when we wanted to fit latents with an already trained model.
+    parser.add_argument('--fit-latents', action='store_true', help='This will cause only the latents to update during training.')
+    parser.add_argument('--latent-ensemble-exp-path', type=str, default='', help='Path to a trained latent ensemble.')
+    parser.add_argument('--latent-ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
     args = parser.parse_args()
 
     if args.debug:

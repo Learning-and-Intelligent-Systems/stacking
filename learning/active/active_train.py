@@ -67,13 +67,19 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
 
         # Initialize and train models.
         print('Training ensemble....')
-        ensemble.reset()
-        if args.use_latents:
-            train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs)
-            print(ensemble.latent_locs.detach().numpy(), np.exp(ensemble.latent_logscales.detach().numpy()))
+        if args.fit_latents:
+            ensemble.reset_latents(random=False)
         else:
-            for model in ensemble.models:
-                train(dataloader, val_dataloader, model, args.n_epochs)
+            ensemble.reset()
+        
+        # If the dataset is empty, then acquire a dataset first.
+        if len(dataset) > 0:
+            if args.use_latents:
+                train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs, freeze_ensemble=args.fit_latents)
+                print(ensemble.latent_locs.detach().numpy(), np.exp(ensemble.latent_logscales.detach().numpy()))
+            else:
+                for model in ensemble.models:
+                    train(dataloader, val_dataloader, model, args.n_epochs)
         print('Done training.')
 
         logger.save_ensemble(ensemble, tx)

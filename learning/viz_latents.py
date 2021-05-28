@@ -4,7 +4,7 @@ import numpy as np
 
 from mpl_toolkits.mplot3d import Axes3D
 
-def viz_latents(locs, scales, lim=2):
+def viz_latents(locs, scales, lim=2, fname=''):
     fig = plt.figure()
     ax = plt.axes(projection='3d')
 
@@ -29,7 +29,11 @@ def viz_latents(locs, scales, lim=2):
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
     ax.set_zlim(-lim, lim)
-    plt.show()
+    if len(fname) > 0:
+        plt.savefig(fname)
+        plt.close()
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':

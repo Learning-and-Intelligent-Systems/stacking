@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from learning.models.ensemble import Ensemble
 from learning.models.mlp_dropout import MLP
-from learning.train_latent import LatentEnsemble
+from learning.models.latent_ensemble import LatentEnsemble
 
 
 class ExperimentLogger:
@@ -83,7 +83,7 @@ class ActiveExperimentLogger:
 
     @staticmethod
     def get_experiments_logger(exp_path, args):
-        logger = ActiveExperimentLogger(exp_path)
+        logger = ActiveExperimentLogger(exp_path, use_latents=args.use_latents)
         dataset_path = os.path.join(exp_path, 'datasets')
         dataset_files = os.listdir(dataset_path)
         if len(dataset_files) == 0:
