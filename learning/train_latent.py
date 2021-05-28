@@ -308,6 +308,13 @@ if __name__ == "__main__":
     # test_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
     # test_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
 
+    # Datasets for blocks with dynamic poses.
+    train_block_train_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
+    train_block_fit_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
+    train_block_test_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_a_3_dict.pkl'
+    test_block_fit_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
+    test_block_test_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
+
     #train_data_filename = "learning/data/10block_set_(x4000.0)_train_10_prerotated.pkl"
     #test_tower_filename = "learning/data/10block_set_(x1000.0)_train_10_towers_prerotated.pkl"
 
