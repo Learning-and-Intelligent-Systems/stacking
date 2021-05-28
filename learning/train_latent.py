@@ -144,7 +144,7 @@ class LatentEnsemble(nn.Module):
         else:
             # prediction of a single model in the ensemble
             labels = self.ensemble.models[ensemble_idx].forward(towers_with_latents)
-            labels = labels[:, None, :]
+            labels = labels.view(N_batch, N_samples, -1).permute(0, 2, 1)
 
         # N_batch x N_ensemble x N_samples
         if collapse_ensemble:
@@ -434,11 +434,18 @@ if __name__ == "__main__":
     # test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_b_2_dict.pkl'
 
     # Datasets for cubes with dynamic poses.
-    train_block_train_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
-    train_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
-    train_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_3_dict.pkl'
-    test_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
-    test_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
+    # train_block_train_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
+    # train_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
+    # train_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_3_dict.pkl'
+    # test_block_fit_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
+    # test_block_test_tower_fname = 'learning/data/may_cubes/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
+
+    # Datasets for blocks with dynamic poses.
+    train_block_train_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_a_1_dict.pkl'
+    train_block_fit_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_a_2_dict.pkl'
+    train_block_test_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_a_3_dict.pkl'
+    test_block_fit_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_b_1_dict.pkl'
+    test_block_test_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_seq_b_2_dict.pkl'
 
     #train_data_filename = "learning/data/10block_set_(x4000.0)_train_10_prerotated.pkl"
     #test_tower_filename = "learning/data/10block_set_(x1000.0)_train_10_towers_prerotated.pkl"
@@ -496,7 +503,7 @@ if __name__ == "__main__":
 
     # train
     latent_ensemble.reset_latents(random=False)
-    latent_ensemble, losses, latents = train(train_block_train_tower_loader, train_block_train_tower_loader, latent_ensemble, n_epochs=30, disable_latents=args.disable_latents, return_logs=True)
+    latent_ensemble, losses, latents = train(train_block_train_tower_loader, train_block_train_tower_loader, latent_ensemble, n_epochs=50, disable_latents=args.disable_latents, return_logs=True)
     torch.save(latent_ensemble.state_dict(), model_path)
     np.save('learning/experiments/logs/latents/fit_during_train.npy', latents)
     print(latent_ensemble.latent_locs, torch.exp(latent_ensemble.latent_logscales))
@@ -506,13 +513,13 @@ if __name__ == "__main__":
     latent_ensemble.load_state_dict(torch.load(model_path))
     test(latent_ensemble, train_block_train_tower_loader, train_block_train_tower_loader, disable_latents=args.disable_latents, n_epochs=10)
 
-    print('\nTesting with training blocks on new towers', tx)
+    print('\nTesting with training blocks on new towers')
     latent_ensemble.load_state_dict(torch.load(model_path))
-    test(latent_ensemble, train_block_fit_tower_loader, train_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=1000)
+    test(latent_ensemble, train_block_fit_tower_loader, train_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=500)
 
-    print('\nTesting with test blocks', tx)
+    print('\nTesting with test blocks')
     latent_ensemble.load_state_dict(torch.load(model_path))
-    test(latent_ensemble, test_block_fit_tower_loader, test_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=1000)
+    test(latent_ensemble, test_block_fit_tower_loader, test_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=500)
     
 
 

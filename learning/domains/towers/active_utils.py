@@ -342,6 +342,7 @@ def get_predictions(dataset, ensemble, use_latents=False, N_samples=10):
     # Iterate through dataset, getting predictions for each.
     for tensor, block_ids, labels in tower_loader:
         N_batch = tensor.shape[0]
+        block_ids = block_ids.long() # indices must be long, byte, or bool tensors
         if torch.cuda.is_available():
             tensor = tensor.cuda()
         with torch.no_grad():
@@ -426,6 +427,8 @@ def get_labels(dataset, exec_mode, agent, logger, xy_noise, save_tower=False, la
                         block_placements += k_sub
                         labels[tower_ix] = 0.0
                         break
+            # NOTE(izzy): the way this is implemented currently, it looks like the 'sim' and 'real'
+            # agents do not support the subtower strategy
             else:
                 vis = True
                 success = False
