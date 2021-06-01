@@ -8,17 +8,24 @@ def bald(predictions, eps=1e-5):
     :param predictions: (N, K) predictions for N datapoints from K models.
     :return: (N,) The BALD score for each of the datapoints.
     """
+    p_c1 = predictions
+    p_c0 = 1 - predictions
     mp_c1 = torch.mean(predictions, dim=1)
-    mp_c0 = torch.mean(1 - predictions, dim=1)
+    mp_c0 = 1 - mp_c1
 
     m_ent = -(mp_c1 * torch.log(mp_c1+eps) + mp_c0 * torch.log(mp_c0+eps))
 
-    p_c1 = predictions
-    p_c0 = 1 - predictions
     ent_per_model = p_c1 * torch.log(p_c1+eps) + p_c0 * torch.log(p_c0+eps)
     ent = torch.mean(ent_per_model, dim=1)
 
     bald = m_ent + ent
+
+    # we compute the bald score along axis=1. If the input is of dimension
+    # greater than 2, we compute the mean along all the remaining axes
+    # other than the 0th, which is the batch axis
+    ndims = len(bald.shape)
+    if ndims > 1:
+        bald = bald.mean(axis=tuple(np.arange(1,ndims)))
 
     return bald
 
@@ -62,7 +69,12 @@ def subtower_bald(samples, ensemble, data_pred_fn):
             # so we multiply the bald score for each added block by the
             # predicted probability that the tower will reach that height
             two_block_scores = subtower_scores[0]
-            constructability = subtower_preds.mean(axis=2)
+
+            # if we've sampled along multiple dimensions in the latent ensemble, then
+            # preds will be higher dimensional, so we need to compute the mean along
+            # all the axes
+            H, N = subtower_preds.shape[:2]
+            constructability = subtower_preds.view(H, N, -1).mean(axis=2)
 
             # NOTE(izzy): this is the change Mike proposed where we need to take the product
             # of the predicted "add-block-ability" labels for each subtower to get constuctability
