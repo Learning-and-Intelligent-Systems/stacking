@@ -66,10 +66,10 @@ def sample_sequential_data(block_set, dataset, n_samples, prerotate=False):
                         block.name = 'obj_'+str(int(dataset.tower_block_ids[k][ix, bx]))
                     block_tower.append(block)
                 stable_towers.append(block_tower)
-
-    # maintain block info my block name
+            
+    # maintain block info my block name 
     # TODO: this will NOT work if using random blocks
-    block_lookup = {}
+    block_lookup = {}    
     for block in block_set:
         block_lookup[block.name] = block
 
@@ -88,18 +88,18 @@ def sample_sequential_data(block_set, dataset, n_samples, prerotate=False):
                     used = True
             if not used:
                 remaining_blocks[k] = block_lookup[k]
-
+                
         # if we switch block sets during training then the remaining_blocks list
         # will be longer than block_set - len(base_tower)
         #assert(len(remaining_blocks) == len(block_set) - len(base_tower))
 
         new_block = deepcopy(np.random.choice(list(remaining_blocks.values())))
-
+        
         # Choose an orientation.
         orn = QUATERNIONS[np.random.choice(np.arange(0, len(QUATERNIONS)))]
         new_block.pose = Pose(ZERO_POS, orn)
         rot_block = get_rotated_block(new_block)
-
+        
         # Sample a displacement.
         base_dims = np.array(base_rotated[-1].dimensions)[:2]
         new_dims = np.array(rot_block.dimensions)[:2]
@@ -113,7 +113,7 @@ def sample_sequential_data(block_set, dataset, n_samples, prerotate=False):
         pos_z = np.sum([b.dimensions.z for b in base_rotated]) + rot_block.dimensions.z/2.
         rot_block.pose = Pose((pos_xy[0], pos_xy[1], pos_z), (0, 0, 0, 1))
         new_block.pose = Pose((pos_xy[0], pos_xy[1], pos_z), new_block.pose.orn)
-
+        
         # Add block to tower.
         if prerotate:
             new_tower = base_rotated + [rot_block]
@@ -131,12 +131,12 @@ def sample_sequential_data(block_set, dataset, n_samples, prerotate=False):
         # Save that tower in the sampled_towers dict
         n_blocks = len(new_tower)
         sampled_towers['%dblock' % n_blocks]['towers'].append(vectorize(new_tower))
-
+    
         # save block id
         if block_set is not None:
             block_ids = [block.get_id() for block in new_tower]
             sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
-
+    
     # convert all the sampled towers to numpy arrays
     for k in keys:
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
@@ -149,7 +149,7 @@ def sample_sequential_data(block_set, dataset, n_samples, prerotate=False):
 
 def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_blocks=(2, 5)):
     """ Generate n_samples random towers. For now each sample can also have
-    random blocks. We should change this later so that the blocks are fixed
+    random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
     :param n_samples: Number of random towers to consider.
     :param block_set (optional): blocks to use in towers. generate new blocks if None
@@ -174,7 +174,7 @@ def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_bl
     for ix in range(n_samples):
         n_blocks = np.random.randint(min_n_blocks, max_n_blocks+1)
         # get n_blocks, either from scratch or from the block set
-        if block_set is not None:
+        if block_set is not None: 
             blocks = np.random.choice(block_set, n_blocks, replace=False)
         else:
             blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
@@ -189,7 +189,7 @@ def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_bl
         if block_set is not None:
             block_ids = [block.get_id() for block in rotated_tower]
             sampled_towers['%dblock' % n_blocks]['block_ids'].append(block_ids)
-
+    
     # convert all the sampled towers to numpy arrays
     for k in sampled_towers.keys():
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
@@ -225,7 +225,7 @@ def sample_next_block(n_samples, bases={}, block_set=None):
             if block_set is None:
                 new_top_blocks = [Object.random(f'obj_{ix}') for ix in range(n_new_blocks_per_base)]
             else:
-                # we can't duplicate blocks, so only choose new top blocks from the
+                # we can't duplicate blocks, so only choose new top blocks from the 
                 # blocks that aren't already in the base
                 block_ids_already_in_tower = list(bases[base_n_blocks_key]['block_ids'][i])
                 remaining_blocks = [b for b in block_set if b.name.strip('obj_') not in block_ids_already_in_tower]
@@ -323,11 +323,11 @@ def get_sequential_predictions(dataset, ensemble, use_latents=False):
         #print(preds[-1].shape)
     return torch.cat(preds, dim=0)
 
-def get_predictions(dataset, ensemble, use_latents=False, keep_sample_dimensions=False, N_samples=10):
+def get_predictions(dataset, ensemble, use_latents=False, N_samples=10):
     """
     :param dataset: A tower_dict structure.
     :param ensemble: The Ensemble model which to use for predictions.
-    :return: Return (N, K) array of flat predictions. Predictions are
+    :return: Return (N, K) array of flat predictions. Predictions are 
     ordered by tower size.
     """
     preds = []
@@ -347,21 +347,25 @@ def get_predictions(dataset, ensemble, use_latents=False, keep_sample_dimensions
             tensor = tensor.cuda()
         with torch.no_grad():
             if use_latents:
-                # takes samples from the joint distribution from the joint distribution to compute I(y ; theta, z)
-                pred = ensemble.forward(
-                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=False, collapse_latents=False)
+                # take samples from the ensemble and the latents separately, to approximate computing MI
+                # I(y ; theta) and I(y ; z) separately
+                # latent_samples = ensemble.forward(
+                #     tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=True, collapse_latents=False).reshape(N_batch, -1)
+                # ensemble_samples = ensemble.forward(
+                #     tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=False, collapse_latents=True).reshape(N_batch, -1)
+                # pred_samples = torch.cat([latent_samples, ensemble_samples], axis=1)
+                # preds.append(pred_samples)
 
-                # NOTE(izzy): if we want to compute BALD for one latent variable and not the other,
-                # we need to keep the samples for each latent variable in separate dimensions
-                if keep_sample_dimensions: preds.append(pred)
-                else: preds.append(pred.reshape(N_batch, -1))
+                # takes samples from the joint distribution from the joint distribution to compute I(y ; theta, z)
+                preds.append(ensemble.forward(
+                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=False, collapse_latents=False).reshape(N_batch, -1))
             else:
                 preds.append(ensemble.forward(tensor))
     return torch.cat(preds, dim=0)
 
 def get_labels(dataset, exec_mode, agent, logger, xy_noise, save_tower=False, label_subtowers=False):
-    """ Takes as input a dictionary from the get_subset function.
-    Augment it with stability labels.
+    """ Takes as input a dictionary from the get_subset function. 
+    Augment it with stability labels. 
     :param dataset:
     :param exec_mode: str in ['simple-model', 'noisy-model', 'sim', 'real']
     :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
@@ -372,9 +376,9 @@ def get_labels(dataset, exec_mode, agent, logger, xy_noise, save_tower=False, la
         subtower_dataset[k]['towers'] = []
         subtower_dataset[k]['block_ids'] = []
         subtower_dataset[k]['labels'] = []
-
+        
     block_placements = 0
-
+        
     tp = TowerPlanner(stability_mode='contains')
     for k in dataset.keys():
         n_towers, n_blocks, _ = dataset[k]['towers'].shape
@@ -384,7 +388,7 @@ def get_labels(dataset, exec_mode, agent, logger, xy_noise, save_tower=False, la
             print(f'Collecting tower {tower_ix+1}/{n_towers} for {k} towers...')
             # convert tower to Block representation.
             block_tower = []
-            for block_jx in range(n_blocks):
+            for block_jx in range(n_blocks): 
                 vec_block = deepcopy(dataset[k]['towers'][tower_ix, block_jx, :])
                 # only add noise if we are using the noisy-model exec_mode
                 if exec_mode == 'noisy-model':
@@ -395,27 +399,27 @@ def get_labels(dataset, exec_mode, agent, logger, xy_noise, save_tower=False, la
                 block_tower.append(block)
             #  Use tp to check for stability.
             if exec_mode == 'simple-model' or exec_mode == 'noisy-model':
-
+                
                 # iterate through each subtower until it falls (is not constructable)
                 subtowers = [block_tower[:k_sub] for k_sub in list(range(2,len(block_tower)+1))]
                 for k_sub, subtower in enumerate(subtowers, 2):
                     rot_subtower = [get_rotated_block(b) for b in subtower]
                     label = float(tp.tower_is_constructable(rot_subtower))
-
-                    # add to labeled dataset
+                    
+                    # add to labeled dataset    
                     subtower_dataset['%dblock' % k_sub]['towers'].append(dataset[k]['towers'][tower_ix, :k_sub, :])
                     if 'block_ids' in subtower_dataset['%dblock' % k_sub]:
                         subtower_dataset['%dblock' % k_sub]['block_ids'].append(dataset[k]['block_ids'][tower_ix, :k_sub])
                     subtower_dataset['%dblock' % k_sub]['labels'].append(label)
-
+                    
                     # save tower file
                     if save_tower:
                         if 'block_ids' in dataset[k].keys():
-                            logger.save_towers_data(dataset[k]['towers'][tower_ix, :k_sub, :],
+                            logger.save_towers_data(dataset[k]['towers'][tower_ix, :k_sub, :], 
                                                     dataset[k]['block_ids'][tower_ix, :k_sub],
                                                     label)
                         else:
-                            logger.save_towers_data(dataset[k]['towers'][tower_ix, :k_sub, :],
+                            logger.save_towers_data(dataset[k]['towers'][tower_ix, :k_sub, :], 
                                                     None,
                                                     label)
                     # stop when tower falls
@@ -443,19 +447,19 @@ def get_labels(dataset, exec_mode, agent, logger, xy_noise, save_tower=False, la
                             input('Should reset sim. Not yet handled. Exit and restart training.')
                 labels[tower_ix] = label
                 if 'block_ids' in dataset[k].keys():
-                    logger.save_towers_data(dataset[k]['towers'][tower_ix, :, :],
+                    logger.save_towers_data(dataset[k]['towers'][tower_ix, :, :], 
                                             dataset[k]['block_ids'][tower_ix, :],
                                             labels[tower_ix])
                 else:
-                    logger.save_towers_data(dataset[k]['towers'][tower_ix, :, :],
+                    logger.save_towers_data(dataset[k]['towers'][tower_ix, :, :], 
                                             None,
                                             labels[tower_ix])
         dataset[k]['labels'] = labels
-
+    
     if save_tower:
         # save block placement data
         logger.save_block_placement_data(block_placements)
-
+        
     if label_subtowers:
         # vectorize labeled dataset and return
         for ki, k in enumerate(subtower_dataset, start=2):
@@ -479,7 +483,7 @@ def get_subset(samples, indices):
     """
     keys = samples.keys()
     selected_towers = {k: {'towers': [], 'block_ids': []} for k in keys}
-
+    
     # Initialize tower ranges.
     start = 0
     for k in keys:
@@ -518,21 +522,21 @@ class PoolSampler:
         start = 0
         for k in self.keys:
             end = start + self.pool[k]['towers'].shape[0]
-
+            
             tower_ixs = indices[np.logical_and(indices >= start,
                                         indices < end)] - start
             selected_towers[k]['towers'] = self.pool[k]['towers'][tower_ixs,...]
-
+ 
             mask = np.ones(self.pool[k]['towers'].shape[0], dtype=bool)
 
             mask[tower_ixs] = False
             self.pool[k]['towers'] = self.pool[k]['towers'][mask,...]
             self.pool[k]['labels'] = self.pool[k]['labels'][mask,...]
-
+            
             start = end
-
+        
         return selected_towers
-
+        
 
 
 if __name__ == '__main__':
@@ -576,18 +580,18 @@ if __name__ == '__main__':
     for batch_ixs in sampler:
         print(batch_ixs)
 
-
+    
     # print(len(loader))
 
     # print('----- Pool Sampler Test -----')
     # sampler = PoolSampler('learning/data/random_blocks_(x40000)_5blocks_uniform_mass.pkl')
     # pool = sampler.sample_unlabeled_data(10)
     # for k in sampler.keys:
-    #     print(pool[k]['towers'].shape)
+    #     print(pool[k]['towers'].shape) 
 
     # sampler.get_subset(np.array([0, 1, 2, 3, 4, 20000, 20005]))
     # for k in sampler.keys:
-    #     print(pool[k]['towers'].shape)
+    #     print(pool[k]['towers'].shape) 
 
 
     print('----- Sequential Sampler Test -----')
