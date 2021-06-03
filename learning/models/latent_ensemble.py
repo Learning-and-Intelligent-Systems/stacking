@@ -133,6 +133,7 @@ class LatentEnsemble(nn.Module):
             # prediction of a single model in the ensemble
             labels = self.ensemble.models[ensemble_idx].forward(towers_with_latents)
             labels = labels[:, None, :]
+            labels = labels.view(N_batch, N_samples, -1).permute(0, 2, 1)
 
         # N_batch x N_ensemble x N_samples
         if collapse_ensemble:

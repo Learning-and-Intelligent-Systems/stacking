@@ -19,6 +19,38 @@ from learning.models.latent_ensemble import LatentEnsemble
 from learning.viz_latents import viz_latents
 
 
+def get_both_loss(latent_ensemble, batches, disable_latents, N, N_samples=10):
+    likelihood_loss = 0
+    N_models = latent_ensemble.ensemble.n_models
+
+    for i, batch in enumerate(batches): # for each model === for each sample from the model distribution
+        towers, block_ids, labels = batch
+        N_batch = towers.shape[0]
+
+        if torch.cuda.is_available():
+            towers = towers.cuda()
+            block_ids = block_ids.cuda()
+            labels = labels.cuda()
+        # TODO(izzy): I'm dropping the first four elements from the vectorized
+        # towers, mass and COM xyz. I'm not sure if this is the best place to
+        # do that because it it is still in the datast. It should probably be a
+        # flag in the TowerDataset?
+        if disable_latents:
+            preds = latent_ensemble.ensemble.models[i].forward(towers).squeeze()
+        else:
+            preds = latent_ensemble(towers[:,:,4:], block_ids.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples)
+            # print(preds.shape)
+        likelihood_loss += F.binary_cross_entropy(preds.squeeze(), labels[:, None].expand(N_batch, N_samples), reduction='sum')
+
+    likelihood_loss = likelihood_loss/N_models/N_samples
+
+    q_z = torch.distributions.normal.Normal(latent_ensemble.latent_locs, torch.exp(latent_ensemble.latent_logscales))
+    p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
+    kl_loss = torch.distributions.kl_divergence(q_z, p_z).sum()
+
+    return (kl_loss + N*likelihood_loss)/N_batch
+
+
 def get_params_loss(latent_ensemble, batches, disable_latents, N):
     """
     1. sample ~ latents
@@ -45,7 +77,7 @@ def get_params_loss(latent_ensemble, batches, disable_latents, N):
         if disable_latents:
             preds = latent_ensemble.ensemble.models[i].forward(towers).squeeze()
         else:
-            preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, ensemble_idx=i)
+            preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, collapse_ensemble=False, ensemble_idx=i)
         likelihood_loss += F.binary_cross_entropy(preds.squeeze(), labels.squeeze(), reduction='sum')
 
     # we sum the likelihoods for every input in the batch, but we want the
@@ -105,14 +137,11 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     freeze_latents=False,
     freeze_ensemble=False,
     disable_latents=False,
-    return_logs=False):
+    return_logs=False,
+    alternate=False):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
-    # TODO: Check if learning rate should be different for the latents.
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
-
-    # NOTE(izzy): we should be computing the KL divergence + likelihood of entire dataset.
-    # so for each batch we need to divide by the number of batches
 
     losses = []
     latents = []
@@ -122,22 +151,33 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     for epoch_idx in range(n_epochs):
         accs = []
         for batch_idx, set_of_batches in enumerate(dataloader):
-            batch_loss = 0
-            # update the latent distribution while holding the model parameters fixed.
-            if (not freeze_latents) and (not disable_latents):
-                latent_optimizer.zero_grad()
-                latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0], N=len(dataloader.loaders[0].dataset))
-                latent_loss.backward()
-                latent_optimizer.step()
-                batch_loss += latent_loss.item()
 
-            # update the model parameters while sampling from the latent distribution.
-            if not freeze_ensemble:
+            if alternate: # take gradient descent steps separately
+                batch_loss = 0
+                # update the latent distribution while holding the model parameters fixed.
+                if (not freeze_latents) and (not disable_latents):
+                    latent_optimizer.zero_grad()
+                    latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0], N=len(dataloader.loaders[0].dataset))
+                    latent_loss.backward()
+                    latent_optimizer.step()
+                    batch_loss += latent_loss.item()
+
+                # # update the model parameters while sampling from the latent distribution.
+                if not freeze_ensemble:
+                    params_optimizer.zero_grad()
+                    params_loss = get_params_loss(latent_ensemble, set_of_batches, disable_latents, N=len(dataloader.loaders[0].dataset))
+                    params_loss.backward()
+                    params_optimizer.step()
+                    batch_loss += params_loss.item()
+
+            else: # take gradient descent steps together
                 params_optimizer.zero_grad()
-                params_loss = get_params_loss(latent_ensemble, set_of_batches, disable_latents, N=len(dataloader.loaders[0].dataset))
-                params_loss.backward()
-                params_optimizer.step()
-                batch_loss += params_loss.item()
+                latent_optimizer.zero_grad()
+                both_loss = get_both_loss(latent_ensemble, set_of_batches, disable_latents, N=len(dataloader.loaders[0].dataset))
+                both_loss.backward()
+                if (not freeze_latents) and (not disable_latents): latent_optimizer.step()
+                if not freeze_ensemble: params_optimizer.step()
+                batch_loss = both_loss.item()
 
             losses.append(batch_loss)
 
@@ -171,7 +211,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 def evaluate(latent_ensemble, data_loader, disable_latents, val_metric='f1'):
     acc = []
     losses = []
-    
+
     preds = []
     labels = []
     for val_batches in data_loader:
@@ -186,7 +226,7 @@ def evaluate(latent_ensemble, data_loader, disable_latents, val_metric='f1'):
             pred = latent_ensemble(towers[:,:,4:], block_ids.long()).squeeze()
         if len(pred.shape) == 0: pred = pred.unsqueeze(-1)
         loss = F.binary_cross_entropy(pred, label)
-     
+
         with torch.no_grad():
             preds += (pred > 0.5).cpu().float().numpy().tolist()
             labels += label.cpu().numpy().tolist()
@@ -253,7 +293,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.exp_name = 'pretrained_latents'
     args.use_latents = not args.disable_latents
-    
+
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
     # sample_unlabeled to generate dataset. 50/50 class split. using 10 blocks
@@ -338,9 +378,9 @@ if __name__ == "__main__":
 
     train_block_fit_tower_dict = shrink_dict(train_block_fit_tower_dict, 5)
     test_block_fit_tower_dict = shrink_dict(test_block_fit_tower_dict, 5)
-    
+
     # with open('learning/experiments/logs/exp-20210518-181538/datasets/active_34.pkl', 'rb') as handle:
-    #     train_dataset = pickle.load(handle)    
+    #     train_dataset = pickle.load(handle)
 
     train_block_train_tower_dataset = TowerDataset(train_block_train_tower_dict, augment=True, prerotated=False)
     train_block_fit_tower_dataset = TowerDataset(train_block_fit_tower_dict, augment=True, prerotated=False)
@@ -399,7 +439,7 @@ if __name__ == "__main__":
     print('\nTesting with test blocks')
     latent_ensemble.load_state_dict(torch.load(model_path))
     test(latent_ensemble, test_block_fit_tower_loader, test_block_test_tower_loader, disable_latents=args.disable_latents, n_epochs=100)
-    
+
 
 
 
