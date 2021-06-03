@@ -98,7 +98,7 @@ def run_active_towers(args):
         val_dataset = TowerDataset(val_dict, 
                                    augment=True,
                                    K_skip=10)
-    elif args.sampler == 'sequential':
+    elif args.sampler == 'sequential' or args.strategy == 'subtower' or args.strategy == 'subtower-greedy':
         print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
         towers_dict = sample_sequential_data(block_set, None, 40)
         towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
