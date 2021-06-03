@@ -32,7 +32,7 @@ def get_params_loss(latent_ensemble, batches, disable_latents, N):
     """
 
     likelihood_loss = 0
-    for i, batch in enumerate(batches):
+    for i, batch in enumerate(batches): # for each model === for each sample from the model distribution
         towers, block_ids, labels = batch
         if torch.cuda.is_available():
             towers = towers.cuda()
@@ -46,14 +46,14 @@ def get_params_loss(latent_ensemble, batches, disable_latents, N):
             preds = latent_ensemble.ensemble.models[i].forward(towers).squeeze()
         else:
             preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, ensemble_idx=i)
-        likelihood_loss += F.binary_cross_entropy(preds.squeeze(), labels.squeeze())
+        likelihood_loss += F.binary_cross_entropy(preds.squeeze(), labels.squeeze(), reduction='sum')
 
     # we sum the likelihoods for every input in the batch, but we want the
     # expected likelihood under the ensemble which means we take the mean
-    return N*likelihood_loss
+    return N*likelihood_loss/towers.shape[0]/latent_ensemble.ensemble.n_models
 
 
-def get_latent_loss(latent_ensemble, batch, N):
+def get_latent_loss(latent_ensemble, batch, N, N_samples=10):
     """
     [mu, sigma] -(reparam)-> [sample] -(thru ensemble)-> [likelihood]
     [mu, sigma] -> [KL]
@@ -82,9 +82,16 @@ def get_latent_loss(latent_ensemble, batch, N):
     # towers, mass and COM xyz. I'm not sure if this is the best place to
     # do that because it it is still in the datast. It should probably be a
     # flag in the TowerDataset?
-    preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, collapse_ensemble=True)#, np.random.randint(0, len(latent_ensemble.ensemble.models))) # take the mean of the ensemble
-    likelihood_loss = F.binary_cross_entropy(preds.squeeze(), labels.squeeze(), reduction='sum')
+
+    # old version: takes the mean of the labels before computing likelihood
+    # preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=True, collapse_ensemble=True)#, np.random.randint(0, len(latent_ensemble.ensemble.models))) # take the mean of the ensemble
+    # likelihood_loss = F.binary_cross_entropy(preds.squeeze(), labels.squeeze(), reduction='sum')
     # and compute the kl divergence
+
+    # updated version June 3: we want to take the expectation outside the likelihood
+    preds = latent_ensemble(towers[:,:,4:], block_ids.long(), collapse_latents=False, collapse_ensemble=True, N_samples=N_samples)
+    likelihood_losses = F.binary_cross_entropy(preds.squeeze(), labels[:, None].expand(towers.shape[0], N_samples), reduction='none')
+    likelihood_loss = likelihood_losses.mean(axis=1).sum(axis=0)
 
     # Option 1: Calculate KL for every latent in each batch.
     q_z = torch.distributions.normal.Normal(latent_ensemble.latent_locs, torch.exp(latent_ensemble.latent_logscales))
@@ -102,7 +109,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     # TODO: Check if learning rate should be different for the latents.
-    latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-2)
+    latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
 
     # NOTE(izzy): we should be computing the KL divergence + likelihood of entire dataset.
     # so for each batch we need to divide by the number of batches
@@ -285,14 +292,14 @@ if __name__ == "__main__":
     # test_block_filename = 'learning/data/10block_set_(x1000)_cubes_test_seq1_dict.pkl'
 
     # Datasets for blocks with dynamic poses.
-    train_block_train_tower_fname = 'learning/data/10block_set_(x1000)_blocks_a_1_dict.pkl'
+    # train_block_train_tower_fname = 'learning/data/10block_set_(x1000)_blocks_a_1_dict.pkl'
     #train_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_blocks_a_2_dict.pkl'
     #train_block_test_tower_fname = 'learning/data/10block_set_(x1000)_blocks_a_3_dict.pkl'
     #train_block_train_tower_fname = 'learning/data/may_blocks/towers/100block_set_(x10000)_nblocks_a_1_dict.pkl'
-    train_block_fit_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_2_dict.pkl'
-    train_block_test_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_3_dict.pkl'
-    test_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_1_dict.pkl'
-    test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_2_dict.pkl'
+    # train_block_fit_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_2_dict.pkl'
+    # train_block_test_tower_fname = 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_3_dict.pkl'
+    # test_block_fit_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_1_dict.pkl'
+    # test_block_test_tower_fname = 'learning/data/10block_set_(x1000)_blocks_b_2_dict.pkl'
 
     # Datasets for cubes with fixed poses.
     # train_block_train_tower_fname = 'learning/data/10block_set_(x1000)_cubes_fixed_a_1_dict.pkl'
@@ -329,8 +336,8 @@ if __name__ == "__main__":
     with open(test_block_test_tower_fname, 'rb') as handle:
         test_block_test_tower_dict = pickle.load(handle)
 
-    train_block_fit_tower_dict = shrink_dict(train_block_fit_tower_dict, 100)
-    test_block_fit_tower_dict = shrink_dict(test_block_fit_tower_dict, 100)
+    train_block_fit_tower_dict = shrink_dict(train_block_fit_tower_dict, 5)
+    test_block_fit_tower_dict = shrink_dict(test_block_fit_tower_dict, 5)
     
     # with open('learning/experiments/logs/exp-20210518-181538/datasets/active_34.pkl', 'rb') as handle:
     #     train_dataset = pickle.load(handle)    
