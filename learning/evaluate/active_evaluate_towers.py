@@ -102,10 +102,12 @@ def get_validation_accuracy(logger, fname):
 
 
     for tx in range(0, logger.args.max_acquisitions):
-        if tx % 10 == 0:
-            print('Eval timestep, ', tx)
+        dataset = logger.load_dataset(tx)
+        val_dataset = logger.load_val_dataset(tx)
+        if tx % 1 == 0:
+            print('Eval timestep, ', tx, 'N:', len(dataset))
         ensemble = logger.get_ensemble(tx)
-        if hasattr(logger.args, 'sampler') and logger.args.sampler == 'sequential':
+        if hasattr(logger.args, 'sampler') and (logger.args.sampler == 'sequential' or logger.args.strategy == 'subtower'):
             preds = get_sequential_predictions(val_towers, ensemble, use_latents=logger.use_latents).mean(1).numpy()
         else:
             preds = get_predictions(val_towers, ensemble, use_latents=logger.use_latents).mean(1).numpy()
@@ -113,7 +115,7 @@ def get_validation_accuracy(logger, fname):
         start = 0
         for k in tower_keys:
             end = start + val_towers[k]['towers'].shape[0]
-            print(val_towers[k]['labels'])
+            #print(val_towers[k]['labels'])
             acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
             f1 = f1_score(val_towers[k]['labels'], preds[start:end] > 0.5)
             print('Acc:', tx, k, acc)
@@ -1065,6 +1067,19 @@ def check_stable_bases(logger):
                     print('Unstable Base')
                     #print(tower_vec)
 
+def plot_latents(logger):
+    from learning.viz_latents import viz_latents
+    import imageio
+    images = []
+    for tx in range(0, logger.args.max_acquisitions, 1):
+        ensemble = logger.get_ensemble(tx)
+        fname = logger.get_figure_path('latents_%d.png' % tx)
+        with torch.no_grad():
+            viz_latents(ensemble.latent_locs, torch.exp(ensemble.latent_logscales), fname=fname)
+            images.append(imageio.imread(fname))
+    fname = logger.get_figure_path('latents_evolution.gif')
+    imageio.mimsave(fname, images)
+
 
 
 if __name__ == '__main__':
@@ -1075,8 +1090,10 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
     logger.args.max_acquisitions = 50
 
-    plot_train_accuracy(logger)
-    plot_latent_uncertainty(logger)
+    # plot_train_accuracy(logger)
+    # plot_latent_uncertainty(logger)
+
+    #plot_latents(logger)
 
 
     #plot_sample_efficiency(logger)
@@ -1091,10 +1108,10 @@ if __name__ == '__main__':
 
     #inspect_validation_set('learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
 
-    accs = get_validation_accuracy(logger,
-                                  # 'learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
-                                  '/Users/izzy/projects/stacking/learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl')
-    plot_val_accuracy(logger)
+    #accs = get_validation_accuracy(logger,
+    #                              'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_b_1_dict.pkl')
+                                  #'/Users/izzy/projects/stacking/learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl')
+    plot_val_accuracy(logger, init_dataset_size=2, n_acquire=2)
 
     # #analyze_collected_2block_towers(logger)
     # print(accs)

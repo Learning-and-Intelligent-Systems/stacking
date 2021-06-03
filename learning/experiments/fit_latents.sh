@@ -5,10 +5,11 @@ python -m learning.experiments.active_train_towers --block-set-fname="learning/d
                                                    --strategy subtower \
                                                    --sampler random \
                                                    --n-epochs 100 \
-                                                   --exp-name fit-latents \
-                                                   --latent-ensemble-exp-path learning/experiments/logs/pretrained_latents-20210527-165656 \
-                                                   --latent-ensemble-tx 0 \
+                                                   --exp-name fit-latents-2-acquire-100-sample \
+                                                   --latent-ensemble-exp-path learning/experiments/logs/latent-blocks-20210528-192208 \
+                                                   --latent-ensemble-tx 40 \
                                                    --fit-latents \
-                                                   --n-models 7 \
-                                                   --n-acquire 2
+                                                   --n-models 10 \
+                                                   --n-acquire 2 \
+                                                   --max-acquisitions 50
                                         
