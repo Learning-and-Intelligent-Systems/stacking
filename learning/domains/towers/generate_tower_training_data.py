@@ -48,7 +48,7 @@ def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=Fal
         # get the x and y dimensions of each block (after the rotation)
         dims_xy = np.array([rb.dimensions for rb in rotated_blocks])[:,:2]
         # figure out how far each block can be moved w/ losing contact w/ the block below
-        max_displacements_xy = (dims_xy[1:] + dims_xy[:1])/2.
+        max_displacements_xy = (dims_xy[1:] + dims_xy[:-1])/2.
         # sample unscaled noise (clip bceause random normal can exceed -1, 1)
         noise_xy = np.clip(0.5*np.random.randn(num_blocks-1, 2), -0.95, 0.95)
         # and scale the noise by the max allowed displacement
