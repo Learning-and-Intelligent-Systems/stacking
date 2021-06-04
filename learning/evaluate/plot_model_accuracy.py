@@ -25,8 +25,12 @@ def calc_model_accuracy(logger, dataset, args, exp_path, save_local_fig=True):
         ensemble = logger.get_ensemble(tx)
         if torch.cuda.is_available():
             ensemble = ensemble.cuda()
-        preds = get_sequential_predictions(dataset, ensemble)
-        preds = preds.mean(axis=1).round()
+        if logger.args.sampler == 'sequential' or logger.args.strategy == 'subtower' or logger.args.strategy == 'subtower-greedy':
+            preds = get_sequential_predictions(dataset, ensemble)
+            preds = preds.round()
+        else:
+            preds = get_predictions(dataset, ensemble)
+            preds = preds.mean(axis=1).round()        
         
         samples_per_height = dataset[list(dataset.keys())[0]]['towers'].shape[0]
         

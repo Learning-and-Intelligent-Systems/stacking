@@ -294,12 +294,12 @@ def get_sequential_predictions(dataset, ensemble):
             if torch.cuda.is_available():
                 tensor = tensor.cuda()
             with torch.no_grad():
-                sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
+                sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]).mean(dim=1))
         sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
         #print('SubTowerPreds:', sub_tower_preds.shape)
         #preds.append(sub_tower_preds[-1,:,:])
-        #preds.append(sub_tower_preds.prod(dim=0))
-        preds.append((sub_tower_preds > 0.5).all(dim=0).float())
+        preds.append(sub_tower_preds.prod(dim=0))
+        #preds.append((sub_tower_preds > 0.5).all(dim=0).float())
         #print(preds[-1].shape)
     return torch.cat(preds, dim=0)
 

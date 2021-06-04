@@ -133,9 +133,11 @@ class EnsemblePlanner:
                         if torch.cuda.is_available():
                             tensor = tensor.cuda()
                         with torch.no_grad():
-                            sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
+                            sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]).mean(dim=1))
                     sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
                     preds.append(sub_tower_preds.prod(dim=0))
+                p_stables = torch.cat(preds, dim=0)
+
             else:
                 for tensor, _ in tower_loader:
                     if torch.cuda.is_available():
@@ -143,7 +145,7 @@ class EnsemblePlanner:
                     with torch.no_grad():
                         preds.append(ensemble.forward(tensor))
         
-            p_stables = torch.cat(preds, dim=0).mean(dim=1)
+                p_stables = torch.cat(preds, dim=0).mean(dim=1)
             
         elif args.planning_model == 'noisy-model':
             n_estimate = 10
