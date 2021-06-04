@@ -126,22 +126,22 @@ class EnsemblePlanner:
             tower_loader = DataLoader(dataset=tower_dataset,
                                       batch_sampler=tower_sampler)
             preds = []
-            #if hasattr(self.logger.args, 'sampler') and self.logger.args.sampler == 'sequential':
-            for tensor, _ in tower_loader:
-                sub_tower_preds = []
-                for n_blocks in range(2, tensor.shape[1]+1):
+            if hasattr(self.logger.args, 'sampler') and (self.logger.args.sampler == 'sequential' or self.logger.args.strategy == 'subtower' or self.logger.args.strategy == 'subtower-greedy'):
+                for tensor, _ in tower_loader:
+                    sub_tower_preds = []
+                    for n_blocks in range(2, tensor.shape[1]+1):
+                        if torch.cuda.is_available():
+                            tensor = tensor.cuda()
+                        with torch.no_grad():
+                            sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
+                    sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
+                    preds.append(sub_tower_preds.prod(dim=0))
+            else:
+                for tensor, _ in tower_loader:
                     if torch.cuda.is_available():
                         tensor = tensor.cuda()
                     with torch.no_grad():
-                        sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
-                sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
-                preds.append(sub_tower_preds.prod(dim=0))
-            # else:
-            #     for tensor, _ in tower_loader:
-            #         if torch.cuda.is_available():
-            #             tensor = tensor.cuda()
-            #         with torch.no_grad():
-            #             preds.append(ensemble.forward(tensor))
+                        preds.append(ensemble.forward(tensor))
         
             p_stables = torch.cat(preds, dim=0).mean(dim=1)
             
