@@ -323,7 +323,7 @@ def get_sequential_predictions(dataset, ensemble, use_latents=False):
         #print(preds[-1].shape)
     return torch.cat(preds, dim=0)
 
-def get_predictions(dataset, ensemble, use_latents=False, N_samples=10):
+def get_predictions(dataset, ensemble, use_latents=False, N_samples=10, collapse_latents=False, collapse_ensemble=False):
     """
     :param dataset: A tower_dict structure.
     :param ensemble: The Ensemble model which to use for predictions.
@@ -358,7 +358,7 @@ def get_predictions(dataset, ensemble, use_latents=False, N_samples=10):
 
                 # takes samples from the joint distribution from the joint distribution to compute I(y ; theta, z)
                 preds.append(ensemble.forward(
-                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=False, collapse_latents=False).reshape(N_batch, -1))
+                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=collapse_ensemble, collapse_latents=collapse_latents).reshape(N_batch, -1))
             else:
                 preds.append(ensemble.forward(tensor))
     return torch.cat(preds, dim=0)
