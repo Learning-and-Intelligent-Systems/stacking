@@ -142,3 +142,58 @@ class LatentEnsemble(nn.Module):
             labels = labels.mean(axis=2, keepdim=True)
 
         return labels
+
+
+class ThrowingLatentEnsemble(LatentEnsemble):
+
+    def concat_samples(self, x, z_samples):
+        """
+        Arguments:
+            x {torch.Tensor} -- [N_batch x D_observed]
+            z_samples {torch.Tensor} -- [N_batch x N_samples x D_latent]
+
+        Returns:
+            [N_batch x N_samples x (D_observed+D_latent)]
+        """
+        N_batch, N_samples, D_latent = z_samples.shape
+        x = x.unsqueeze(1).expand(-1, N_samples, -1)
+        return torch.cat([samples, x], 2)
+
+
+    def forward(self, x, obj_ids, ensemble_idx, N_samples, collapse_latents=True, collapse_ensemble=True):
+        assert x.shape[0] == obj_ids.shape[0], "One object per experiment"
+        N_ensemble = self.ensemble.n_models
+
+        # parameters will have shape [N_batch x D_latent]
+        q_z = torch.distributions.normal.Normal(self.latent_locs[obj_ids],
+                                                torch.exp(self.latent_logscales[obj_ids]))
+
+        # samples will have shape [N_batch x N_samples x D_latent]
+        z_samples = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2)
+        # data will have shape [N_batch x N_samples x (D_observed+D_latent)]
+        x_with_z_samples = self.concat_samples(x, z_samples)
+
+        # reshape the resulting tensor so the batch dimension holds
+        # N_batch times N_samples
+        N_batch, N_samples, D_total = x_with_z_samples.shape
+        x_with_z_samples = x_with_z_samples.view(-1, D_total)
+
+        if ensemble_ids is None:
+            # prediction for each model in the ensemble ensemble
+            # [(N_batch*N_samples) x N_ensemble x D_pred]
+            labels = self.ensemble.forward(x_with_z_samples)
+            labels = labels.view(N_batch, N_samples, N_ensemble, -1).permute(0, 2, 1, 3)
+        else:
+            # prediction of a single model in the ensemble
+            # [(N_batch*N_samples) x D_pred]
+            labels = self.ensemble.models[ensemble_idx].forward(x_with_z_samples)
+            labels = labels[:, None, :]
+            labels = labels.view(N_batch, N_samples, N_ensemble, -1).permute(0, 2, 1, 3)
+
+        # N_batch x N_ensemble x N_samples
+        if collapse_ensemble:
+            labels = labels.mean(axis=1, keepdim=True)
+        if collapse_latents:
+            labels = labels.mean(axis=2, keepdim=True)
+
+        return labels
