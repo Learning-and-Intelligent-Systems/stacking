@@ -141,7 +141,7 @@ This will output a file to ```learning/experiments/logs/<experiment-name>/evalua
 
 To build the towers on the panda robot:
 ```
-python3 -m learning.experiments.run_towers_evaluation --real --use-vision --blocks-file learning/domains/towers/eval_block_set_9.pkl --towers-file learning/experiments/logs/<experiment-name>/evaluation_towers/cumulative-overhang/learned/towers_<n-towers>.pkl
+python3 -m learning.experiments.run_towers_evaluation --real --use-vision --use-planning-server --blocks-file learning/domains/towers/eval_block_set_9.pkl --towers-file learning/experiments/logs/<experiment-name>/evaluation_towers/cumulative-overhang/learned/towers_<n-towers>.pkl
 ```
 
 ### Evaluate Task Performance with the Simulator
