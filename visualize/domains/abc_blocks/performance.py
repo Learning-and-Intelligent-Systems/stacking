@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("TkAgg")
 
+from learning.domains.abc_blocks.world import TABLE, MAXBLOCK
+
 
 def calc_trans_error_rate(args, trans_dataset, model):
     n = len(trans_dataset)
@@ -21,6 +23,56 @@ def calc_trans_error_rate(args, trans_dataset, model):
         #error_rate = (preds[i].round() != delta_state).sum().float().mean()
     return error_rate
     
+def detailed_error_stats(args, trans_dataset, trans_model):
+    n = len(trans_dataset)
+    trans_types = 5
+    transition_frequency = np.zeros(trans_types)
+    preds = [[] for _ in range(trans_types)]
+    xs, ys = trans_dataset[:]
+    all_preds = trans_model(xs).detach()
+    corr_pred = np.zeros((trans_types,3,3))
+    for i, ((object_features, edge_features, action), next_edge_features) in enumerate(trans_dataset):
+        if edge_features[TABLE, 1] == 1 and edge_features[TABLE, 2] ==1:
+            # Transition 1: all blocks on table, then place(A)
+            if (action == torch.tensor([0, 1, 0])).all():
+                print('Transition 1')
+                print(edge_features.squeeze())
+                print(next_edge_features.squeeze())
+                transition_frequency[0] += 1
+                preds[0] += [all_preds[i]]
+                corr_pred[0] = next_edge_features.squeeze()
+            # Transition 2: all blocks on table, then place(B)
+            elif (action == torch.tensor([0, 0, 1])).all():
+                transition_frequency[1] += 1
+                preds[1] += [all_preds[i]]
+                corr_pred[1] = next_edge_features.squeeze()
+                print('Transition 2')
+                print(edge_features.squeeze())
+                print(next_edge_features.squeeze())
+        # A on B
+        elif edge_features[TABLE, 1] == 1 and edge_features[1, 2] ==1:
+            if (action == torch.tensor([0, 1, 0])).all():
+                transition_frequency[2] += 1
+                preds[2] += [all_preds[i]]
+                corr_pred[2] = next_edge_features.squeeze()
+            elif (action == torch.tensor([0, 0, 1])).all():
+                transition_frequency[3] += 1
+                preds[3] += [all_preds[i]]
+                corr_pred[3] = next_edge_features.squeeze()
+        # Non action
+        elif (action == torch.tensor([0, 0, 0])).all():
+            transition_frequency[4] += 1
+            preds[4] += [all_preds[i]]
+            corr_pred[4] = next_edge_features.squeeze()
+    for type in range(trans_types):
+        print('Transition type %i occured %f of the time in the training datasest' % (type, transition_frequency[type]/n))
+        if transition_frequency[type] != 0:
+            print('Its average prediction was')
+            print(torch.cat(preds[type], axis=2).mean(axis=2))
+            print('Correct Prediction')
+            print(corr_pred[type])
+                
+                
 def calc_successful_action_error_rate(args, trans_dataset, trans_model):
     xs, ys = trans_dataset[:]
     preds = trans_model(xs)
@@ -32,7 +84,7 @@ def calc_successful_action_error_rate(args, trans_dataset, trans_model):
                 successful_actions += 1
                 if ((preds[i]>0.5) != next_edge_features).sum().float() > 0.:
                     action_errors += 1
-                print(preds[i,:,:,0], next_edge_features[:,:,0])
+                print(preds[i].squeeze(), next_edge_features.squeeze())
                 #action_errors.append(((preds[i]>0.5) != next_state).sum().float())
         print('%i/%i datapoints consisted of transtitions.' % (successful_actions, len(trans_dataset)))
         print('%i/%i transitions were incorrectly predicted' % (action_errors, successful_actions))
@@ -44,9 +96,9 @@ def calc_successful_action_error_rate(args, trans_dataset, trans_model):
                 actions += 1
                 if (preds[i].round() != delta_edge_features).sum().float() > 0.:
                     action_errors += 1
-                print(preds[i,:,:,0])
+                print(preds[i].squeeze())
+                print(delta_edge_features.squeeze())
                 #action_errors += (preds[i].round() != delta_state).sum().float()
-                #print(preds[i])
         print('%i/%i datapoints consisted of transtitions.' % (actions, len(trans_dataset)))
         print('%i/%i transitions were incorrectly predicted' % (action_errors, actions))
     
@@ -75,23 +127,33 @@ def vis_trans_errors(test_dataset, model):
     fig.colorbar(c)
     
     
-def vis_trans_dataset_grid(trans_dataset, title):
+def vis_trans_dataset_grid(args, trans_dataset, title):
     fig, ax = plt.subplots()
     xs, ys = trans_dataset[:]
-    all_edge_masks, all_actions = xs
-    avg_edge_mask = all_edge_masks.sum(axis=0).detach()
-    c = ax.pcolor(avg_edge_mask, cmap='viridis')
+    if args.pred_type == 'full_state':
+        new_edge_features = ys
+    elif args.pred_type == 'delta_state':
+        _, edge_features, _ = xs
+        delta_edge_features = ys
+        new_edge_features = torch.add(edge_features, delta_edge_features)
+    avg_edge_features = new_edge_features.sum(axis=0).detach().squeeze()
+    c = ax.pcolor(avg_edge_features, cmap='viridis')
     ax.set_title(title)
     ax.set_ylabel('Bottom Object')
     ax.set_xlabel('Top Object')
     fig.colorbar(c)
     
-def vis_trans_dataset_hist(trans_dataset, title):
+def vis_trans_dataset_hist(args, trans_dataset, title):
     # Visualize Training Dataset
     stacked_blocks = []
     for x, y in trans_dataset:
-        state, action = x 
-        state_stacked = state[2:,2:].sum()+1  # one block is stacked on table
+        if args.pred_type == 'full_state':
+            new_edge_features = y
+        elif args.pred_type == 'delta_state':
+            _, edge_features, _ = x
+            delta_edge_features = y
+            new_edge_features = torch.add(edge_features, delta_edge_features)
+        state_stacked = new_edge_features[TABLE+1:,TABLE+1:].sum()+1  # one block is stacked on table
         stacked_blocks.append(state_stacked)
     
     fig, ax = plt.subplots()

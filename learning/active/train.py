@@ -60,6 +60,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
     all_accs = []
     all_losses = []
     for ex in range(n_epochs):
+        epoch_losses = []
         #print('Epoch', ex)
         for x, y in dataloader:
             if torch.cuda.is_available():
@@ -70,6 +71,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
             pred = model.forward(x)
             loss = loss_fn(pred, y)
             loss.backward()
+            #print('grad', [p.grad.sum() for p in list(model.parameters())])
 
             optimizer.step()
 
@@ -77,24 +79,29 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
             accuracy = ((pred>0.5) == y).float().mean()
             
             all_accs.append(accuracy.item())
-            all_losses.append(loss.item())
+            #all_losses.append(loss.item())
+            epoch_losses.append(loss.item())
             it += 1
         if val_dataloader is not None:
             val_loss = evaluate(val_dataloader, model)
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_weights = copy.deepcopy(model.state_dict())
-                #print('Saved')    
+                #print('Saved')  
+        all_losses.append(np.mean(epoch_losses))
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
+    
     
     fig, ax = plt.subplots()
     #ax.plot(all_accs, label='accuracy')
     ax.plot(all_losses, label='loss')
-    ax.set_xlabel('Batch Number (%i Epochs)' % n_epochs)
-    ax.set_title('Loss and Accuracy on Training Dataset')
+    ax.set_xlabel('Epoch')
+    ax.set_title('Loss on Training Dataset')
     ax.legend()
     plt.show()
+    
+    
     return model
 
 if __name__ == '__main__':

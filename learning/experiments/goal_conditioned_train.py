@@ -8,15 +8,19 @@ import matplotlib
 matplotlib.use("TkAgg")
 
 from learning.active.train import train
-from learning.domains.abc_blocks.world import ABCBlocksWorld
+from learning.domains.abc_blocks.world import ABCBlocksWorld, N_OBJECTS
 from learning.active.utils import ActiveExperimentLogger
 from learning.models.goal_conditioned import TransitionGNN, HeuristicGNN
 from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset, ABCBlocksHeurDataset
 from learning.domains.abc_blocks.generate_data import generate_dataset, preprocess
-from visualize.domains.abc_blocks.performance import calc_trans_error_rate, calc_heur_error_rate, \
-                                                        vis_trans_errors, vis_trans_dataset_grid, \
-                                                        vis_trans_dataset_hist, \
-                                                        calc_successful_action_error_rate
+from visualize.domains.abc_blocks.performance import * #calc_trans_error_rate, calc_heur_error_rate, \
+                                                        #vis_trans_errors, vis_trans_dataset_grid, \
+                                                        #vis_trans_dataset_hist, \
+                                                        #calc_successful_action_error_rate
+
+batch_size = 16
+n_epochs = 1000
+n_hidden = 16
 
 def run_goal_directed_train(args, plot=True):
     if args.domain == 'abc_blocks':
@@ -25,8 +29,8 @@ def run_goal_directed_train(args, plot=True):
         heur_dataset = ABCBlocksHeurDataset()
 
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
-    trans_dataloader = DataLoader(trans_dataset, batch_size=16, shuffle=False)
-    heur_dataloader = DataLoader(heur_dataset, batch_size=16, shuffle=False)
+    trans_dataloader = DataLoader(trans_dataset, batch_size=batch_size, shuffle=False)
+    heur_dataloader = DataLoader(heur_dataset, batch_size=batch_size, shuffle=False)
         
     print('Generating test dataset.')
     test_args = copy(args)
@@ -42,30 +46,31 @@ def run_goal_directed_train(args, plot=True):
     n_datapoints = []
     trans_error_rates = []
     heur_error_rates = []
-    train_policy = world.expert_policy
-    for i, max_additional_seq_attempts in enumerate([20]):#[1, 4, 5, 10, 30, 50]):
+    train_policy = world.random_policy
+    for i, max_additional_seq_attempts in enumerate([10]):#[1, 4, 5, 10, 30, 50]):
         print('Adding to training dataset.')
         args.max_seq_attempts = max_additional_seq_attempts
         generate_dataset(args, world, logger, trans_dataset, heur_dataset, train_policy)
-        preprocess(args, trans_dataset)
-        trans_model = TransitionGNN(args, n_hidden=7)
-        print('Training with %i datapoints' % len(trans_dataset))
+        preprocess(args, trans_dataset, type='balanced_actions')
+        trans_model = TransitionGNN(args, n_of_in=N_OBJECTS, n_hidden=n_hidden)
+        print('Training with %i datapoints.' % len(trans_dataset))
         n_datapoints.append(len(trans_dataset))
         if args.pred_type == 'delta_state':
             loss_fn = F.mse_loss
         elif args.pred_type == 'full_state':
             loss_fn = F.binary_cross_entropy
-        train(trans_dataloader, None, trans_model, n_epochs=100, loss_fn=loss_fn)
+        train(trans_dataloader, None, trans_model, n_epochs=n_epochs, loss_fn=loss_fn)
         # TODO: fix calculation
         trans_error_rate = calc_trans_error_rate(args, test_trans_dataset, trans_model)
         trans_error_rates.append(trans_error_rate)
         #print('Forward Prediction Error Rate: %f' % trans_error_rate)
         calc_successful_action_error_rate(args, test_trans_dataset, trans_model)
+        detailed_error_stats(args, trans_dataset, trans_model)
         if plot:
             vis_trans_errors(test_trans_dataset, trans_model)
-            vis_trans_dataset_grid(trans_dataset, 'Frequency of Edges seen in Training Dataset')
+            vis_trans_dataset_grid(args, trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
             vis_trans_dataset_grid(test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
-            vis_trans_dataset_hist(trans_dataset, 'Tower Heights in Training Data')
+            vis_trans_dataset_hist(args, trans_dataset, 'Tower Heights in Training Data')
         
         '''
         heur_model = HeuristicGNN()
@@ -77,10 +82,10 @@ def run_goal_directed_train(args, plot=True):
 
     if plot:
         # Visualize Error Rate
-        fig, ax = plt.subplots()
-        ax.plot(n_datapoints, trans_error_rates, '*-')
-        ax.set_xlabel('Training Dataset Size (Number of Actions)')
-        ax.set_ylabel('Edge Prediction Error Rate')
+        #fig, ax = plt.subplots()
+        #ax.plot(n_datapoints, trans_error_rates, '*-')
+        #ax.set_xlabel('Training Dataset Size (Number of Actions)')
+        #ax.set_ylabel('Edge Prediction Error Rate')
         
         plt.ion()
         plt.show()

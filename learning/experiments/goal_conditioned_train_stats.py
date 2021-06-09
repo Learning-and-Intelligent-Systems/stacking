@@ -7,7 +7,7 @@ from visualize.domains.abc_blocks.performance import plot_error_stats
 from learning.experiments.goal_conditioned_train import run_goal_directed_train
 
 def train_stats(args):
-    N = 100
+    N = 1
     all_trans_error_rates = []
     for n in range(N):
         n_datapoints, trans_error_rates = run_goal_directed_train(args, plot=False)

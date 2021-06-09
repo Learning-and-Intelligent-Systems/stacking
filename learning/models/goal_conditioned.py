@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-        
+    
 class HeuristicGNN(nn.Module):
     def __init__(self, n_of_in=7, n_hidden=1):
         """ This network is given an input of size (N, K, K).
@@ -16,15 +16,15 @@ class HeuristicGNN(nn.Module):
         
         # Message function that compute relation between two nodes and outputs a message vector.
         self.E = nn.Sequential(nn.Linear(2*n_of_in, n_hidden),
-                               nn.ReLU())
+                               nn.Tanh())
 
         # Update function that updates a node based on the sum of its messages.
         self.N = nn.Sequential(nn.Linear(n_of_in+n_hidden, n_hidden),  
-                               nn.ReLU())
+                               nn.Tanh())
 
         # Output function that predicts heuristic.
         self.O = nn.Sequential(nn.Linear(2*n_hidden, n_hidden),
-                               nn.ReLU(),
+                               nn.Tanh(),
                                nn.Linear(n_hidden, 1))
 
         self.n_of_in, self.n_hidden = n_of_in, n_hidden
@@ -109,10 +109,11 @@ class HeuristicGNN(nn.Module):
         pred = self.O(torch.cat([h_state, h_goal], dim=1)).view(N)
         return pred
 
+
 class TransitionGNN(nn.Module):
     def __init__(self, args, n_of_in=7, n_ef_in=1, n_hidden=1):
         """ This network is given three inputs of size (N, K, K), (N, 1), and (N, K, K).
-        N is the batch size, K is the number of objects (including a * object)
+        N is the batch size, K is the number of objects (including a table)
         :param n_of_in: Dimensionality of object features and action (one-hot encodings)
         :param n_ef_in: Dimensionality of edge features
         :param n_hidden: Number of hidden units used throughout the network.
@@ -122,45 +123,46 @@ class TransitionGNN(nn.Module):
         torch.set_default_dtype(torch.float64) # my data was float64 and model params were float32
         
         # Initial embedding of object features and action into latent state
-        self.Ni = nn.Sequential(nn.Linear(2*n_of_in, n_hidden))#,
-                               #nn.ReLU())
+        self.Ni = nn.Sequential(nn.Linear(n_of_in, n_hidden))#,
+                               #nn.Tanh())
         
         # Message function that compute relation between two nodes and outputs a message vector.
-        self.E = nn.Sequential(nn.Linear(2*n_hidden+n_ef_in, n_hidden),
-                               nn.ReLU())#,
+        self.E = nn.Sequential(nn.Linear(2*n_hidden, n_hidden),
+                               nn.Tanh())#,
                                #nn.Linear(n_hidden, n_hidden),
-                               #nn.ReLU())
+                               #nn.Tanh())
 
         # Update function that updates a node based on the sum of its messages.
         self.N = nn.Sequential(nn.Linear(n_hidden, n_hidden),  
-                               nn.ReLU())#,
+                               nn.Tanh())#,
                                #nn.Linear(n_hidden, n_hidden),
-                               #nn.ReLU())
+                               #nn.Tanh())
                                
-        # Final function to get full edge predictions
-        self.Ef = nn.Sequential(nn.Linear(n_hidden, n_ef_in),
-                                nn.ReLU())
+        # Final function to get next state edge predictions
+        self.Ef = nn.Sequential(nn.Linear(2*n_hidden+n_of_in, 2*n_hidden),
+                                nn.ReLU(),
+                                nn.Linear(2*n_hidden, n_hidden),
+                                nn.ReLU(),
+                                nn.Linear(n_hidden,1),
+                                nn.Tanh())
 
         self.n_of_in, self.n_ef_in, self.n_hidden = n_of_in, n_ef_in, n_hidden
         
         self.pred_type = args.pred_type
 
-    def embed(self, object_features, action):
+    def embed(self, object_features):
         """
         :param object_features: Node input features (N, K, n_of_in)
         :param action: Action taken (N, n_of_in)
         """
         N, K, n_of_in = object_features.shape
         
-        # Combine features with action
-        # a.shape = (N, K, n_of_in)
-        # xa.shape = (N, K, 2*n_of_in) --> (N*K, 2*n_of_in)
-        a = action[:, None, :].expand(-1, K, -1)
-        xa = torch.cat([object_features, a], dim=2).view(-1, 2*self.n_of_in)
+        # x.shape = (N*K, n_of_in)
+        x = object_features.view(-1, n_of_in)
         
         # Calculate the hidden edge state for each node
         # hn.shape = (N, K, n_hidden)
-        hn = self.Ni(xa).view(N, K, self.n_hidden)
+        hn = self.Ni(x).view(N, K, self.n_hidden)
         return hn
 
     def edge_fn(self, hn, edge_features):
@@ -170,6 +172,7 @@ class TransitionGNN(nn.Module):
         """
         N, K, K, n_ef_in = edge_features.shape
 
+        '''
         # Get features between all nodes and append edge features.
         # x.shape = (N, K, K, n_hidden)
         # xx.shape = (N, K, K, 2*n_hidden)
@@ -181,6 +184,19 @@ class TransitionGNN(nn.Module):
         # Calculate the hidden edge state for each edge
         # he.shape = (N, K, K, n_hidden)
         he = self.E(xxe).view(N, K, K, self.n_hidden)
+        '''
+        
+        # Get features between all nodes and mask with edge features.
+        # x.shape = (N, K, K, n_hidden)
+        # xx.shape = (N, K, K, 2*n_hidden)
+        ## xxm.shape = (N, K, K, 2*n_hidden) --> (N*K*K, 2*n_hidden)
+        x = hn[:, :, None, :].expand(-1, -1, K, -1)
+        xx = torch.cat([x, x.transpose(1, 2)], dim=3)
+        xxm = xx*edge_features
+        
+        # Calculate the hidden edge state for each edge
+        # he.shape = (N, K, K, n_hidden)
+        he = self.E(xxm).view(N, K, K, self.n_hidden)
         return he
 
     def node_fn(self, he):
@@ -206,10 +222,11 @@ class TransitionGNN(nn.Module):
         """
         
         object_features, edge_features, action = x
+        N, K, n_of_in = object_features.shape
         N, K, K, n_ef_in = edge_features.shape
 
         # Calculate initial node hidden state
-        hn = self.embed(object_features, action)
+        hn = self.embed(object_features)
 
         I = 1
         for i in range(I):
@@ -218,16 +235,22 @@ class TransitionGNN(nn.Module):
         
             # Calculate node hidden state
             hn = self.node_fn(he)
-
-        he = self.edge_fn(hn, edge_features)
         
         # Calculate the final edge predictions
-        # he.shape = (N, K, K, n_hidden) --> (N*K*K, n_hidden)
-        # hef.shape = (N*K*K, n_ef_in) --> (N, K, K, n_ef_in)
-        hef = self.Ef(he).view(N, K, K, n_ef_in)
+        # hn.shape = (N, K, n_hidden)
+        # x.shape = (N, K, K, n_hidden)
+        # a.shape = (N, K, K, n_of_in)
+        # xx.shape = (N, K, K, 2*n_hidden) 
+        # xxa.shape = (N, K, K, 2*n_hidden+n_of_in) --> (N*K*K, 2*n_hidden+n_of_in)
+        # y.shape = (N*K*K, 1) --> (N, K, K, 1)
+        x = hn[:, :, None, :].expand(-1, -1, K, -1)
+        a = action[:, None, None, :].expand(-1, K, K, -1)
+        xx = torch.cat([x, x.transpose(1, 2)], dim=3)
+        xxa = torch.cat([xx, a], dim=3).view(-1, 2*self.n_hidden+n_of_in)
+        y = self.Ef(xxa).view(N, K, K, n_ef_in)
         
         # if predicting next full state, hidden state is a probability
         if self.pred_type == 'full_state':
-            hef = torch.sigmoid(hef)
+            y = torch.sigmoid(y)
         
-        return hef
+        return y

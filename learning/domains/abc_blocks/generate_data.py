@@ -1,13 +1,14 @@
 import torch
 
 from tamp.logic import subset
-from learning.domains.abc_blocks.world import get_vectorized_state
+from learning.domains.abc_blocks.world import get_vectorized_state, N_OBJECTS, TABLE
 
 # TODO: generate validation dataset too!!
 def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
     #for gi, goal in enumerate(world.parse_goals_csv(args.goals_file_path)):
         #print('Generating data for goal %i' % gi)
-    goal = world.parse_goals_csv(args.goals_file_path)[0]
+    #goal = world.parse_goals_csv(args.goals_file_path)[0]
+    goal = None
     for i in range(args.max_seq_attempts):
         world.reset()
         action_sequence = []
@@ -20,6 +21,16 @@ def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
             action = policy()
             world.transition(action)
             action_sequence.append((state, action))
+            if len(world._stacked_blocks) == N_OBJECTS-1:
+                state = world.get_state()
+                #if subset(goal, state):
+                #    action_sequence.append((state, NONACTION))
+                #    break
+                #else:
+                action = policy()
+                world.transition(action)
+                action_sequence.append((state, action))
+                break
         add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger)
     #logger.save_dataset(dataset, i)
 
@@ -50,11 +61,26 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
         helper(action_sequence[:goal_i+1], hindsight_goal)
         
 # for testing, only keep samples with successful actions/edge changes
-def preprocess(args, dataset):
+def preprocess(args, dataset, type='successful_actions'):
     xs, ys = dataset[:]
     remove_list = []
-    for i, ((object_features, edge_features, action), next_edge_features) in enumerate(dataset):
-        if (args.pred_type == 'full_state' and (edge_features == next_edge_features).all()) or \
-            (args.pred_type == 'delta_state' and (next_edge_features.abs().sum() == 0)):
-            remove_list.append(i)
+    if type == 'successful_actions':
+        for i, ((object_features, edge_features, action), next_edge_features) in enumerate(dataset):
+            if (args.pred_type == 'full_state' and (edge_features == next_edge_features).all()) or \
+                (args.pred_type == 'delta_state' and (next_edge_features.abs().sum() == 0)):
+                remove_list.append(i)
+    if type == 'balanced_actions':
+        distinct_actions = []
+        actions_counter = {}
+        for i, ((object_features, edge_features, action), next_edge_features) in enumerate(dataset):
+            a = tuple(action.numpy())
+            if a not in distinct_actions:
+                distinct_actions.append(a)
+                actions_counter[a] = [i]
+            else:
+                actions_counter[a] += [i]
+        min_distinct_actions = min([len(counter) for counter in actions_counter.values()])        
+        for a in distinct_actions:
+            remove_list += actions_counter[a][min_distinct_actions:]
+            
     dataset.remove_elements(remove_list)

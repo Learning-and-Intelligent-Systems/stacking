@@ -6,15 +6,15 @@ import numpy as np
 from tamp.predicates import On
 
 '''
+remove for now 0: * object
 features:
-    0: * object
-    1: Table
-    2-6: Blocks and Place block action
+    0: Table
+    1 --> N_OBJECTS-1: Blocks and Place block action
 '''
-N_OBJECTS=7 # must be 3 or greater
-STAR=0
-TABLE=1
-MINBLOCK=2
+N_OBJECTS=3 # must be 2 or greater
+#STAR=0
+TABLE=0
+MINBLOCK=1
 MAXBLOCK=N_OBJECTS-1
 
 # NOTE: all object properties are currently static
@@ -63,8 +63,13 @@ class ABCBlocksWorld:
     def transition(self, action):
         if action.sum() != 0.:
             block_num = int(np.where(action == 1.)[0])
-            if len(self._stacked_blocks) == 0 or block_num == self._stacked_blocks[-1].num+1:
-                self._stacked_blocks.append(self._blocks[block_num])
+            if block_num != MINBLOCK:
+                if len(self._stacked_blocks) == 0:
+                    self._stacked_blocks.append(self._blocks[block_num-1])
+                    self._stacked_blocks.append(self._blocks[block_num])
+                else:
+                    if block_num-1 == self._stacked_blocks[-1].num:
+                        self._stacked_blocks.append(self._blocks[block_num])
         
     def random_policy(self):
         action = np.zeros(MAXBLOCK+1)
@@ -89,7 +94,7 @@ class ABCBlocksWorld:
         state = []
         # bottom stacked block is on table
         if len(self._stacked_blocks) > 0:
-            state.append(On(self._table, self._stacked_blocks[-1]))
+            state.append(On(self._table, self._stacked_blocks[0]))
         # remaining stacked blocks
         for bottom_block, top_block in zip(self._stacked_blocks[:-1], self._stacked_blocks[1:]):
             state.append(On(bottom_block, top_block))
