@@ -22,6 +22,32 @@ def bald(predictions, eps=1e-5):
 
     return bald
 
+def bald_diagonal_gaussian(sigma):
+    """ Get the BALD score for each example. Only requires variance
+
+    see https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Differential_entropy
+
+    Note that the det(A) = prod(diag(A))
+
+    Arguments:
+        sigma {torch.Tensor} -- [N_batch x N_samples x D_pred]
+
+    Returns:
+        [N_batch]
+    """
+    k = sigma.shape[2]
+    C = 0.5 * k * (1 + np.log(2*np.pi))
+
+    m_sigma = torch.mean(sigma, dim=1)
+    m_ent = C + 0.5 * torch.log(m_sigma.prod(axis=1))
+
+    ent_per_model = C + 0.5 * torch.log(m_sigma.prod(axis=2))
+    ent = torch.mean(ent_per_model, dim=1)
+
+    bald = m_ent + ent
+
+    return bald
+
 def subtower_bald(samples, ensemble, data_pred_fn):
     """ subtower_bald is the sum of the bald scores for each subtower
 
@@ -49,7 +75,7 @@ def subtower_bald(samples, ensemble, data_pred_fn):
             subtower_scores = []
             for i in range(2, n_blocks+1):
                 subtowers = {f'{i}block': {'towers': data[:,:i,:],
-                                           'block_ids': block_ids[:, :i], 
+                                           'block_ids': block_ids[:, :i],
                                            'labels': np.zeros(data.shape[0])}}
                 subtower_preds.append(data_pred_fn(subtowers, ensemble))
                 subtower_scores.append(bald(subtower_preds[-1]))
