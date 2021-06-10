@@ -19,13 +19,13 @@ class ThrowingAgent:
                                            tmax=5)
 
 
-    def sample_action(self):
+    def sample_action(self, b=None):
         """
         Samples an action, which consists of a ball and release velocities
         """
 
         # Sample a random ball
-        b = np.random.choice(self.objects)
+        if b is None: np.random.choice(self.objects)
 
         # Sample random velocities
         v = 5
@@ -52,5 +52,5 @@ class ThrowingAgent:
         # TODO: Parse through the simulation results and pick desired criteria
         # (e.g. max x direction, number of bounces, etc.)
         # Then, return learning signal
-        return True
+        return results["state"][0,-1]
   
