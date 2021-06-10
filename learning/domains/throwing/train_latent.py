@@ -14,6 +14,39 @@ from learning.models.latent_ensemble import ThrowingLatentEnsemble
 from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader
 
 
+def get_predictions(latent_ensemble,
+                    unlabeled_data,
+                    n_latent_samples,
+                    marginalize_latents=True,
+                    marginalize_ensemble=True):
+
+    dataset = TensorDataset(*unlabeled_data)
+    dataloader = DataLoader(dataset, shuffle=False, batch_size=64)
+
+    mus = []
+    sigmas = []
+
+    for batch in dataloader:
+        x, z_id = batch
+        if torch.cuda.is_available():
+            x = x.cuda()
+            z_id = z_id.cuda()
+
+        with torch.no_grad():
+            # run a forward pass of the network and compute the likeliehood of y
+            pred = latent_ensemble(x, z_id.long(),
+                                   collapse_latents=marginalize_latents,
+                                   collapse_ensemble=marginalize_ensemble,
+                                   N_samples=n_latent_samples).squeeze()
+            D_pred = pred.shape[-1] // 2
+            mu, log_sigma = torch.split(pred, D_pred, dim=-1)
+            sigma = torch.exp(log_sigma)
+
+        mus.append(mu)
+        sigmas.append(sigma)
+
+    return torch.cat(mus, axis=0), torch.cat(sigmas, axis=0)
+
 def get_both_loss(latent_ensemble, batches, N, N_samples=10):
     """ compute the loglikelohood of both the latents and the ensemble
 
@@ -98,11 +131,12 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
             if not freeze_ensemble: params_optimizer.step()
             batch_loss = both_loss.item()
 
-            losses.append(batch_loss)
+            # losses.append(batch_loss)
 
         #TODO: Check for early stopping.
         if val_dataloader is not None:
             val_loss = evaluate(latent_ensemble, val_dataloader)
+            losses.append(val_loss.item())
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_weights = copy.deepcopy(latent_ensemble.state_dict())
@@ -120,18 +154,20 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 
 
 if __name__ == '__main__':
-    n_objects = 4
+    n_objects = 5
     n_latents = n_objects
     n_models = 10
     d_observe = 11
-    d_latents = 1
+    d_latents = 3
     d_pred = 2
 
 
     # generate training data
     train_objects = generate_objects(n_objects)
-    train_dataset = TensorDataset(*generate_dataset(train_objects, 50))
-    val_dataset = TensorDataset(*generate_dataset(train_objects, 50))
+    print('Generating Training Data')
+    train_dataset = TensorDataset(*generate_dataset(train_objects, 1000))
+    print('Generating Validation Data')
+    val_dataset = TensorDataset(*generate_dataset(train_objects, 100))
 
     # inialize dataloaders
     train_dataloader = ParallelDataLoader(dataset=train_dataset,

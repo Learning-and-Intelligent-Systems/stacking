@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from agents.throwing_agent import ThrowingAgent
 from learning.domains.throwing.entities import ThrowingBall, ThrowingAction
 
-def sample_action(obj_ids, n_samples=1):
+def sample_actions(obj_ids, n_samples=1):
     """ sample which object to throw, and the parameters of that throw
     """
     z_ids = np.random.choice(a=obj_ids, size=n_samples, replace=True)
@@ -13,18 +13,18 @@ def sample_action(obj_ids, n_samples=1):
     w = np.random.uniform(-10, 10, size=n_samples)
     return np.stack([ang, w], axis=1), z_ids
 
-def label_actions(objects, actions, z_ids):
+def label_actions(objects, actions, z_ids, as_tensor=False):
     """ produce an outcome for executing an action on an object
     """
     agent = ThrowingAgent(objects)
     ys = []
 
     for a, z_id in zip(actions, z_ids):
-        b = objects[z_id]
+        b = objects[int(z_id)]
         act = ThrowingAction.from_vector(b, a)
         ys.append(agent.run(act))
 
-    return np.array(ys)
+    return torch.Tensor(ys) if as_tensor else np.array(ys)
 
 def construct_xs(objects, actions, z_ids):
     """ construct a vectorized representation of an action and 
@@ -40,13 +40,16 @@ def construct_xs(objects, actions, z_ids):
 
     return np.array(xs)
 
-def generate_dataset(objects, n_data, as_tensor=True):
+def generate_dataset(objects, n_data, as_tensor=True, label=True):
     obj_ids = np.arange(len(objects))
-    actions, z_ids = sample_action(obj_ids, n_samples=n_data)
+    actions, z_ids = sample_actions(obj_ids, n_samples=n_data)
     xs = construct_xs(objects, actions, z_ids)
-    ys = label_actions(objects, actions, z_ids)
-    dataset = xs, z_ids, ys
-    return (torch.Tensor(d) for d in dataset) if as_tensor else dataset
+    if label:
+        ys = label_actions(objects, actions, z_ids)
+        dataset = xs, z_ids, ys
+    else:
+        dataset = xs, z_ids
+    return tuple(torch.Tensor(d) for d in dataset) if as_tensor else dataset
 
 def generate_objects(n_objects):
     return [ThrowingBall.random() for _ in range(n_objects)]
@@ -62,8 +65,9 @@ class ParallelDataLoader:
         """
         # Create a custom sampler and loader so each loader uses idependently shuffled data.
         self.loaders = []
+        self.dataset = dataset
         for _ in range(n_dataloaders):
-            loader = DataLoader(dataset=dataset,
+            loader = DataLoader(dataset=self.dataset,
                                 batch_size=batch_size,
                                 shuffle=shuffle)
             self.loaders.append(loader)
@@ -86,3 +90,9 @@ class ParallelDataLoader:
 
     def __len__(self):
         return len(self.loaders[0])
+
+    def add(self, *data):
+        n = len(self.dataset.tensors)
+        assert n == len(data), "Require same number of tensors"
+        self.dataset.tensors = tuple(torch.cat([self.dataset.tensors[i], data[i]], axis=0) for i in range(n))
+
