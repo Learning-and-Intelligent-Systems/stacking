@@ -41,11 +41,10 @@ def bald_diagonal_gaussian(sigma):
     m_sigma = torch.mean(sigma, dim=1)
     m_ent = C + 0.5 * torch.log(m_sigma.prod(axis=1))
 
-    ent_per_model = C + 0.5 * torch.log(m_sigma.prod(axis=2))
-    ent = torch.mean(ent_per_model, dim=1)
+    ent_per_sample = C + 0.5 * torch.log(sigma.prod(axis=2))
+    ent = torch.mean(ent_per_sample, dim=1)
 
     bald = m_ent + ent
-
     return bald
 
 def subtower_bald(samples, ensemble, data_pred_fn):
