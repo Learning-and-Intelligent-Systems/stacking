@@ -157,10 +157,10 @@ class ThrowingLatentEnsemble(LatentEnsemble):
         """
         N_batch, N_samples, D_latent = z_samples.shape
         x = x.unsqueeze(1).expand(-1, N_samples, -1)
-        return torch.cat([samples, x], 2)
+        return torch.cat([x, z_samples], 2)
 
 
-    def forward(self, x, obj_ids, ensemble_idx, N_samples, collapse_latents=True, collapse_ensemble=True):
+    def forward(self, x, obj_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True):
         assert x.shape[0] == obj_ids.shape[0], "One object per experiment"
         N_ensemble = self.ensemble.n_models
 
@@ -178,7 +178,7 @@ class ThrowingLatentEnsemble(LatentEnsemble):
         N_batch, N_samples, D_total = x_with_z_samples.shape
         x_with_z_samples = x_with_z_samples.view(-1, D_total)
 
-        if ensemble_ids is None:
+        if ensemble_idx is None:
             # prediction for each model in the ensemble ensemble
             # [(N_batch*N_samples) x N_ensemble x D_pred]
             labels = self.ensemble.forward(x_with_z_samples)
@@ -188,7 +188,7 @@ class ThrowingLatentEnsemble(LatentEnsemble):
             # [(N_batch*N_samples) x D_pred]
             labels = self.ensemble.models[ensemble_idx].forward(x_with_z_samples)
             labels = labels[:, None, :]
-            labels = labels.view(N_batch, N_samples, N_ensemble, -1).permute(0, 2, 1, 3)
+            labels = labels.view(N_batch, N_samples, 1, -1).permute(0, 2, 1, 3)
 
         # N_batch x N_ensemble x N_samples
         if collapse_ensemble:

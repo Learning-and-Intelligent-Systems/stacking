@@ -11,8 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
-from learning.domains.throwing.generate_data import generate_objects, generate_dataset
-from learning.domains.towers.tower_data import ParallelDataLoader
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader
 
 
 def get_both_loss(latent_ensemble, batches, N, N_samples=10):
@@ -32,7 +31,7 @@ def get_both_loss(latent_ensemble, batches, N, N_samples=10):
     loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
 
     for i, batch in enumerate(batches):
-        x, z_id, y = val_batches[0]
+        x, z_id, y = batch
         N_batch = x.shape[0]
         if torch.cuda.is_available():
             x = x.cuda()
@@ -40,12 +39,11 @@ def get_both_loss(latent_ensemble, batches, N, N_samples=10):
             y = y.cuda()
 
         # run a forward pass of the network and compute the likeliehood of y
-        preds = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples)
+        pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples)
         D_pred = pred.shape[-1] // 2
         mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-        print(mu, log_sigma)
         likelihood_loss += loss_func(y[:, None].expand(N_batch, N_samples), mu, torch.exp(log_sigma))
-        print(likelihood_loss)
+
     likelihood_loss = likelihood_loss/N_models/N_samples
 
     q_z = torch.distributions.normal.Normal(latent_ensemble.latent_locs, torch.exp(latent_ensemble.latent_logscales))
@@ -92,10 +90,9 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
         print(f'Epoch {epoch_idx}')
         accs = []
         for batch_idx, set_of_batches in enumerate(dataloader):
-            print(set_of_batches)
             params_optimizer.zero_grad()
             latent_optimizer.zero_grad()
-            both_loss = get_both_loss(latent_ensemble, set_of_batches, disable_latents, N=len(dataloader.loaders[0].dataset))
+            both_loss = get_both_loss(latent_ensemble, set_of_batches, N=len(dataloader.loaders[0].dataset))
             both_loss.backward()
             if not freeze_latents: latent_optimizer.step()
             if not freeze_ensemble: params_optimizer.step()
@@ -106,7 +103,6 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
         #TODO: Check for early stopping.
         if val_dataloader is not None:
             val_loss = evaluate(latent_ensemble, val_dataloader)
-            print(val_loss)
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_weights = copy.deepcopy(latent_ensemble.state_dict())
@@ -124,11 +120,11 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 
 
 if __name__ == '__main__':
-    n_objects = 10
+    n_objects = 4
     n_latents = n_objects
     n_models = 10
-    d_observe = 6
-    d_latents = 4
+    d_observe = 11
+    d_latents = 1
     d_pred = 2
 
 
