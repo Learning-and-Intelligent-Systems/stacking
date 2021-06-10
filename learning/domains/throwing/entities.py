@@ -84,3 +84,14 @@ class ThrowingAction:
         self.object = obj
         self.x, self.y, self.th = init_pos
         self.vx, self.vy, self.w = init_vel
+
+    @staticmethod
+    def from_vector(b, vec):
+        ang, w = vec
+        vel = 5
+        init_vel = [
+            vel * np.cos(ang),
+            vel * np.sin(ang),
+            w,
+        ]
+        return ThrowingAction(b, init_pos=[0,0,0], init_vel=init_vel)
