@@ -23,27 +23,12 @@ def parse_args():
         pdb.set_trace()
     return args
 
-
-def create_objects():
-    """ Initializes a set of test objects """
-    b1 = ThrowingBall(bounciness = 0.85)
-
-    b2 = ThrowingBall(color = [0,0,1], mass = 1.2, radius = 0.03,
-                      air_drag_angular = 1e-5, friction_coef = 0.85,
-                      rolling_resistance = 1e-4, bounciness = 0.4)
-
-    b3 = ThrowingBall(color = [0,0.6,0], mass=0.7, radius=0.05,
-                      friction_coef = 0.2, rolling_resistance = 5e-3,
-                      bounciness = 0.2)
-
-    objects = [b1, b2, b3]
-    return objects
-
+def create_random_objects(num_objects):
+    return [ThrowingBall.random() for _ in range(num_objects)]
 
 def main(objects, args):
     """ Creates an agent and run some simulations """
-    num_objs = min(args.num_objects, len(objects))
-    agent = ThrowingAgent(objects[:num_objs+1])
+    agent = ThrowingAgent(objects)
 
     for i in range(args.num_sims):
         print(f"\nRunning simulation {i}")
@@ -54,5 +39,5 @@ def main(objects, args):
 
 if __name__=="__main__":
     args = parse_args()
-    objects = create_objects()
+    objects = create_random_objects(args.num_objects)
     main(objects, args)
