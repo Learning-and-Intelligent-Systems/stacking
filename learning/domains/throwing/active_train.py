@@ -17,13 +17,12 @@ def get_latent_ensemble(args):
     d_latents = 1
     d_pred = 2
 
-    if args.fit_latents:
+    if args.fitting:
         # if we are fitting latents, then we load the latent ensemble from a previous exp-path
         assert(args.use_latents and len(args.latent_ensemble_exp_path) > 0 and args.latent_ensemble_tx >= 0)
         logger = ActiveExperimentLogger.get_experiments_logger(args.latent_ensemble_exp_path, args)
         logger.args.throwing = True # hack to get it to load a ThrowingLatentEnsemble
         latent_ensemble = logger.get_ensemble(args.latent_ensemble_tx)
-        print(latent_ensemble)
 
     else:
         # if we are fitting the model, then we create a new latent ensemble
@@ -34,7 +33,10 @@ def get_latent_ensemble(args):
                                         'h_dims': [64, 32]
                                       },
                             n_models=args.n_models)
-        latent_ensemble = ThrowingLatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
+        latent_ensemble = ThrowingLatentEnsemble(ensemble,
+                                                 n_latents=n_latents,
+                                                 d_latents=d_latents,
+                                                 disable_latents=not args.use_latents)
 
     if torch.cuda.is_available():
         latent_ensemble = latent_ensemble.cuda()
@@ -77,13 +79,14 @@ def active_train(latent_ensemble, dataloader, val_dataloader, acquire_fn, logger
         logger.save_dataset(dataloader.dataset, tx)
 
         # reset and train the model on the current dataset
-        if args.fit_latents: latent_ensemble.reset_latents()
+        if not args.use_latents: pass
+        elif args.fitting: latent_ensemble.reset_latents()
         else: latent_ensemble.reset()
         latent_ensemble, accs, latents = train(dataloader,
                                                val_dataloader,
                                                latent_ensemble,
                                                n_epochs=args.n_epochs,
-                                               freeze_ensemble=args.fit_latents,
+                                               freeze_ensemble=args.fitting,
                                                return_logs=True)
 
         # save the ensemble after training
@@ -109,8 +112,8 @@ def run_active_throwing(args):
     data_pred_fn = lambda latent_ensemble, unlabeled_data: get_predictions(latent_ensemble,
                                                                            unlabeled_data,
                                                                            n_latent_samples=10,
-                                                                           marginalize_latents=(not args.fit_latents),
-                                                                           marginalize_ensemble=args.fit_latents)
+                                                                           marginalize_latents=(not args.fitting),
+                                                                           marginalize_ensemble=(args.fitting and args.use_latents))
 
     # first two columns of xs are the action params
     data_label_fn = lambda xs, z_ids: label_actions(objects,
@@ -151,7 +154,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--max-acquisitions',
                         type=int,
-                        default=100,
+                        default=125,
                         help='Number of iterations to run the main active learning loop for.')
     parser.add_argument('--exp-name', type=str, default='throwing', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--batch-size', type=int, default=16)
@@ -162,12 +165,13 @@ if __name__ == '__main__':
     parser.add_argument('--n-objects', type=int, default=10)
 
     # The following arguments are used when we wanted to fit latents with an already trained model.
-    parser.add_argument('--fit-latents', action='store_true', help='This will cause only the latents to update during training.')
+    parser.add_argument('--use-latents', action='store_true')
+    parser.add_argument('--fitting', action='store_true', help='This will cause only the latents to update during training.')
     parser.add_argument('--latent-ensemble-exp-path', type=str, default='', help='Path to a trained latent ensemble.')
     parser.add_argument('--latent-ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
 
     args = parser.parse_args()
-    args.use_latents = True # hack required for ActiveExperimentLogger compatibility
+    
 
     run_active_throwing(args)
 

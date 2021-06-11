@@ -5,7 +5,7 @@ from scipy.spatial.transform import Rotation
 
 
 class LatentEnsemble(nn.Module):
-    def __init__(self, ensemble, n_latents, d_latents):
+    def __init__(self, ensemble, n_latents, d_latents, disable_latents=False):
         """
         Arguments:
             n_latents {int}: Number of blocks.
@@ -19,6 +19,7 @@ class LatentEnsemble(nn.Module):
 
         self.latent_locs = nn.Parameter(torch.zeros(n_latents, d_latents))
         self.latent_logscales = nn.Parameter(torch.zeros(n_latents, d_latents))
+        self.disable_latents = disable_latents
 
     def reset(self, random_latents=False):
         self.reset_latents(random=random_latents)
@@ -168,8 +169,9 @@ class ThrowingLatentEnsemble(LatentEnsemble):
         q_z = torch.distributions.normal.Normal(self.latent_locs[obj_ids],
                                                 torch.exp(self.latent_logscales[obj_ids]))
 
+        if self.disable_latents: N_samples = 1
         # samples will have shape [N_batch x N_samples x D_latent]
-        z_samples = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2)
+        z_samples = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2) * float(not self.disable_latents)
         # data will have shape [N_batch x N_samples x (D_observed+D_latent)]
         x_with_z_samples = self.concat_samples(x, z_samples)
 
