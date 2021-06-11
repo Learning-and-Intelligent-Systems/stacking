@@ -319,4 +319,14 @@ class ActiveExperimentLogger:
                     data = pickle.load(f)
                 towers_data[os.path.join(tower_path, file)] = data
         return towers_data
+
+    def get_evaluation_labels(self, task, planning_model, tx):
+        tower_path = os.path.join(self.exp_path, 'evaluation_towers', task, planning_model)
+        towers_data = {}
+        for file in os.listdir(tower_path):
+            if file != '.DS_Store' and 'label' in file:
+                with open(os.path.join(tower_path, file), 'rb') as f:
+                    data = pickle.load(f)
+                towers_data[os.path.join(tower_path, file)] = data
+        return towers_data
         
