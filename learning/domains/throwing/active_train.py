@@ -17,15 +17,24 @@ def get_latent_ensemble(args):
     d_latents = 1
     d_pred = 2
 
-    # initialize the LatentEnsemble
-    ensemble = Ensemble(base_model=FeedForward,
-                        base_args={
-                                    'd_in': d_observe + d_latents,
-                                    'd_out': d_pred,
-                                    'h_dims': [64, 32]
-                                  },
-                        n_models=args.n_models)
-    latent_ensemble = ThrowingLatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
+    if args.fit_latents:
+        # if we are fitting latents, then we load the latent ensemble from a previous exp-path
+        assert(args.use_latents and len(args.latent_ensemble_exp_path) > 0 and args.latent_ensemble_tx >= 0)
+        logger = ActiveExperimentLogger.get_experiments_logger(args.latent_ensemble_exp_path, args)
+        latent_ensemble = logger.get_ensemble(args.latent_ensemble_tx, latent_ensemble_class=ThrowingLatentEnsemble)
+        print(latent_ensemble)
+
+    else:
+        # if we are fitting the model, then we create a new latent ensemble
+        ensemble = Ensemble(base_model=FeedForward,
+                            base_args={
+                                        'd_in': d_observe + d_latents,
+                                        'd_out': d_pred,
+                                        'h_dims': [64, 32]
+                                      },
+                            n_models=args.n_models)
+        latent_ensemble = ThrowingLatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
+
     if torch.cuda.is_available():
         latent_ensemble = latent_ensemble.cuda()
 
@@ -59,16 +68,22 @@ def acquire_datapoints(latent_ensemble,
     return xs, z_ids, ys
 
 
-def active_train(latent_ensemble, dataloader, acquire_fn, logger, args):
+def active_train(latent_ensemble, dataloader, val_dataloader, acquire_fn, logger, args):
     for tx in range(args.max_acquisitions):
         print('Acquisition step', tx)
 
         # save the current dataset
         logger.save_dataset(dataloader.dataset, tx)
 
-        # train the model on the current dataset
-        latent_ensemble.reset()
-        latent_ensemble, accs, latents = train(dataloader, dataloader, latent_ensemble, n_epochs=args.n_epochs, return_logs=True)
+        # reset and train the model on the current dataset
+        if args.fit_latents: latent_ensemble.reset_latents()
+        else: latent_ensemble.reset()
+        latent_ensemble, accs, latents = train(dataloader,
+                                               val_dataloader,
+                                               latent_ensemble,
+                                               n_epochs=args.n_epochs,
+                                               freeze_ensemble=args.fit_latents,
+                                               return_logs=True)
 
         # save the ensemble after training
         logger.save_ensemble(latent_ensemble, tx)
@@ -83,24 +98,7 @@ def active_train(latent_ensemble, dataloader, acquire_fn, logger, args):
         dataloader.add(*new_data)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--max-acquisitions',
-                        type=int,
-                        default=1000,
-                        help='Number of iterations to run the main active learning loop for.')
-    parser.add_argument('--exp-name', type=str, default='throwing', help='Where results will be saved. Randon number if not specified.')
-    parser.add_argument('--batch-size', type=int, default=16)
-    parser.add_argument('--n-models', type=int, default=7)
-    parser.add_argument('--n-epochs', type=int, default=50)
-    parser.add_argument('--n-samples', type=int, default=10000)
-    parser.add_argument('--n-acquire', type=int, default=10)
-    parser.add_argument('--n-objects', type=int, default=5)
-
-    args = parser.parse_args()
-    args.use_latents = True # hack required for ActiveExperimentLogger compatibility
-
-
+def run_active_throwing(args):
     objects = generate_objects(args.n_objects)
 
     # use the sample_action function to get actions, and then preprocess to xs
@@ -110,8 +108,8 @@ if __name__ == '__main__':
     data_pred_fn = lambda latent_ensemble, unlabeled_data: get_predictions(latent_ensemble,
                                                                            unlabeled_data,
                                                                            n_latent_samples=10,
-                                                                           marginalize_latents=True,
-                                                                           marginalize_ensemble=False)
+                                                                           marginalize_latents=(not args.fit_latents),
+                                                                           marginalize_ensemble=args.fit_latents)
 
     # first two columns of xs are the action params
     data_label_fn = lambda xs, z_ids: label_actions(objects,
@@ -130,18 +128,45 @@ if __name__ == '__main__':
 
     print('Generating initialization and validation datasets')
     init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10)),
-                                         batch_size=16,
+                                         batch_size=args.batch_size,
                                          shuffle=True,
                                          n_dataloaders=args.n_models)
-    val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 50)),
-                                     batch_size=16,
+    val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10*args.n_objects)),
+                                     batch_size=args.batch_size,
                                      shuffle=True,
                                      n_dataloaders=1)
 
 
+    # create a logger and save the object set (in vector form)
+    logger = ActiveExperimentLogger.setup_experiment_directory(args)
+    logger.save_objects(objects)
+
     # create the latent ensemble
     latent_ensemble = get_latent_ensemble(args)
+    active_train(latent_ensemble, init_dataloader, val_dataloader, acquire_fn, logger, args)
 
-    logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
-    active_train(latent_ensemble, init_dataloader, acquire_fn, logger, args)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--max-acquisitions',
+                        type=int,
+                        default=1000,
+                        help='Number of iterations to run the main active learning loop for.')
+    parser.add_argument('--exp-name', type=str, default='throwing', help='Where results will be saved. Randon number if not specified.')
+    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--n-models', type=int, default=10)
+    parser.add_argument('--n-epochs', type=int, default=50)
+    parser.add_argument('--n-samples', type=int, default=10000)
+    parser.add_argument('--n-acquire', type=int, default=10)
+    parser.add_argument('--n-objects', type=int, default=10)
+
+    # The following arguments are used when we wanted to fit latents with an already trained model.
+    parser.add_argument('--fit-latents', action='store_true', help='This will cause only the latents to update during training.')
+    parser.add_argument('--latent-ensemble-exp-path', type=str, default='', help='Path to a trained latent ensemble.')
+    parser.add_argument('--latent-ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
+
+    args = parser.parse_args()
+    args.use_latents = True # hack required for ActiveExperimentLogger compatibility
+
+    run_active_throwing(args)
+

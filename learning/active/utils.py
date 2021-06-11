@@ -1,5 +1,6 @@
 import re
 import os
+import numpy as np
 import pickle
 import time
 import torch
@@ -168,7 +169,7 @@ class ActiveExperimentLogger:
     def get_towers_path(self, fname):
         return os.path.join(self.exp_path, 'towers', fname)
 
-    def get_ensemble(self, tx):
+    def get_ensemble(self, tx, latent_ensemble_class=LatentEnsemble):
         """ Load an ensemble from the logging structure.
         :param tx: The active learning iteration of which ensemble to load.
         :return: learning.models.Ensemble object.
@@ -181,7 +182,7 @@ class ActiveExperimentLogger:
                             base_args=metadata['base_args'],
                             n_models=metadata['n_models'])
         if self.use_latents:
-            ensemble = LatentEnsemble(ensemble,
+            ensemble = latent_ensemble_class(ensemble,
                 n_latents=metadata['n_latents'],
                 d_latents=metadata['d_latents'])
 
@@ -192,6 +193,7 @@ class ActiveExperimentLogger:
             return ensemble
         except:
             print('ensemble_%d.pkl not found on path' % tx)
+            print(path)
             return None
 
 
@@ -234,6 +236,16 @@ class ActiveExperimentLogger:
         # Save ensemble weights.
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
         torch.save(latent_ensemble.state_dict(), os.path.join(path))
+
+    def save_objects(self, objects):
+        vs = np.array([o.vectorize() for o in objects])
+        fname = os.path.join(self.exp_path, 'datasets', 'objects.npy')
+        np.save(fname, vs)
+
+    def get_objects(self, object_class):
+        fname = os.path.join(self.exp_path, 'datasets', 'objects.npy')
+        vs = np.load(fname)
+        return [object_class.from_vector(v) for v in vs]
 
     def get_towers_data(self, tx):
         # Get all tower files at the current acquisition step, in sorted order
