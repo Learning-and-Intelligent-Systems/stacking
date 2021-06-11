@@ -40,6 +40,9 @@ def construct_xs(objects, actions, z_ids):
 
     return np.array(xs)
 
+def xs_to_actions(xs):
+    return xs[:,:2]
+
 def generate_dataset(objects, n_data, as_tensor=True, label=True):
     obj_ids = np.arange(len(objects))
     actions, z_ids = sample_actions(obj_ids, n_samples=n_data)

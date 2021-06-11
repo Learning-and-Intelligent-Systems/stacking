@@ -274,7 +274,10 @@ class ActiveExperimentLogger:
         self.remove_unlabeled_acquisition_data()
         
     def remove_unlabeled_acquisition_data(self):
-        os.remove(os.path.join(self.exp_path, 'acquired_processing.pkl'))
+        try:
+            os.remove(os.path.join(self.exp_path, 'acquired_processing.pkl'))
+        except FileNotFoundError:
+            pass
         
     def save_unlabeled_acquisition_data(self, data):
         path = os.path.join(self.exp_path, 'acquired_processing.pkl')

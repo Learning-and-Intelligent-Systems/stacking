@@ -124,7 +124,7 @@ def evaluate(latent_ensemble, dataloader):
 def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     freeze_latents=False,
     freeze_ensemble=False,
-    return_logs=False,):
+    return_logs=False):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
