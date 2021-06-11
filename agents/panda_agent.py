@@ -16,6 +16,7 @@ import tamp.primitives
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
                       print_planning_problem, ExecuteActions, ExecutionFailure
 from tamp.pddlstream_utils import get_pddlstream_info, pddlstream_plan
+from tamp.ros_utils import block_init_to_ros
 
 
 class PandaAgent:
@@ -683,7 +684,8 @@ class PandaAgent:
             except ExecutionFailure as e:
                 print("Planning/execution failed.")
                 print(e)
-                saved_world.restore()
+                if not self.use_planning_server:
+                    saved_world.restore()
                 if real:
                     self._update_block_poses()
                     self.robot.arm.SetJointValues(self.real_arm.convertToList(self.real_arm.joint_angles()))

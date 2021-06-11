@@ -33,8 +33,7 @@ def main(args):
                          num_blocks=args.num_blocks)
     agent = PandaAgent(blocks,
                       use_platform=False, 
-                      teleport=False,
-                      use_action_server=True,
+                      use_planning_server=args.use_planning_server,
                       use_vision=args.use_vision,
                       real=args.real)
 
@@ -50,12 +49,12 @@ def main(args):
             tower, max_reward, reward = data
             n_blocks = len(tower)
             print(f"Starting tower {tx}")
-            success, stable, n_stacked = agent.simulate_tower_parallel(tower,
-                                                                    real=args.real,
-                                                                    base_xy=(0.5, -0.3),
-                                                                    vis=True,
-                                                                    T=2500,
-                                                                    ignore_resets=True)
+            success, stable, n_stacked = agent.simulate_tower(tower,
+                                                              real=args.real,
+                                                              base_xy=(0.5, -0.3),
+                                                              vis=True,
+                                                              T=2500,
+                                                              ignore_resets=True)
             # If successful, add the stability information to the list
             if success:
                 print(f"Finished {k} tower {tx} with stable: {stable}, num successful: {n_stacked}/{n_blocks}")
@@ -75,7 +74,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--use-vision', action='store_true', help='get block poses from AR tags')
+    parser.add_argument('--use-planning-server', action='store_true', help='Use planning server')
+    parser.add_argument('--use-vision', action='store_true', help='Get block poses from AR tags')
     parser.add_argument('--blocks-file', type=str, default='learning/domains/towers/final_block_set_10.pkl')
     parser.add_argument('--towers-file', type=str, default='learning/experiments/towers_40.pkl')
     parser.add_argument('--num-blocks', type=int, default=10)
