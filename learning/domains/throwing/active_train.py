@@ -21,7 +21,8 @@ def get_latent_ensemble(args):
         # if we are fitting latents, then we load the latent ensemble from a previous exp-path
         assert(args.use_latents and len(args.latent_ensemble_exp_path) > 0 and args.latent_ensemble_tx >= 0)
         logger = ActiveExperimentLogger.get_experiments_logger(args.latent_ensemble_exp_path, args)
-        latent_ensemble = logger.get_ensemble(args.latent_ensemble_tx, latent_ensemble_class=ThrowingLatentEnsemble)
+        logger.args.throwing = True # hack to get it to load a ThrowingLatentEnsemble
+        latent_ensemble = logger.get_ensemble(args.latent_ensemble_tx)
         print(latent_ensemble)
 
     else:
@@ -150,7 +151,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--max-acquisitions',
                         type=int,
-                        default=1000,
+                        default=100,
                         help='Number of iterations to run the main active learning loop for.')
     parser.add_argument('--exp-name', type=str, default='throwing', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--batch-size', type=int, default=16)

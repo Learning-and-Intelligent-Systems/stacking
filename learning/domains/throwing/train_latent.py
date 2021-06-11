@@ -16,7 +16,7 @@ from learning.domains.throwing.throwing_data import generate_objects, generate_d
 
 def get_predictions(latent_ensemble,
                     unlabeled_data,
-                    n_latent_samples,
+                    n_latent_samples=10,
                     marginalize_latents=True,
                     marginalize_ensemble=True):
 
