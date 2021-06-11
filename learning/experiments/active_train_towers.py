@@ -84,7 +84,7 @@ def get_initial_dataset(args, block_set, agent, logger):
             print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
             towers_dict = sample_sequential_data(block_set, None, 40)
             towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
-            dataset = TowerDataset(towers_dict, augment=False, K_skip=1)
+            dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
             val_towers_dict = sample_sequential_data(block_set, None, 40)
             val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
