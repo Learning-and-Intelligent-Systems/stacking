@@ -17,24 +17,30 @@ from agents.panda_agent import PandaAgent, PandaClientAgent
 from tamp.misc import load_blocks
 
 def initialize_model(args, n_blocks):
+    n_in = 14
+    if args.com_repr == 'removed':
+        n_in = 10
+        if args.model != 'fcgn':
+            raise NotImplementedError()
+
     if args.model == 'fcgn':
         base_model = FCGN
-        base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
+        base_args = {'n_hidden': args.n_hidden, 'n_in': n_in, 'remove_com': args.com_repr == 'removed' }
     elif args.model == 'fcgn-fc':
         base_model = FCGNFC
-        base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
+        base_args = {'n_hidden': args.n_hidden, 'n_in': n_in}
     elif args.model == 'fcgn-con':
         base_model = ConstructableFCGN
-        base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
+        base_args = {'n_hidden': args.n_hidden, 'n_in': n_in}
     elif args.model == 'lstm':
         base_model = TowerLSTM
-        base_args = {'n_hidden': args.n_hidden, 'n_in': 14}
+        base_args = {'n_hidden': args.n_hidden, 'n_in': n_in}
     elif args.model == 'bottomup-shared':
         base_model = BottomUpNet
-        base_args = {'n_hidden': args.n_hidden, 'n_in': 14, 'share_weights': True, 'max_blocks': 5}
+        base_args = {'n_hidden': args.n_hidden, 'n_in': n_in, 'share_weights': True, 'max_blocks': 5}
     elif args.model == 'bottomup-unshared':
         base_model = BottomUpNet
-        base_args = {'n_hidden': args.n_hidden, 'n_in': 14, 'share_weights': False, 'max_blocks': 5}
+        base_args = {'n_hidden': args.n_hidden, 'n_in': n_in, 'share_weights': False, 'max_blocks': 5}
     else:
         raise NotImplementedError()
 
@@ -84,7 +90,7 @@ def get_initial_dataset(args, block_set, agent, logger):
             print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
             towers_dict = sample_sequential_data(block_set, None, 40)
             towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
-            dataset = TowerDataset(towers_dict, augment=False, K_skip=1)
+            dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
             val_towers_dict = sample_sequential_data(block_set, None, 40)
             val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
@@ -143,6 +149,14 @@ def get_sampler_fn(args, block_set):
 
 
 def run_active_towers(args):
+    # Initial arg checks.
+    args.use_latents = False
+    if args.com_repr == 'latent':
+        args.use_latents = True
+    elif args.com_repr == 'explicit':
+        # This will be the RSS code.
+        raise NotImplementedError('This will be implemented when we merge back with main.')
+
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
     # Initialize agent with supplied blocks (only works with args.block_set_fname set)
@@ -245,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('--xy-noise', default=0.003, type=float, help='Variance in the normally distributed noise in block placements (used when args.exec-mode==noisy-model)')
     parser.add_argument('--use-panda-server', action='store_true')
     parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--use-latents', action='store_true')
+    parser.add_argument('--com-repr', type=str, choices=['latent', 'explicit', 'removed'], required=True)
     # The following arguments are used when we wanted to fit latents with an already trained model.
     parser.add_argument('--fit-latents', action='store_true', help='This will cause only the latents to update during training.')
     parser.add_argument('--latent-ensemble-exp-path', type=str, default='', help='Path to a trained latent ensemble.')

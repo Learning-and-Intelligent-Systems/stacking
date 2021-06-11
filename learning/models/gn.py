@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 
 class FCGN(nn.Module):
-    def __init__(self, n_in, n_hidden):
+    def __init__(self, n_in, n_hidden, remove_com=False):
         """ This network is given input of size (N, K, n_in) where N, K can vary per batch.
         :param n_in: Number of block-specific parameters.
         :param n_hidden: Number of hidden units unsed throughout the network.
@@ -38,6 +38,7 @@ class FCGN(nn.Module):
         
         self.n_in, self.n_hidden = n_in, n_hidden
         self.init = nn.Parameter(torch.zeros(1, 1, n_hidden))
+        self.remove_com = remove_com
 
     def edge_fn(self, towers, h):
         N, K, _ = towers.shape
@@ -89,6 +90,9 @@ class FCGN(nn.Module):
         :param towers: (N, K, n_in) tensor describing the tower.
         :param k: Number of times to iterate the graph update.
         """
+        if self.remove_com:
+            towers = towers[:, :, 4:]
+            
         N, K, _ = towers.shape
         k=1
         # Initialize hidden state for each node.
