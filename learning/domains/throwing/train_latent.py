@@ -1,6 +1,6 @@
 import argparse
 import copy
-from matplotlib import pyplot as pyplot
+from matplotlib import pyplot as plt
 import numpy as np
 import pickle
 import torch
@@ -86,12 +86,27 @@ def get_both_loss(latent_ensemble, batches, N, N_samples=10):
     return (kl_loss + N*likelihood_loss)/N_batch
 
 
-def evaluate(latent_ensemble, val_dataloader):
-    log_prob = 0
-    loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
+def evaluate(latent_ensemble, dataloader):
+    """ computes the data likelihood
 
-    for val_batches in val_dataloader:
-        x, z_id, y = val_batches[0]
+    Arguments:
+        latent_ensemble {[type]} -- [description]
+        dataloader {[type]} -- [description]
+
+    Keyword Arguments:
+        normalized {bool} -- [description] (default: {True})
+
+    Returns:
+        [type] -- [description]
+    """
+    total_prob = 0
+    loss_func = nn.GaussianNLLLoss(reduction='none', full=True)
+
+    # decided whether or not to normalize by the amount of data
+    N = dataloader.dataset.tensors[0].shape[0]
+
+    for batches in dataloader:
+        x, z_id, y = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
         if torch.cuda.is_available():
             x = x.cuda()
             z_id = z_id.cuda()
@@ -101,9 +116,9 @@ def evaluate(latent_ensemble, val_dataloader):
         pred = latent_ensemble(x, z_id.long()).squeeze()
         D_pred = pred.shape[-1] // 2
         mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-        log_prob -= loss_func(y, mu, torch.exp(log_sigma))
+        total_prob += torch.exp(-loss_func(y, mu, torch.exp(log_sigma))).sum()
 
-    return log_prob
+    return total_prob / N
 
 
 def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
@@ -114,14 +129,14 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
 
-    losses = []
+    accs = []
     latents = []
-
     best_weights = None
-    best_loss = 1000
+    best_acc = 0
+
     for epoch_idx in range(n_epochs):
         print(f'Epoch {epoch_idx}')
-        accs = []
+
         for batch_idx, set_of_batches in enumerate(dataloader):
             params_optimizer.zero_grad()
             latent_optimizer.zero_grad()
@@ -131,16 +146,14 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
             if not freeze_ensemble: params_optimizer.step()
             batch_loss = both_loss.item()
 
-            # losses.append(batch_loss)
 
-        #TODO: Check for early stopping.
         if val_dataloader is not None:
-            val_loss = evaluate(latent_ensemble, val_dataloader)
-            losses.append(val_loss.item())
-            if val_loss < best_loss:
-                best_loss = val_loss
+            val_acc = evaluate(latent_ensemble, val_dataloader)
+            accs.append(val_acc.item())
+            if val_acc > best_acc:
+                best_acc = val_acc
                 best_weights = copy.deepcopy(latent_ensemble.state_dict())
-                print('New best validation score.')
+                print('New best validation score.', val_acc.item())
 
         latents.append(np.hstack([latent_ensemble.latent_locs.cpu().detach().numpy(),
                                   torch.exp(latent_ensemble.latent_logscales).cpu().detach().numpy()]))
@@ -148,7 +161,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     if val_dataloader is not None:
         latent_ensemble.load_state_dict(best_weights)
     if return_logs:
-        return latent_ensemble, losses, latents
+        return latent_ensemble, accs, latents
     else:
         return latent_ensemble
 
@@ -194,8 +207,11 @@ if __name__ == '__main__':
 
     # train the LatentEnsemble
     latent_ensemble.reset_latents(random=False)
-    latent_ensemble, losses, latents = train(train_dataloader,
-                                             val_dataloader,
-                                             latent_ensemble,
-                                             n_epochs=30,
-                                             return_logs=True)
+    latent_ensemble, accs, latents = train(train_dataloader,
+                                           val_dataloader,
+                                           latent_ensemble,
+                                           n_epochs=100,
+                                           return_logs=True)
+
+    plt.plot(accs)
+    plt.show()
