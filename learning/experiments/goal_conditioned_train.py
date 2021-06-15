@@ -52,7 +52,7 @@ def run_goal_directed_train(args, plot=True):
         args.max_seq_attempts = max_additional_seq_attempts
         generate_dataset(args, world, logger, trans_dataset, heur_dataset, train_policy)
         preprocess(args, trans_dataset, type='balanced_actions')
-        trans_model = TransitionGNN(args, n_of_in=N_OBJECTS, n_hidden=n_hidden)
+        trans_model = TransitionGNN(args, n_ef_in=1+2*N_OBJECTS, n_af_in=2*N_OBJECTS, n_hidden=n_hidden)
         print('Training with %i datapoints.' % len(trans_dataset))
         n_datapoints.append(len(trans_dataset))
         if args.pred_type == 'delta_state':

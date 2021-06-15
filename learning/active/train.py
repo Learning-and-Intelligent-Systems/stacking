@@ -92,7 +92,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
     
-    
+    '''
     fig, ax = plt.subplots()
     #ax.plot(all_accs, label='accuracy')
     ax.plot(all_losses, label='loss')
@@ -100,7 +100,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
     ax.set_title('Loss on Training Dataset')
     ax.legend()
     plt.show()
-    
+    '''
     
     return model
 
