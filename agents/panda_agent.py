@@ -564,8 +564,10 @@ class PandaAgent:
 
                     # Wait for a valid plan
                     plan = []
+                    saved_world = pb_robot.utils.WorldSaver()
                     while len(plan) == 0 and planning_active:
                         time.sleep(5)
+                        print("Getting a plan from server...")
                         ros_resp = self.get_plan_client.call()
                         if not ros_resp.planning_active:
                             print("Planning failed on server side.")
@@ -684,8 +686,7 @@ class PandaAgent:
             except ExecutionFailure as e:
                 print("Planning/execution failed.")
                 print(e)
-                if not self.use_planning_server:
-                    saved_world.restore()
+                saved_world.restore()
                 if real:
                     self._update_block_poses()
                     self.robot.arm.SetJointValues(self.real_arm.convertToList(self.real_arm.joint_angles()))

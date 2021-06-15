@@ -135,9 +135,11 @@ To generate a set of evaluation towers from the learned model for the Panda to c
 ```
 python3 -m learning.evaluate.plan_evaluate_models --problem <problem> --block-set-fname learning/domains/towers/eval_block_set_9.pkl --exp-path learning/experiments/logs/<experiment-name> --acquisition-step <acquisition-step> --n-towers <n-towers>
 ```
-Where ```<problem>``` can be one of: ['tallest', 'overhang', 'min-contact', 'cumulative-overhang'], ```<acquisition-step>``` is the acquisition step of the model you would like to use (most likely the last one trained), and ```<n-towers>``` is how many evaluation towers you would like the robot to build.
+Where ```<problem>``` can be one of: ['tallest', 'overhang', 'min-contact', 'cumulative-overhang'], ```<acquisition-step>``` is the acquisition step of the model you would like to use (most likely the last one trained), ```<n-towers>``` is how many evaluation towers you would like the robot to build, ```<planning-mode>``` is one of ['learned', 'simple-model', 'noisy-model']. If using the 'noisy-model' you must also add ```--plan-xy-noise <planning-model-noise>``` where ```<plan-xy-noise>``` is a float representing the variance of the Gaussian noise added to block placements.
 
-This will output a file to ```learning/experiments/logs/<experiment-name>/evaluation_towers/<problem>/learned/towers_<n-towers>.pkl```
+This will output a file to ```learning/experiments/logs/<experiment-name>/evaluation_towers/<problem>/<planning-model>/towers_<n-towers>.pkl``` 
+
+If you run the same command more than once, towers will be appended to the existing tower files.
 
 To build the towers on the panda robot:
 ```
