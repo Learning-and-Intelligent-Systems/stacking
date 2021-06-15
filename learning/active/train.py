@@ -31,7 +31,7 @@ def evaluate(loader, model, val_metric='f1'):
         with torch.no_grad():
             preds += (pred > 0.5).cpu().float().numpy().tolist()
             labels += y.cpu().numpy().tolist()
-        accuracy = ((pred>0.5) == y).float().mean()
+        accuracy = ((pred>0.5) == y.bool()).float().mean()
         acc.append(accuracy.item())
         losses.append(loss.item())
     if val_metric == 'loss':
@@ -69,8 +69,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             loss.backward()
 
             optimizer.step()
-
-            accuracy = ((pred>0.5) == y).float().mean()
+            accuracy = ((pred>0.5) == y.bool()).float().mean()
             acc.append(accuracy.item())
 
             it += 1
