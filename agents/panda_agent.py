@@ -16,7 +16,6 @@ import tamp.primitives
 from tamp.misc import setup_panda_world, get_pddl_block_lookup, \
                       print_planning_problem, ExecuteActions, ExecutionFailure
 from tamp.pddlstream_utils import get_pddlstream_info, pddlstream_plan
-from tamp.ros_utils import block_init_to_ros
 
 
 class PandaAgent:
@@ -485,6 +484,7 @@ class PandaAgent:
         while (not success and not fatal):
             print(f"Got recoverable failure. Replanning from step index {num_success}.")
             if self.use_planning_server:
+                from tamp.ros_utils import block_init_to_ros
                 if self.real:
                     planning_prob.robot_config.angles = self.real_arm.convertToList(self.real_arm.joint_angles())
                 else:
