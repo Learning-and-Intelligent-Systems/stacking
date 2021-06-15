@@ -7,18 +7,20 @@ from visualize.domains.abc_blocks.performance import plot_error_stats
 from learning.experiments.goal_conditioned_train import run_goal_directed_train
 
 def train_stats(args):
+    plot = False
     N = 1
     all_trans_error_rates = []
     for n in range(N):
-        n_datapoints, trans_error_rates = run_goal_directed_train(args, plot=False)
+        n_datapoints, trans_error_rates = run_goal_directed_train(args, plot=plot)
         all_trans_error_rates.append(trans_error_rates)
         
-    plot_error_stats(n_datapoints, all_trans_error_rates)
+    #plot_error_stats(n_datapoints, all_trans_error_rates)
     
-    plt.ion()
-    plt.show()
-    input('Enter to close plots.')
-    plt.close()
+    if plot:
+        plt.ion()
+        plt.show()
+        input('Enter to close plots.')
+        plt.close()
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

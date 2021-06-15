@@ -19,7 +19,7 @@ from visualize.domains.abc_blocks.performance import * #calc_trans_error_rate, c
                                                         #calc_successful_action_error_rate
 
 batch_size = 16
-n_epochs = 1000
+n_epochs = 300
 n_hidden = 16
 
 def run_goal_directed_train(args, plot=True):
@@ -52,7 +52,7 @@ def run_goal_directed_train(args, plot=True):
         args.max_seq_attempts = max_additional_seq_attempts
         generate_dataset(args, world, logger, trans_dataset, heur_dataset, train_policy)
         preprocess(args, trans_dataset, type='balanced_actions')
-        trans_model = TransitionGNN(args, n_ef_in=1+2*N_OBJECTS, n_af_in=2*N_OBJECTS, n_hidden=n_hidden)
+        trans_model = TransitionGNN(args, n_of_in=N_OBJECTS, n_ef_in=1, n_af_in=2*N_OBJECTS, n_hidden=n_hidden)
         print('Training with %i datapoints.' % len(trans_dataset))
         n_datapoints.append(len(trans_dataset))
         if args.pred_type == 'delta_state':
@@ -60,17 +60,12 @@ def run_goal_directed_train(args, plot=True):
         elif args.pred_type == 'full_state':
             loss_fn = F.binary_cross_entropy
         train(trans_dataloader, None, trans_model, n_epochs=n_epochs, loss_fn=loss_fn)
-        # TODO: fix calculation
-        trans_error_rate = calc_trans_error_rate(args, test_trans_dataset, trans_model)
-        trans_error_rates.append(trans_error_rate)
-        #print('Forward Prediction Error Rate: %f' % trans_error_rate)
-        calc_successful_action_error_rate(args, test_trans_dataset, trans_model)
         detailed_error_stats(args, trans_dataset, trans_model)
-        if plot:
-            vis_trans_errors(test_trans_dataset, trans_model)
-            vis_trans_dataset_grid(args, trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
-            vis_trans_dataset_grid(test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
-            vis_trans_dataset_hist(args, trans_dataset, 'Tower Heights in Training Data')
+        #if plot:
+        #    vis_trans_errors(test_trans_dataset, trans_model)
+        #    vis_trans_dataset_grid(args, trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
+        #    vis_trans_dataset_grid(test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
+        #    vis_trans_dataset_hist(args, trans_dataset, 'Tower Heights in Training Data')
         
         '''
         heur_model = HeuristicGNN()

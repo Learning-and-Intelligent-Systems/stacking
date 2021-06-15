@@ -37,19 +37,19 @@ def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger):
     def helper(sequence, seq_goal):
         n = len(sequence)
-        goal_edge_features = get_vectorized_state(seq_goal)
+        object_features, goal_edge_features = get_vectorized_state(seq_goal)
         for i in range(n):
             state, action = sequence[i]
-            edge_features = get_vectorized_state(state)
-            heur_dataset.add_to_dataset(edge_features, goal_edge_features, n-i-1)
+            object_features, edge_features = get_vectorized_state(state)
+            heur_dataset.add_to_dataset(object_features, edge_features, goal_edge_features, n-i-1)
             if i < n-1: # training transition model doesn't require last action in sequence
                 next_state, _ = sequence[i+1]
-                next_edge_features = get_vectorized_state(next_state)
+                object_features, next_edge_features = get_vectorized_state(next_state)
                 if args.pred_type == 'delta_state':
                     edge_features_to_add = next_edge_features-edge_features
                 elif args.pred_type == 'full_state':
                     edge_features_to_add = next_edge_features
-                trans_dataset.add_to_dataset(edge_features, action, edge_features_to_add)
+                trans_dataset.add_to_dataset(object_features, edge_features, action, edge_features_to_add)
                 
     # if given goal was reached, add to dataset
     #if subset(goal, action_sequence[-1][0]):
@@ -64,14 +64,14 @@ def preprocess(args, dataset, type='successful_actions'):
     xs, ys = dataset[:]
     remove_list = []
     if type == 'successful_actions':
-        for i, ((edge_features, action), next_edge_features) in enumerate(dataset):
+        for i, ((object_features, edge_features, action), next_edge_features) in enumerate(dataset):
             if (args.pred_type == 'full_state' and (edge_features == next_edge_features).all()) or \
                 (args.pred_type == 'delta_state' and (next_edge_features.abs().sum() == 0)):
                 remove_list.append(i)
     if type == 'balanced_actions':
         distinct_actions = []
         actions_counter = {}
-        for i, ((edge_features, action), next_edge_features) in enumerate(dataset):
+        for i, ((object_features, edge_features, action), next_edge_features) in enumerate(dataset):
             a = tuple(action.numpy())
             if a not in distinct_actions:
                 distinct_actions.append(a)

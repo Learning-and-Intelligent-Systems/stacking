@@ -19,7 +19,6 @@ MAXBLOCK=N_OBJECTS-1
 
 # NOTE: all object properties are currently static
 #       one-hot encoding of the index of the object
-object_features = np.eye(N_OBJECTS)
 
 def get_obj_one_hot(obj_i):
     one_hot = np.zeros(N_OBJECTS)
@@ -37,7 +36,9 @@ def get_vectorized_state(state):
             return object.num
         elif object == '*':
             return STAR
-    edge_features = np.zeros((N_OBJECTS, N_OBJECTS, 2*N_OBJECTS+1))
+            
+    object_features = np.eye(N_OBJECTS)
+    edge_features = np.zeros((N_OBJECTS, N_OBJECTS, 1))
     
     # edge_feature[i, j, 0] == 1 if j on i, else 0
     for fluent in state:
@@ -45,12 +46,7 @@ def get_vectorized_state(state):
         top_i = get_int_object(fluent.top)
         edge_features[bottom_i, top_i, 0] = 1.
         
-    # edge_features[i,j,1:] are the 1-hot encodings of the objects
-    for bottom_obj_i in range(N_OBJECTS):
-        for top_obj_i in range(N_OBJECTS):
-            edge_features[bottom_obj_i, top_obj_i, 1:N_OBJECTS+1] = get_obj_one_hot(bottom_obj_i)
-            edge_features[bottom_obj_i, top_obj_i, 1+N_OBJECTS:] = get_obj_one_hot(top_obj_i)
-    return edge_features
+    return object_features, edge_features
     
 class Block:
     def __init__(self, num):
