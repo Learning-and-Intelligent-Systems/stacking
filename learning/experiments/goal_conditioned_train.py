@@ -22,7 +22,7 @@ batch_size = 16
 n_epochs = 300
 n_hidden = 16
 
-def run_goal_directed_train(args, plot=True):
+def run_goal_directed_train(args):
     if args.domain == 'abc_blocks':
         world = ABCBlocksWorld()
         trans_dataset = ABCBlocksTransDataset()
@@ -44,14 +44,12 @@ def run_goal_directed_train(args, plot=True):
     
     # add more sequences to dataset each time but retrain from scratch
     n_datapoints = []
-    trans_error_rates = []
-    heur_error_rates = []
     train_policy = world.random_policy
     for i, max_additional_seq_attempts in enumerate([10]):#[1, 4, 5, 10, 30, 50]):
         print('Adding to training dataset.')
         args.max_seq_attempts = max_additional_seq_attempts
         generate_dataset(args, world, logger, trans_dataset, heur_dataset, train_policy)
-        preprocess(args, trans_dataset, type='balanced_actions')
+        #preprocess(args, trans_dataset, type='balanced_actions')
         trans_model = TransitionGNN(args, n_of_in=N_OBJECTS, n_ef_in=1, n_af_in=2*N_OBJECTS, n_hidden=n_hidden)
         print('Training with %i datapoints.' % len(trans_dataset))
         n_datapoints.append(len(trans_dataset))
@@ -61,11 +59,11 @@ def run_goal_directed_train(args, plot=True):
             loss_fn = F.binary_cross_entropy
         train(trans_dataloader, None, trans_model, n_epochs=n_epochs, loss_fn=loss_fn)
         detailed_error_stats(args, trans_dataset, trans_model)
-        #if plot:
-        #    vis_trans_errors(test_trans_dataset, trans_model)
-        #    vis_trans_dataset_grid(args, trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
-        #    vis_trans_dataset_grid(test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
-        #    vis_trans_dataset_hist(args, trans_dataset, 'Tower Heights in Training Data')
+        if args.plot:
+            vis_trans_errors(args, test_trans_dataset, trans_model)
+            vis_trans_dataset_grid(args, trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
+            vis_trans_dataset_grid(args, test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
+            vis_trans_dataset_hist(args, trans_dataset, 'Tower Heights in Training Data')
         
         '''
         heur_model = HeuristicGNN()
@@ -75,19 +73,21 @@ def run_goal_directed_train(args, plot=True):
         print('Heuristic Prediction Error Rate: %f' % heur_error_rate)
         '''
 
-    if plot:
+    '''
+    if args.plot:
         # Visualize Error Rate
-        #fig, ax = plt.subplots()
-        #ax.plot(n_datapoints, trans_error_rates, '*-')
-        #ax.set_xlabel('Training Dataset Size (Number of Actions)')
-        #ax.set_ylabel('Edge Prediction Error Rate')
-        
+        fig, ax = plt.subplots()
+        ax.plot(n_datapoints, trans_error_rates, '*-')
+        ax.set_xlabel('Training Dataset Size (Number of Actions)')
+        ax.set_ylabel('Edge Prediction Error Rate')
+    '''
+    if args.plot:
         plt.ion()
         plt.show()
         input('Enter to close plots.')
         plt.close()
     
-    return n_datapoints, trans_error_rates
+    return n_datapoints#, trans_error_rates
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -119,6 +119,8 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='path to save dataset to')
+    parser.add_argument('--plot',
+                        action='store_true')
     args = parser.parse_args()
 
     if args.debug:

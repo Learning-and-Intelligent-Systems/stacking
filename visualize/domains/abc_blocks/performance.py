@@ -62,21 +62,26 @@ def calc_heur_error_rate(heur_dataset, model):
     error_rate = torch.sqrt((preds-ys)**2).mean()
     return error_rate    
     
-def vis_trans_errors(test_dataset, model):
+def vis_trans_errors(args, test_dataset, model):
     fig, ax = plt.subplots()
     xs, ys = test_dataset[:]
     preds = model(xs)
+    # N number of datapoints
+    # K objects
+    # E edge types
+    N, K, K, E = ys.shape 
     
-    edges_in_dataset = ys.sum(axis=0).detach()
-    errors = ((preds>0.5) != ys).float().sum(axis=0).detach()
-    
-    avg_errors = np.nan_to_num(errors/edges_in_dataset)
-    c = ax.pcolor(avg_errors, cmap='viridis', vmin=0, vmax=1)
-    ax.set_title('Erroneous Edge Predictions in Test Dataset')
-    ax.set_ylabel('Bottom Object')
-    ax.set_xlabel('Top Object')
-    fig.colorbar(c)
-    
+    for ei in range(E):
+        preds_ei = preds[:,:,:,ei].round()
+        ys_ei = ys[:,:,:,ei]
+        errors = (preds_ei != ys_ei).float().sum(axis=0).detach()
+        avg_errors = np.nan_to_num(errors/N)
+        
+        c = ax.pcolor(avg_errors, cmap='viridis', vmin=0, vmax=1)
+        ax.set_title('Erroneous Edge Predictions in Test Dataset\nEdge Type %i' % ei)
+        ax.set_ylabel('Bottom Object')
+        ax.set_xlabel('Top Object')
+        fig.colorbar(c)
     
 def vis_trans_dataset_grid(args, trans_dataset, title):
     fig, ax = plt.subplots()
