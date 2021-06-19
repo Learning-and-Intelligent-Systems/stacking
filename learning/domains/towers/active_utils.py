@@ -261,6 +261,16 @@ def sample_next_block(n_samples, bases={}, block_set=None):
             new_towers_local[:,-1] = vectorize(new_top_blocks)
             new_towers.append(new_towers_local)
 
+            if False:
+                block_towers = []
+                for ix in range(10):
+                    b_tower = [Object.from_vector(new_towers_local[ix, bx]) for bx in range(0, new_towers_local.shape[1])]
+                    block_towers.append(World(b_tower))
+                env = Environment(block_towers, vis_sim=True, vis_frames=True)
+                input()
+                
+                env.disconnect()    
+
         # package the new towers into a dict of the appropriate format. include
         # block_ids if we are using a block set
         new_towers = np.concatenate(new_towers)
