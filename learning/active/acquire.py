@@ -72,15 +72,22 @@ def subtower_bald(samples, ensemble, data_pred_fn):
     return torch.cat(scores)
 
 def greedy_sequential_choose_acquisition_data(ensemble, n_samples, n_acquire, data_sampler_fn, \
-        data_label_fn, data_pred_fn, data_subset_fn):
+        data_label_fn, data_pred_fn, data_subset_fn, strategy):
     """ Acquires towers by adding blocks one at a time, and after each new block choosing the
     highest scoring towers
     """
     samples = {}
     for _ in range(2, 6):
         samples = data_sampler_fn(n_samples, bases=samples)
-        samples = choose_acquisition_data(samples, ensemble, n_acquire, 'bald', data_pred_fn, data_subset_fn)
-
+        for k, v in samples.items():
+            print(k, v['towers'].shape)
+        if strategy == 'subtower-greedy':
+            samples = choose_acquisition_data(samples, ensemble, n_acquire, 'bald', data_pred_fn, data_subset_fn)
+        elif strategy == 'subtower-random':
+            samples = choose_acquisition_data(samples, ensemble, n_acquire, 'random', data_pred_fn, data_subset_fn)
+        else:
+            raise NotImplementedError()
+            
     return samples
 
 def choose_acquisition_data(samples, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn):
@@ -127,19 +134,19 @@ def acquire_datapoints(ensemble, n_samples, n_acquire, strategy, data_sampler_fn
     :param agent: PandaAgent or None (if exec_mode == 'simple-model' or 'noisy-model')
     :return: (n_acquire, 2), (n_acquire,) - x,y tuples of the new datapoints.
     """
-    if strategy == 'subtower-greedy':
+    if strategy == 'subtower-greedy' or strategy == 'subtower-random':
         # NOTE(izzy): acquiring a tower by greedily adding blocks to the top requires interleaving
         # sampling new candidate towers and scoring them. therefore this strategy doesn't perfectly
         # fit the separation of functionality that the others did, and it requires its own special case
         unlabeled_pool = None
         xs = greedy_sequential_choose_acquisition_data(ensemble, n_samples, n_acquire, data_sampler_fn, \
-            data_label_fn, data_pred_fn, data_subset_fn)
+            data_label_fn, data_pred_fn, data_subset_fn, strategy)
     else:
         unlabeled_pool = data_sampler_fn(n_samples)
         xs = choose_acquisition_data(unlabeled_pool, ensemble, n_acquire, strategy, data_pred_fn, data_subset_fn)
 
     logger.save_unlabeled_acquisition_data(xs)
-    if strategy == 'subtower-greedy' or strategy == 'subtower':
+    if strategy == 'subtower-greedy' or strategy == 'subtower' or strategy == 'subtower-random':
         new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=True)
     else:
         new_data = data_label_fn(xs, exec_mode, agent, logger, xy_noise, save_tower=True, label_subtowers=False)
