@@ -846,6 +846,17 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                     curr_regrets.append(regret)
                     curr_rewards.append(reward)
 
+        # if just running a single acquisition step, make regrets list the right length
+        if args.acquisition_step is not None:
+            for all_acquisition_steps_i in range(0,100,10):
+                if all_acquisition_steps_i == args.acquisition_step:
+                    regrets[k].append(curr_regrets)
+                    rewards[k].append(curr_rewards)
+                else:
+                    regrets[k].append([])
+                    rewards[k].append([])
+            fname += '_%i' % args.acquisition_step
+        else:
             if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
                 regrets[k].append(curr_regrets)
                 rewards[k].append(curr_rewards)
@@ -858,6 +869,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                 pickle.dump(rewards, handle)
             
     # if just ran for one acquisition step, output final regret and reward
+    '''
     if args.acquisition_step is not None:
         if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
             final_median_regret = np.median(regrets[k][0])
@@ -879,7 +891,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
             
             print('Final Average Regret: %f +/- %f' % (final_average_regret, final_std_regret))
             print('Final Average Reward: %f +/- %f' % (final_average_reward, final_std_reward))
-
+    '''
 def plot_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:
         regrets = pickle.load(handle)
@@ -958,7 +970,7 @@ def save_collected_tower_images(logger):
         image_data = p.getCameraImage(200, 380, shadow=1,  viewMatrix=view_matrix, projectionMatrix=projection_matrix)
         w, h, im = image_data[:3]
         np_im = np.array(im, dtype=np.uint8).reshape(h, w, 4)[:, :, 0:3]
-        #plt.imshow(np.array(np_im))
+        plt.imshow(np.array(np_im))
         plt.imsave(logger.get_figure_path('tower_%d_%d.png' % (tx, label)), np_im)
         env.disconnect()
 
