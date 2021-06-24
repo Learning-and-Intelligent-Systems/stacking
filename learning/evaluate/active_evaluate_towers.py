@@ -746,10 +746,11 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
 
     if args.max_acquisitions is not None: 
         eval_range = range(0, args.max_acquisitions, 10)
-    elif args.acquisition_step is not None: 
-        eval_range = [args.acquisition_step]
+    elif args.acquisition_steps is not None: 
+        eval_range = range(0, 100, 10)
     
     for tx in eval_range:
+    
         print('Acquisition step:', tx)
 
         ensemble = logger.get_ensemble(tx)
@@ -757,141 +758,111 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
             ensemble = ensemble.cuda()
             
         for k, size in zip(tower_keys, args.tower_sizes):
-            print('Tower size', k)
-            num_failures, num_pw_failures = 0, 0
-            curr_regrets = []
-            curr_rewards = []
-            for t in range(0, args.n_towers):
-                print('Tower number', t)
-                
-                if blocks is not None:
-                    plan_blocks = np.random.choice(blocks, size, replace=False)	
-                    plan_blocks = copy.deepcopy(plan_blocks)	
-                else:
-                    plan_blocks = [Object.random() for _ in range(size)]
+            if tx in args.acquisition_steps:
+                print('Tower size', k)
+                num_failures, num_pw_failures = 0, 0
+                curr_regrets = []
+                curr_rewards = []
+                for t in range(0, args.n_towers):
+                    print('Tower number', t)
                     
-                tower, reward, max_reward, tower_block_ids = ep.plan(plan_blocks, 
-                                                                ensemble, 
-                                                                reward_fn,
-                                                                args,
-                                                                num_blocks=size,
-                                                                n_tower=t)
-                                
-                block_tower = []
-                for vec_block, block_id in zip(tower, tower_block_ids):
-                    block = Object.from_vector(vec_block)
-                    block.name = 'obj_%d' % block_id
-                    block_tower.append(block)         
-                                           
-                # save tower info to /evaluation_towers
-                if args.exec_mode is None:
-                    if args.planning_model == 'noisy-model':
-                        logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem, noise=args.plan_xy_noise)
+                    if blocks is not None:
+                        plan_blocks = np.random.choice(blocks, size, replace=False)	
+                        plan_blocks = copy.deepcopy(plan_blocks)	
                     else:
-                        logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem)
-
-                # perturb tower if evaluating with noisy model
-                if args.exec_mode == 'noisy-model':
+                        plan_blocks = [Object.random() for _ in range(size)]
+                        
+                    tower, reward, max_reward, tower_block_ids = ep.plan(plan_blocks, 
+                                                                    ensemble, 
+                                                                    reward_fn,
+                                                                    args,
+                                                                    num_blocks=size,
+                                                                    n_tower=t)
+                                    
                     block_tower = []
                     for vec_block, block_id in zip(tower, tower_block_ids):
-                        vec_block[7:9] += np.random.randn(2)*args.exec_xy_noise
                         block = Object.from_vector(vec_block)
                         block.name = 'obj_%d' % block_id
-                        block_tower.append(block)     
-    
-                # build found tower
-                if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-                    if not tp.tower_is_constructable(block_tower):
-                        reward = 0
-                        num_failures += 1
-                        if tp.tower_is_pairwise_stable(block_tower):
-                            num_pw_failures += 1
+                        block_tower.append(block)         
+                                               
+                    # save tower info to /evaluation_towers
+                    if args.exec_mode is None:
+                        if args.planning_model == 'noisy-model':
+                            logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem, noise=args.plan_xy_noise)
                         else:
-                            pairs = []
-                            dists = []
-                            for i in range(len(tower) - 1):
-                                # check that each pair of blocks is stably individually
-                                top = block_tower[i+1]
-                                bottom = block_tower[i]
-                                if not tp.pair_is_stable(bottom, top): 
-                                    pairs.append(False)
-                                else:
-                                    pairs.append(True)
-                                top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
-                                top_rel_com = top_rel_pos + top.com
-                                dists.append((np.abs(top_rel_com)*2 - bottom.dimensions)[:2])
-                            #print('Pairs:', pairs, dists)
-                            
-                    #print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
-                    #print('Global Stable:', tp.tower_is_stable(block_tower))
+                            logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem)
+
+                    # perturb tower if evaluating with noisy model
+                    if args.exec_mode == 'noisy-model':
+                        block_tower = []
+                        for vec_block, block_id in zip(tower, tower_block_ids):
+                            vec_block[7:9] += np.random.randn(2)*args.exec_xy_noise
+                            block = Object.from_vector(vec_block)
+                            block.name = 'obj_%d' % block_id
+                            block_tower.append(block)     
+        
+                    # build found tower
+                    if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
+                        if not tp.tower_is_constructable(block_tower):
+                            reward = 0
+                            num_failures += 1
+                            if tp.tower_is_pairwise_stable(block_tower):
+                                num_pw_failures += 1
+                            else:
+                                pairs = []
+                                dists = []
+                                for i in range(len(tower) - 1):
+                                    # check that each pair of blocks is stably individually
+                                    top = block_tower[i+1]
+                                    bottom = block_tower[i]
+                                    if not tp.pair_is_stable(bottom, top): 
+                                        pairs.append(False)
+                                    else:
+                                        pairs.append(True)
+                                    top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
+                                    top_rel_com = top_rel_pos + top.com
+                                    dists.append((np.abs(top_rel_com)*2 - bottom.dimensions)[:2])
+                                #print('Pairs:', pairs, dists)
+                                
+                        #print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
+                        #print('Global Stable:', tp.tower_is_stable(block_tower))
+                        
+                        if False and reward != 0:
+                            print(reward, max_reward)
+                            w = World(block_tower)
+                            env = Environment([w], vis_sim=True, vis_frames=True)
+                            input()
+                            for tx in range(240):
+                                env.step(vis_frames=True)
+                                time.sleep(1/240.)
+                            env.disconnect()
                     
-                    if False and reward != 0:
-                        print(reward, max_reward)
-                        w = World(block_tower)
-                        env = Environment([w], vis_sim=True, vis_frames=True)
-                        input()
-                        for tx in range(240):
-                            env.step(vis_frames=True)
-                            time.sleep(1/240.)
-                        env.disconnect()
+                        # Note that in general max reward may not be the best possible due to sampling.
+                        #ground_truth = np.sum([np.max(b.dimensions) for b in blocks])
+                        #print(max_reward, ground_truth)
+
+                        # Compare heights and calculate regret.
+                        regret = (max_reward - reward)/max_reward
+                        #print(reward, max_reward)
+                        #print(regret)
+                        curr_regrets.append(regret)
+                        curr_rewards.append(reward)
+            else:
+                curr_regrets = []
+                curr_rewards = []
                 
-                    # Note that in general max reward may not be the best possible due to sampling.
-                    #ground_truth = np.sum([np.max(b.dimensions) for b in blocks])
-                    #print(max_reward, ground_truth)
-
-                    # Compare heights and calculate regret.
-                    regret = (max_reward - reward)/max_reward
-                    #print(reward, max_reward)
-                    #print(regret)
-                    curr_regrets.append(regret)
-                    curr_rewards.append(reward)
-
-        # if just running a single acquisition step, make regrets list the right length
-        if args.acquisition_step is not None:
-            for all_acquisition_steps_i in range(0,100,10):
-                if all_acquisition_steps_i == args.acquisition_step:
-                    regrets[k].append(curr_regrets)
-                    rewards[k].append(curr_rewards)
-                else:
-                    regrets[k].append([])
-                    rewards[k].append([])
-            fname += '_%i' % args.acquisition_step
-        else:
             if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
                 regrets[k].append(curr_regrets)
                 rewards[k].append(curr_rewards)
 
-        if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-            with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
-                pickle.dump(regrets, handle)
-                
-            with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
-                pickle.dump(rewards, handle)
-            
-    # if just ran for one acquisition step, output final regret and reward
-    '''
-    if args.acquisition_step is not None:
-        if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-            final_median_regret = np.median(regrets[k][0])
-            final_upper75_regret = np.quantile(regrets[k][0], 0.75)
-            final_lower25_regret = np.quantile(regrets[k][0][0], 0.25)
-            
-            final_median_reward = np.median(rewards[k][0])
-            final_upper75_reward = np.quantile(rewards[k][0], 0.75)
-            final_lower25_reward = np.quantile(rewards[k][0], 0.25)
-            
-            final_average_regret = np.average(regrets[k][0])
-            final_std_regret = np.std(regrets[k][0])
-            
-            final_average_reward = np.average(rewards[k][0])
-            final_std_reward = np.std(rewards[k][0])
-            
-            print('Final Median Regret: (%f) %f (%f)' % (final_lower25_regret, final_median_regret, final_upper75_regret))
-            print('Final Median Reward: (%f) %f (%f)' % (final_lower25_reward, final_median_reward, final_upper75_reward))
-            
-            print('Final Average Regret: %f +/- %f' % (final_average_regret, final_std_regret))
-            print('Final Average Reward: %f +/- %f' % (final_average_reward, final_std_reward))
-    '''
+            if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
+                min_tx, max_tx = min(args.acquisition_steps), max(args.acquisition_steps)
+                with open(logger.get_figure_path('%s_%i_%i_regrets.pkl' % (fname, min_tx, max_tx)), 'wb') as handle:
+                    pickle.dump(regrets, handle)
+                    
+                with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
+                    pickle.dump(rewards, handle)
+        
 def plot_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:
         regrets = pickle.load(handle)

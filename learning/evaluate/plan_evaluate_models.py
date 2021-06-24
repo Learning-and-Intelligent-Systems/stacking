@@ -27,8 +27,9 @@ if __name__ == '__main__':
     parser.add_argument('--max-acquisitions',
                         type=int, 
                         help='evaluate from 0 to this acquisition step (use either this or --acquisition-step)')
-    parser.add_argument('--acquisition-step',
+    parser.add_argument('--acquisition-steps',
                         type=int,
+                        nargs='+',
                         help='acquisition step to evaluate (use either this or --max-acquisition)')
     parser.add_argument('--n-towers',
                         default = 50,
@@ -67,8 +68,8 @@ if __name__ == '__main__':
     if args.debug:
         import pdb; pdb.set_trace()
  
-    assert ((args.acquisition_step is None) and (args.max_acquisitions is not None)) \
-            or ((args.max_acquisitions is None) and (args.acquisition_step is not None)), \
+    assert ((args.acquisition_steps is None) and (args.max_acquisitions is not None)) \
+            or ((args.max_acquisitions is None) and (args.acquisition_steps is not None)), \
             'must set EITHER --aquisition-step OR --max-acquisitions'
      
     if args.planning_model == 'noisy-model' and not args.plan_xy_noise:
