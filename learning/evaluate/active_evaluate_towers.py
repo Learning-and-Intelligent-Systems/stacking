@@ -758,7 +758,8 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
             ensemble = ensemble.cuda()
             
         for k, size in zip(tower_keys, args.tower_sizes):
-            if tx in args.acquisition_steps:
+            if tx >= args.acquisition_steps[0] and \
+                tx <= args.acquisition_steps[1]:
                 print('Tower size', k)
                 num_failures, num_pw_failures = 0, 0
                 curr_regrets = []
