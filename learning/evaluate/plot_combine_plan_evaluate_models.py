@@ -12,7 +12,7 @@ def plot_all_task_performance(xs, plot_task_data, args, task, y_axis, color_map)
     plot_height = 4*len(args.tower_sizes)
     fig, axes = plt.subplots(len(args.tower_sizes), figsize=(7, plot_height))
     for mi, (method, method_plot_data) in enumerate(plot_task_data.items()):
-        print(method)
+        #print(method)
         if len(method_plot_data) == 1: # just plotting a single tower height
             key = list(method_plot_data.keys())[0]
             if len(method_plot_data[key]['mid']) == 1: # single value to plot along entire x axis (eg. random strategy)
@@ -84,51 +84,52 @@ if __name__ == '__main__':
     #   'Non Zero Reward Rate'
     #   'Stable Towers Regret'
     
-    '''
-    local_exp_paths = [['paper_results_02232021/subtower-sequential-fcgn-0-20210223-223622',
-                         'paper_results_02232021/subtower-sequential-fcgn-1-20210227-085527',
-                         'paper_results_02232021/subtower-sequential-fcgn-2-20210227-043159'],
-                        ['paper_results_02232021/bald-sequential-fcgn-0-20210223-234054',
-                         'paper_results_02232021/bald-sequential-fcgn-1-20210226-230742',
-                         'paper_results_02232021/bald-sequential-fcgn-2-20210227-183002'],
-                        ['paper_results_02232021/subtower-greedy-sequential-fcgn-0-20210223-223607',
-                         'paper_results_02232021/subtower-greedy-sequential-fcgn-1-20210226-232246',
-                         'paper_results_02232021/subtower-greedy-sequential-fcgn-2-20210227-043159'],
-                        ['paper_results_02172021/bald-random-fcgn-0-20210218-004545',
-                         'paper_results_02232021/bald-random-fcgn-1-20210226-190417',
-                         'paper_results_02232021/bald-random-fcgn-2-20210227-183618'],
-                        ['paper_results_02232021/noncurious-0-20210325-211317',
-                         'paper_results_02232021/noncurious-1-20210326-185702',
-                         'paper_results_02232021/noncurious-2-20210326-185705']]
-    labels = ['sequential', 'incremental', 'greedy', 'complete', 'random']
-    color_map = {'sequential': '#d62728', 'incremental': '#ff7f0e', 'greedy': '#1f77b4', 'complete': '#2ca02c', 'random': '#000000'}
-    '''
-    '''
-    local_exp_paths = [['paper_results_02232021/bald-sequential-fcgn-0-20210223-234054',
-                         'paper_results_02232021/bald-sequential-fcgn-1-20210226-230742',
-                         'paper_results_02232021/bald-sequential-fcgn-2-20210227-183002'],
-                        ['paper_results_02232021/subtower-greedy-sequential-fcgn-0-20210223-223607',
-                         'paper_results_02232021/subtower-greedy-sequential-fcgn-1-20210226-232246',
-                         'paper_results_02232021/subtower-greedy-sequential-fcgn-2-20210227-043159'],
-                        ['paper_results_02232021/noncurious-0-20210325-211317',
-                         'paper_results_02232021/noncurious-1-20210326-185702',
-                         'paper_results_02232021/noncurious-2-20210326-185705']]
-    labels = ['incremental', 'greedy', 'random']
-    color_map = {'incremental': '#d62728', 'greedy': '#ff7f0e', 'random': '#1f77b4'}
-    '''
-    exp_paths = {'incremental':
-                        ['paper_results_02232021/bald-sequential-fcgn-0-20210223-234054',
-                         'paper_results_02232021/bald-sequential-fcgn-1-20210226-230742',
-                         'paper_results_02232021/bald-sequential-fcgn-2-20210227-183002'],
+    
+    all_exp_paths = {'incremental':
+                        ['rss_camera_ready/bald-sequential-fcgn-0-20210604-160506',
+                            'rss_camera_ready/bald-sequential-fcgn-1-20210604-190943',
+                            'rss_camera_ready/bald-sequential-fcgn-2-20210604-193703',
+                            'rss_camera_ready/bald-sequential-fcgn-3-20210615-231115'],
                 'greedy':        
-                        ['paper_results_02232021/subtower-greedy-sequential-fcgn-0-20210223-223607',
-                         'paper_results_02232021/subtower-greedy-sequential-fcgn-1-20210226-232246',
-                         'paper_results_02232021/subtower-greedy-sequential-fcgn-2-20210227-043159'],
-                'random':        
-                        ['paper_results_02232021/random-random-fcgn-0-20210329-184050',
-                         'paper_results_02232021/random-random-fcgn-1-20210329-184050',
-                         'paper_results_02232021/random-random-fcgn-2-20210329-184052']}
-    color_map = {'incremental': '#d62728', 'greedy': '#ff7f0e', 'random': '#1f77b4'}
+                        ['rss_camera_ready/subtower-greedy-sequential-fcgn-0-20210604-160500',
+                            'rss_camera_ready/subtower-greedy-sequential-fcgn-1-20210604-190834',
+                            'rss_camera_ready/subtower-greedy-sequential-fcgn-2-20210604-193549',
+                            'rss_camera_ready/subtower-greedy-sequential-fcgn-3-20210615-145846'],
+                'random-comp':        
+                        ['rss_camera_ready/random-random-fcgn-0-20210604-193209',
+                            'rss_camera_ready/random-random-fcgn-1-20210604-195044',
+                            'rss_camera_ready/random-random-fcgn-2-20210604-195352',
+                            'rss_camera_ready/random-random-fcgn-3-20210615-231130'],
+                'complete':
+                        ['rss_camera_ready/bald-random-fcgn-0-20210604-160822',
+                            'rss_camera_ready/bald-random-fcgn-1-20210604-201218',
+                            'rss_camera_ready/bald-random-fcgn-2-20210604-193847',
+                            'rss_camera_ready/bald-random-fcgn-3-20210615-145732'],
+                'random-ss':
+                        ['rss_camera_ready/subtower-random-fcgn-0-20210620-121050',
+                            'rss_camera_ready/subtower-random-fcgn-1-20210620-121152',
+                            'rss_camera_ready/subtower-random-fcgn-2-20210622-042118',
+                            'rss_camera_ready/subtower-random-fcgn-3-20210622-042847'],
+                'sequential':
+                        ['rss_camera_ready/subtower-sequential-fcgn-0-20210604-160455',
+                            'rss_camera_ready/subtower-sequential-fcgn-1-20210604-190759',
+                            'rss_camera_ready/subtower-sequential-fcgn-2-20210604-193420',
+                            'rss_camera_ready/subtower-sequential-fcgn-3-20210616-091302']}
+    all_color_map = {'incremental': '#ff7f0e', 
+                    'greedy': '#1f77b4', 
+                    'random-comp': '#800080',
+                    'complete': '#2ca02c',
+                    'random-ss': '#000000',
+                    'sequential': '#d62728'}
+
+    #### set this
+    #methods_to_plot = ['sequential', 'incremental', 'greedy', 'complete']
+    #methods_to_plot = ['sequential', 'incremental', 'greedy', 'random-ss']
+    methods_to_plot = ['complete', 'random-comp']
+    ####
+    
+    exp_paths = {method: all_exp_paths[method] for method in methods_to_plot}
+    color_map = {method: all_color_map[method] for method in methods_to_plot}
 
     all_problems = ['tallest', 'min_contact', 'max_overhang']
     for label, same_exp_paths in exp_paths.items():

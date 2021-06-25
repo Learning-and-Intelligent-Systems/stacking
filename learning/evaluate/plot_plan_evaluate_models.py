@@ -24,11 +24,15 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
                         metric = pickle.load(handle)
                 except:
                     print('%s does not exist' % logger.get_figure_path(fname))
+                    continue
                 try:
                     tower_size_key = str(tower_size)+'block'
                     rs = metric[tower_size_key]
+                    if len(rs) != 10: print('The following file does not have acquisition data for all time steps:\n            %s' % logger.get_figure_path(fname))
                 except:
                     print('tower sizes '+str(tower_size)+' are not in file '+fname)
+                    rs = []
+                    pass
                 metric_dict[tower_size_key].append(rs)
     
     if single_value:
@@ -46,7 +50,9 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
                     try:
                         tx_rs += rs[tx]
                     except Exception as e:
-                        print('You are asking for more acquisition steps than exist in the exp_path. Try a lower args.max_acquisitions.')
+                        continue
+                        #print()
+                        #print('You are asking for more acquisition steps than exist in the exp_path. Try a lower args.max_acquisitions. %i %s' % (tx, regret_fname))
             tx_regrets = np.array(tx_regrets)
             tx_rewards = np.array(tx_rewards)
             
