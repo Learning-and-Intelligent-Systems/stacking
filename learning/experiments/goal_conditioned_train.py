@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 
 from learning.active.train import train
-from learning.domains.abc_blocks.world import ABCBlocksWorld, N_OBJECTS
+from learning.domains.abc_blocks.world import ABCBlocksWorld, MAX_OBJECTS
 from learning.active.utils import ActiveExperimentLogger
 from learning.models.goal_conditioned import TransitionGNN, HeuristicGNN
 from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset, ABCBlocksHeurDataset
@@ -21,49 +21,55 @@ from visualize.domains.abc_blocks.performance import * #calc_trans_error_rate, c
 batch_size = 16
 n_epochs = 300
 n_hidden = 16
+train_num_blocks = 2
+test_num_blocks = 3
 
-def run_goal_directed_train(args):
-    if args.domain == 'abc_blocks':
-        world = ABCBlocksWorld()
-        trans_dataset = ABCBlocksTransDataset()
-        heur_dataset = ABCBlocksHeurDataset()
-
-    logger = ActiveExperimentLogger.setup_experiment_directory(args)
-    trans_dataloader = DataLoader(trans_dataset, batch_size=batch_size, shuffle=False)
-    heur_dataloader = DataLoader(heur_dataset, batch_size=batch_size, shuffle=False)
-        
+def run_goal_directed_train(train_args):
     print('Generating test dataset.')
-    test_args = copy(args)
+    test_world = ABCBlocksWorld(test_num_blocks)
+    test_args = copy(train_args)
     test_args.max_seq_attempts = 10
     test_args.exp_name = 'test1'
     test_trans_dataset = ABCBlocksTransDataset()
     test_heur_dataset = ABCBlocksHeurDataset()
     test_logger = ActiveExperimentLogger.setup_experiment_directory(test_args)
-    test_policy = world.random_policy
-    generate_dataset(test_args, world, test_logger, test_trans_dataset, test_heur_dataset, test_policy)
+    test_policy = test_world.random_policy
+    generate_dataset(test_args, test_world, test_logger, test_trans_dataset, test_heur_dataset, test_policy)
+    #preprocess(test_args, test_trans_dataset, type='balanced_actions')
+    
+    train_world = ABCBlocksWorld(train_num_blocks)
+    train_trans_dataset = ABCBlocksTransDataset()
+    train_heur_dataset = ABCBlocksHeurDataset()
+    train_logger = ActiveExperimentLogger.setup_experiment_directory(args)
+    train_trans_dataloader = DataLoader(train_trans_dataset, batch_size=batch_size, shuffle=False)
+    train_heur_dataloader = DataLoader(train_heur_dataset, batch_size=batch_size, shuffle=False)
     
     # add more sequences to dataset each time but retrain from scratch
     n_datapoints = []
-    train_policy = world.random_policy
+    train_policy = train_world.random_policy
     for i, max_additional_seq_attempts in enumerate([10]):#[1, 4, 5, 10, 30, 50]):
         print('Adding to training dataset.')
         args.max_seq_attempts = max_additional_seq_attempts
-        generate_dataset(args, world, logger, trans_dataset, heur_dataset, train_policy)
-        #preprocess(args, trans_dataset, type='balanced_actions')
-        trans_model = TransitionGNN(args, n_of_in=N_OBJECTS, n_ef_in=1, n_af_in=2*N_OBJECTS, n_hidden=n_hidden)
-        print('Training with %i datapoints.' % len(trans_dataset))
-        n_datapoints.append(len(trans_dataset))
+        generate_dataset(train_args, train_world, train_logger, train_trans_dataset, train_heur_dataset, train_policy)
+        #preprocess(train_args, train_trans_dataset, type='balanced_actions')
+        train_trans_model = TransitionGNN(train_args, n_of_in=MAX_OBJECTS, n_ef_in=1, n_af_in=2*MAX_OBJECTS, n_hidden=n_hidden)
+        print('Training with %i datapoints.' % len(train_trans_dataset))
+        n_datapoints.append(len(train_trans_dataset))
         if args.pred_type == 'delta_state':
             loss_fn = F.mse_loss
         elif args.pred_type == 'full_state':
             loss_fn = F.binary_cross_entropy
-        train(trans_dataloader, None, trans_model, n_epochs=n_epochs, loss_fn=loss_fn)
-        detailed_error_stats(args, trans_dataset, trans_model)
+        train(train_trans_dataloader, None, train_trans_model, n_epochs=n_epochs, loss_fn=loss_fn)
+        print('training accuracy')
+        detailed_error_stats(train_args, train_trans_dataset, train_trans_model)
+        print('test accuracy')
+        detailed_error_stats(train_args, test_trans_dataset, train_trans_model)
         if args.plot:
-            vis_trans_errors(args, test_trans_dataset, trans_model)
-            vis_trans_dataset_grid(args, trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
-            vis_trans_dataset_grid(args, test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
-            vis_trans_dataset_hist(args, trans_dataset, 'Tower Heights in Training Data')
+            vis_trans_errors(train_args, test_trans_dataset, train_trans_model)
+            vis_trans_dataset_grid(train_args, train_trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
+            vis_trans_dataset_grid(test_args, test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
+            vis_trans_dataset_hist(train_args, train_trans_dataset, 'Tower Heights in Training Data')
+            vis_trans_dataset_hist(test_args, test_trans_dataset, 'Tower Heights in Test Data')
         
         '''
         heur_model = HeuristicGNN()

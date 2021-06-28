@@ -11,7 +11,7 @@ def train_stats(args):
     N = 1
     all_trans_error_rates = []
     for n in range(N):
-        n_datapoints, trans_error_rates = run_goal_directed_train(args, plot=plot)
+        n_datapoints, trans_error_rates = run_goal_directed_train(args)
         all_trans_error_rates.append(trans_error_rates)
         
     #plot_error_stats(n_datapoints, all_trans_error_rates)

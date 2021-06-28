@@ -3,34 +3,33 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("TkAgg")
+from learning.domains.abc_blocks.world import MAX_OBJECTS
 
-from learning.domains.abc_blocks.world import TABLE, MAXBLOCK, get_obj_one_hot, N_OBJECTS
+# # HACK: 
+TABLE = 0
 
 def detailed_error_stats(args, trans_dataset, trans_model):
-    # get all unique transitions in dataset
+    # get all unique transitions in dataset and collect stats
+    xs, ys = trans_dataset[:]
+    all_preds = trans_model(xs).detach()
     trans_info = {}
     for i, ((object_features, edge_features, action), next_edge_features) in enumerate(trans_dataset):
         trans_i = tuple(map(tuple, edge_features.squeeze().numpy()))
+        action = tuple(action.numpy())
         trans_j = tuple(map(tuple, next_edge_features.squeeze().numpy()))
-        trans = (trans_i, trans_j)
-        if trans not in trans_info:
+        trans = (trans_i, action, trans_j)
+        if trans in trans_info:
+            trans_info[trans]['frequency'] += 1
+            trans_info[trans]['preds'] += [all_preds[i]]
+            trans_info[trans]['true_preds'] = [next_edge_features.squeeze()]
+        else:
             trans_info[trans] = {}
-            trans_info[trans]['frequency'] = 0
-            trans_info[trans]['preds'] = []
-            trans_info[trans]['true_preds'] = []
-
-    # get stats on each transition type
-    xs, ys = trans_dataset[:]
-    all_preds = trans_model(xs).detach()
-    for i, ((object_features, edge_features, action), next_edge_features) in enumerate(trans_dataset):
-        trans_i = tuple(map(tuple, edge_features.squeeze().numpy()))
-        trans_j = tuple(map(tuple, next_edge_features.squeeze().numpy()))
-        trans_key = (trans_i, trans_j)
-        trans_info[trans_key]['frequency'] += 1
-        trans_info[trans_key]['preds'] += [all_preds[i]]
-        trans_info[trans_key]['true_pred'] = next_edge_features.squeeze()
+            trans_info[trans]['frequency'] = 1
+            trans_info[trans]['preds'] = [all_preds[i]]
+            trans_info[trans]['true_preds'] = [next_edge_features.squeeze()]
 
     n_ef = 1 # number of edge features
+    N_OBJECTS = len(object_features) # hack
     # Print results
     for trans in trans_info:
         print('Transition type')
@@ -41,18 +40,27 @@ def detailed_error_stats(args, trans_dataset, trans_model):
         preds_tensor = torch.cat(preds_expand, axis=0)
         avg_preds = preds_tensor.mean(axis=0)
         if n_ef == 1:
-            avg_preds = avg_preds.squeeze()
+            avg_preds = avg_preds.squeeze().round()
         print(avg_preds)
-        print('Correct Prediction')
-        print(trans_info[trans]['true_pred'])
+        print('------------------')
+
 
 def print_trans(trans_tuple):
-    for edge_state in trans_tuple:
-        print(edge_state[0])
-        print(edge_state[1])
-        print(edge_state[2])
-        print('-----------')
-
+    def print_edge_state(edge_state):
+        for row in edge_state:
+            print(row)
+    def print_action(action):
+        top_block = int(np.where(np.array(action[:MAX_OBJECTS]) == 1.)[0]) 
+        bottom_block = int(np.where(np.array(action[MAX_OBJECTS:]) == 1.)[0])
+        print('%i --> %i' % (top_block, bottom_block))
+    print('initial_edge_state')
+    print_edge_state(trans_tuple[0])
+    print('action')
+    print_action(trans_tuple[1])
+    print('next_edge_state')
+    print_edge_state(trans_tuple[2])
+    
+    
 def calc_heur_error_rate(heur_dataset, model):
     n = len(heur_dataset)
     xs, ys = heur_dataset[:]

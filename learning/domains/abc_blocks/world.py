@@ -5,67 +5,44 @@ import numpy as np
 
 from tamp.predicates import On
 
-'''
-remove for now 0: * object
-features:
-    0: Table
-    1 --> N_OBJECTS-1: Blocks and Place block action
-'''
-N_OBJECTS=3 # must be 2 or greater
-#STAR=0
-TABLE=0
-MINBLOCK=1
-MAXBLOCK=N_OBJECTS-1
+MAX_OBJECTS = 6
 
-# NOTE: all object properties are currently static
-#       one-hot encoding of the index of the object
-
-def get_obj_one_hot(obj_i):
-    one_hot = np.zeros(N_OBJECTS)
-    one_hot[obj_i] = 1.
-    return one_hot
-
-def get_obj_num(one_hot):
-    return int(np.where(one_hot == 1.)[0])
-    
-def get_vectorized_state(state):
-    def get_int_object(object):
-        if isinstance(object, Table):
-            return TABLE
-        elif isinstance(object, Block):
-            return object.num
-        elif object == '*':
-            return STAR
-            
-    object_features = np.eye(N_OBJECTS)
-    edge_features = np.zeros((N_OBJECTS, N_OBJECTS, 1))
-    
-    # edge_feature[i, j, 0] == 1 if j on i, else 0
-    for fluent in state:
-        bottom_i = get_int_object(fluent.bottom)
-        top_i = get_int_object(fluent.top)
-        edge_features[bottom_i, top_i, 0] = 1.
-        
-    return object_features, edge_features
-    
-class Block:
+class Object:
     def __init__(self, num):
-        self.name = 'block_%i' % num
         self.num = num
+        
+class Block(Object):
+    def __init__(self, num):
+        super(Block, self).__init__(num)
+        self.name = 'block_%i' % num
 
-class Table:
+class Table(Object):
     def __init__(self):
+        super(Table, self).__init__(0) # make 1 when using * as 0
         self.name = 'table'
 
+'''
 class Star:
     def __init__(self):
         self.name= 'star'
-
+        self.num = 0
+'''
 class ABCBlocksWorld:
-    def __init__(self):
-        self._blocks = {i: Block(i) for i in range(MINBLOCK, MAXBLOCK+1)}
+    def __init__(self, num_blocks):
+        '''
+        remove for now 0: * object
+        features:
+            0: Table
+            1 --> num_blocks-1: Blocks
+        '''
+        self.num_blocks = num_blocks
+        self.num_objects = num_blocks + 1 # table is also an object
+        self.min_block = 1                # 0 is the table
+        self.max_block = num_blocks
+        
+        self._blocks = {i: Block(i) for i in range(self.min_block, self.max_block+1)}
         self._table = Table()
-        self._star = Star()
+        #self._star = Star()
         self._stacked_blocks = None
         self.reset()
         
@@ -74,8 +51,8 @@ class ABCBlocksWorld:
 
     def transition(self, action):
         if action.sum() != 0.:
-            bottom_block_num = get_obj_num(action[:N_OBJECTS])
-            top_block_num = get_obj_num(action[N_OBJECTS:])
+            bottom_block_num = self.get_obj_num(action[:MAX_OBJECTS])
+            top_block_num = self.get_obj_num(action[MAX_OBJECTS:])
             # can only stack blocks by increments of one
             if top_block_num == bottom_block_num + 1:
                 # if this is the start of the stack add both blocks to stacked list
@@ -87,34 +64,34 @@ class ABCBlocksWorld:
                     self._stacked_blocks.append(self._blocks[top_block_num])
         
     def random_policy(self):
-        action = np.zeros(2*N_OBJECTS)
+        action = np.zeros(2*MAX_OBJECTS)
         remaining_blocks = list(set(self._blocks.values()).difference(set(self._stacked_blocks)))
         if len(remaining_blocks) > 0:
             top_block = random.choice(remaining_blocks)
             if len(self._stacked_blocks) > 0:
                 bottom_block = self._stacked_blocks[-1]
-                action[:N_OBJECTS] = get_obj_one_hot(bottom_block.num)
-                action[N_OBJECTS:] = get_obj_one_hot(top_block.num)
+                action[:MAX_OBJECTS] = self.get_obj_one_hot(bottom_block.num)
+                action[MAX_OBJECTS:] = self.get_obj_one_hot(top_block.num)
             else:
                 possible_bottom_blocks = list(set(remaining_blocks).difference(set([top_block])))
                 if len(possible_bottom_blocks) > 0:
                     bottom_block = random.choice(possible_bottom_blocks)
-                    action[:N_OBJECTS] = get_obj_one_hot(bottom_block.num)
-                    action[N_OBJECTS:] = get_obj_one_hot(top_block.num)
+                    action[:MAX_OBJECTS] = self.get_obj_one_hot(bottom_block.num)
+                    action[MAX_OBJECTS:] = self.get_obj_one_hot(top_block.num)
         return action
             
     def expert_policy(self):
-        action = np.zeros(2*N_OBJECTS)
+        action = np.zeros(2*MAX_OBJECTS)
         if len(self._stacked_blocks) > 0:
             top_of_stack = self._stacked_blocks[-1]
             if top_of_stack.num != MAXBLOCK:
-                action[:N_OBJECTS] = get_obj_one_hot(top_of_stack.num)
-                action[N_OBJECTS:] = get_obj_one_hot(top_of_stack.num+1)
+                action[:MAX_OBJECTS] = self.get_obj_one_hot(top_of_stack.num)
+                action[MAX_OBJECTS:] = self.get_obj_one_hot(top_of_stack.num+1)
         else:
             random_bottom_block = random.choice(list(self._blocks.values()))
             random_top_block = random.choice(list(self._blocks.values()))
-            action[:N_OBJECTS] = get_obj_one_hot(random_bottom_block.num)
-            action[N_OBJECTS:] = get_obj_one_hot(random_top_block.num)
+            action[:MAX_OBJECTS] = self.get_obj_one_hot(random_bottom_block.num)
+            action[MAX_OBJECTS:] = self.get_obj_one_hot(random_top_block.num)
         return action
             
     def get_state(self):
@@ -148,4 +125,33 @@ class ABCBlocksWorld:
                 if pred_name == 'On':
                     goals.append([On(ground_obj(pred_args[0]), ground_obj(pred_args[1]))])
         return goals
-                    
+
+    def get_obj_one_hot(self, obj_i):
+        one_hot = np.zeros(MAX_OBJECTS)
+        one_hot[obj_i] = 1.
+        return one_hot
+
+    def get_obj_num(self, one_hot):
+        return int(np.where(one_hot == 1.)[0])
+
+
+    def get_vectorized_state(self):
+        def get_int_object(object):
+            if isinstance(object, Table):
+                return self._table.num
+            elif isinstance(object, Block):
+                return object.num
+            elif object == '*':
+                return STAR
+            
+        object_features = np.eye(MAX_OBJECTS)
+        edge_features = np.zeros((MAX_OBJECTS, MAX_OBJECTS, 1))
+
+        # edge_feature[i, j, 0] == 1 if j on i, else 0
+        state = self.get_state()
+        for fluent in state:
+            bottom_i = get_int_object(fluent.bottom)
+            top_i = get_int_object(fluent.top)
+            edge_features[bottom_i, top_i, 0] = 1.
+            
+        return object_features, edge_features

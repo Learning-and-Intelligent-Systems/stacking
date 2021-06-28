@@ -1,7 +1,6 @@
 import torch
 
 from tamp.logic import subset
-from learning.domains.abc_blocks.world import get_vectorized_state, N_OBJECTS, TABLE
 
 # TODO: generate validation dataset too!!
 def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
@@ -13,38 +12,38 @@ def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
         world.reset()
         action_sequence = []
         for j in range(args.max_action_attempts):
-            state = world.get_state()
+            vec_state = world.get_vectorized_state()
             #if subset(goal, state):
             #    action_sequence.append((state, NONACTION))
             #    break
             #else:
             action = policy()
             world.transition(action)
-            action_sequence.append((state, action))
-            if len(world._stacked_blocks) == N_OBJECTS-1:
-                state = world.get_state()
+            action_sequence.append((vec_state, action))
+            if len(world._stacked_blocks) == world.num_objects-1:
+                vec_state = world.get_vectorized_state()
                 #if subset(goal, state):
                 #    action_sequence.append((state, NONACTION))
                 #    break
                 #else:
                 action = policy()
                 world.transition(action)
-                action_sequence.append((state, action))
+                action_sequence.append((vec_state, action))
                 break
         add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger)
     #logger.save_dataset(dataset, i)
 
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger):
-    def helper(sequence, seq_goal):
+    def helper(sequence, vec_seq_goal):
         n = len(sequence)
-        object_features, goal_edge_features = get_vectorized_state(seq_goal)
+        object_features, goal_edge_features = vec_seq_goal
         for i in range(n):
-            state, action = sequence[i]
-            object_features, edge_features = get_vectorized_state(state)
+            vec_state, action = sequence[i]
+            object_features, edge_features = vec_state
             heur_dataset.add_to_dataset(object_features, edge_features, goal_edge_features, n-i-1)
             if i < n-1: # training transition model doesn't require last action in sequence
-                next_state, _ = sequence[i+1]
-                object_features, next_edge_features = get_vectorized_state(next_state)
+                vec_next_state, _ = sequence[i+1]
+                object_features, next_edge_features = vec_next_state
                 if args.pred_type == 'delta_state':
                     edge_features_to_add = next_edge_features-edge_features
                 elif args.pred_type == 'full_state':
@@ -59,15 +58,17 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
     for goal_i, (hindsight_goal, _) in enumerate(action_sequence):
         helper(action_sequence[:goal_i+1], hindsight_goal)
         
-# for testing, only keep samples with successful actions/edge changes
+# for testing
 def preprocess(args, dataset, type='successful_actions'):
     xs, ys = dataset[:]
     remove_list = []
+    # only keep samples with successful actions/edge changes
     if type == 'successful_actions':
         for i, ((object_features, edge_features, action), next_edge_features) in enumerate(dataset):
             if (args.pred_type == 'full_state' and (edge_features == next_edge_features).all()) or \
                 (args.pred_type == 'delta_state' and (next_edge_features.abs().sum() == 0)):
                 remove_list.append(i)
+    # all actions have same frequency in the dataset
     if type == 'balanced_actions':
         distinct_actions = []
         actions_counter = {}
