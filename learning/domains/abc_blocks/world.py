@@ -50,9 +50,9 @@ class ABCBlocksWorld:
         self._stacked_blocks = []
 
     def transition(self, action):
-        if action.sum() != 0.:
-            bottom_block_num = self.get_obj_num(action[:MAX_OBJECTS])
-            top_block_num = self.get_obj_num(action[MAX_OBJECTS:])
+        if action is not None:
+            bottom_block_num = action[0].num
+            top_block_num = action[1].num
             # can only stack blocks by increments of one
             if top_block_num == bottom_block_num + 1:
                 # if this is the start of the stack add both blocks to stacked list
@@ -64,34 +64,31 @@ class ABCBlocksWorld:
                     self._stacked_blocks.append(self._blocks[top_block_num])
         
     def random_policy(self):
-        action = np.zeros(2*MAX_OBJECTS)
+        action = None
         remaining_blocks = list(set(self._blocks.values()).difference(set(self._stacked_blocks)))
         if len(remaining_blocks) > 0:
             top_block = random.choice(remaining_blocks)
             if len(self._stacked_blocks) > 0:
                 bottom_block = self._stacked_blocks[-1]
-                action[:MAX_OBJECTS] = self.get_obj_one_hot(bottom_block.num)
-                action[MAX_OBJECTS:] = self.get_obj_one_hot(top_block.num)
+                action = (bottom_block, top_block)
             else:
                 possible_bottom_blocks = list(set(remaining_blocks).difference(set([top_block])))
                 if len(possible_bottom_blocks) > 0:
                     bottom_block = random.choice(possible_bottom_blocks)
-                    action[:MAX_OBJECTS] = self.get_obj_one_hot(bottom_block.num)
-                    action[MAX_OBJECTS:] = self.get_obj_one_hot(top_block.num)
+                    action = (bottom_block, top_block)
         return action
             
     def expert_policy(self):
-        action = np.zeros(2*MAX_OBJECTS)
+        action = None
         if len(self._stacked_blocks) > 0:
-            top_of_stack = self._stacked_blocks[-1]
-            if top_of_stack.num != MAXBLOCK:
-                action[:MAX_OBJECTS] = self.get_obj_one_hot(top_of_stack.num)
-                action[MAX_OBJECTS:] = self.get_obj_one_hot(top_of_stack.num+1)
+            bottom_block = self._stacked_blocks[-1]
+            if top_of_stack.num != self.max_block:
+                top_block = self.get_object_by_num(top_of_stack.num + 1)
+                action = (bottom_block, top_block)
         else:
             random_bottom_block = random.choice(list(self._blocks.values()))
             random_top_block = random.choice(list(self._blocks.values()))
-            action[:MAX_OBJECTS] = self.get_obj_one_hot(random_bottom_block.num)
-            action[MAX_OBJECTS:] = self.get_obj_one_hot(random_top_block.num)
+            action = (random_bottom_block, random_top_block)
         return action
             
     def get_state(self):
@@ -107,7 +104,7 @@ class ABCBlocksWorld:
             if block not in self._stacked_blocks:
                 state.append(On(self._table, block))
         return state
-        
+
     def parse_goals_csv(self, goal_file_path):
         def ground_obj(obj_str):
             if obj_str == 'table':
@@ -134,6 +131,10 @@ class ABCBlocksWorld:
     def get_obj_num(self, one_hot):
         return int(np.where(one_hot == 1.)[0])
 
+    def get_object_by_num(self, num):
+        for block in self._blocks:
+            if block.num == num:
+                return block
 
     def get_vectorized_state(self):
         def get_int_object(object):
@@ -144,7 +145,8 @@ class ABCBlocksWorld:
             elif object == '*':
                 return STAR
             
-        object_features = np.eye(MAX_OBJECTS)
+        #object_features = np.eye(MAX_OBJECTS)
+        object_features = np.expand_dims(np.arange(MAX_OBJECTS), 1)
         edge_features = np.zeros((MAX_OBJECTS, MAX_OBJECTS, 1))
 
         # edge_feature[i, j, 0] == 1 if j on i, else 0
@@ -155,3 +157,14 @@ class ABCBlocksWorld:
             edge_features[bottom_i, top_i, 0] = 1.
             
         return object_features, edge_features
+
+    def get_vectorized_action(self, action):
+        #action_vec = np.zeros(2*MAX_OBJECTS)
+        action_vec = np.zeros(2)
+        if action is not None:
+            bottom_block, top_block = action
+            action_vec[0] = bottom_block.num
+            action_vec[1] = top_block.num
+            #action_vec[:MAX_OBJECTS] = self.get_obj_one_hot(bottom_block.num)
+            #action_vec[MAX_OBJECTS:] = self.get_obj_one_hot(top_block.num)
+        return action_vec

@@ -21,6 +21,9 @@ from visualize.domains.abc_blocks.performance import * #calc_trans_error_rate, c
 batch_size = 16
 n_epochs = 300
 n_hidden = 16
+n_of_in=1 #MAX_OBJECTS 
+n_ef_in=1
+n_af_in=2 #2*MAX_OBJECTS
 train_num_blocks = 2
 test_num_blocks = 3
 
@@ -52,7 +55,11 @@ def run_goal_directed_train(train_args):
         args.max_seq_attempts = max_additional_seq_attempts
         generate_dataset(train_args, train_world, train_logger, train_trans_dataset, train_heur_dataset, train_policy)
         #preprocess(train_args, train_trans_dataset, type='balanced_actions')
-        train_trans_model = TransitionGNN(train_args, n_of_in=MAX_OBJECTS, n_ef_in=1, n_af_in=2*MAX_OBJECTS, n_hidden=n_hidden)
+        train_trans_model = TransitionGNN(train_args, 
+                                            n_of_in=n_of_in, 
+                                            n_ef_in=n_ef_in, 
+                                            n_af_in=n_af_in, 
+                                            n_hidden=n_hidden)
         print('Training with %i datapoints.' % len(train_trans_dataset))
         n_datapoints.append(len(train_trans_dataset))
         if args.pred_type == 'delta_state':

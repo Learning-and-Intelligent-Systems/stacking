@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader, Sampler
     
 class ABCBlocksTransDataset(Dataset):
     def __init__(self):
-        self.object_features = torch.tensor([])
+        self.object_features = torch.tensor([], dtype=torch.float64)
         self.edge_features = torch.tensor([])
         self.actions = torch.tensor([])
         self.next_edge_features = torch.tensor([])

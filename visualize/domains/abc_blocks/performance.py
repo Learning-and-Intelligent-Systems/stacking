@@ -50,8 +50,10 @@ def print_trans(trans_tuple):
         for row in edge_state:
             print(row)
     def print_action(action):
-        top_block = int(np.where(np.array(action[:MAX_OBJECTS]) == 1.)[0]) 
-        bottom_block = int(np.where(np.array(action[MAX_OBJECTS:]) == 1.)[0])
+        bottom_block = action[0]
+        top_block = action[1]
+        #bottom_block = int(np.where(np.array(action[MAX_OBJECTS:]) == 1.)[0])
+        #top_block = int(np.where(np.array(action[:MAX_OBJECTS]) == 1.)[0]) 
         print('%i --> %i' % (top_block, bottom_block))
     print('initial_edge_state')
     print_edge_state(trans_tuple[0])

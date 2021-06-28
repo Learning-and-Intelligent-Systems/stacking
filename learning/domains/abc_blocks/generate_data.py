@@ -18,8 +18,9 @@ def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
             #    break
             #else:
             action = policy()
+            vec_action = world.get_vectorized_action(action)
             world.transition(action)
-            action_sequence.append((vec_state, action))
+            action_sequence.append((vec_state, vec_action))
             if len(world._stacked_blocks) == world.num_objects-1:
                 vec_state = world.get_vectorized_state()
                 #if subset(goal, state):
@@ -27,8 +28,9 @@ def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
                 #    break
                 #else:
                 action = policy()
+                vec_action = world.get_vectorized_action(action)
                 world.transition(action)
-                action_sequence.append((vec_state, action))
+                action_sequence.append((vec_state, vec_action))
                 break
         add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger)
     #logger.save_dataset(dataset, i)
@@ -38,7 +40,7 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
         n = len(sequence)
         object_features, goal_edge_features = vec_seq_goal
         for i in range(n):
-            vec_state, action = sequence[i]
+            vec_state, vec_action = sequence[i]
             object_features, edge_features = vec_state
             heur_dataset.add_to_dataset(object_features, edge_features, goal_edge_features, n-i-1)
             if i < n-1: # training transition model doesn't require last action in sequence
@@ -48,7 +50,7 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
                     edge_features_to_add = next_edge_features-edge_features
                 elif args.pred_type == 'full_state':
                     edge_features_to_add = next_edge_features
-                trans_dataset.add_to_dataset(object_features, edge_features, action, edge_features_to_add)
+                trans_dataset.add_to_dataset(object_features, edge_features, vec_action, edge_features_to_add)
                 
     # if given goal was reached, add to dataset
     #if subset(goal, action_sequence[-1][0]):
