@@ -5,8 +5,6 @@ import numpy as np
 
 from tamp.predicates import On
 
-MAX_OBJECTS = 6
-
 class Object:
     def __init__(self, num):
         self.num = num
@@ -124,7 +122,7 @@ class ABCBlocksWorld:
         return goals
 
     def get_obj_one_hot(self, obj_i):
-        one_hot = np.zeros(MAX_OBJECTS)
+        one_hot = np.zeros(self.num_objects)
         one_hot[obj_i] = 1.
         return one_hot
 
@@ -146,8 +144,8 @@ class ABCBlocksWorld:
                 return STAR
             
         #object_features = np.eye(MAX_OBJECTS)
-        object_features = np.expand_dims(np.arange(MAX_OBJECTS), 1)
-        edge_features = np.zeros((MAX_OBJECTS, MAX_OBJECTS, 1))
+        object_features = np.expand_dims(np.arange(self.num_objects), 1)
+        edge_features = np.zeros((self.num_objects, self.num_objects, 1))
 
         # edge_feature[i, j, 0] == 1 if j on i, else 0
         state = self.get_state()

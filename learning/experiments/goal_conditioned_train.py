@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 
 from learning.active.train import train
-from learning.domains.abc_blocks.world import ABCBlocksWorld, MAX_OBJECTS
+from learning.domains.abc_blocks.world import ABCBlocksWorld
 from learning.active.utils import ActiveExperimentLogger
 from learning.models.goal_conditioned import TransitionGNN, HeuristicGNN
 from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset, ABCBlocksHeurDataset
@@ -24,8 +24,8 @@ n_hidden = 16
 n_of_in=1 #MAX_OBJECTS 
 n_ef_in=1
 n_af_in=2 #2*MAX_OBJECTS
-train_num_blocks = 2
-test_num_blocks = 3
+train_num_blocks = 4
+test_num_blocks = 6
 
 def run_goal_directed_train(train_args):
     print('Generating test dataset.')

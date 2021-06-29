@@ -3,20 +3,18 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("TkAgg")
-from learning.domains.abc_blocks.world import MAX_OBJECTS
-
-# # HACK: 
-TABLE = 0
 
 def detailed_error_stats(args, trans_dataset, trans_model):
+    def tensor_to_tuple(edge_tensor):
+        return tuple(map(tuple, edge_tensor.squeeze().numpy()))
     # get all unique transitions in dataset and collect stats
     xs, ys = trans_dataset[:]
     all_preds = trans_model(xs).detach()
     trans_info = {}
     for i, ((object_features, edge_features, action), next_edge_features) in enumerate(trans_dataset):
-        trans_i = tuple(map(tuple, edge_features.squeeze().numpy()))
+        trans_i = tensor_to_tuple(edge_features)
         action = tuple(action.numpy())
-        trans_j = tuple(map(tuple, next_edge_features.squeeze().numpy()))
+        trans_j = tensor_to_tuple(next_edge_features)
         trans = (trans_i, action, trans_j)
         if trans in trans_info:
             trans_info[trans]['frequency'] += 1
@@ -32,29 +30,37 @@ def detailed_error_stats(args, trans_dataset, trans_model):
     N_OBJECTS = len(object_features) # hack
     # Print results
     for trans in trans_info:
-        print('Transition type')
-        print_trans(trans)
-        print('Frequency %f' % trans_info[trans]['frequency'])
-        print('Average prediction')
+        
         preds_expand = [pred.view(1, N_OBJECTS, N_OBJECTS, n_ef) for pred in trans_info[trans]['preds']]
         preds_tensor = torch.cat(preds_expand, axis=0)
-        avg_preds = preds_tensor.mean(axis=0)
-        if n_ef == 1:
-            avg_preds = avg_preds.squeeze().round()
-        print(avg_preds)
+        round_preds_tensor = preds_tensor.round()
+        avg_preds_tensor = round_preds_tensor.mean(axis=0).squeeze() + 0 # change -0 to 0
+        
+        edge_features, action, next_edge_features = trans
+        mse = np.linalg.norm(avg_preds_tensor - np.array(next_edge_features))
+        
+        print('Frequency %f' % trans_info[trans]['frequency'])
+        print('Initial state')
+        print_edge_state(edge_features)
+        print('Action')
+        print_action(action)
+        if mse > 0:
+            print('Predicted delta state')
+            print_edge_state(tensor_to_tuple(avg_preds_tensor))
         print('------------------')
 
-
+def print_edge_state(edge_state):
+    for row in edge_state:
+        print(row)
+        
+def print_action(action):
+    bottom_block = action[0]
+    top_block = action[1]
+    #bottom_block = int(np.where(np.array(action[MAX_OBJECTS:]) == 1.)[0])
+    #top_block = int(np.where(np.array(action[:MAX_OBJECTS]) == 1.)[0]) 
+    print('%i --> %i' % (top_block, bottom_block))
+    
 def print_trans(trans_tuple):
-    def print_edge_state(edge_state):
-        for row in edge_state:
-            print(row)
-    def print_action(action):
-        bottom_block = action[0]
-        top_block = action[1]
-        #bottom_block = int(np.where(np.array(action[MAX_OBJECTS:]) == 1.)[0])
-        #top_block = int(np.where(np.array(action[:MAX_OBJECTS]) == 1.)[0]) 
-        print('%i --> %i' % (top_block, bottom_block))
     print('initial_edge_state')
     print_edge_state(trans_tuple[0])
     print('action')
@@ -110,6 +116,9 @@ def vis_trans_dataset_grid(args, trans_dataset, title):
     fig.colorbar(c)
     
 def vis_trans_dataset_hist(args, trans_dataset, title):
+    # # HACK: 
+    TABLE = 0
+
     # Visualize Training Dataset
     stacked_blocks = []
     for x, y in trans_dataset:
