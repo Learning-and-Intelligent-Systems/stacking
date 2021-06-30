@@ -20,7 +20,7 @@ See the full installation steps in [the installation README](./doc/installation.
 ## Hardware Setup
 For information on our hardware configuration, refer to [our hardware setup README](./doc/hardware.md).
 
-For specific information on the blocks used for our experiments, refer to [our blocks README](./doc/blocks.md).
+For specific information on the blocks used for our experiments, refer to [our blocks README](./doc/blocks.md). This README also describes how to draw initial "home" block poses on the table.
 
 ---
 

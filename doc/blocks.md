@@ -15,3 +15,15 @@ To generate a simulated block set, run ```python -m learning.domains.towers.crea
 
 ### Notes
 * All of the block set pickle and csv files that we currently use are in ```learning/domains/towers```. ```learning/domains/towers/block_set_info.txt``` has a brief description of each block set.
+
+## Home Poses Markings
+The planning system will assume that blocks start at fixed positions behind the robot. Since these positions are not visible to the cameras, they have been manually specified in ```tamp/misc.py:setup_panda_world```. To aid the operator in resetting the blocks when necessary, we drew outlines of each block's home position on the table and marked the orientations.
+
+We use the following procedure to draw an outline of the table for each block.
+
+1. **Start the robot:** Setup the robot and ensure the ```interface.launch``` file is running.
+2. **Move arm to block's home position:** With any empty gripper, run ```python go_to_init_pose.py --show-frames --blocks-file BLOCKS_PKL_FILE --id BLOCK_NUM```, where ```BLOCKS_PKL_FILE``` is the ```.pkl``` file generated above and ```BLOCK_NUM``` is the id of the block whose home position you wish to mark. The system will first create a motion plan and then prompt you to continue. It will then move to the grasp pose with the open gripper. It will pause at this position.
+3. **Create block markings:** Put the block on the table in between the gripper with the correct orientation (this will be visualized in PyBullet). With a pencil, outline the 4 corners of the block on the table and mark which sides are facing each way. This will help the operator quickly return blocks to the correct pose.
+4. **Reset arm:** Move the arm back to the home position by pressing enter on the keyboard.
+
+Repeat this process for each block in the block set.
