@@ -3,37 +3,26 @@ import torch
 from tamp.logic import subset
 
 # TODO: generate validation dataset too!!
+# want to show that this will be improved by an actively collected dataset
 def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
-    #for gi, goal in enumerate(world.parse_goals_csv(args.goals_file_path)):
-        #print('Generating data for goal %i' % gi)
-    #goal = world.parse_goals_csv(args.goals_file_path)[0]
     goal = None
     for i in range(args.max_seq_attempts):
         world.reset()
         action_sequence = []
-        for j in range(args.max_action_attempts):
+        valid_actions = True
+        while valid_actions:
             vec_state = world.get_vectorized_state()
-            #if subset(goal, state):
-            #    action_sequence.append((state, NONACTION))
-            #    break
-            #else:
             action = policy()
             vec_action = world.get_vectorized_action(action)
             world.transition(action)
             action_sequence.append((vec_state, vec_action))
-            if len(world._stacked_blocks) == world.num_objects-1:
+            # no valid actions left
+            if world.expert_policy() is None:
+                valid_actions = False
                 vec_state = world.get_vectorized_state()
-                #if subset(goal, state):
-                #    action_sequence.append((state, NONACTION))
-                #    break
-                #else:
-                action = policy()
-                vec_action = world.get_vectorized_action(action)
-                world.transition(action)
+                vec_action = world.get_vectorized_action(None)
                 action_sequence.append((vec_state, vec_action))
-                break
         add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger)
-    #logger.save_dataset(dataset, i)
 
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger):
     def helper(sequence, vec_seq_goal):
@@ -52,10 +41,6 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
                     edge_features_to_add = next_edge_features
                 trans_dataset.add_to_dataset(object_features, edge_features, vec_action, edge_features_to_add)
                 
-    # if given goal was reached, add to dataset
-    #if subset(goal, action_sequence[-1][0]):
-    #helper(action_sequence, goal)
-        
     # for all other reached states, make them goals (hindsight experience replay)
     for goal_i, (hindsight_goal, _) in enumerate(action_sequence):
         helper(action_sequence[:goal_i+1], hindsight_goal)

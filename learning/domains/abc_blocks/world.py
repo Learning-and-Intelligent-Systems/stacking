@@ -80,8 +80,8 @@ class ABCBlocksWorld:
         action = None
         if len(self._stacked_blocks) > 0:
             bottom_block = self._stacked_blocks[-1]
-            if top_of_stack.num != self.max_block:
-                top_block = self.get_object_by_num(top_of_stack.num + 1)
+            if bottom_block.num != self.max_block:
+                top_block = self.get_object_by_num(bottom_block.num + 1)
                 action = (bottom_block, top_block)
         else:
             random_bottom_block = random.choice(list(self._blocks.values()))
@@ -130,7 +130,7 @@ class ABCBlocksWorld:
         return int(np.where(one_hot == 1.)[0])
 
     def get_object_by_num(self, num):
-        for block in self._blocks:
+        for block in self._blocks.values():
             if block.num == num:
                 return block
 

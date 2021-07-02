@@ -21,86 +21,47 @@ from visualize.domains.abc_blocks.performance import * #calc_trans_error_rate, c
 batch_size = 16
 n_epochs = 300
 n_hidden = 16
-n_of_in=1 #MAX_OBJECTS 
+n_of_in=1
 n_ef_in=1
-n_af_in=2 #2*MAX_OBJECTS
-train_num_blocks = 4
-test_num_blocks = 6
+n_af_in=2
 
-def run_goal_directed_train(train_args):
-    print('Generating test dataset.')
-    test_world = ABCBlocksWorld(test_num_blocks)
-    test_args = copy(train_args)
-    test_args.max_seq_attempts = 10
-    test_args.exp_name = 'test1'
-    test_trans_dataset = ABCBlocksTransDataset()
-    test_heur_dataset = ABCBlocksHeurDataset()
-    test_logger = ActiveExperimentLogger.setup_experiment_directory(test_args)
-    test_policy = test_world.random_policy
-    generate_dataset(test_args, test_world, test_logger, test_trans_dataset, test_heur_dataset, test_policy)
-    #preprocess(test_args, test_trans_dataset, type='balanced_actions')
+def generate_world_dataset(args, num_blocks):
+    world = ABCBlocksWorld(num_blocks)
+    trans_dataset = ABCBlocksTransDataset()
+    heur_dataset = ABCBlocksHeurDataset()
+    policy = world.random_policy
+    generate_dataset(args, world, None, trans_dataset, heur_dataset, policy)
+    #preprocess(args, trans_dataset, type='balanced_actions')
+    return trans_dataset, world
     
-    train_world = ABCBlocksWorld(train_num_blocks)
-    train_trans_dataset = ABCBlocksTransDataset()
-    train_heur_dataset = ABCBlocksHeurDataset()
-    train_logger = ActiveExperimentLogger.setup_experiment_directory(args)
-    train_trans_dataloader = DataLoader(train_trans_dataset, batch_size=batch_size, shuffle=False)
-    train_heur_dataloader = DataLoader(train_heur_dataset, batch_size=batch_size, shuffle=False)
-    
-    # add more sequences to dataset each time but retrain from scratch
-    n_datapoints = []
-    train_policy = train_world.random_policy
-    for i, max_additional_seq_attempts in enumerate([10]):#[1, 4, 5, 10, 30, 50]):
-        print('Adding to training dataset.')
-        args.max_seq_attempts = max_additional_seq_attempts
-        generate_dataset(train_args, train_world, train_logger, train_trans_dataset, train_heur_dataset, train_policy)
-        #preprocess(train_args, train_trans_dataset, type='balanced_actions')
-        train_trans_model = TransitionGNN(train_args, 
-                                            n_of_in=n_of_in, 
-                                            n_ef_in=n_ef_in, 
-                                            n_af_in=n_af_in, 
-                                            n_hidden=n_hidden)
-        print('Training with %i datapoints.' % len(train_trans_dataset))
-        n_datapoints.append(len(train_trans_dataset))
-        if args.pred_type == 'delta_state':
-            loss_fn = F.mse_loss
-        elif args.pred_type == 'full_state':
-            loss_fn = F.binary_cross_entropy
-        train(train_trans_dataloader, None, train_trans_model, n_epochs=n_epochs, loss_fn=loss_fn)
-        print('training accuracy')
-        detailed_error_stats(train_args, train_trans_dataset, train_trans_model)
-        print('test accuracy')
-        detailed_error_stats(train_args, test_trans_dataset, train_trans_model)
-        if args.plot:
-            vis_trans_errors(train_args, test_trans_dataset, train_trans_model)
-            vis_trans_dataset_grid(train_args, train_trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
-            vis_trans_dataset_grid(test_args, test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
-            vis_trans_dataset_hist(train_args, train_trans_dataset, 'Tower Heights in Training Data')
-            vis_trans_dataset_hist(test_args, test_trans_dataset, 'Tower Heights in Test Data')
-        
-        '''
-        heur_model = HeuristicGNN()
-        train(heur_dataloader, None, heur_model, n_epochs=100, loss_fn=F.mse_loss)
-        heur_error_rate = calc_heur_error_rate(test_heur_dataset, heur_model)
-        heur_error_rates.append(heur_error_rate)
-        print('Heuristic Prediction Error Rate: %f' % heur_error_rate)
-        '''
+def setup_and_train(args, trans_dataset):
+    print('Training with %i datapoints.' % len(trans_dataset))
+    trans_dataloader = DataLoader(trans_dataset, batch_size=batch_size, shuffle=False)
+    trans_model = TransitionGNN(args, 
+                                n_of_in=n_of_in, 
+                                n_ef_in=n_ef_in, 
+                                n_af_in=n_af_in, 
+                                n_hidden=n_hidden)
+    if args.pred_type == 'delta_state':
+        loss_fn = F.mse_loss
+    elif args.pred_type == 'full_state':
+        loss_fn = F.binary_cross_entropy
+    train(trans_dataloader, None, trans_model, n_epochs=n_epochs, loss_fn=loss_fn)
+    return trans_model
 
-    '''
+def evaluate(args, trans_model, train_trans_dataset, test_trans_dataset, train_world):
+    print('Training accuracy')
+    detailed_error_stats(args, train_trans_dataset, trans_model)
+    print('Test accuracy')
+    test_accuracy = detailed_error_stats(args, test_trans_dataset, trans_model)
+    perc_t_explored = action_space_stats(train_world.num_objects, train_world.num_blocks, train_trans_dataset)
     if args.plot:
-        # Visualize Error Rate
-        fig, ax = plt.subplots()
-        ax.plot(n_datapoints, trans_error_rates, '*-')
-        ax.set_xlabel('Training Dataset Size (Number of Actions)')
-        ax.set_ylabel('Edge Prediction Error Rate')
-    '''
-    if args.plot:
-        plt.ion()
-        plt.show()
-        input('Enter to close plots.')
-        plt.close()
-    
-    return n_datapoints#, trans_error_rates
+        vis_trans_errors(args, test_trans_dataset, trans_model)
+        vis_trans_dataset_grid(args, train_trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(trans_dataset))
+        vis_trans_dataset_grid(args, test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
+        vis_trans_dataset_hist(args, train_trans_dataset, 'Tower Heights in Training Data')
+        vis_trans_dataset_hist(args, test_trans_dataset, 'Tower Heights in Test Data')
+    return perc_t_explored, test_accuracy
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -127,20 +88,34 @@ if __name__ == '__main__':
     parser.add_argument('--pred-type',
                         type=str,
                         choices=['delta_state', 'full_state'],
-                        required=True)
+                        default='delta_state')
     parser.add_argument('--exp-name',
                         type=str,
                         required=True,
                         help='path to save dataset to')
     parser.add_argument('--plot',
                         action='store_true')
+    parser.add_argument('--train-num-blocks',
+                        type=int,
+                        default=3)
+    parser.add_argument('--test-num-blocks',
+                        type=int,
+                        default=4)
     args = parser.parse_args()
 
     if args.debug:
         import pdb; pdb.set_trace()
         
-    run_goal_directed_train(args)
+    print('Generating test dataset.')
+    test_trans_dataset, test_world = generate_world_dataset(args, args.test_num_blocks)
     
+    print('Generating train dataset.')
+    train_trans_dataset, train_world = generate_world_dataset(args, args.train_num_blocks)
+    
+    trans_model = setup_and_train(args, train_trans_dataset)
+    
+    perc_t_explored, test_accuracy = evaluate(args, trans_model, train_trans_dataset, test_trans_dataset, train_world)
+    print('Test accuracy: %f' % test_accuracy)
     '''
     try:
         run_goal_directed_train(args)
