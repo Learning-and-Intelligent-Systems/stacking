@@ -30,7 +30,7 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
                 except:
                     print('tower sizes '+str(tower_size)+' are not in file '+fname)
                 metric_dict[tower_size_key].append(rs)
-    
+
     if single_value:
         acquisition_plot_steps = 1
     else:
@@ -46,22 +46,23 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
                     try:
                         tx_rs += rs[tx]
                     except Exception as e:
-                        print('You are asking for more acquisition steps than exist in the exp_path. Try a lower args.max_acquisitions.')
+                        pass
+                        #print('You are asking for more acquisition steps than exist in the exp_path. Try a lower args.max_acquisitions.')
             tx_regrets = np.array(tx_regrets)
             tx_rewards = np.array(tx_rewards)
-            
+
             # calculated desired metric
             if y_axis == 'Normalized Regret':
                 mid.append(np.median(tx_regrets))
                 lower.append(np.quantile(tx_regrets, 0.25))
                 upper.append(np.quantile(tx_regrets, 0.75))
-                 
+
             elif y_axis == 'Success Rate': # regret == 0
                 success_rate = tx_regrets[tx_regrets == 0.0].shape[0]/tx_regrets.shape[0]
                 mid.append(success_rate)
                 lower.append(success_rate)
                 upper.append(success_rate)
-                
+
             elif y_axis == 'Average Successful Reward': # reward when regret == 0
                 rewards = []
                 for regret, reward in zip(tx_regrets, tx_rewards):
@@ -76,7 +77,7 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
                 mid.append(avg)
                 lower.append(avg - std)
                 upper.append(avg + std)
-                
+
             elif y_axis == 'Average Non Zero Reward': # reward when build
                 non_zero_rewards = tx_rewards[tx_rewards != 0.0]
                 if len(non_zero_rewards) == 0:
@@ -87,13 +88,13 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
                 mid.append(avg)
                 lower.append(avg - std)
                 upper.append(avg + std)
-                
+
             elif y_axis == 'Non Zero Reward Rate':
                 non_zero_rewards = tx_rewards[tx_rewards != 0.0]
                 mid.append(non_zero_rewards.shape[0]/tx_rewards.shape[0])
                 lower.append(non_zero_rewards.shape[0]/tx_rewards.shape[0])
                 upper.append(non_zero_rewards.shape[0]/tx_rewards.shape[0])
-                
+
             elif y_axis == 'Stable Towers Regret':
                 non_one_regrets = tx_regrets[tx_regrets != 1.0]
                 if len(non_one_regrets) == 0:
@@ -104,7 +105,7 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
                 mid.append(avg)
                 lower.append(avg - std)
                 upper.append(avg + std)
-                
+
             plot_data[tsk] = {}
             plot_data[tsk]['mid'] = mid
             plot_data[tsk]['lower'] = lower
@@ -132,9 +133,9 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
             axes[i].set_ylabel(y_axis)
             axes[i].set_xlabel('Number of Training Towers')
             axes[i].legend()
-        
+
     fig.suptitle(method)
-    
+
     if len(loggers) > 1:
         plot_dir = 'learning/experiments/logs/paper_plots/combine_models/'+method
         if not os.path.exists(plot_dir): os.makedirs(plot_dir)
@@ -144,15 +145,15 @@ def plot_planner_performance(loggers, args, y_axis, method, regret_fname, reward
     else:
         plt.savefig(loggers[0].get_figure_path(fname[:-4]+'.png'))
     plt.close()
-    
+
     return xs, plot_data
-    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path-root',
                         type=str,
                         required=True)
-    parser.add_argument('--exp-path-prefix', 
+    parser.add_argument('--exp-path-prefix',
                         type=str,
                         required=True)
     parser.add_argument('--debug',
@@ -163,7 +164,7 @@ if __name__ == '__main__':
                         nargs = '+',
                         help='number of blocks in goal tower')
     parser.add_argument('--max-acquisitions',
-                        type=int, 
+                        type=int,
                         help='evaluate from 0 to this acquisition step (use either this or --acquisition-step)')
     parser.add_argument('--runs',
                         nargs='+',
@@ -172,12 +173,12 @@ if __name__ == '__main__':
                         default=['tallest', 'min_contact', 'max_overhang'],
                         nargs='+')
     args = parser.parse_args()
-    
+
     args.tower_sizes = [int(ts) for ts in args.tower_sizes]
-    
+
     if args.debug:
         import pdb; pdb.set_trace()
- 
+
     # find exp_paths with the given prefix
     exp_path_roots = ['%s-%d' % (args.exp_path_prefix, r) for r in args.runs]
     all_results = os.listdir(args.exp_path_root)
@@ -187,11 +188,11 @@ if __name__ == '__main__':
             if exp_path_root in result:
                 relevant_exp_paths.append(os.path.join(args.exp_path_root, result))
     print(relevant_exp_paths)
-    
+
     loggers = []
     for exp_path in relevant_exp_paths:
         loggers.append(ActiveExperimentLogger(exp_path))
-        
+
     y_axis = 'Normalized Regret' # TODO: detect from file name?
     label = args.exp_path_prefix
     fnames = []
