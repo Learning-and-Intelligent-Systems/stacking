@@ -1,23 +1,27 @@
 from copy import copy
-import random
 import csv
 import numpy as np
 
 from tamp.predicates import On
 
+### Object Classes
+
 class Object:
     def __init__(self, num):
         self.num = num
-        
+
+
 class Block(Object):
     def __init__(self, num):
         super(Block, self).__init__(num)
         self.name = 'block_%i' % num
 
+
 class Table(Object):
-    def __init__(self):
-        super(Table, self).__init__(0) # make 1 when using * as 0
+    def __init__(self, num):
+        super(Table, self).__init__(num) # make 1 when using * as 0
         self.name = 'table'
+
 
 '''
 class Star:
@@ -25,8 +29,50 @@ class Star:
         self.name= 'star'
         self.num = 0
 '''
-class ABCBlocksWorld:
-    def __init__(self, num_blocks):
+
+
+### World and State Classes
+
+class LogicalState:
+    def __init__(self, blocks, num_objects):
+        self.table_num = 0
+        self.table = Table(self.table_num)
+        self.blocks = blocks
+        self.stacked_blocks = []
+        self.num_objects = num_objects
+
+    def as_logical(self):
+        logical_state = []
+
+        # stacked blocks
+        if len(self.stacked_blocks) > 0:
+            logical_state.append(On(self.table, self.stacked_blocks[0]))
+        for bottom_block, top_block in zip(self.stacked_blocks[:-1], self.stacked_blocks[1:]):
+            logical_state.append(On(bottom_block, top_block))
+
+        # remaining blocks on table
+        for block in self.blocks.values():
+            if block not in self.stacked_blocks:
+                logical_state.append(On(self.table, block))
+
+        return logical_state
+
+    def as_vec(self):
+        object_features = np.expand_dims(np.arange(self.num_objects), 1)
+        edge_features = np.zeros((self.num_objects, self.num_objects, 1))
+
+        # edge_feature[i, j, 0] == 1 if j on i, else 0
+        for predicate in self.as_logical():
+            bottom_i = predicate.bottom.num
+            top_i = predicate.top.num
+            edge_features[bottom_i, top_i, 0] = 1.
+
+        return object_features, edge_features
+
+
+# Ground Truth Blocks World
+class ABCBlocksWorldGT:
+    def __init__(self, args, num_blocks):
         '''
         remove for now 0: * object
         features:
@@ -37,132 +83,127 @@ class ABCBlocksWorld:
         self.num_objects = num_blocks + 1 # table is also an object
         self.min_block = 1                # 0 is the table
         self.max_block = num_blocks
-        
-        self._blocks = {i: Block(i) for i in range(self.min_block, self.max_block+1)}
-        self._table = Table()
-        #self._star = Star()
-        self._stacked_blocks = None
-        self.reset()
-        
-    def reset(self):
-        self._stacked_blocks = []
 
-    def transition(self, action):
+        self._blocks = {i: Block(i) for i in range(self.min_block, self.max_block+1)}
+
+    def get_init_state(self):
+        return LogicalState(self._blocks, self.num_objects)
+
+    def transition(self, state, action):
+        new_state = copy(state)
         if action is not None:
-            bottom_block_num = action[0].num
-            top_block_num = action[1].num
+            bottom_block_num = action[0]
+            top_block_num = action[1]
             # can only stack blocks by increments of one
             if top_block_num == bottom_block_num + 1:
                 # if this is the start of the stack add both blocks to stacked list
-                if len(self._stacked_blocks) == 0:
-                    self._stacked_blocks.append(self._blocks[bottom_block_num])
-                    self._stacked_blocks.append(self._blocks[top_block_num])
+                if len(state.stacked_blocks) == 0:
+                    new_state.stacked_blocks.append(self._blocks[bottom_block_num])
+                    new_state.stacked_blocks.append(self._blocks[top_block_num])
                 # can only build one stack at a time (for now)
                 else:
-                    self._stacked_blocks.append(self._blocks[top_block_num])
-        
-    def random_policy(self):
+                    new_state.stacked_blocks.append(self._blocks[top_block_num])
+        return new_state
+
+    def random_policy(self, state):
         action = None
-        remaining_blocks = list(set(self._blocks.values()).difference(set(self._stacked_blocks)))
+        top_block_num = np.random.choice(list(self._blocks))
+        bottom_block_num = np.random.choice(list(self._blocks))
+        return (bottom_block_num, top_block_num)
+
+    # attempt to stack a block that is currently on the table
+    def random_remaining_policy(self, state):
+        action = None
+        remaining_blocks = list(set(self._blocks.values()).difference(set(self.stacked_blocks)))
         if len(remaining_blocks) > 0:
-            top_block = random.choice(remaining_blocks)
-            if len(self._stacked_blocks) > 0:
-                bottom_block = self._stacked_blocks[-1]
-                action = (bottom_block, top_block)
+            top_block_idx = np.random.choice(len(remaining_blocks))
+            top_block_num = remaining_blocks[top_block_idx].num
+            if len(state.stacked_blocks) > 0:
+                bottom_block_num = state.stacked_blocks[-1].num
+                action = (bottom_block_num, top_block_num)
             else:
                 possible_bottom_blocks = list(set(remaining_blocks).difference(set([top_block])))
                 if len(possible_bottom_blocks) > 0:
-                    bottom_block = random.choice(possible_bottom_blocks)
-                    action = (bottom_block, top_block)
+                    bottom_block_idx = np.random.choice(len(possible_bottom_blocks))
+                    bottom_block_num = possible_bottom_blocks[bottom_block_idx].num
+                    action = (bottom_block_num, top_block_num)
         return action
-            
-    def expert_policy(self):
+
+    def expert_policy(self, state):
         action = None
-        if len(self._stacked_blocks) > 0:
-            bottom_block = self._stacked_blocks[-1]
-            if bottom_block.num != self.max_block:
-                top_block = self.get_object_by_num(bottom_block.num + 1)
-                action = (bottom_block, top_block)
+        if len(state.stacked_blocks) > 0:
+            bottom_block_num = state.stacked_blocks[-1].num
+            if bottom_block_num != self.max_block:
+                top_block_num = bottom_block_num + 1
+                action = (bottom_block_num, top_block_num)
         else:
-            random_bottom_block = random.choice(list(self._blocks.values()))
-            random_top_block = random.choice(list(self._blocks.values()))
-            action = (random_bottom_block, random_top_block)
+            random_bottom_block_num = np.random.choice(list(self._blocks.values()))
+            random_top_block_num = np.random.choice(list(self._blocks.values()))
+            action = (random_bottom_block_num, random_top_block_num)
         return action
-            
-    def get_state(self):
-        state = []
-        # bottom stacked block is on table
-        if len(self._stacked_blocks) > 0:
-            state.append(On(self._table, self._stacked_blocks[0]))
-        # remaining stacked blocks
-        for bottom_block, top_block in zip(self._stacked_blocks[:-1], self._stacked_blocks[1:]):
-            state.append(On(bottom_block, top_block))
-        # remaining blocks on table
-        for block in self._blocks.values():
-            if block not in self._stacked_blocks:
-                state.append(On(self._table, block))
-        return state
 
-    def parse_goals_csv(self, goal_file_path):
-        def ground_obj(obj_str):
-            if obj_str == 'table':
-                return self._table
-            elif obj_str == '*':
-                return self._star
-            else:
-                return self._blocks[int(obj_str)]
-        goals = []
-        with open(goal_file_path, 'r') as file:
-            reader = csv.reader(file)
-            for row in reader:
-                pred_name = row[0]
-                pred_args = row[1:]
-                if pred_name == 'On':
-                    goals.append([On(ground_obj(pred_args[0]), ground_obj(pred_args[1]))])
-        return goals
 
-    def get_obj_one_hot(self, obj_i):
-        one_hot = np.zeros(self.num_objects)
-        one_hot[obj_i] = 1.
-        return one_hot
-
-    def get_obj_num(self, one_hot):
-        return int(np.where(one_hot == 1.)[0])
-
-    def get_object_by_num(self, num):
-        for block in self._blocks.values():
-            if block.num == num:
-                return block
-
-    def get_vectorized_state(self):
-        def get_int_object(object):
-            if isinstance(object, Table):
-                return self._table.num
-            elif isinstance(object, Block):
-                return object.num
-            elif object == '*':
-                return STAR
-            
-        #object_features = np.eye(MAX_OBJECTS)
-        object_features = np.expand_dims(np.arange(self.num_objects), 1)
-        edge_features = np.zeros((self.num_objects, self.num_objects, 1))
+# When using learned model for transitions, edge states won't always make sense as logical states,
+# so need a separate class (eg. 2 blocks can be on top of one in a vectorized edge state)
+class VectorizedState:
+    def __init__(self, blocks, num_objects):
+        self.table_num = 0
+        self.table = Table(self.table_num)
+        self.object_features = np.expand_dims(np.arange(num_objects), 1)
+        self.edge_features = np.zeros((num_objects, num_objects, 1))
 
         # edge_feature[i, j, 0] == 1 if j on i, else 0
-        state = self.get_state()
-        for fluent in state:
-            bottom_i = get_int_object(fluent.bottom)
-            top_i = get_int_object(fluent.top)
-            edge_features[bottom_i, top_i, 0] = 1.
-            
-        return object_features, edge_features
+        # initially everything on table
+        for block_num in blocks.keys():
+            self.edge_features[self.table.num, block_num, 0] = 1.
 
-    def get_vectorized_action(self, action):
-        #action_vec = np.zeros(2*MAX_OBJECTS)
-        action_vec = np.zeros(2)
-        if action is not None:
-            bottom_block, top_block = action
-            action_vec[0] = bottom_block.num
-            action_vec[1] = top_block.num
-            #action_vec[:MAX_OBJECTS] = self.get_obj_one_hot(bottom_block.num)
-            #action_vec[MAX_OBJECTS:] = self.get_obj_one_hot(top_block.num)
-        return action_vec
+
+# Learned Blocks World
+class ABCBlocksWorldLearned:
+    def __init__(self, args, num_blocks):
+        '''
+        remove for now 0: * object
+        features:
+            0: Table
+            1 --> num_blocks-1: Blocks
+        '''
+        self.num_blocks = num_blocks
+        self.num_objects = num_blocks + 1 # table is also an object
+        self.min_block = 1                # 0 is the table
+        self.max_block = num_blocks
+
+        self._blocks = {i: Block(i) for i in range(self.min_block, self.max_block+1)}
+
+        if args.model_path:
+            self.model_path = args.model_path
+
+    def get_init_state(self):
+        return VectorizedState(self._blocks, self.num_objects)
+
+    def transition(self, state, action):
+        new_state = copy(state)
+        vec_action = get_vectorized_action(action)
+        model = torch.load_state(self.model_path)
+        delta_edge_features = model(state.object_features, state.edge_features, vec_action)
+        new_state.edge_features += delta_edge_features # for now object features are static
+        return new_state
+
+
+### Helper Functions
+def parse_goals_csv(self, goal_file_path):
+    def ground_obj(obj_str):
+        if obj_str == 'table':
+            return self._table
+        elif obj_str == '*':
+            return self._star
+        else:
+            return self._blocks[int(obj_str)]
+    goals = []
+    with open(goal_file_path, 'r') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            pred_name = row[0]
+            pred_args = row[1:]
+            if pred_name == 'On':
+                goals.append([On(ground_obj(pred_args[0]), ground_obj(pred_args[1]))])
+    return goals

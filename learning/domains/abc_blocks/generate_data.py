@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from tamp.logic import subset
 
@@ -7,21 +8,18 @@ from tamp.logic import subset
 def generate_dataset(args, world, logger, trans_dataset, heur_dataset, policy):
     goal = None
     for i in range(args.max_seq_attempts):
-        world.reset()
+        state = world.get_init_state()
         action_sequence = []
         valid_actions = True
         while valid_actions:
-            vec_state = world.get_vectorized_state()
-            action = policy()
-            vec_action = world.get_vectorized_action(action)
-            world.transition(action)
-            action_sequence.append((vec_state, vec_action))
+            vec_action = policy(state)
+            state = world.transition(state, vec_action)
+            action_sequence.append((state.as_vec(), vec_action))
             # no valid actions left
-            if world.expert_policy() is None:
+            if world.expert_policy(state) is None:
                 valid_actions = False
-                vec_state = world.get_vectorized_state()
-                vec_action = world.get_vectorized_action(None)
-                action_sequence.append((vec_state, vec_action))
+                action = np.zeros(2)
+                action_sequence.append((state.as_vec(), vec_action))
         add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger)
 
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, logger):
@@ -40,11 +38,11 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
                 elif args.pred_type == 'full_state':
                     edge_features_to_add = next_edge_features
                 trans_dataset.add_to_dataset(object_features, edge_features, vec_action, edge_features_to_add)
-                
+
     # for all other reached states, make them goals (hindsight experience replay)
     for goal_i, (hindsight_goal, _) in enumerate(action_sequence):
         helper(action_sequence[:goal_i+1], hindsight_goal)
-        
+
 # for testing
 def preprocess(args, dataset, type='successful_actions'):
     xs, ys = dataset[:]
@@ -66,8 +64,8 @@ def preprocess(args, dataset, type='successful_actions'):
                 actions_counter[a] = [i]
             else:
                 actions_counter[a] += [i]
-        min_distinct_actions = min([len(counter) for counter in actions_counter.values()])        
+        min_distinct_actions = min([len(counter) for counter in actions_counter.values()])
         for a in distinct_actions:
             remove_list += actions_counter[a][min_distinct_actions:]
-            
+
     dataset.remove_elements(remove_list)
