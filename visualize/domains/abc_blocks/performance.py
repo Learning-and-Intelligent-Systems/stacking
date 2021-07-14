@@ -94,8 +94,6 @@ def print_edge_state(edge_state):
 def print_action(action):
     bottom_block = action[0]
     top_block = action[1]
-    #bottom_block = int(np.where(np.array(action[MAX_OBJECTS:]) == 1.)[0])
-    #top_block = int(np.where(np.array(action[:MAX_OBJECTS]) == 1.)[0])
     print('%i --> %i' % (top_block, bottom_block))
 
 def print_trans(trans_tuple):
@@ -157,17 +155,20 @@ def vis_trans_dataset_hist(args, trans_dataset, title):
     # # HACK:
     TABLE = 0
 
-    # Visualize Training Dataset
+    # Visualize Dataset
     stacked_blocks = []
     for x, y in trans_dataset:
+        object_features, edge_features, action = x
         if args.pred_type == 'full_state':
             new_edge_features = y
         elif args.pred_type == 'delta_state':
-            _, edge_features, _ = x
             delta_edge_features = y
             new_edge_features = torch.add(edge_features, delta_edge_features)
-        state_stacked = float(new_edge_features[TABLE+1:,TABLE+1:].sum()+1)  # one block is stacked on table
-        stacked_blocks.append(state_stacked)
+        # add init state and new state
+        state_num_stacked = float(edge_features[TABLE+1:,TABLE+1:].sum()+1)  # one block is stacked on table
+        new_state_num_stacked = float(new_edge_features[TABLE+1:,TABLE+1:].sum()+1)
+        stacked_blocks.append(state_num_stacked)
+        stacked_blocks.append(new_state_num_stacked)
 
     fig, ax = plt.subplots()
     ax.hist(stacked_blocks)

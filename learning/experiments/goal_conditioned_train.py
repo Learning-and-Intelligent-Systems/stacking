@@ -25,11 +25,14 @@ n_of_in=1
 n_ef_in=1
 n_af_in=2
 
-def generate_world_dataset(args, num_blocks):
-    world = ABCBlocksWorldGT(args, num_blocks)
+def generate_world_dataset(args, num_blocks, mode):
+    world = ABCBlocksWorldGT(num_blocks)
     trans_dataset = ABCBlocksTransDataset()
     heur_dataset = ABCBlocksHeurDataset()
-    policy = world.random_policy
+    if mode == 'train':
+        policy = world.random_policy
+    elif mode == 'test':
+        policy = world.expert_policy
     generate_dataset(args, world, None, trans_dataset, heur_dataset, policy)
     #preprocess(args, trans_dataset, type='balanced_actions')
     return trans_dataset, world
@@ -60,7 +63,9 @@ def evaluate(args, trans_model, train_trans_dataset, test_trans_dataset, train_w
         vis_trans_errors(args, test_trans_dataset, trans_model)
         vis_trans_dataset_grid(args, train_trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(train_trans_dataset))
         vis_trans_dataset_grid(args, test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
+        print('train')
         vis_trans_dataset_hist(args, train_trans_dataset, 'Tower Heights in Training Data')
+        print('test')
         vis_trans_dataset_hist(args, test_trans_dataset, 'Tower Heights in Test Data')
         plt.show()
     return perc_t_explored, test_accuracy
@@ -85,7 +90,7 @@ if __name__ == '__main__':
                         help='max number of times to attempt to reach a given goal')
     parser.add_argument('--max-action-attempts',
                         type=int,
-                        default=10,
+                        default=30,
                         help='max number of actions in a sequence')
     parser.add_argument('--pred-type',
                         type=str,
@@ -108,19 +113,16 @@ if __name__ == '__main__':
     if args.debug:
         import pdb; pdb.set_trace()
 
+    #try:
     print('Generating test dataset.')
-    test_trans_dataset, test_world = generate_world_dataset(args, args.test_num_blocks)
+    test_trans_dataset, test_world = generate_world_dataset(args, args.test_num_blocks, 'test')
 
     print('Generating train dataset.')
-    train_trans_dataset, train_world = generate_world_dataset(args, args.train_num_blocks)
+    train_trans_dataset, train_world = generate_world_dataset(args, args.train_num_blocks, 'train')
 
     trans_model = setup_and_train(args, train_trans_dataset)
 
     evaluate(args, trans_model, train_trans_dataset, test_trans_dataset, train_world)
 
-    '''
-    try:
-        run_goal_directed_train(args)
-    except:
-        import pdb; pdb.post_mortem()
-    '''
+    #except:
+    #    import pdb; pdb.post_mortem()
