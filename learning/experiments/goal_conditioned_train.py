@@ -63,9 +63,7 @@ def evaluate(args, trans_model, train_trans_dataset, test_trans_dataset, train_w
         vis_trans_errors(args, test_trans_dataset, trans_model)
         vis_trans_dataset_grid(args, train_trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(train_trans_dataset))
         vis_trans_dataset_grid(args, test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
-        print('train')
         vis_trans_dataset_hist(args, train_trans_dataset, 'Tower Heights in Training Data')
-        print('test')
         vis_trans_dataset_hist(args, test_trans_dataset, 'Tower Heights in Test Data')
         plt.show()
     return perc_t_explored, test_accuracy

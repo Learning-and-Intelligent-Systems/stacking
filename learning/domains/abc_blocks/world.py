@@ -1,3 +1,4 @@
+from copy import copy, deepcopy
 import csv
 import numpy as np
 
@@ -64,7 +65,7 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         return LogicalState(self._blocks, self.num_objects, self.table)
 
     def transition(self, state, action):
-        new_state = state
+        new_state = state.copy()
         if action is not None:
             bottom_block_num = action[0]
             top_block_num = action[1]
@@ -197,6 +198,10 @@ class LogicalState:
 
         return object_features, edge_features
 
+    def copy(self):
+        copy_state = LogicalState(self.blocks, self.num_objects, self.table)
+        copy_state.stacked_blocks = deepcopy(self.stacked_blocks)
+        return copy_state
 
 ### Helper Functions
 def parse_goals_csv(self, goal_file_path):
