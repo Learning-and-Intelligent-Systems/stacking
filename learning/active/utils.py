@@ -359,17 +359,17 @@ class GoalConditionedExperimentLogger:
         with open(os.path.join(self.exp_path, 'dataset.pkl'), 'wb') as handle:
             pickle.dump(dataset, handle)
 
-    '''
-    def load_dataset(self, fname):
-        with open(os.path.join(self.exp_path, 'datasets', fname), 'rb') as handle:
+    def load_dataset(self):
+        with open(os.path.join(self.exp_path, 'dataset.pkl'), 'rb') as handle:
             dataset = pickle.load(handle)
         return dataset
 
+    def save_model(self, model):
+        torch.save(model.state_dict(), os.path.join(self.exp_path, 'model.pt'))
+
+    '''
     def get_figure_path(self, fname):
         return os.path.join(self.exp_path, 'figures', fname)
-
-    def save_model(self, model, fname):
-        torch.save(model.state_dict(), os.path.join(self.exp_path, 'models', fname))
 
     def load_model(self, fname):
         model = MLP(n_hidden=self.args.n_hidden, dropout=self.args.dropout)
