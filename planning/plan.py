@@ -8,8 +8,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--num-blocks',
                         type=int,
-                        default=3,
-                        help='only used in model_type == true')
+                        default=3)
     parser.add_argument('--num-branches',
                         type=int,
                         default=10,
@@ -51,7 +50,7 @@ if __name__ == '__main__':
         model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
         model_args = model_logger.load_args()
         model = model_logger.load_model()
-        world = ABCBlocksWorldLearned(model_args.num_blocks, model)
+        world = ABCBlocksWorldLearned(args.num_blocks, model)
         print('Using model %s.' % model_logger.exp_path)
     elif args.model_type == 'true':
         world = ABCBlocksWorldGT(args.num_blocks)
