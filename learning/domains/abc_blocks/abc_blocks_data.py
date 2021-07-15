@@ -5,7 +5,7 @@ import torch
 
 from itertools import islice
 from torch.utils.data import Dataset, DataLoader, Sampler
-    
+
 class ABCBlocksTransDataset(Dataset):
     def __init__(self):
         self.object_features = torch.tensor([], dtype=torch.float64)
@@ -18,12 +18,12 @@ class ABCBlocksTransDataset(Dataset):
                 self.edge_features[ix],
                 self.actions[ix]], \
                 self.next_edge_features[ix]
-        
+
     def __len__(self):
         """
         The total number of datapoints in the entire dataset.
         """
-        return len(self.object_features)    
+        return len(self.object_features)
 
     def remove_elements(self, remove_list):
         mask = np.ones(len(self.edge_features), dtype=bool)
@@ -38,8 +38,8 @@ class ABCBlocksTransDataset(Dataset):
         self.edge_features = torch.cat([self.edge_features, torch.tensor([edge_features])])
         self.actions = torch.cat([self.actions, torch.tensor([action])])
         self.next_edge_features = torch.cat([self.next_edge_features, torch.tensor([next_edge_features])])
-        
-    
+
+
 class ABCBlocksHeurDataset(Dataset):
     def __init__(self):
         self.object_features = torch.tensor([])
@@ -52,15 +52,24 @@ class ABCBlocksHeurDataset(Dataset):
                 self.edge_features[ix],
                 self.goal_edge_features[ix]], \
                 self.steps_to_goal[ix]
-        
+
     def __len__(self):
         """
         The total number of datapoints in the entire dataset.
         """
-        return len(self.object_features)    
+        return len(self.object_features)
 
     def add_to_dataset(self, object_features, edge_features, goal_edge_features, steps_to_goal):
         self.object_features = torch.cat([self.object_features, torch.tensor([object_features])])
         self.edge_features = torch.cat([self.edge_features, torch.tensor([edge_features])])
         self.goal_edge_features = torch.cat([self.goal_edge_features, torch.tensor([goal_edge_features])])
         self.steps_to_goal = torch.cat([self.steps_to_goal, torch.tensor([steps_to_goal])])
+
+# this is only for single inputs (not batches)
+# TODO: have it detect if a single input or a batch is being passed in
+def model_forward(model, inputs):
+    tensor_inputs = []
+    for input in inputs:
+        tensor_inputs.append(torch.tensor(input, dtype=torch.float64)[None, :])
+    output = model.forward(tensor_inputs)
+    return output.detach().numpy().squeeze(0)

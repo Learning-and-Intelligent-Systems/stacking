@@ -11,28 +11,7 @@ from learning.active.train import train
 from learning.active.utils import GoalConditionedExperimentLogger
 from learning.models.goal_conditioned import TransitionGNN, HeuristicGNN
 from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset, ABCBlocksHeurDataset
-from visualize.domains.abc_blocks.performance import * #calc_trans_error_rate, calc_heur_error_rate, \
-                                                        #vis_trans_errors, vis_trans_dataset_grid, \
-                                                        #vis_trans_dataset_hist, \
-                                                        #calc_successful_action_error_rate
 
-'''
-def evaluate(args, trans_model, train_trans_dataset, test_trans_dataset, train_world):
-    print('Training Dataset')
-    perc_t_explored = action_space_stats(train_world.num_objects, train_world.num_blocks, train_trans_dataset)
-    train_accuracy = detailed_error_stats(args, train_trans_dataset, trans_model)
-    print('Test Dataset')
-    test_accuracy = detailed_error_stats(args, test_trans_dataset, trans_model)
-
-    if args.plot:
-        vis_trans_errors(args, test_trans_dataset, trans_model)
-        vis_trans_dataset_grid(args, train_trans_dataset, 'Frequency of Edges seen in Training Dataset (n=%i)' % len(train_trans_dataset))
-        vis_trans_dataset_grid(args, test_trans_dataset, 'Frequency of Edges seen in Test Dataset')
-        vis_trans_dataset_hist(args, train_trans_dataset, 'Tower Heights in Training Data')
-        vis_trans_dataset_hist(args, test_trans_dataset, 'Tower Heights in Test Data')
-        plt.show()
-    return perc_t_explored, test_accuracy
-'''
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug',
@@ -80,16 +59,20 @@ if __name__ == '__main__':
     dataset_logger = GoalConditionedExperimentLogger(args.dataset_exp_path)
     trans_dataset = dataset_logger.load_dataset()
 
+    # add num_blocks to model args
+    dataset_args = dataset_logger.load_args()
+    args.num_blocks = dataset_args.num_blocks
+
     model_logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'models')
 
     print('Training dataset %s.' % dataset_logger.exp_path)
     print('Training with %i datapoints.' % len(trans_dataset))
     trans_dataloader = DataLoader(trans_dataset, batch_size=args.batch_size, shuffle=False) # TODO: switch to shuffle?
-    trans_model = TransitionGNN(args,
-                                n_of_in=n_of_in,
+    trans_model = TransitionGNN(n_of_in=n_of_in,
                                 n_ef_in=n_ef_in,
                                 n_af_in=n_af_in,
-                                n_hidden=args.n_hidden)
+                                n_hidden=args.n_hidden,
+                                pred_type=args.pred_type)
     if args.pred_type == 'delta_state':
         loss_fn = F.mse_loss
     elif args.pred_type == 'full_state':

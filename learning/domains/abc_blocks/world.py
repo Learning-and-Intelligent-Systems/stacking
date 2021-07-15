@@ -3,6 +3,7 @@ import csv
 import numpy as np
 
 from tamp.predicates import On
+from learning.domains.abc_blocks.abc_blocks_data import model_forward
 
 TABLE_NUM = 0
 
@@ -124,33 +125,34 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
 
 # Learned Blocks World
 class ABCBlocksWorldLearned(ABCBlocksWorld):
-    def __init__(self, args, num_blocks):
+    def __init__(self, num_blocks, model):
         super().__init__(num_blocks)
         self.object_features = np.expand_dims(np.arange(self.num_objects), 1) # for now object features are static
-        if args.model_path:
-            self.model_path = args.model_path
+        self.model = model
 
     def get_init_state(self):
         edge_features = np.zeros((self.num_objects, self.num_objects, 1))
         # edge_feature[i, j, 0] == 1 if j on i, else 0
         # initially everything on table
-        for block_num in blocks.keys():
+        for block_num in self._blocks.keys():
             edge_features[self.table.num, block_num, 0] = 1.
         return self.object_features, edge_features
 
     def transition(self, state, action):
         object_features, edge_features = state
-        model = torch.load_state(self.model_path)
-        delta_edge_features = model(object_features, edge_features, vec_action)
-        new_state = edge_features + delta_edge_features
-        return new_state
+        delta_edge_features = model_forward(self.model, [object_features, edge_features, action])
+        new_edge_state = edge_features + delta_edge_features
+        return object_features, new_edge_state
 
     def is_goal_state(self, state, goal):
-        goal_idxs = np.where(goal == 1)
+        # goal is logical and state is vec
+        object_features, goal_edge_features = logical_to_vec_state(goal, self.num_objects)
+        object_features, state_edge_features = state
+        goal_idxs = np.array(np.where(goal_edge_features == 1))
         goal_reached = True
-        for goal_idx in zip(goal_idxs.T):
+        for goal_idx in goal_idxs.T:
             # NOTE: This only works when vactorized states are 2D
-            goal_reached = goal_reached and (round(state[goal_idx[0]][goal_idx[1]]) == 1)
+            goal_reached = goal_reached and (np.round(state_edge_features[goal_idx[0]][goal_idx[1]]) == 1)
         return goal_reached
 
 
@@ -187,16 +189,8 @@ class LogicalState:
         return logical_state
 
     def as_vec(self):
-        object_features = np.expand_dims(np.arange(self.num_objects), 1)
-        edge_features = np.zeros((self.num_objects, self.num_objects, 1))
-
-        # edge_feature[i, j, 0] == 1 if j on i, else 0
-        for predicate in self.as_logical():
-            bottom_i = predicate.bottom.num
-            top_i = predicate.top.num
-            edge_features[bottom_i, top_i, 0] = 1.
-
-        return object_features, edge_features
+        logical_state = self.as_logical()
+        return logical_to_vec_state(logical_state, self.num_objects)
 
     def copy(self):
         copy_state = LogicalState(self.blocks, self.num_objects, self.table)
@@ -204,6 +198,28 @@ class LogicalState:
         return copy_state
 
 ### Helper Functions
+def print_state(state):
+    def print_vec_state(vec_state):
+        print(np.round(vec_state[1].squeeze()))
+    if isinstance(state, LogicalState):
+        print_vec_state(state.as_vec())
+    elif isinstance(state, tuple) and len(state) == 2:
+        print_vec_state(state)
+    elif isinstance(state, list) and isinstance(state[0], On):
+        print_vec_state(logical_to_vec_state)
+
+def logical_to_vec_state(state, num_objects):
+    object_features = np.expand_dims(np.arange(num_objects), 1)
+    edge_features = np.zeros((num_objects, num_objects, 1))
+
+    # edge_feature[i, j, 0] == 1 if j on i, else 0
+    for predicate in state:
+        bottom_i = predicate.bottom.num
+        top_i = predicate.top.num
+        edge_features[bottom_i, top_i, 0] = 1.
+
+    return object_features, edge_features
+
 def parse_goals_csv(self, goal_file_path):
     def ground_obj(obj_str):
         if obj_str == 'table':

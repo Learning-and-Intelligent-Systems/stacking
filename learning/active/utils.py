@@ -320,6 +320,7 @@ class ActiveExperimentLogger:
                 towers_data[os.path.join(tower_path, file)] = data
         return towers_data
 
+from learning.models.goal_conditioned import TransitionGNN
 
 class GoalConditionedExperimentLogger:
 
@@ -367,18 +368,25 @@ class GoalConditionedExperimentLogger:
     def save_model(self, model):
         torch.save(model.state_dict(), os.path.join(self.exp_path, 'model.pt'))
 
-    '''
-    def get_figure_path(self, fname):
-        return os.path.join(self.exp_path, 'figures', fname)
-
-    def load_model(self, fname):
-        model = MLP(n_hidden=self.args.n_hidden, dropout=self.args.dropout)
-        model.load_state_dict(torch.load(os.path.join(self.exp_path, 'models', fname)))
+    def load_model(self):
+        n_of_in=1
+        n_ef_in=1
+        n_af_in=2
+        model = TransitionGNN(n_of_in=n_of_in,
+                                n_ef_in=n_ef_in,
+                                n_af_in=n_af_in,
+                                n_hidden=self.args.n_hidden,
+                                pred_type=self.args.pred_type)
+        model.load_state_dict(torch.load(os.path.join(self.exp_path, 'model.pt')))
         return model
 
-    def get_ensemble(self):
-        ensemble = []
-        for mx in range(0, self.args.n_models):
-            ensemble.append(self.load_model('net_%d.pt' % mx))
-        return ensemble
-    '''
+    def load_args(self):
+        with open(os.path.join(self.exp_path, 'args.pkl'), 'rb') as handle:
+            args = pickle.load(handle)
+        return args
+
+    def save_planning_data(self, tree, goal):
+        with open(os.path.join(self.exp_path, 'tree.pkl'), 'wb') as handle:
+            pickle.dump(tree, handle)
+        with open(os.path.join(self.exp_path, 'goal.pkl'), 'wb') as handle:
+            pickle.dump(goal, handle)
