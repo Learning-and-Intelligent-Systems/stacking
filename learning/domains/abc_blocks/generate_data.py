@@ -119,7 +119,7 @@ if __name__ == '__main__':
         import pdb; pdb.set_trace()
 
     #try:
-    print('Generating dataset with %i blocks with %s policy.' % (args.num_blocks, args.policy))
+    print('Generating datasets with %i blocks with %s policy.' % (args.num_blocks, args.policy))
 
     if args.domain == 'abc_blocks':
         world = ABCBlocksWorldGT(args.num_blocks)
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     generate_dataset(args, world, trans_dataset, heur_dataset, policy)
     logger.save_trans_dataset(trans_dataset)
     logger.save_heur_dataset(heur_dataset)
-    print('Dataset saved to %s' % logger.exp_path)
+    print('Datasets saved to %s' % logger.exp_path)
 
     #except:
     #    import pdb; pdb.post_mortem()

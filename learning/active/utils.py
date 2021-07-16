@@ -365,18 +365,30 @@ class GoalConditionedExperimentLogger:
             pickle.dump(dataset, handle)
 
     def save_trans_dataset(self, dataset):
-        self.save_dataset(dataset, 'trans_dataset.pt')
+        self.save_dataset(dataset, 'trans_dataset.pkl')
 
     def save_heur_dataset(self, dataset):
-        self.save_dataset(dataset, 'heur_dataset.pt')
+        self.save_dataset(dataset, 'heur_dataset.pkl')
 
-    def load_dataset(self):
-        with open(os.path.join(self.exp_path, 'dataset.pkl'), 'rb') as handle:
+    def load_dataset(self, fname):
+        with open(os.path.join(self.exp_path, fname), 'rb') as handle:
             dataset = pickle.load(handle)
         return dataset
 
+    def load_trans_dataset(self):
+        return self.load_dataset('trans_dataset.pkl')
+
+    def load_heur_dataset(self):
+        return self.load_dataset('heur_dataset.pkl')
+
     def save_model(self, model):
         torch.save(model.state_dict(), os.path.join(self.exp_path, 'model.pt'))
+
+    def save_trans_model(self, model):
+        torch.save(model.state_dict(), os.path.join(self.exp_path, 'trans_model.pt'))
+
+    def save_heur_model(self, model):
+        torch.save(model.state_dict(), os.path.join(self.exp_path, 'heur_model.pt'))
 
     def load_model(self):
         n_of_in=1

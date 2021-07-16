@@ -42,7 +42,7 @@ class ABCBlocksTransDataset(Dataset):
 
 class ABCBlocksHeurDataset(Dataset):
     def __init__(self):
-        self.object_features = torch.tensor([])
+        self.object_features = torch.tensor([], dtype=torch.float64)
         self.edge_features = torch.tensor([])
         self.goal_edge_features = torch.tensor([])
         self.steps_to_goal = torch.tensor([], dtype=torch.float64)

@@ -9,6 +9,10 @@ class GCGNN(nn.Module):
         :param n_ef_in: Dimensionality of edge features
         :param n_hidden: Number of hidden units used throughout the network.
         """
+        super().__init__()
+
+        torch.set_default_dtype(torch.float64) # my data was float64 and model params were float32
+
         self.n_of_in, self.n_ef_in, self.n_hidden = n_of_in, n_ef_in, n_hidden
 
         # Initial embedding of node features into latent state
@@ -32,7 +36,7 @@ class GCGNN(nn.Module):
         :param input: Network input. First item is always
                         object_features (N, K, n_of_in)
         """
-        object_features = x[0]
+        object_features = input[0]
         N, K, n_of_in = object_features.shape
 
         # Pass each object feature from encoder
@@ -82,8 +86,8 @@ class GCGNN(nn.Module):
         """
 
         # Calculate initial node and edge hidden states
-        hn = self.embed_node(x)
-        he = self.embed_edge(hn, x)
+        hn = self.embed_node(input)
+        he = self.embed_edge(hn, input)
 
         I = 1
         for i in range(I):
@@ -106,10 +110,8 @@ class HeuristicGNN(GCGNN):
         """
         super(HeuristicGNN, self).__init__(n_of_in, n_ef_in, n_hidden)
 
-        torch.set_default_dtype(torch.float64) # my data was float64 and model params were float32
-
         # Initial embedding of edge features and action into latent state
-        self.Ei = nn.Sequential(nn.Linear(n_ef_in+n_af_in+2*n_hidden, n_hidden))#,
+        self.Ei = nn.Sequential(nn.Linear(2*n_ef_in+2*n_hidden, n_hidden))#,
                                #nn.Tanh())
 
         # Final function to get next state edge predictions
@@ -143,7 +145,7 @@ class HeuristicGNN(GCGNN):
         hn_exp = hn[:, :, None, :].expand(-1, -1, K, -1)
         hnhn = torch.cat([hn_exp, hn_exp.transpose(1, 2)], dim=3)
         gxhnhn = torch.cat([edge_features, goal_edge_features, hnhn], dim=3)
-        gxhnhn = xahnhn.view(-1, 2*n_ef_in+2*n_hidden)
+        gxhnhn = gxhnhn.view(-1, 2*n_ef_in+2*n_hidden)
 
         # Calculate the hidden edge state for each node
         # he.shape = (N*K*K, n_hidden) --> (N, K, K, n_hidden)
@@ -156,11 +158,10 @@ class HeuristicGNN(GCGNN):
         # Calculate the final edge predictions
         # he.shape = (N, K, K, n_hidden) --> (N*K*K, n_hidden)
         he = he.view(-1, self.n_hidden)
-        y = self.Ef(he).view(N, K*K, 1)
+        y = self.Ef(he).view(N, K*K)
 
         # sum all edge outputs to get predicted steps to goal
-        y = torch.sum(axis=2).view(N)
-
+        y = torch.sum(y, axis=1)
         return y
 
 
@@ -173,8 +174,6 @@ class TransitionGNN(GCGNN):
         :param n_hidden: Number of hidden units used throughout the network.
         """
         super(TransitionGNN, self).__init__(n_of_in, n_ef_in, n_hidden)
-
-        torch.set_default_dtype(torch.float64) # my data was float64 and model params were float32
 
         # Initial embedding of edge features and action into latent state
         self.Ei = nn.Sequential(nn.Linear(n_ef_in+n_af_in+2*n_hidden, n_hidden))#,
@@ -227,7 +226,7 @@ class TransitionGNN(GCGNN):
         # Calculate the final edge predictions
         # he.shape = (N, K, K, n_hidden) --> (N*K*K, n_hidden)
         he = he.view(-1, self.n_hidden)
-        y = self.Ef(he).view(N, K, K, n_ef_in)
+        y = self.Ef(he).view(N, K, K, self.n_ef_in)
 
         # if predicting next full state, hidden state is a probability
         if self.pred_type == 'full_state':
