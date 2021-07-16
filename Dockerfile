@@ -9,9 +9,10 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     apt-utils \
+    build-essential \
+    curl \
     locales \
     lsb-release \
-    build-essential \
  && apt-get clean
 
 # Set up locale and UTF-8 encoding, mostly so setup runs without errors
@@ -24,7 +25,7 @@ RUN dpkg-reconfigure locales
 
 # Install ROS Melodic
 RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
-RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ros-melodic-desktop-full
 RUN apt-get install -y --no-install-recommends python-rosdep
@@ -86,27 +87,31 @@ RUN source /opt/ros/melodic/setup.bash \
  && cd /catkin_ws \
  && catkin_init_workspace
 
-# Install franka packages and TF in the Catkin workspace
+# Install Franka packages in the Catkin workspace
 RUN apt-get install -y \
-  ros-melodic-libfranka \
-  ros-melodic-panda-moveit-config
+    ros-melodic-libfranka \
+    ros-melodic-panda-moveit-config
 RUN source /opt/ros/melodic/setup.bash \
  && cd /catkin_ws \
- && git clone -b melodic-devel https://github.com/ros/geometry.git src/geometry \
- && git clone -b melodic-devel https://github.com/ros/geometry2.git src/geometry2 \
  && git clone --recursive https://github.com/frankaemika/franka_ros src/franka_ros \
  && cd src/franka_ros \
  && git checkout tags/0.7.1 -b v0.7.1 \
  && cd ../.. \
  && rosdep install --from-paths src --ignore-src --rosdistro melodic -y
 
+# Install TF and PyKDL packages to work with Python3
+RUN source /opt/ros/melodic/setup.bash \
+ && cd /catkin_ws/src \
+ && git clone -b melodic-devel https://github.com/ros/geometry.git \
+ && git clone -b melodic-devel https://github.com/ros/geometry2.git \
+ && git clone -b master --recurse-submodules https://github.com/orocos/orocos_kinematics_dynamics.git
+
 # Set up PDDLStream
 RUN mkdir -p /external
 RUN cd /external \
- && git clone https://github.com/caelan/pddlstream.git \
+ && git clone --recurse-submodules https://github.com/caelan/pddlstream.git \
  && cd pddlstream \
- && git submodule update --init --recursive \
- && ./FastDownward/build.py
+ && ./downward/build.py
 
 # Set up stacking repo
 RUN git clone https://github.com/Learning-and-Intelligent-Systems/stacking.git \
