@@ -4,7 +4,7 @@ import argparse
 
 from tamp.logic import subset
 from learning.domains.abc_blocks.world import ABCBlocksWorldGT
-from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset
+from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset, ABCBlocksHeurDataset
 from learning.active.utils import GoalConditionedExperimentLogger
 
 # TODO: generate validation dataset too!!
@@ -30,14 +30,14 @@ def generate_dataset(args, world, trans_dataset, heur_dataset, policy):
         add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal)
 
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal):
-    def helper(sequence, vec_seq_goal):
+    def helper(sequence, vec_seq_goal, add_to_trans):
         n = len(sequence)
         object_features, goal_edge_features = vec_seq_goal
         for i in range(n):
             vec_state, vec_action = sequence[i]
             object_features, edge_features = vec_state
-            #heur_dataset.add_to_dataset(object_features, edge_features, goal_edge_features, n-i-1)
-            if i < n-1: # training transition model doesn't require last action in sequence
+            heur_dataset.add_to_dataset(object_features, edge_features, goal_edge_features, n-i-1)
+            if add_to_trans and i < n-1: # training transition model doesn't require last action in sequence
                 vec_next_state, _ = sequence[i+1]
                 object_features, next_edge_features = vec_next_state
                 if args.pred_type == 'delta_state':
@@ -46,14 +46,9 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
                     edge_features_to_add = next_edge_features
                 trans_dataset.add_to_dataset(object_features, edge_features, vec_action, edge_features_to_add)
 
-    # for all other reached states, make them goals (hindsight experience replay)
-    #for goal_i, (hindsight_goal, _) in enumerate(action_sequence):
-    #    helper(action_sequence[:goal_i+1], hindsight_goal)
-    # TODO: for now just add each transition to dataset once. when learning heuristics
-    # will add hindsight goals
-    final_goal, final_action = action_sequence[-1]
-    helper(action_sequence, final_goal)
-
+    # make each reached state a goal (hindsight experience replay)
+    for goal_i, (hindsight_goal, _) in enumerate(action_sequence):
+        helper(action_sequence[:goal_i+1], hindsight_goal, add_to_trans=(goal_i == len(action_sequence)-1))
 
 # for testing
 def preprocess(args, dataset, type='successful_actions'):
@@ -136,11 +131,12 @@ if __name__ == '__main__':
     elif args.policy == 'expert':
         policy = world.expert_policy
 
-    heur_dataset = None
     trans_dataset = ABCBlocksTransDataset()
+    heur_dataset = ABCBlocksHeurDataset()
     logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'datasets')
     generate_dataset(args, world, trans_dataset, heur_dataset, policy)
-    logger.save_dataset(trans_dataset)
+    logger.save_trans_dataset(trans_dataset)
+    logger.save_heur_dataset(heur_dataset)
     print('Dataset saved to %s' % logger.exp_path)
 
     #except:

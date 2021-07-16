@@ -360,9 +360,15 @@ class GoalConditionedExperimentLogger:
 
         return GoalConditionedExperimentLogger(exp_path)
 
-    def save_dataset(self, dataset):
-        with open(os.path.join(self.exp_path, 'dataset.pkl'), 'wb') as handle:
+    def save_dataset(self, dataset, fname):
+        with open(os.path.join(self.exp_path, fname), 'wb') as handle:
             pickle.dump(dataset, handle)
+
+    def save_trans_dataset(self, dataset):
+        self.save_dataset(dataset, 'trans_dataset.pt')
+
+    def save_heur_dataset(self, dataset):
+        self.save_dataset(dataset, 'heur_dataset.pt')
 
     def load_dataset(self):
         with open(os.path.join(self.exp_path, 'dataset.pkl'), 'rb') as handle:
