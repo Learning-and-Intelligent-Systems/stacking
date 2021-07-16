@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 from planning.tree import Tree, Node
-from learning.domains.abc_blocks.world import ABCBlocksWorldGT, print_state
+from learning.domains.abc_blocks.world import print_state
 
 def run(world, goal, args):
     tree = Tree(world, goal, args)
@@ -18,16 +18,18 @@ def run(world, goal, args):
         state = parent_node.state
         new_actions = [world.random_policy(state) for _ in range(args.num_branches)]
         new_states = [world.transition(state, action) for action in new_actions]
-        new_nodes = [Node(new_state, parent_node.id) for new_state in new_states]
+        new_nodes = [Node(new_state, new_action, parent_node.id) for (new_state, new_action) \
+                                in zip(new_states, new_actions)]
 
-        for new_action, new_node in zip(new_actions, new_nodes):
+        for new_node in new_nodes:
             new_node_id = tree.expand(new_node)
             rollout_value = tree.rollout(new_node_id)
             tree.backpropagate(new_node_id, rollout_value)
 
     return tree
 
-def plan_from_tree(world, goal, tree):
+def plan_from_tree(world, goal, tree, debug=False):
+    found_plan = None
     goal_nodes = list(filter(lambda node: world.is_goal_state(node.state, goal), tree.nodes.values()))
     print('Max value in tree is: %f.' % max([node.value for node in tree.nodes.values()]))
     if goal_nodes != []:
@@ -36,15 +38,19 @@ def plan_from_tree(world, goal, tree):
         best_goal_node_idx = goal_node_values.index(max(goal_node_values))
         best_goal_node = goal_nodes[best_goal_node_idx]
 
-        plan = [best_goal_node]
+        found_plan = [best_goal_node]
         node = best_goal_node
         while node.id != 0:
             node = tree.nodes[node.parent_id]
-            plan = [node] + plan
+            found_plan = [node] + found_plan
 
-        # TODO: add actions to tree
-        for node in plan:
-            print_state(node.state)
-            print('---')
+        if debug:
+            for node in found_plan:
+                print(node.action)
+                print('---')
+                print_state(node.state, world.num_objects)
+                print('---')
+
     else:
         print('Goal not found!')
+    return found_plan

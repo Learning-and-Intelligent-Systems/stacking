@@ -32,11 +32,11 @@ class ABCBlocksWorld:
     def __init__(self, num_blocks):
         self.num_blocks = num_blocks
         self.num_objects = num_blocks + 1 # table is also an object
-        self.min_block = 1                # 0 is the table
-        self.max_block = num_blocks
+        self.min_block_num = 1                # 0 is the table
+        self.max_block_num = num_blocks
 
         self.table = Table(TABLE_NUM)
-        self._blocks = {i: Block(i) for i in range(self.min_block, self.max_block+1)}
+        self._blocks = {i: Block(i) for i in range(self.min_block_num, self.max_block_num+1)}
 
     def get_init_state(self):
         raise NotImplementedError
@@ -84,6 +84,12 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         #print('new stack:', new_state.stacked_blocks)
         return new_state
 
+    def execute_plan(self, plan):
+        state = self.get_init_state()
+        for action in plan:
+            state = self.transition(state, action)
+        return state
+
     # attempt to stack a block that is currently on the table
     def random_remaining_policy(self, state):
         action = None
@@ -106,11 +112,11 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         action = None
         if len(state.stacked_blocks) > 0:
             bottom_block_num = state.stacked_blocks[-1]
-            if bottom_block_num != self.max_block:
+            if bottom_block_num != self.max_block_num:
                 top_block_num = bottom_block_num + 1
                 action = (bottom_block_num, top_block_num)
         else: # start stack
-            action = (self.min_block, self.min_block+1)
+            action = (self.min_block_num, self.min_block_num+1)
         return action
 
     # goal state is already logical
@@ -165,26 +171,26 @@ class LogicalState:
         self.stacked_blocks = []
         self.num_objects = num_objects
 
-    def as_logical(self, pprint=False):
+    def as_logical(self, debug=False):
         logical_state = []
 
         # stacked blocks
         if len(self.stacked_blocks) > 0:
-            logical_state.append(On(self.table, self.blocks[self.stacked_blocks[0]]))
-            if pprint:
+            logical_state.append(On(self.table.num, self.blocks[self.stacked_blocks[0]].num))
+            if debug:
                 print(self.table.num, self.blocks[self.stacked_blocks[0]].num)
         for bottom_block_num, top_block_num in zip(self.stacked_blocks[:-1], self.stacked_blocks[1:]):
-            logical_state.append(On(self.blocks[bottom_block_num], self.blocks[top_block_num]))
-            if pprint:
+            logical_state.append(On(self.blocks[bottom_block_num].num, self.blocks[top_block_num].num))
+            if debug:
                 print(bottom_block_num, top_block_num)
 
         # remaining blocks on table
         for block_num, block in self.blocks.items():
             if block_num not in self.stacked_blocks:
-                logical_state.append(On(self.table, block))
-                if pprint:
+                logical_state.append(On(self.table.num, block.num))
+                if debug:
                     print(self.table.num, block_num)
-        if pprint:
+        if debug:
             print('---')
         return logical_state
 
@@ -198,7 +204,7 @@ class LogicalState:
         return copy_state
 
 ### Helper Functions
-def print_state(state):
+def print_state(state, num_objects):
     def print_vec_state(vec_state):
         print(np.round(vec_state[1].squeeze()))
     if isinstance(state, LogicalState):
@@ -206,7 +212,7 @@ def print_state(state):
     elif isinstance(state, tuple) and len(state) == 2:
         print_vec_state(state)
     elif isinstance(state, list) and isinstance(state[0], On):
-        print_vec_state(logical_to_vec_state)
+        print_vec_state(logical_to_vec_state(state, num_objects))
 
 def logical_to_vec_state(state, num_objects):
     object_features = np.expand_dims(np.arange(num_objects), 1)
@@ -214,12 +220,13 @@ def logical_to_vec_state(state, num_objects):
 
     # edge_feature[i, j, 0] == 1 if j on i, else 0
     for predicate in state:
-        bottom_i = predicate.bottom.num
-        top_i = predicate.top.num
+        bottom_i = predicate.bottom_num
+        top_i = predicate.top_num
         edge_features[bottom_i, top_i, 0] = 1.
 
     return object_features, edge_features
 
+'''
 def parse_goals_csv(self, goal_file_path):
     def ground_obj(obj_str):
         if obj_str == 'table':
@@ -237,3 +244,4 @@ def parse_goals_csv(self, goal_file_path):
             if pred_name == 'On':
                 goals.append([On(ground_obj(pred_args[0]), ground_obj(pred_args[1]))])
     return goals
+'''

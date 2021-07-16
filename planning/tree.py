@@ -2,8 +2,9 @@ from collections import namedtuple
 import numpy as np
 
 class Node:
-    def __init__(self, state, parent_id):
+    def __init__(self, state, action, parent_id):
         self.state = state
+        self.action = action
         self.parent_id = parent_id
         self.children = []
         self.leaf = True
@@ -18,7 +19,7 @@ class Tree:
         self.goal = goal
 
         init_state = self.world.get_init_state()
-        init_node = Node(init_state, None)
+        init_node = Node(init_state, None, None)
         init_node.id = 0
         self.nodes = {0: init_node}
         self.tree_count = 1

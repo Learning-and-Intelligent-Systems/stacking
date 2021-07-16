@@ -343,8 +343,12 @@ class GoalConditionedExperimentLogger:
         ts = time.strftime('%Y%m%d-%H%M%S')
         exp_dir = '%s-%s' % (exp_name, ts)
         exp_path = os.path.join(root, exp_dir)
+        if os.path.exists(exp_path):
+            suff = 1
+            while os.path.exists(exp_path+'_'+str(suff)):
+                suff += 1
+            exp_path = exp_path+'_'+str(suff)
         os.mkdir(exp_path)
-
         if root_folder == 'models':
             os.mkdir(os.path.join(exp_path, 'tests'))
             os.mkdir(os.path.join(exp_path, 'figures'))
@@ -385,8 +389,14 @@ class GoalConditionedExperimentLogger:
             args = pickle.load(handle)
         return args
 
-    def save_planning_data(self, tree, goal):
+    def save_planning_data(self, tree, goal, plan):
         with open(os.path.join(self.exp_path, 'tree.pkl'), 'wb') as handle:
             pickle.dump(tree, handle)
         with open(os.path.join(self.exp_path, 'goal.pkl'), 'wb') as handle:
             pickle.dump(goal, handle)
+        with open(os.path.join(self.exp_path, 'plan.pkl'), 'wb') as handle:
+            pickle.dump(plan, handle)
+
+    def save_success_data(self, plan_paths):
+        with open(os.path.join(self.exp_path, 'success_data.pkl'), 'wb') as handle:
+            pickle.dump(plan_paths, handle)

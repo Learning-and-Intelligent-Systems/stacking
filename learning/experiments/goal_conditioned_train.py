@@ -62,6 +62,7 @@ if __name__ == '__main__':
     # add num_blocks to model args
     dataset_args = dataset_logger.load_args()
     args.num_blocks = dataset_args.num_blocks
+    args.policy = dataset_args.policy
 
     model_logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'models')
 
