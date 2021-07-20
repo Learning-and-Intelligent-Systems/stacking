@@ -4,11 +4,11 @@ import pickle
 import time
 import torch
 import datetime
-
 from torch.utils.data import DataLoader
 
 from learning.models.ensemble import Ensemble
 from learning.models.mlp_dropout import MLP
+from learning.models.goal_conditioned import TransitionGNN, HeuristicGNN
 
 
 class ExperimentLogger:
@@ -320,8 +320,6 @@ class ActiveExperimentLogger:
                 towers_data[os.path.join(tower_path, file)] = data
         return towers_data
 
-from learning.models.goal_conditioned import TransitionGNN
-
 class GoalConditionedExperimentLogger:
 
     def __init__(self, exp_path):
@@ -390,7 +388,7 @@ class GoalConditionedExperimentLogger:
     def save_heur_model(self, model):
         torch.save(model.state_dict(), os.path.join(self.exp_path, 'heur_model.pt'))
 
-    def load_model(self):
+    def load_trans_model(self):
         n_of_in=1
         n_ef_in=1
         n_af_in=2
@@ -399,7 +397,16 @@ class GoalConditionedExperimentLogger:
                                 n_af_in=n_af_in,
                                 n_hidden=self.args.n_hidden,
                                 pred_type=self.args.pred_type)
-        model.load_state_dict(torch.load(os.path.join(self.exp_path, 'model.pt')))
+        model.load_state_dict(torch.load(os.path.join(self.exp_path, 'trans_model.pt')))
+        return model
+
+    def load_heur_model(self):
+        n_of_in=1
+        n_ef_in=1
+        model = HeuristicGNN(n_of_in=n_of_in,
+                                n_ef_in=n_ef_in,
+                                n_hidden=self.args.n_hidden)
+        model.load_state_dict(torch.load(os.path.join(self.exp_path, 'heur_model.pt')))
         return model
 
     def load_args(self):

@@ -146,7 +146,8 @@ class ABCBlocksWorldLearned(ABCBlocksWorld):
 
     def transition(self, state, action):
         object_features, edge_features = state
-        delta_edge_features = model_forward(self.model, [object_features, edge_features, action])
+        delta_edge_features = model_forward(self.model, [object_features, edge_features, action], 'transition')
+        delta_edge_features = delta_edge_features.squeeze(0) # since only returns a batch of 1
         new_edge_state = edge_features + delta_edge_features
         return object_features, new_edge_state
 
