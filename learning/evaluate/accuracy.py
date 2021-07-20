@@ -8,7 +8,7 @@ from learning.domains.abc_blocks.abc_blocks_data import model_forward
 def calc_accuracy(model, test_dataset, model_type):
     xs, ys = test_dataset[:]
     ys = ys.detach().numpy()
-    preds = model_forward(model, xs, model_type)
+    preds = model_forward(model, xs)
     preds = preds.round()
     sum_axes = tuple(range(len(preds.shape)))[1:]
     accuracy = np.sum(np.all(ys == preds.round(), axis=sum_axes))/len(preds)

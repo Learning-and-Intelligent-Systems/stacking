@@ -1,6 +1,9 @@
 from collections import namedtuple
 import numpy as np
 
+from learning.domains.abc_blocks.abc_blocks_data import model_forward
+from learning.domains.abc_blocks.world import logical_to_vec_state
+
 class Node:
     def __init__(self, state, action, parent_id):
         self.state = state
@@ -27,7 +30,7 @@ class Tree:
         self.c = args.c
         self.max_ro = args.max_ro # max rollout steps
 
-    def traverse(self):
+    def traverse(self, node_select_fn):
         node = self.nodes[0]
         while not node.leaf:
             node = self.get_uct_node(node)
@@ -65,6 +68,14 @@ class Tree:
         uct_node_idx = np.argmax(uct_values)
         return children[uct_node_idx]
 
+    def get_min_value_node(self, node):
+        children = [self.nodes[child_id] for child_id in node.children]
+        values = np.zeros(len(children))
+        for i, child in enumerate(children):
+            values[i] = child.value
+        min_node_idx = np.argmin(values)
+        return children[min_node_idx]
+
     def expand(self, new_node):
         new_node_id = self.tree_count
         new_node.id = new_node_id
@@ -73,3 +84,11 @@ class Tree:
         self.nodes[new_node.parent_id].leaf = False
         self.tree_count += 1
         return new_node_id
+
+    def get_heuristic(self, node_id, heuristic_model):
+        node_state = self.nodes[node_id].state
+        vec_state = node_state.as_vec()
+        vec_goal_state = logical_to_vec_state(self.goal, self.world.num_objects)
+        model_input = [vec_state[0], vec_state[1], vec_goal_state[1]]
+        heuristic_values = model_forward(heuristic_model, model_input)
+        return heuristic_values[0] # since returns batch of 1

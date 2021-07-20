@@ -5,6 +5,7 @@ import torch
 
 from itertools import islice
 from torch.utils.data import Dataset, DataLoader, Sampler
+from learning.models.goal_conditioned import TransitionGNN, HeuristicGNN
 
 class ABCBlocksTransDataset(Dataset):
     def __init__(self):
@@ -67,11 +68,11 @@ class ABCBlocksHeurDataset(Dataset):
 
 # this is only for single inputs (not batches)
 # TODO: have it detect if a single input or a batch is being passed in
-def model_forward(model, inputs, model_type):
+def model_forward(model, inputs):
     tensor_inputs = []
-    if model_type == 'transition':
+    if isinstance(model, TransitionGNN):
         batch_shape_lens = [3, 4, 2]
-    elif model_type == 'heuristic':
+    elif isinstance(model, HeuristicGNN):
         batch_shape_lens = [3, 4, 4]
     for batch_input_shape_len, input in zip(batch_shape_lens, inputs):
         input = torch.tensor(input, dtype=torch.float64)
