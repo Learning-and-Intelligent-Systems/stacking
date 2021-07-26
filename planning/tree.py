@@ -2,7 +2,7 @@ from collections import namedtuple
 import numpy as np
 
 from learning.domains.abc_blocks.abc_blocks_data import model_forward
-from learning.domains.abc_blocks.world import logical_to_vec_state
+from learning.domains.abc_blocks.world import logical_to_vec_state, LogicalState
 
 class Node:
     def __init__(self, state, action, parent_id):
@@ -87,7 +87,10 @@ class Tree:
 
     def get_heuristic(self, node_id, heuristic_model):
         node_state = self.nodes[node_id].state
-        vec_state = node_state.as_vec()
+        if isinstance(node_state, LogicalState):
+            vec_state = node_state.as_vec()
+        else:
+            vec_state = node_state
         vec_goal_state = logical_to_vec_state(self.goal, self.world.num_objects)
         model_input = [vec_state[0], vec_state[1], vec_goal_state[1]]
         heuristic_values = model_forward(heuristic_model, model_input)

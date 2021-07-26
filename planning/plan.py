@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-from planning import mcts
 from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldLearned, print_state
 from learning.active.utils import GoalConditionedExperimentLogger
 from planning.tree import Tree, Node
@@ -41,16 +40,18 @@ def search(tree, world, node_value_fn, node_select_fn, args):
 def run(goal, args):
     world = setup_world(args)
     tree = Tree(world, goal, args)
+    print('Planning method is %s search.' % args.search_mode)
     if args.search_mode == 'mcts':
         node_value_fn = tree.rollout
         node_select_fn = tree.get_uct_node
     elif args.search_mode == 'heuristic':
         model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
+        print('Using heuristic model %s.' % model_logger.exp_path)
         heur_model = model_logger.load_heur_model()
         node_value_fn = lambda node_id: tree.get_heuristic(node_id, heur_model)
         node_select_fn = tree.get_min_value_node
     tree = search(tree, world, node_value_fn, node_select_fn, args)
-    found_plan = plan_from_tree(world, goal, tree, debug=True)
+    found_plan = plan_from_tree(world, goal, tree, debug=False)
 
     logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'planning')
     logger.save_planning_data(tree, goal, found_plan)

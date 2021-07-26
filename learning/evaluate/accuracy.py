@@ -25,6 +25,10 @@ def plot_accuracies(accuracies, title):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--exp-name',
+                        type=str,
+                        required=True,
+                        help='where to save exp data')
     parser.add_argument('--debug',
                         action='store_true',
                         help='set to run in debug mode')
