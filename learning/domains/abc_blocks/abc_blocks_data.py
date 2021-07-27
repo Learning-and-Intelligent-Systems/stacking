@@ -98,7 +98,8 @@ def model_forward(model, inputs):
     elif isinstance(model, HeuristicGNN):
         batch_shape_lens = [3, 4, 4]
     for batch_input_shape_len, input in zip(batch_shape_lens, inputs):
-        input = torch.tensor(input, dtype=torch.float64)
+        if not torch.is_tensor(input):
+            input = torch.tensor(input, dtype=torch.float64)
         if len(input.shape) == batch_input_shape_len-1: # if this is a batch of 1, then add a dimension
             input = input[None, :]
         tensor_inputs.append(input)

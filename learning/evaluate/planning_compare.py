@@ -89,6 +89,6 @@ if __name__ == '__main__':
 
         logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'eval_methods')
         plt.savefig(logger.exp_path+'/eval_methods.png')
-        logger.save_success_data([plan_paths, success_data])
+        logger.save_plot_data([plan_paths, success_data])
     #except:
     #    import pdb; pdb.post_mortem()

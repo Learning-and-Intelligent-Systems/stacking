@@ -38,30 +38,30 @@ if __name__ == '__main__':
         import pdb; pdb.set_trace()
 
     # get models from logger
-    model_paths = ['learning/experiments/logs/models/2_random-20210719-150928',
-                    'learning/experiments/logs/models/3_random-20210719-151007',
-                	'learning/experiments/logs/models/4_random-20210719-151107',
-                    'learning/experiments/logs/models/5_random-20210719-151247']
+    model_paths = ['learning/experiments/logs/models/2_random-20210727-093617',
+                    'learning/experiments/logs/models/3_random-20210727-100817',
+                	'learning/experiments/logs/models/4_random-20210727-100851',
+                    'learning/experiments/logs/models/5_random-20210727-100337']
 
     # get test dataset from logger
-    expert_test_dataset_paths = ['learning/experiments/logs/datasets/2_expert-20210719-150611',
-                                    'learning/experiments/logs/datasets/3_expert-20210719-150622',
-                                    'learning/experiments/logs/datasets/4_expert-20210719-150627',
-                                    'learning/experiments/logs/datasets/5_expert-20210719-150634',
-                                    'learning/experiments/logs/datasets/6_expert-20210719-150639',
-                                    'learning/experiments/logs/datasets/7_expert-20210719-150644',
-                                    'learning/experiments/logs/datasets/8_expert-20210719-150649']
+    expert_test_dataset_paths = ['learning/experiments/logs/datasets/2_expert-20210727-093318',
+                                    'learning/experiments/logs/datasets/3_expert-20210727-093328',
+                                    'learning/experiments/logs/datasets/4_expert-20210727-093335',
+                                    'learning/experiments/logs/datasets/5_expert-20210727-093342',
+                                    'learning/experiments/logs/datasets/6_expert-20210727-093400',
+                                    'learning/experiments/logs/datasets/7_expert-20210727-093407',
+                                    'learning/experiments/logs/datasets/8_expert-20210727-093415']
 
-    random_test_dataset_paths = ['learning/experiments/logs/datasets/2_random-20210719-150504',
-                                    'learning/experiments/logs/datasets/3_random-20210719-150512',
-                                    'learning/experiments/logs/datasets/4_random-20210719-150520',
-                                    'learning/experiments/logs/datasets/5_random-20210719-150529',
-                                    'learning/experiments/logs/datasets/6_random-20210719-152416',
-                                    'learning/experiments/logs/datasets/7_random-20210719-152421',
-                                    'learning/experiments/logs/datasets/8_random-20210719-152427']
+    random_test_dataset_paths = ['learning/experiments/logs/datasets/2_random_test-20210727-093504',
+                                    'learning/experiments/logs/datasets/3_random_test-20210727-093459',
+                                    'learning/experiments/logs/datasets/4_random_test-20210727-093452',
+                                    'learning/experiments/logs/datasets/5_random_test-20210727-093446',
+                                    'learning/experiments/logs/datasets/6_random_test-20210727-093440',
+                                    'learning/experiments/logs/datasets/7_random_test-20210727-093433',
+                                    'learning/experiments/logs/datasets/8_random_test-20210727-093426']
 
-    #test_dataset_paths = expert_test_dataset_paths
-    test_dataset_paths = random_test_dataset_paths
+    test_dataset_paths = expert_test_dataset_paths
+    #test_dataset_paths = random_test_dataset_paths
 
     # calculate accuracy
     accuracies = {'transition': {}, 'heuristic': {}}
@@ -75,9 +75,10 @@ if __name__ == '__main__':
             accuracies['transition'][train_num_blocks] = [[], []]
             accuracies['heuristic'][train_num_blocks] = [[], []]
         for test_dataset_path in test_dataset_paths:
-            assert (test_dataset_path != train_dataset_path, 'Cannot evaluate on training dataset')
+            assert test_dataset_path != train_dataset_path, 'Test dataset cannot be same as training dataset'
             test_dataset_logger = GoalConditionedExperimentLogger(test_dataset_path)
             test_trans_dataset = test_dataset_logger.load_trans_dataset()
+            test_trans_dataset.set_pred_type(trans_model.pred_type)
             test_heur_dataset = test_dataset_logger.load_heur_dataset()
             test_dataset_num_blocks = test_dataset_logger.args.num_blocks
             accuracies['transition'][train_num_blocks][0].append(test_dataset_num_blocks)
@@ -86,6 +87,10 @@ if __name__ == '__main__':
             accuracies['heuristic'][train_num_blocks][1].append(calc_accuracy(heur_model, test_heur_dataset, 'heuristic'))
 
     # plot results
+    logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'accuracy')
     plot_accuracies(accuracies['transition'], 'Learned Transition Model Accuracy')
+    plt.savefig(logger.exp_path+'/transition_accuracy.png')
     plot_accuracies(accuracies['heuristic'], 'Learned Heuristic Model Accuracy')
-    plt.show()
+    plt.savefig(logger.exp_path+'/heuristic_accuracy.png')
+    logger.save_plot_data([model_paths, test_dataset_paths, accuracies]) # TODO save_accuracy data?
+    print('Saving figures and data to %s.' % logger.exp_path)

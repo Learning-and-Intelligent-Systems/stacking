@@ -37,7 +37,9 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
             state, vec_action = sequence[i]
             object_features, edge_features = state.as_vec()
             heur_dataset.add_to_dataset(object_features, edge_features, goal_edge_features, n-i-1)
-            if add_to_trans and i < n-1: # training transition model doesn't require last action in sequence
+            # add_to_trans: only add to transition model once per sequence (not hindsight subsequences)
+            # i < n-1: don't add last action to trans dataset as it doesn't do anything
+            if add_to_trans and i < n-1:
                 next_state, _ = sequence[i+1]
                 object_features, next_edge_features = next_state.as_vec()
                 delta_edge_features = next_edge_features-edge_features
@@ -104,7 +106,7 @@ if __name__ == '__main__':
     generate_dataset(args, world, trans_dataset, heur_dataset, policy)
     logger.save_trans_dataset(trans_dataset)
     logger.save_heur_dataset(heur_dataset)
-    print('Datasets saved to %s' % logger.exp_path)
+    print('Datasets saved to %s.' % logger.exp_path)
 
     #except:
     #    import pdb; pdb.post_mortem()

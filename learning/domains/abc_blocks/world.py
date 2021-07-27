@@ -140,7 +140,6 @@ class ABCBlocksWorldLearnedClass(ABCBlocksWorldGT):
         object_features, edge_features = state.as_vec()
         pred = model_forward(self.model, [object_features, edge_features, action]).squeeze(0)
         if pred.round() == 1:
-            print('true transition')
             return super().transition(state, action, optimistic=True)
         else:
             return state
@@ -224,7 +223,9 @@ class LogicalState:
         return copy_state
 
     def is_equal(self, state):
-        return np.array_equal(self.as_vec(), state.as_vec())
+        this_edge_features = self.as_vec()[1]
+        other_edge_features = state.as_vec()[1]
+        return np.array_equal(this_edge_features, other_edge_features)
 
 ### Helper Functions
 def print_state(state, num_objects):

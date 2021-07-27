@@ -422,6 +422,6 @@ class GoalConditionedExperimentLogger:
         with open(os.path.join(self.exp_path, 'plan.pkl'), 'wb') as handle:
             pickle.dump(plan, handle)
 
-    def save_success_data(self, plan_paths):
-        with open(os.path.join(self.exp_path, 'success_data.pkl'), 'wb') as handle:
-            pickle.dump(plan_paths, handle)
+    def save_plot_data(self, plot_data):
+        with open(os.path.join(self.exp_path, 'plot_data.pkl'), 'wb') as handle:
+            pickle.dump(plot_data, handle)
