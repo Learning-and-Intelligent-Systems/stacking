@@ -65,14 +65,18 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
     def get_init_state(self):
         return LogicalState(self._blocks, self.num_objects, self.table)
 
-    def transition(self, state, action):
+    def transition(self, state, action, optimistic=False):
         new_state = state.copy()
         if action is not None:
             bottom_block_num = action[0]
             top_block_num = action[1]
-            # can only stack blocks by increments of one and top block must be on table
-            if top_block_num == bottom_block_num + 1 and \
-                top_block_num not in state.stacked_blocks:
+            if optimistic:
+                condition = True
+            else:
+                # can only stack blocks by increments of one and top block must be on table
+                condition = top_block_num == bottom_block_num + 1 and \
+                    top_block_num not in state.stacked_blocks
+            if condition:
                 # add both if bottom block is on table and this is the start of the stack
                 if bottom_block_num not in state.stacked_blocks and \
                                         len(state.stacked_blocks) == 0:
@@ -125,6 +129,7 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         for goal_pred in goal:
             in_goal = in_goal and goal_pred.in_state(state.as_logical())
         return in_goal
+
 
 # When using learned model for transitions, edge states won't always make sense as logical states,
 # so need a separate World class (eg. 2 blocks can be on top of one in a vectorized edge state)
@@ -203,6 +208,9 @@ class LogicalState:
         copy_state = LogicalState(self.blocks, self.num_objects, self.table)
         copy_state.stacked_blocks = deepcopy(self.stacked_blocks)
         return copy_state
+
+    def is_equal(self, state):
+        return np.array_equal(self.as_vec(), state.as_vec())
 
 ### Helper Functions
 def print_state(state, num_objects):

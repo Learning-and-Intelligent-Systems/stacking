@@ -23,7 +23,7 @@ if __name__ == '__main__':
     #                    help='path to csv file of goals to attempt')
     parser.add_argument('--pred-type',
                         type=str,
-                        choices=['delta_state', 'full_state'],
+                        choices=['delta_state', 'full_state', 'class'],
                         default='delta_state')
     parser.add_argument('--exp-name',
                         type=str,
@@ -58,6 +58,7 @@ if __name__ == '__main__':
 
     dataset_logger = GoalConditionedExperimentLogger(args.dataset_exp_path)
     trans_dataset = dataset_logger.load_trans_dataset()
+    trans_dataset.set_pred_type(args.pred_type)
     heur_dataset = dataset_logger.load_heur_dataset()
 
     # add num_blocks to model args
@@ -80,7 +81,7 @@ if __name__ == '__main__':
                                 n_hidden=args.n_hidden)
     if args.pred_type == 'delta_state':
         loss_fn = F.mse_loss
-    elif args.pred_type == 'full_state':
+    elif args.pred_type == 'full_state' or args.pred_type == 'class':
         loss_fn = F.binary_cross_entropy
     print('Training transition model with %i datapoints.' % len(trans_dataset))
     train(trans_dataloader, None, trans_model, n_epochs=args.n_epochs, loss_fn=loss_fn)

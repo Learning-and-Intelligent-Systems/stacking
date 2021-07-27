@@ -102,10 +102,10 @@ class GCGNN(nn.Module):
 
 class HeuristicGNN(GCGNN):
     def __init__(self, n_of_in=7, n_ef_in=7, n_hidden=16):
-        """ This network is given three inputs of size (N, K, n_of_in), (N, K, K, n_ef_in), and (N, n_of_in).
+        """ This network is given three inputs of size (N, K, n_of_in), (N, K, K, n_ef_in), and (N, n_af_in).
         N is the batch size, K is the number of objects (including a table)
+        :param n_of_in: Dimensionality of object features
         :param n_ef_in: Dimensionality of edge features
-        :param n_af_in: Dimensionality of action features
         :param n_hidden: Number of hidden units used throughout the network.
         """
         super(HeuristicGNN, self).__init__(n_of_in, n_ef_in, n_hidden)
@@ -167,11 +167,15 @@ class HeuristicGNN(GCGNN):
 
 class TransitionGNN(GCGNN):
     def __init__(self, n_of_in=7, n_ef_in=7, n_af_in=1, n_hidden=16, pred_type='delta_state'):
-        """ This network is given three inputs of size (N, K, n_of_in), (N, K, K, n_ef_in), and (N, n_of_in).
+        """ This network is given three inputs of size (N, K, n_of_in), (N, K, K, n_ef_in), and (N, n_af_in).
         N is the batch size, K is the number of objects (including a table)
+        :param n_of_in: Dimensionality of object features
         :param n_ef_in: Dimensionality of edge features
         :param n_af_in: Dimensionality of action features
         :param n_hidden: Number of hidden units used throughout the network.
+        :param pred_type: delta_state -- predict change in edge features
+                          full_state -- predict full next edge features
+                          class -- predict wether or not the optimistic function is correct
         """
         super(TransitionGNN, self).__init__(n_of_in, n_ef_in, n_hidden)
 
@@ -223,12 +227,21 @@ class TransitionGNN(GCGNN):
     def final_pred(self, he):
         N, K, K, n_hidden = he.shape
 
-        # Calculate the final edge predictions
-        # he.shape = (N, K, K, n_hidden) --> (N*K*K, n_hidden)
-        he = he.view(-1, self.n_hidden)
-        y = self.Ef(he).view(N, K, K, self.n_ef_in)
+        if self.pred_type == 'delta_state' or self.pred_type == 'full_state':
+            # Calculate the final edge predictions
+            # he.shape = (N, K, K, n_hidden) --> (N*K*K, n_hidden)
+            he = he.view(-1, self.n_hidden)
+            y = self.Ef(he).view(N, K, K, self.n_ef_in)
 
-        # if predicting next full state, hidden state is a probability
-        if self.pred_type == 'full_state':
-            y = torch.sigmoid(y)
+            # if predicting next full state, hidden state is a probability
+            if self.pred_type == 'full_state':
+                y = torch.sigmoid(y)
+        elif self.pred_type == 'class':
+            # Calculate the final edge predictions
+            # he.shape = (N, K, K, n_hidden)
+            # x.shape = (N, n_hidden)
+            # y.shape = (N, 1) --> (N)
+            x = torch.mean(he, dim=(1,2))
+            y = self.Ef(x).view(N)
+            return torch.sigmoid(y)
         return y
