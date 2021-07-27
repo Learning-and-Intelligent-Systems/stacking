@@ -94,7 +94,7 @@ def model_forward(model, inputs):
         if model.pred_type != 'class':
             batch_shape_lens = [3, 4, 2]
         else:
-            batch_shape_lens = [3, 4, 1]
+            batch_shape_lens = [3, 4, 2]
     elif isinstance(model, HeuristicGNN):
         batch_shape_lens = [3, 4, 4]
     for batch_input_shape_len, input in zip(batch_shape_lens, inputs):

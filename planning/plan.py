@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldLearned, print_state
+from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldLearned, ABCBlocksWorldLearnedClass, print_state
 from learning.active.utils import GoalConditionedExperimentLogger
 from planning.tree import Tree, Node
 
@@ -14,7 +14,10 @@ def setup_world(args):
     if args.model_type == 'learned':
         model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
         model = model_logger.load_trans_model()
-        world = ABCBlocksWorldLearned(args.num_blocks, model)
+        if model.pred_type != 'class':
+            world = ABCBlocksWorldLearned(args.num_blocks, model)
+        else:
+            world = ABCBlocksWorldLearnedClass(args.num_blocks, model)
         print('Using model %s.' % model_logger.exp_path)
     elif args.model_type == 'true':
         world = ABCBlocksWorldGT(args.num_blocks)

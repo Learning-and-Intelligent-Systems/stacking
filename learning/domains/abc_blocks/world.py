@@ -57,7 +57,7 @@ class ABCBlocksWorld:
         raise NotImplementedError
 
 
-# Ground Truth Blocks World
+# Ground Truth Blocks World (with option to behave optimistically)
 class ABCBlocksWorldGT(ABCBlocksWorld):
     def __init__(self, num_blocks):
         super().__init__(num_blocks)
@@ -130,6 +130,20 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
             in_goal = in_goal and goal_pred.in_state(state.as_logical())
         return in_goal
 
+# Learned Blocks World where learned model is a classifier on top of the ground truth optimistic model
+class ABCBlocksWorldLearnedClass(ABCBlocksWorldGT):
+    def __init__(self, num_blocks, model):
+        super().__init__(num_blocks)
+        self.model = model
+
+    def transition(self, state, action):
+        object_features, edge_features = state.as_vec()
+        pred = model_forward(self.model, [object_features, edge_features, action]).squeeze(0)
+        if pred.round() == 1:
+            print('true transition')
+            return super().transition(state, action, optimistic=True)
+        else:
+            return state
 
 # When using learned model for transitions, edge states won't always make sense as logical states,
 # so need a separate World class (eg. 2 blocks can be on top of one in a vectorized edge state)
