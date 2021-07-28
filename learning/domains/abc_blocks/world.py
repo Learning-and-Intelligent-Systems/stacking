@@ -180,7 +180,13 @@ class ABCBlocksWorldLearned(ABCBlocksWorld):
             goal_reached = goal_reached and (np.round(state_edge_features[goal_idx[0]][goal_idx[1]]) == 1)
         return goal_reached
 
+class ABCBlocksWorldGTOpt(ABCBlocksWorldGT):
+    def __init__(self, num_blocks):
+        super().__init__(num_blocks)
 
+    def transition(self, state, action):
+        return super().transition(state, action, optimistic=True)
+        
 # In the ground truth world the state is separate from world so that we can get different
 # state representations (logical and vectorized)
 class LogicalState:

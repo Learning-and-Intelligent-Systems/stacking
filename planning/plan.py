@@ -22,6 +22,9 @@ def setup_world(args):
     elif args.model_type == 'true':
         world = ABCBlocksWorldGT(args.num_blocks)
         print('Planning with %i blocks.' % args.num_blocks)
+    elif args.model_type == 'opt':
+        world = ABCBlocksWorldGTOpt(args.num_blocks)
+        
     return world
 
 def search(tree, world, node_value_fn, node_select_fn, args):
