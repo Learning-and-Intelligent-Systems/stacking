@@ -1,6 +1,6 @@
 # stacking
 
-This repo has code for block stacking tasks such as tallest tower, longest overhang, etc. using a robot manipulator. This includes:
+This repo has code for the paper [Active Learning of Abstract Plan Feasibility](https://arxiv.org/abs/2107.00683). In it we perform experiments in a block stacking domain where the evaluation tasks include constructing the tallest tower, longest overhang, etc. using a robot manipulator. This repo includes:
 
 * A simulation-based particle filter to estimate the center of mass of blocks.
 * An active learning strategy to learn a model for abstract plan feasibility with a information-theoretic approach to improve data sampling efficiency.
@@ -14,7 +14,7 @@ For a more detailed overview of the repository and its folders, refer to [the ov
 
 ## Installation
 See the full installation steps in [the installation README](./doc/installation.md).
-  
+
 ---
 
 ## Hardware Setup
