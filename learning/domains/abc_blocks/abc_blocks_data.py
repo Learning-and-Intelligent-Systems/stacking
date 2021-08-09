@@ -20,7 +20,7 @@ class ABCBlocksTransDataset(Dataset):
         self.pred_type = pred_type
 
     def __getitem__(self, ix):
-        assert(self.pred_type, 'Must set pred_type to getitem from ABCBlocksTransDataset')
+        assert self.pred_type, 'Must set pred_type to getitem from ABCBlocksTransDataset'
         if self.pred_type == 'full_state':
             return [self.object_features[ix],
                     self.edge_features[ix],
