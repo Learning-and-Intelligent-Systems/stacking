@@ -10,6 +10,7 @@ from learning.active.utils import GoalConditionedExperimentLogger
 # TODO: generate validation dataset too!!
 # want to show that this will be improved by an actively collected dataset
 def generate_dataset(args, world, trans_dataset, heur_dataset, policy):
+    final_states = []
     goal = None
     for seq_i in range(args.max_seq_attempts):
         new_state = world.get_init_state()
@@ -27,7 +28,9 @@ def generate_dataset(args, world, trans_dataset, heur_dataset, policy):
                 valid_actions = False
                 action = np.zeros(2)
                 action_sequence.append((new_state, vec_action))
+        final_states.append(new_state)
         add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, world)
+    return final_states
 
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, world):
     def helper(sequence, seq_goal, add_to_trans):
@@ -103,10 +106,11 @@ if __name__ == '__main__':
     trans_dataset = ABCBlocksTransDataset()
     heur_dataset = ABCBlocksHeurDataset()
     logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'datasets')
-    generate_dataset(args, world, trans_dataset, heur_dataset, policy)
+    final_states = generate_dataset(args, world, trans_dataset, heur_dataset, policy)
     logger.save_trans_dataset(trans_dataset)
     logger.save_heur_dataset(heur_dataset)
-    print('Datasets saved to %s.' % logger.exp_path)
+    logger.save_final_states(final_states)
+    print('Datasets and tower info saved to %s.' % logger.exp_path)
 
     #except:
     #    import pdb; pdb.post_mortem()
