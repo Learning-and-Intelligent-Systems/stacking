@@ -1087,8 +1087,8 @@ if __name__ == '__main__':
     parser.add_argument('--exp-path', type=str, required=True)
     args = parser.parse_args()
     
-    logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-    logger.args.max_acquisitions = 50
+    logger = ActiveExperimentLogger(args.exp_path, use_latents=False)
+    logger.args.max_acquisitions = 40
 
     # plot_train_accuracy(logger)
     # plot_latent_uncertainty(logger)
@@ -1108,10 +1108,12 @@ if __name__ == '__main__':
 
     #inspect_validation_set('learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
 
-    #accs = get_validation_accuracy(logger,
-    #                              'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_b_1_dict.pkl')
+    accs = get_validation_accuracy(logger,
+                                  'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_1_dict.pkl')
                                   #'/Users/izzy/projects/stacking/learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl')
-    plot_val_accuracy(logger, init_dataset_size=2, n_acquire=2)
+    plot_val_accuracy(logger, init_dataset_size=40, n_acquire=10)
+
+    #plot_val_accuracy(logger, init_dataset_size=2, n_acquire=2)
 
     # #analyze_collected_2block_towers(logger)
     # print(accs)

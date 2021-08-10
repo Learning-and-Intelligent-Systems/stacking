@@ -55,10 +55,10 @@ def initialize_model(args, n_blocks):
     return ensemble
 
 
-def load_latent_ensemble(args):
-    assert(args.use_latents and len(args.latent_ensemble_exp_path) > 0 and args.latent_ensemble_tx >= 0)
-    logger = ActiveExperimentLogger.get_experiments_logger(args.latent_ensemble_exp_path, args)
-    ensemble = logger.get_ensemble(args.latent_ensemble_tx)
+def load_ensemble(args):
+    assert(args.fit and len(args.ensemble_exp_path) > 0 and args.ensemble_tx >= 0)
+    logger = ActiveExperimentLogger.get_experiments_logger(args.ensemble_exp_path, args)
+    ensemble = logger.get_ensemble(args.ensemble_tx)
     return ensemble
 
 
@@ -178,8 +178,8 @@ def run_active_towers(args):
             agent = PandaAgent(block_set)
 
     # Initialize ensemble.
-    if args.fit_latents:
-        ensemble = load_latent_ensemble(args)
+    if args.fit:
+        ensemble = load_ensemble(args)
     else:
         ensemble = initialize_model(args, len(block_set))    
     if torch.cuda.is_available():
@@ -200,7 +200,7 @@ def run_active_towers(args):
         if args.sample_joint:
             collapse_ensemble = False
             collapse_latents = False
-        elif args.fit_latents:
+        elif args.fit:
             collapse_ensemble = True
             collapse_latents = False
         else:
@@ -261,9 +261,9 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--com-repr', type=str, choices=['latent', 'explicit', 'removed'], required=True)
     # The following arguments are used when we wanted to fit latents with an already trained model.
-    parser.add_argument('--fit-latents', action='store_true', help='This will cause only the latents to update during training.')
-    parser.add_argument('--latent-ensemble-exp-path', type=str, default='', help='Path to a trained latent ensemble.')
-    parser.add_argument('--latent-ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
+    parser.add_argument('--fit', action='store_true', help='This will start training with the given pretrained model.')
+    parser.add_argument('--pretrained-ensemble-exp-path', type=str, default='', help='Path to a trained ensemble.')
+    parser.add_argument('--ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
     args = parser.parse_args()
 
     if args.debug:

@@ -67,15 +67,18 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
 
         # Initialize and train models.
         print('Training ensemble....')
-        if args.fit_latents:
+        if args.fit and args.com_repr == 'latent':
             ensemble.reset_latents(random=False)
+        elif args.fit and args.com_repr == 'removed':
+            # TODO: Implement resetting model to pretrained weights.
+            pass
         else:
             ensemble.reset()
         
         # If the dataset is empty, then acquire a dataset first.
         if len(dataset) > 0:
             if args.use_latents:
-                train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs, freeze_ensemble=args.fit_latents)
+                train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs, freeze_ensemble=args.fit)
                 #print(ensemble.latent_locs.detach().numpy(), np.exp(ensemble.latent_logscales.detach().numpy()))
             else:
                 for model in ensemble.models:
