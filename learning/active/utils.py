@@ -422,9 +422,32 @@ class GoalConditionedExperimentLogger:
         with open(os.path.join(self.exp_path, 'plan.pkl'), 'wb') as handle:
             pickle.dump(plan, handle)
 
+    def save_dot_graph(self, dot_graph):
+        dot_graph.write_svg(os.path.join(self.exp_path, 'plan_graph.svg'))
+
+    def load_plan_tree(self):
+        with open(os.path.join(self.exp_path, 'tree.pkl'), 'rb') as handle:
+            tree = pickle.load(handle)
+        return tree
+
+    def load_plan_goal(self):
+        with open(os.path.join(self.exp_path, 'goal.pkl'), 'rb') as handle:
+            goal = pickle.load(handle)
+        return goal
+
+    def load_final_plan(self):
+        with open(os.path.join(self.exp_path, 'plan.pkl'), 'rb') as handle:
+            final_plan = pickle.load(handle)
+        return final_plan
+
     def save_plot_data(self, plot_data):
         with open(os.path.join(self.exp_path, 'plot_data.pkl'), 'wb') as handle:
             pickle.dump(plot_data, handle)
+
+    def load_plot_data(self):
+        with open(os.path.join(self.exp_path, 'plot_data.pkl'), 'rb') as handle:
+            plot_data = pickle.load(handle)
+        return plot_data
 
     def save_final_states(self, final_states):
         with open(os.path.join(self.exp_path, 'final_states.pkl'), 'wb') as handle:
