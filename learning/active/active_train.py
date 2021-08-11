@@ -79,7 +79,7 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
         # If the dataset is empty, then acquire a dataset first.
         if len(dataset) > 0:
             if args.use_latents:
-                train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs, freeze_ensemble=args.fit)
+                train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs, freeze_ensemble=args.fit, args=args)
                 #print(ensemble.latent_locs.detach().numpy(), np.exp(ensemble.latent_logscales.detach().numpy()))
             else:
                 for model in ensemble.models:

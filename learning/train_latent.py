@@ -138,7 +138,8 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     freeze_ensemble=False,
     disable_latents=False,
     return_logs=False,
-    alternate=False):
+    alternate=False,
+    args=None):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
@@ -159,6 +160,11 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
                     latent_optimizer.zero_grad()
                     latent_loss = get_latent_loss(latent_ensemble, set_of_batches[0], N=len(dataloader.loaders[0].dataset))
                     latent_loss.backward()
+                    # If we are only updating the new latents, zero out gradients for the training blocks.
+                    if args.fit:
+                        latent_ensemble.latent_locs.grad.data[:args.num_train_blocks, :].fill_(0.)
+                        latent_ensemble.latent_logscale.grad.data[:args.num_train_blocks, :].fill_(0.)
+
                     latent_optimizer.step()
                     batch_loss += latent_loss.item()
 
@@ -175,6 +181,10 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
                 latent_optimizer.zero_grad()
                 both_loss = get_both_loss(latent_ensemble, set_of_batches, disable_latents, N=len(dataloader.loaders[0].dataset))
                 both_loss.backward()
+                if args.fit:
+                    latent_ensemble.latent_locs.grad.data[:args.num_train_blocks, :].fill_(0.)
+                    latent_ensemble.latent_logscale.grad.data[:args.num_train_blocks, :].fill_(0.)
+
                 if (not freeze_latents) and (not disable_latents): latent_optimizer.step()
                 if not freeze_ensemble: params_optimizer.step()
                 batch_loss = both_loss.item()
