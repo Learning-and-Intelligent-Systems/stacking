@@ -162,6 +162,7 @@ class ABCBlocksWorldLearned(ABCBlocksWorld):
         delta_edge_features = model_forward(self.model, [object_features, edge_features, action])
         delta_edge_features = delta_edge_features.squeeze(0) # since only returns a batch of 1
         new_edge_state = edge_features + delta_edge_features
+        new_edge_state = np.round(new_edge_state)+0
         return object_features, new_edge_state
 
     def is_goal_state(self, state, goal):
@@ -231,7 +232,7 @@ class LogicalState:
 ### Helper Functions
 def print_state(state, num_objects):
     def print_vec_state(vec_state):
-        print(np.round(vec_state[1].squeeze()))
+        print(vec_state[1].squeeze())
     if isinstance(state, LogicalState):
         print_vec_state(state.as_vec())
     elif isinstance(state, tuple) and len(state) == 2:
