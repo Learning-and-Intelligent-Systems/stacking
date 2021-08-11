@@ -112,6 +112,7 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
                     action = (bottom_block_num, top_block_num)
         return action
 
+    # expert once stack is started
     def expert_policy(self, state):
         action = None
         if len(state.stacked_blocks) > 0:
@@ -120,7 +121,9 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
                 top_block_num = bottom_block_num + 1
                 action = (bottom_block_num, top_block_num)
         else: # start stack
-            action = (self.min_block_num, self.min_block_num+1)
+            bottom_block_num = np.random.choice(self.max_block_num-1)+1
+            top_block_num = bottom_block_num +1
+            action = (bottom_block_num, top_block_num)
         return action
 
     # goal state is already logical
@@ -186,7 +189,7 @@ class ABCBlocksWorldGTOpt(ABCBlocksWorldGT):
 
     def transition(self, state, action):
         return super().transition(state, action, optimistic=True)
-        
+
 # In the ground truth world the state is separate from world so that we can get different
 # state representations (logical and vectorized)
 class LogicalState:
