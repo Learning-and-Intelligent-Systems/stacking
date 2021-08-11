@@ -46,9 +46,20 @@ class ABCBlocksWorld:
 
     def random_policy(self, state):
         action = None
-        top_block_num = np.random.choice(list(self._blocks))
-        bottom_block_num = np.random.choice(list(self._blocks))
-        return (bottom_block_num, top_block_num)
+        remaining_blocks = list(set(self._blocks.keys()).difference(set(state.stacked_blocks)))
+        if len(remaining_blocks) > 0:
+            top_block_idx = np.random.choice(len(remaining_blocks))
+            top_block_num = remaining_blocks[top_block_idx]
+            if len(state.stacked_blocks) > 0:
+                bottom_block_num = state.stacked_blocks[-1]
+                action = (bottom_block_num, top_block_num)
+            else:
+                possible_bottom_blocks = list(set(remaining_blocks).difference(set([top_block_num])))
+                if len(possible_bottom_blocks) > 0:
+                    bottom_block_idx = np.random.choice(len(possible_bottom_blocks))
+                    bottom_block_num = possible_bottom_blocks[bottom_block_idx]
+                    action = (bottom_block_num, top_block_num)
+        return action
 
     def reward(self, state, goal):
         return 1 if self.is_goal_state(state, goal) else 0
@@ -70,14 +81,13 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         if action is not None:
             bottom_block_num = action[0]
             top_block_num = action[1]
-            if optimistic:
-                condition = True
-            else:
-                # can only stack blocks by increments of one and top block must be on table
-                condition = top_block_num == bottom_block_num + 1 and \
-                    top_block_num not in state.stacked_blocks
+            condition = top_block_num not in state.stacked_blocks
+            if not optimistic:
+                condition = condition and \
+                        top_block_num == bottom_block_num + 1
             if condition:
                 # add both if bottom block is on table and this is the start of the stack
+                # TODO: I think this can just be if len(stack) == 0
                 if bottom_block_num not in state.stacked_blocks and \
                                         len(state.stacked_blocks) == 0:
                     new_state.stacked_blocks.append(bottom_block_num)
@@ -93,24 +103,6 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         for action in plan:
             state = self.transition(state, action)
         return state
-
-    # attempt to stack a block that is currently on the table
-    def random_remaining_policy(self, state):
-        action = None
-        remaining_blocks = list(set(self._blocks.keys()).difference(set(self.stacked_blocks)))
-        if len(remaining_blocks) > 0:
-            top_block_idx = np.random.choice(len(remaining_blocks))
-            top_block_num = remaining_blocks[top_block_idx].num
-            if len(state.stacked_blocks) > 0:
-                bottom_block_num = state.stacked_blocks[-1]
-                action = (bottom_block_num, top_block_num)
-            else:
-                possible_bottom_blocks = list(set(remaining_blocks).difference(set([top_block])))
-                if len(possible_bottom_blocks) > 0:
-                    bottom_block_idx = np.random.choice(len(possible_bottom_blocks))
-                    bottom_block_num = possible_bottom_blocks[bottom_block_idx].num
-                    action = (bottom_block_num, top_block_num)
-        return action
 
     # expert once stack is started
     def expert_policy(self, state):
