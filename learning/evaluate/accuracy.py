@@ -17,11 +17,12 @@ def calc_accuracy(model, test_dataset, model_type):
 def plot_accuracies(accuracies, title):
     fig, axis = plt.subplots()
     for train_num_blocks, model_accuracies in accuracies.items():
-        axis.plot(model_accuracies[0], model_accuracies[1], label=train_num_blocks)
+        axis.plot(model_accuracies[0], model_accuracies[1], '*', label=train_num_blocks)
     axis.legend(title='Number of Training Blocks')
     axis.set_title(title)
     axis.set_ylabel('Accuracy')
     axis.set_xlabel('Number of Test Blocks')
+    axis.set_ylim(0.0, 1.0)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -38,30 +39,27 @@ if __name__ == '__main__':
         import pdb; pdb.set_trace()
 
     # get models from logger
-    model_paths = ['learning/experiments/logs/models/2_random-20210727-093617',
-                    'learning/experiments/logs/models/3_random-20210727-100817',
-                	'learning/experiments/logs/models/4_random-20210727-100851',
-                    'learning/experiments/logs/models/5_random-20210727-100337']
+    model_paths = ['learning/experiments/logs/models/large-train-set-20210810-160955',
+                    'learning/experiments/logs/models/large-train-set-20210810-161047',
+                    'learning/experiments/logs/models/large-train-set-20210810-161118',
+                    'learning/experiments/logs/models/large-train-set-20210810-161223']
 
-    # get test dataset from logger
-    expert_test_dataset_paths = ['learning/experiments/logs/datasets/2_expert-20210727-093318',
-                                    'learning/experiments/logs/datasets/3_expert-20210727-093328',
-                                    'learning/experiments/logs/datasets/4_expert-20210727-093335',
-                                    'learning/experiments/logs/datasets/5_expert-20210727-093342',
-                                    'learning/experiments/logs/datasets/6_expert-20210727-093400',
-                                    'learning/experiments/logs/datasets/7_expert-20210727-093407',
-                                    'learning/experiments/logs/datasets/8_expert-20210727-093415']
+    # Expert Test Sets
+    expert_test_dataset_paths = ['learning/experiments/logs/datasets/large-test-set-2-20210810-161843',
+        'learning/experiments/logs/datasets/large-test-set-3-20210810-161852',
+        'learning/experiments/logs/datasets/large-test-set-4-20210810-161859',
+        'learning/experiments/logs/datasets/large-test-set-5-20210810-161906',
+        'learning/experiments/logs/datasets/large-test-set-6-20210810-161913']
 
-    random_test_dataset_paths = ['learning/experiments/logs/datasets/2_random_test-20210727-093504',
-                                    'learning/experiments/logs/datasets/3_random_test-20210727-093459',
-                                    'learning/experiments/logs/datasets/4_random_test-20210727-093452',
-                                    'learning/experiments/logs/datasets/5_random_test-20210727-093446',
-                                    'learning/experiments/logs/datasets/6_random_test-20210727-093440',
-                                    'learning/experiments/logs/datasets/7_random_test-20210727-093433',
-                                    'learning/experiments/logs/datasets/8_random_test-20210727-093426']
+    # Random Test Sets (2,3,4,5,6 num blocks)
+    random_test_dataset_paths = ['learning/experiments/logs/datasets/large-test-set-random-2-20210810-165325',
+        'learning/experiments/logs/datasets/large-test-set-random-3-20210810-165531',
+        'learning/experiments/logs/datasets/large-test-set-random-4-20210810-165541',
+        'learning/experiments/logs/datasets/large-test-set-random-5-20210810-165608',
+        'learning/experiments/logs/datasets/large-test-set-random-6-20210810-165910']
 
-    test_dataset_paths = expert_test_dataset_paths
-    #test_dataset_paths = random_test_dataset_paths
+    #test_dataset_paths = expert_test_dataset_paths
+    test_dataset_paths = random_test_dataset_paths
 
     # calculate accuracy
     accuracies = {'transition': {}, 'heuristic': {}}
