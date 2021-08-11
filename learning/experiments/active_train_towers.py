@@ -161,8 +161,19 @@ def run_active_towers(args):
 
     # Initialize agent with supplied blocks (only works with args.block_set_fname set)
     if args.block_set_fname is not '':
-        with open(args.block_set_fname, 'rb') as f:
-            block_set = pickle.load(f)
+        if args.fit:
+            train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path,
+                                                  use_latents=args.use_latents)
+            train_blocks_fname = train_logger.args.block_set_fname
+            block_set = load_blocks(train_blocks_fname=train_blocks_fname, 
+                                    eval_blocks_fname=args.block_set_fname,
+                                    eval_block_ixs=args.eval_block_ixs,
+                                    num_blocks=11)
+            args.num_eval_blocks = len(args.eval_block_ixs)
+            args.num_train_blocks = len(block_set) - args.num_eval_blocks
+        else:
+            block_set = load_blocks(train_block_fname=args.block_set_fname,
+                                    num_blocks=10)
     else:
         raise NotImplementedError()
 
@@ -173,13 +184,12 @@ def run_active_towers(args):
         if args.use_panda_server:
             agent = PandaClientAgent()
         else:
-            block_set = load_blocks(fname=args.block_set_fname,
-                                    num_blocks=10)
             agent = PandaAgent(block_set)
 
     # Initialize ensemble.
     if args.fit:
         ensemble = load_ensemble(args)
+        ensemble.add_latents(args.num_eval_blocks)
     else:
         ensemble = initialize_model(args, len(block_set))    
     if torch.cuda.is_available():
@@ -233,24 +243,30 @@ def run_active_towers(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max-acquisitions',
-                        type=int,
-                        default=1000,
-                        help='Number of iterations to run the main active learning loop for.')
-    parser.add_argument('--batch-size', type=int, default=16)
-    parser.add_argument('--n-models', type=int, default=7, help='Number of models in the ensemble.')
-    parser.add_argument('--n-hidden', type=int, default=64)
-    parser.add_argument('--n-epochs', type=int, default=50)
+    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
+    parser.add_argument('--debug', action='store_true')
+
+    # Active learning parameters. 
+    parser.add_argument('--max-acquisitions', type=int, default=1000, help='Number of iterations to run the main active learning loop for.')
     parser.add_argument('--init-data-fname', type=str, default='')
     parser.add_argument('--val-data-fname', type=str, default='')
     parser.add_argument('--block-set-fname', type=str, default='', help='File containing a list of AT LEAST 5 blocks (block_utils.Object) where the block.name is formatted obj_#')
     parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
-    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--sample-joint', action='store_true', help='Whether BALD should sample from the joint distribution or marginals (default).')
     parser.add_argument('--strategy', choices=['random', 'bald', 'subtower', 'subtower-greedy'], default='bald', help='[random] chooses towers randomly. [bald] scores each tower with the BALD score. [subtower-greedy] chooses a tower by adding blocks one at a time and keeping towers with the highest bald score [subtower] is similar to subtower-greedy, but we multiply the bald score of each tower by the probabiliy that the tower is constructible.')
     parser.add_argument('--sampler', choices=['random', 'sequential'], default='random', help='Choose how the unlabeled pool will be generated. Sequential assumes every tower has a stable base.')
+
+    # Model/training parameters.
+    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--n-models', type=int, default=7, help='Number of models in the ensemble.')
+    parser.add_argument('--n-hidden', type=int, default=64)
+    parser.add_argument('--n-epochs', type=int, default=50)
     parser.add_argument('--model', default='fcgn', choices=['fcgn', 'fcgn-fc', 'fcgn-con', 'lstm', 'bottomup-shared', 'bottomup-unshared'])
+    parser.add_argument('--com-repr', type=str, choices=['latent', 'explicit', 'removed'], required=True,
+                        help='Explicit specifies the true CoM for each block. Latent has a LV for the CoM. Removed completely removes any CoM repr.')
+    
+    # Execution parameters.
     # simple-model: does not perturb the blocks, uses TowerPlanner to check constructability
     # noisy-model: perturbs the blocks, uses TowerPlanner to check constructability
     # sim: uses pyBullet with no noise
@@ -258,12 +274,12 @@ if __name__ == '__main__':
     parser.add_argument('--exec-mode', default='noisy-model', choices=['simple-model', 'noisy-model', 'sim', 'real'])
     parser.add_argument('--xy-noise', default=0.003, type=float, help='Variance in the normally distributed noise in block placements (used when args.exec-mode==noisy-model)')
     parser.add_argument('--use-panda-server', action='store_true')
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--com-repr', type=str, choices=['latent', 'explicit', 'removed'], required=True)
+    
     # The following arguments are used when we wanted to fit latents with an already trained model.
-    parser.add_argument('--fit', action='store_true', help='This will start training with the given pretrained model.')
+    parser.add_argument('--fit', action='store_true', help='This will start training with the given pretrained model. Uses VI to retrain the model at each step.')
     parser.add_argument('--pretrained-ensemble-exp-path', type=str, default='', help='Path to a trained ensemble.')
     parser.add_argument('--ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
+    parser.add_argument('--eval-block-ixs', nargs='+', type=int, default=[0], help='Indices of which eval blocks to use.')
     args = parser.parse_args()
 
     if args.debug:

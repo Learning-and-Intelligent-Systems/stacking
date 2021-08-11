@@ -68,7 +68,8 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
         # Initialize and train models.
         print('Training ensemble....')
         if args.fit and args.com_repr == 'latent':
-            ensemble.reset_latents(random=False)
+            eval_block_ixs = list(range(args.num_train_blocks, args.num_train_blocks+args.num_eval_blocks))
+            ensemble.reset_latents(ixs=eval_block_ixs, random=False)
         elif args.fit and args.com_repr == 'removed':
             # TODO: Implement resetting model to pretrained weights.
             pass

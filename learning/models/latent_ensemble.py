@@ -27,14 +27,39 @@ class LatentEnsemble(nn.Module):
         if torch.cuda.is_available():
             self.ensemble = self.ensemble.cuda()
 
-    def reset_latents(self, random=False):
+    def reset_latents(self, ixs=[], random=False):
+        """
+        Reset all or a subset of the latent variables. 
+        :param ixs: A list of which indices to reset.
+        :param random: Set True to randomly reset latents, otherwise set to prior.
+        """
         with torch.no_grad():
             if random:
-                self.latent_locs[:] = torch.randn_like(self.latent_locs)
-                self.latent_logscales[:] = torch.randn_like(self.latent_logscales)
+                if len(ixs) == 0:
+                    self.latent_locs[:] = torch.randn_like(self.latent_locs)
+                    self.latent_logscales[:] = torch.randn_like(self.latent_logscales)
+                else:
+                    self.latent_locs[ixs, :] = torch.randn((len(ixs), self.d_latents))
+                    self.latent_logscales[ixs, :] = torch.randn((len(ixs), self.d_latents))
             else:
-                self.latent_locs[:] = 0.
-                self.latent_logscales[:] = 0.
+                if len(ixs) == 0:
+                    self.latent_locs[:] = 0.
+                    self.latent_logscales[:] = 0.
+                else:
+                    self.latent_locs[ixs, :] = 0.
+                    self.latent_logscales[ixs, :] = 0.
+
+    def add_latents(self, n_latents):
+        """
+        Call this function when more blocks are added to increase the number of latent variables.
+        :param n_latents: The number of latents to add.
+        """
+        self.n_latents += n_latents
+        new_locs = torch.zeros(n_latents, self.d_latents)
+        new_logscales = torch.zeros(n_latents, self.d_latents)
+
+        self.latent_locs = nn.Parameter(torch.stack([self.latent_locs.data, new_locs]))
+        self.latent_logscales = nn.Parameter(torch.stack([self.latent_logscales.data, new_logscales]))
 
     def associate(self, samples, block_ids):
         """ given samples from the latent space for each block in the set,

@@ -35,15 +35,20 @@ class ExecutionFailure(Exception):
             print_str += f" while holding {self.obj_held.body.readableName}"
         return print_str
 
-def load_blocks(fname, num_blocks, remove_ixs=[]):
+def load_blocks(train_blocks_fname, eval_blocks_fname='', num_blocks=10, eval_block_ixs=[], remove_ixs=[]):
     """"
     Load blocks from a pickle file. Option to remove specific block ids.
     :param fname: .pkl file of the blocks.
     :param num_blocks: The number of desired blocks to load.
-    :param remove_ixs: List of indices to exclude from the final set.
+    :param remove_ixs: List of indices to exclude from the final set. The indices start at the first block set.
     """
-    with open(fname, 'rb') as handle:
+    with open(train_blocks_fname, 'rb') as handle:
         blocks = pickle.load(handle)
+    if len(eval_blocks_fname) > 0:
+        eval_blocks = pickle.load(handle)
+        for ix in eval_block_ixs:
+            blocks += eval_blocks[ix]
+
     for ix in sorted(remove_ixs, reverse=True):
         del blocks[ix]
     return blocks[:num_blocks]
