@@ -117,7 +117,7 @@ class LatentEnsemble(nn.Module):
         return samples
 
 
-    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True):
+    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True, keep_latent_ix=-1):
         """ predict feasibility of the towers
 
         Arguments:
@@ -131,17 +131,43 @@ class LatentEnsemble(nn.Module):
         Returns:
             torch.Tensor -- [N_batch]
         """
-
+        N_batch, N_blocks, N_feats = towers.shape
         # samples_for_each_tower_in_batch will be [N_batch x N_samples x tower_height x latent_dim]
 
         # Draw one sample for each block each time it appears in a tower
-        q_z = torch.distributions.normal.Normal(self.latent_locs[block_ids],
-                                                torch.exp(self.latent_logscales[block_ids]))
-        samples_for_each_tower_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2, 3)
+        if keep_latent_ix < 0 and collapse_latents:
+            q_z = torch.distributions.normal.Normal(self.latent_locs[block_ids],
+                                                    torch.exp(self.latent_logscales[block_ids]))  # [N_batch, N_blocks, latent_dim]
+            samples_for_each_tower_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2, 3)  # [N_batch, N_samples, N_blocks, latent_dim]
+            samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
+            towers_with_latents = self.concat_samples(
+                samples_for_each_tower_in_batch, towers)
+        else:
+            # Assume that keep_latent_ix is in each tower.
+            
+            # First create latents which are shape: [N_batch, N_samples (marg), N_samples (rest of latents), N_blocks, latent_dim]
+            samples_for_each_tower_in_batch = torch.zeros((N_batch, N_samples, N_samples, N_blocks, self.d_latents))
+            if torch.cuda.is_available():
+                samples_for_each_tower_in_batch = samples_for_each_tower_in_batch.cuda()
+            
+            # Do one tower at a time. Might need to vectorize later if too slow.
+            for tx in range(0, N_batch):
+                for bx_tower in range(0, N_block):
+                    bx_blockset = block_ids[tx, bx_tower]
+                    q_z = torch.distributions.normal.Normal(self.latent_locs[bx_blockset],
+                                                            torch.exp(self.latent_logscales[bx_blockset]))
+                    if bx_blockset == keep_latent_ix:
+                        zk_samples = q_z.rsample(sample_shape=[N_samples])  # [N_samples, latent_dim]
+                        samples_for_each_tower_in_batch[tx, :, :, bx_tower, :] = zk_samples.unsqueeze(1)
+                    else:
+                        zk_samples = q_z.rsample(sample_shape=[N_samples, N_samples])  # [N_samples, N_samples, latent_dim]
+                        samples_for_each_tower_in_batch[tx, :, :, bx_tower, :] = zk_samples
+            
+            # Temporarily combine sample dimensions.
+            samples_for_each_tower_in_batch = samples_for_each_tower_in_batch.view(N_batch, N_samples*N_samples, N_blocks, self.d_latents)
+            samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
+            towers_with_latents = self.concat_samples(samples_for_each_tower_in_batch, towers)
 
-        samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
-        towers_with_latents = self.concat_samples(
-            samples_for_each_tower_in_batch, towers)
 
         # reshape the resulting tensor so the batch dimension holds
         # N_batch times N_samples
@@ -164,6 +190,10 @@ class LatentEnsemble(nn.Module):
         if collapse_ensemble:
             labels = labels.mean(axis=1, keepdim=True)
         if collapse_latents:
-            labels = labels.mean(axis=2, keepdim=True)
+            if keep_latent_ix < 0:
+                labels = labels.mean(axis=2, keepdim=True)
+            else:
+                labels = labels.view(N_batch, -1, N_samples, N_samples)
+                labels = labels.mean(axis=3)
 
         return labels

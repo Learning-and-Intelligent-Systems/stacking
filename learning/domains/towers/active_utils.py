@@ -147,7 +147,7 @@ def sample_sequential_data(block_set, dataset, n_samples, prerotate=False):
             sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
     return sampled_towers
 
-def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_blocks=(2, 5)):
+def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_blocks=(2, 5), include_index=-1):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
@@ -174,8 +174,11 @@ def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_bl
     for ix in range(n_samples):
         n_blocks = np.random.randint(min_n_blocks, max_n_blocks+1)
         # get n_blocks, either from scratch or from the block set
-        if block_set is not None: 
+        if block_set is not None and include_index < 0: 
             blocks = np.random.choice(block_set, n_blocks, replace=False)
+        elif block_set is not None:
+            extra_blocks = block_set[:include_index] + block_set[include_index+1:]
+            blocks = [block_set[include_index]] + np.random.choice(block_set, n_blocks-1, replace=False)
         else:
             blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
         # sample a new tower

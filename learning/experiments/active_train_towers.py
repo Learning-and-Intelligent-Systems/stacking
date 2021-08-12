@@ -138,7 +138,10 @@ def get_sampler_fn(args, block_set):
     if args.strategy == 'subtower-greedy':
         data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
     elif args.strategy == 'subtower':
-        data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(5, 5))
+        if args.fit:
+            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1)
+        else:
+            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 5))
     else:
         # Otherwise we defaul to whatever --sampler was directly specified.
         if args.sampler == 'sequential':
@@ -162,6 +165,7 @@ def run_active_towers(args):
     # Initialize agent with supplied blocks (only works with args.block_set_fname set)
     if args.block_set_fname is not '':
         if args.fit:
+            assert(len(args.eval_block_ixs) == 1)  # Right now the code only supports doing inference for a single block on top of the training blocks.
             train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path,
                                                   use_latents=args.use_latents)
             train_blocks_fname = train_logger.args.block_set_fname
@@ -210,16 +214,20 @@ def run_active_towers(args):
         if args.sample_joint:
             collapse_ensemble = False
             collapse_latents = False
+            keep_latent_ix = -1
         elif args.fit:
             collapse_ensemble = True
             collapse_latents = False
+            keep_latent_ix = args.num_train_blocks + args.num_eval_blocks - 1
         else:
             collapse_ensemble = False
             collapse_latents = True
+            keep_latent_ix = -1
 
         data_pred_fn = lambda dataset, ensemble: get_predictions(
             dataset, ensemble, N_samples=10, use_latents=True,
-            collapse_latents=collapse_latents, collapse_ensemble=collapse_ensemble)
+            collapse_latents=collapse_latents, collapse_ensemble=collapse_ensemble, keep_latent_ix=keep_latent_ix)
+
     else:
         data_pred_fn = get_predictions    
 
