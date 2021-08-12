@@ -178,7 +178,7 @@ def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_bl
             blocks = np.random.choice(block_set, n_blocks, replace=False)
         elif block_set is not None:
             extra_blocks = block_set[:include_index] + block_set[include_index+1:]
-            blocks = [block_set[include_index]] + np.random.choice(block_set, n_blocks-1, replace=False)
+            blocks = [block_set[include_index]] + list(np.random.choice(extra_blocks, n_blocks-1, replace=False))
         else:
             blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
         # sample a new tower
@@ -326,7 +326,7 @@ def get_sequential_predictions(dataset, ensemble, use_latents=False):
         #print(preds[-1].shape)
     return torch.cat(preds, dim=0)
 
-def get_predictions(dataset, ensemble, use_latents=False, N_samples=10, collapse_latents=False, collapse_ensemble=False):
+def get_predictions(dataset, ensemble, use_latents=False, N_samples=10, collapse_latents=False, collapse_ensemble=False, keep_latent_ix=-1):
     """
     :param dataset: A tower_dict structure.
     :param ensemble: The Ensemble model which to use for predictions.
@@ -361,7 +361,7 @@ def get_predictions(dataset, ensemble, use_latents=False, N_samples=10, collapse
 
                 # takes samples from the joint distribution from the joint distribution to compute I(y ; theta, z)
                 preds.append(ensemble.forward(
-                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=collapse_ensemble, collapse_latents=collapse_latents).reshape(N_batch, -1))
+                    tensor[...,4:], block_ids, N_samples=N_samples, collapse_ensemble=collapse_ensemble, collapse_latents=collapse_latents, keep_latent_ix=keep_latent_ix).reshape(N_batch, -1))
             else:
                 preds.append(ensemble.forward(tensor))
     return torch.cat(preds, dim=0)

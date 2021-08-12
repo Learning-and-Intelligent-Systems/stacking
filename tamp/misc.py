@@ -44,10 +44,13 @@ def load_blocks(train_blocks_fname, eval_blocks_fname='', num_blocks=10, eval_bl
     """
     with open(train_blocks_fname, 'rb') as handle:
         blocks = pickle.load(handle)
+        n_train = len(blocks)
     if len(eval_blocks_fname) > 0:
-        eval_blocks = pickle.load(handle)
+        with open(eval_blocks_fname, 'rb') as handle:
+            eval_blocks = pickle.load(handle)
         for ix in eval_block_ixs:
-            blocks += eval_blocks[ix]
+            eval_blocks[ix].name = 'obj_' + str(n_train + ix)
+            blocks.append(eval_blocks[ix])
 
     for ix in sorted(remove_ixs, reverse=True):
         del blocks[ix]

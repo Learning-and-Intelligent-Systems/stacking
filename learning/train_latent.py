@@ -38,11 +38,11 @@ def get_both_loss(latent_ensemble, batches, disable_latents, N, N_samples=10):
         if disable_latents:
             preds = latent_ensemble.ensemble.models[i].forward(towers).squeeze()
         else:
-            preds = latent_ensemble(towers[:,:,4:], block_ids.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples)
-            # print(preds.shape)
-        likelihood_loss += F.binary_cross_entropy(preds.squeeze(), labels[:, None].expand(N_batch, N_samples), reduction='sum')
+            preds = latent_ensemble(towers[:,:,4:], block_ids.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples).squeeze()
+        total_samples = preds.shape[1]
+        likelihood_loss += F.binary_cross_entropy(preds, labels[:, None].expand(N_batch, total_samples), reduction='sum')
 
-    likelihood_loss = likelihood_loss/N_models/N_samples
+    likelihood_loss = likelihood_loss/N_models/total_samples
 
     q_z = torch.distributions.normal.Normal(latent_ensemble.latent_locs, torch.exp(latent_ensemble.latent_logscales))
     p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
@@ -163,7 +163,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
                     # If we are only updating the new latents, zero out gradients for the training blocks.
                     if args.fit:
                         latent_ensemble.latent_locs.grad.data[:args.num_train_blocks, :].fill_(0.)
-                        latent_ensemble.latent_logscale.grad.data[:args.num_train_blocks, :].fill_(0.)
+                        latent_ensemble.latent_logscales.grad.data[:args.num_train_blocks, :].fill_(0.)
 
                     latent_optimizer.step()
                     batch_loss += latent_loss.item()
@@ -183,7 +183,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
                 both_loss.backward()
                 if args.fit:
                     latent_ensemble.latent_locs.grad.data[:args.num_train_blocks, :].fill_(0.)
-                    latent_ensemble.latent_logscale.grad.data[:args.num_train_blocks, :].fill_(0.)
+                    latent_ensemble.latent_logscales.grad.data[:args.num_train_blocks, :].fill_(0.)
 
                 if (not freeze_latents) and (not disable_latents): latent_optimizer.step()
                 if not freeze_ensemble: params_optimizer.step()

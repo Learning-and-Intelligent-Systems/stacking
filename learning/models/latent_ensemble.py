@@ -58,8 +58,8 @@ class LatentEnsemble(nn.Module):
         new_locs = torch.zeros(n_latents, self.d_latents)
         new_logscales = torch.zeros(n_latents, self.d_latents)
 
-        self.latent_locs = nn.Parameter(torch.stack([self.latent_locs.data, new_locs]))
-        self.latent_logscales = nn.Parameter(torch.stack([self.latent_logscales.data, new_logscales]))
+        self.latent_locs = nn.Parameter(torch.cat([self.latent_locs.data, new_locs], dim=0))
+        self.latent_logscales = nn.Parameter(torch.cat([self.latent_logscales.data, new_logscales], dim=0))
 
     def associate(self, samples, block_ids):
         """ given samples from the latent space for each block in the set,
@@ -133,7 +133,6 @@ class LatentEnsemble(nn.Module):
         """
         N_batch, N_blocks, N_feats = towers.shape
         # samples_for_each_tower_in_batch will be [N_batch x N_samples x tower_height x latent_dim]
-
         # Draw one sample for each block each time it appears in a tower
         if keep_latent_ix < 0 and collapse_latents:
             q_z = torch.distributions.normal.Normal(self.latent_locs[block_ids],
@@ -152,7 +151,7 @@ class LatentEnsemble(nn.Module):
             
             # Do one tower at a time. Might need to vectorize later if too slow.
             for tx in range(0, N_batch):
-                for bx_tower in range(0, N_block):
+                for bx_tower in range(0, N_blocks):
                     bx_blockset = block_ids[tx, bx_tower]
                     q_z = torch.distributions.normal.Normal(self.latent_locs[bx_blockset],
                                                             torch.exp(self.latent_logscales[bx_blockset]))

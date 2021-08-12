@@ -56,15 +56,15 @@ def initialize_model(args, n_blocks):
 
 
 def load_ensemble(args):
-    assert(args.fit and len(args.ensemble_exp_path) > 0 and args.ensemble_tx >= 0)
-    logger = ActiveExperimentLogger.get_experiments_logger(args.ensemble_exp_path, args)
+    assert(args.fit and len(args.pretrained_ensemble_exp_path) > 0 and args.ensemble_tx >= 0)
+    logger = ActiveExperimentLogger.get_experiments_logger(args.pretrained_ensemble_exp_path, args)
     ensemble = logger.get_ensemble(args.ensemble_tx)
     return ensemble
 
 
 def get_initial_dataset(args, block_set, agent, logger):
     # If we are fitting the latents, start with an empty dataset.
-    if args.fit_latents:
+    if args.fit:
         towers_dict = sample_sequential_data(block_set, None, 0)
         towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
         dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
@@ -202,7 +202,7 @@ def run_active_towers(args):
     # Get an initial dataset.
     dataset, val_dataset = get_initial_dataset(args, block_set, agent, logger)
     dataloader, val_dataloader = get_dataloaders(args, dataset, val_dataset)
-    if args.fit_latents:
+    if args.fit:
         val_dataset, val_dataloader = None, None
 
     # Get active learning helper functions.
@@ -225,8 +225,9 @@ def run_active_towers(args):
             keep_latent_ix = -1
 
         data_pred_fn = lambda dataset, ensemble: get_predictions(
-            dataset, ensemble, N_samples=10, use_latents=True,
+            dataset, ensemble, N_samples=5, use_latents=True,
             collapse_latents=collapse_latents, collapse_ensemble=collapse_ensemble, keep_latent_ix=keep_latent_ix)
+
 
     else:
         data_pred_fn = get_predictions    
