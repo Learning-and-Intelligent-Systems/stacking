@@ -1,38 +1,88 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import namedtuple
 
 from tamp.predicates import On
 from planning import plan
 from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldGTOpt
 from learning.active.utils import GoalConditionedExperimentLogger
 from learning.domains.abc_blocks.abc_blocks_data import model_forward
-from learning.evaluate.analyze_plans import vec_to_logical_state
+from learning.evaluate.analyze_plans import vec_to_logical_state, plot_horiz_bars, join_strs, stacked_blocks_to_str
 
-def calc_accuracy(model_type, test_dataset, model=None, test_num_blocks=None):
-    if model_type == 'learned':
-        assert model is not None, 'model must be set to calc accuracy when model_type is learned'
-        xs, ys = test_dataset[:]
-        ys = ys.detach().numpy()
-        preds = model_forward(model, xs)
-        preds = preds.round()
-        sum_axes = tuple(range(len(preds.shape)))[1:]
-        accuracy = np.sum(np.all(ys == preds.round(), axis=sum_axes))/len(preds)
-    elif model_type == 'opt':
-        assert test_num_blocks is not None, 'test_num_blocks must be set to calc accuracy when model_type is opt'
-        test_dataset.set_pred_type('full_state') # now ys will be full new edge states
-        opt_world = ABCBlocksWorldGTOpt(test_num_blocks)
-        preds = []
-        for x, y in test_dataset:
-            vof, vef, va = [xi.detach().numpy() for xi in x]
-            lstate = vec_to_logical_state(vef, opt_world)
-            new_state = opt_world.transition(lstate, va)
-            v_new_edge_state = new_state.as_vec()[1]
-            if np.array_equal(v_new_edge_state, y.detach().numpy()):
-                preds.append(1)
-            else:
-                preds.append(0)
-        accuracy = sum(preds)/len(preds)
+transition_names = ('state', 'action', 'next state', 'gt pred', \
+                'model pred', 'optimistic next state', 'model accuracy')
+
+def save_transition_figs(transitions, model_logger, test_num_blocks):
+    # The first value is how you want to separate the data
+    # The second value is what you want to show on the bars
+    all_plot_inds = {'all_trans': [[0,1,2,3],[4]],
+                'classification': [[3], [0,1,2]],
+                'init_state': [[0,3], [1,2]],
+                'acc': [[0,1], [6]]}
+    plot_keys = ['acc']
+
+    for plot_key in plot_keys:
+        y_axis_values = all_plot_inds[plot_key][0]
+        bar_text_values = all_plot_inds[plot_key][1]
+        y_label = join_strs(transition_names, y_axis_values)
+        x_label = join_strs(transition_names, bar_text_values)
+        color = False
+        if plot_key == 'acc':
+            color = True
+        plot_horiz_bars(transitions, y_axis_values, bar_text_values, plot_title=plot_key, x_label=x_label, y_label=y_label, color=color)
+        plot_path = '%s/%s_testblocks_%i.png' % (model_logger.exp_path, plot_key, test_num_blocks)
+        plt.savefig(plot_path, bbox_inches = "tight")
+        print('Saving accuracy plots to %s' % plot_path)
+        plt.close()
+
+def calc_accuracy(model_type, test_dataset, test_num_blocks, model=None, return_transitions=False):
+    '''
+    :param model_type: in ['learned', 'opt']
+    '''
+    transitions = []
+    accuracies = []
+
+    gt_world = ABCBlocksWorldGT(test_num_blocks)
+    opt_world = ABCBlocksWorldGTOpt(test_num_blocks)
+
+    for x, y in test_dataset:
+        # get all relevant transition info
+        vof, vef, va = [xi.detach().numpy() for xi in x]
+        action = [int(a) for a in va]
+        lstate = vec_to_logical_state(vef, gt_world)
+        lnext_state = gt_world.transition(lstate, action)
+        lnext_opt_state = gt_world.transition(lstate, action)
+        if model_type == 'opt':
+            model_pred = 1. # optimistic model always thinks it's right
+            opt_next_edge_features = lnext_opt_state.as_vec()[1]
+            gt_pred = np.array(np.array_equal(opt_next_edge_features, lnext_state.as_vec()[1]))
+        else:
+            model_pred = model_forward(model, x).round().squeeze()
+            gt_pred = y.numpy().squeeze()
+        accuracy = int(np.array_equal(gt_pred, model_pred))# TODO: check this works in all model cases
+
+        # turn all transition info into a string
+        str_state = stacked_blocks_to_str(lstate.stacked_blocks)
+        str_action = '%i/%i' % (action[0], action[1])
+        str_next_state = stacked_blocks_to_str(lnext_state.stacked_blocks)
+        if len(gt_pred.shape) > 1:
+            str_gt_pred = stacked_blocks_to_str(vec_to_logical_state(gt_pred, gt_world).stacked_blocks)
+            str_pred = stacked_blocks_to_str(vec_to_logical_state(model_pred, gt_world).stacked_blocks)
+        else:
+            str_gt_pred = '%i' % gt_pred # TODO: pred could be a state
+            str_pred = '%i' % model_pred # TODO: pred could be a state
+        str_opt_next_state = stacked_blocks_to_str(lnext_opt_state.stacked_blocks)
+        str_acc = str(accuracy)
+
+        transition = (str_state, str_action, str_next_state, str_gt_pred, \
+                                str_pred, str_opt_next_state, str_acc)
+        transitions.append(transition)
+        accuracies.append(accuracy)
+
+    final_accuracy = np.mean(accuracies)
+    if return_transitions:
+        return accuracy, transitions
     return accuracy
 
 def generate_random_goal(world):
@@ -79,22 +129,55 @@ if __name__ == '__main__':
                     3: 'learning/experiments/logs/datasets/large-test-3-20210810-223754',
                     4: 'learning/experiments/logs/datasets/large-test-4-20210810-223746',
                     5: 'learning/experiments/logs/datasets/large-test-5-20210810-223740',
-                    6: 'learning/experiments/logs/datasets/large-test-6-20210810-223731'}
-                    #7:''
-                    #8:''}
+                    6: 'learning/experiments/logs/datasets/large-test-6-20210810-223731',
+                    7:'learning/experiments/logs/datasets/large-test-7-20210811-173148',
+                    8:'learning/experiments/logs/datasets/large-test-8-20210811-173210'}
 
     # used in both modes
-    all_test_num_blocks = [2, 3, 4, 5, 6]#, 7, 8]     # NOTE: if args.eval_mode == 'accuracy', this must match test_datasets.keys()
+    all_test_num_blocks = [2, 3, 4, 5, 6, 7, 8]     # NOTE: if args.eval_mode == 'accuracy', this must match test_datasets.keys()
     compare_opt = True                              # if want to compare against the optimistic model
-    model_paths = {'FULL': ['learning/experiments/logs/models/4-block-full-20210811-094536',
-                        'learning/experiments/logs/models/4-block-full-20210811-094558',
-                        'learning/experiments/logs/models/4-block-full-20210811-094614',
-                        'learning/experiments/logs/models/4-block-full-20210811-094627'],
-                	'CLASS': ['learning/experiments/logs/models/fixed-opt-4-20210810-223512',
-                        'learning/experiments/logs/models/fixed-opt-4-20210810-223533',
-                        'learning/experiments/logs/models/fixed-opt-4-20210810-223551',
-                        'learning/experiments/logs/models/fixed-opt-4-20210810-223610']}
-    ########
+    model_paths = {'FULL': ['learning/experiments/logs/models/delta-4-block-random-20210811-171313',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171322',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171330',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171339',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171347',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171356',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171404',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171413',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171421',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171430',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171438',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171447',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171456',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171504',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171513',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171522',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171530',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171539',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171548',
+                                'learning/experiments/logs/models/delta-4-block-random-20210811-171557'],
+                	'CLASS': ['learning/experiments/logs/models/class-4-block-random-20210811-170709',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170858',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170719',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170909',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170730',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170920',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170740',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170936',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170750',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-171043',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170802',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-171054',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170814',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-171125',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170825',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-171142',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170835',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-171210',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-170847',
+                                'learning/experiments/logs/models/class-4-block-random-20210811-171218']}
+
+########
 
     success_data = {}
     plan_paths = {}
@@ -150,11 +233,16 @@ if __name__ == '__main__':
                     test_trans_dataset = test_dataset_logger.load_trans_dataset()
                     test_trans_dataset.set_pred_type(trans_model.pred_type)
                     #test_heur_dataset = test_dataset_logger.load_heur_dataset()
-                    test_dataset_num_blocks = test_dataset_logger.args.num_blocks
-                    assert test_dataset_num_blocks == test_num_blocks, 'Test dataset path %s does not contain %i blocks' % (test_dataset_path, test_num_blocks)
-                    success_data[method][test_num_blocks][model_path] = calc_accuracy('learned', test_trans_dataset, model=trans_model)
-                    #accuracies['heuristic'][train_num_blocks][0].append(test_dataset_num_blocks)
+                    assert test_dataset_logger.args.num_blocks == test_num_blocks, \
+                            'Test dataset path %s does not contain %i blocks' % \
+                            (test_dataset_path, test_num_blocks)
+                    accuracy, transitions = success_data[method][test_num_blocks][model_path] = \
+                            calc_accuracy('learned', test_trans_dataset, test_dataset_logger.args.num_blocks, \
+                            model=trans_model, return_transitions=True)
+                    success_data[method][test_num_blocks][model_path] = accuracy
+                    #accuracies['heuristic'][train_num_blocks][0].append(test_dataset_logger.args.num_blocks)
                     #accuracies['heuristic'][train_num_blocks][1].append(calc_accuracy(heur_model, test_heur_dataset))
+                    save_transition_figs(transitions, model_logger, test_dataset_logger.args.num_blocks)
 
     if compare_opt:
         success_data['OPT'] = {}
@@ -184,8 +272,8 @@ if __name__ == '__main__':
                 test_dataset_path = test_datasets[test_num_blocks]
                 test_dataset_logger = GoalConditionedExperimentLogger(test_dataset_path)
                 test_trans_dataset = test_dataset_logger.load_trans_dataset()
-                test_trans_dataset.set_pred_type(trans_model.pred_type)
-                success_data['OPT'][test_num_blocks] = calc_accuracy('opt', test_trans_dataset, test_num_blocks=test_num_blocks)
+                test_trans_dataset.set_pred_type('full_state')
+                success_data['OPT'][test_num_blocks] = calc_accuracy('opt', test_trans_dataset, test_dataset_logger.args.num_blocks)
 
     # Plot results
 
@@ -204,8 +292,8 @@ if __name__ == '__main__':
             else:
                 num_block_success_data = [data for model_path, data in num_block_successes.items()]
             method_avgs.append(np.mean(num_block_success_data))
-            method_mins.append(np.min(num_block_success_data))
-            method_maxs.append(np.max(num_block_success_data))
+            method_mins.append(np.mean(num_block_success_data)-np.std(num_block_success_data))
+            method_maxs.append(np.mean(num_block_success_data)+np.std(num_block_success_data))
 
         axis.plot(all_test_num_blocks, method_avgs, color=cs[i], label=method)
         axis.fill_between(all_test_num_blocks, method_mins, method_maxs, color=cs[i], alpha=0.1)
