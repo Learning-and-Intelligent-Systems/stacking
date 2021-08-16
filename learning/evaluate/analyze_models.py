@@ -8,19 +8,14 @@ from planning import plan
 from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldGTOpt
 from learning.active.utils import GoalConditionedExperimentLogger
 from learning.domains.abc_blocks.abc_blocks_data import model_forward
-from learning.evaluate.analyze_plans import vec_to_logical_state, plot_horiz_bars, join_strs, stacked_blocks_to_str
+from learning.evaluate.utils import vec_to_logical_state, plot_horiz_bars, join_strs, stacked_blocks_to_str
 
 transition_names = ('state', 'action', 'next state', 'gt pred', \
                 'model pred', 'optimistic next state', 'model accuracy')
 
-def save_transition_figs(transitions, model_logger, test_num_blocks):
+def save_transition_figs(transitions, model_logger, test_num_blocks, all_plot_inds, plot_keys):
     # The first value is how you want to separate the data
     # The second value is what you want to show on the bars
-    all_plot_inds = {'all_trans': [[0,1,2,3],[4]],
-                'classification': [[3], [0,1,2]],
-                'init_state': [[0,3], [1,2]],
-                'acc': [[0,1], [6]]}
-    plot_keys = ['acc']
 
     for plot_key in plot_keys:
         y_axis_values = all_plot_inds[plot_key][0]
@@ -113,7 +108,7 @@ if __name__ == '__main__':
         import pdb; pdb.set_trace()
 
     #### Parameters ####
-     # used if args.eval_mode == 'planning'
+    ### used if args.eval_mode == 'planning' ###
     num_goals = 5
     num_plan_attempts = 1
     plan_args = argparse.Namespace(num_branches=10,
@@ -122,8 +117,7 @@ if __name__ == '__main__':
                         max_ro=10,
                         search_mode=args.search_mode)
 
-    # used if args.eval_mode == 'accuracy'
-
+    ### used if args.eval_mode == 'accuracy' ###
     # these are randomly generated datasets
     test_datasets = {2: 'learning/experiments/logs/datasets/large-test-2-20210810-223800',
                     3: 'learning/experiments/logs/datasets/large-test-3-20210810-223754',
@@ -132,8 +126,15 @@ if __name__ == '__main__':
                     6: 'learning/experiments/logs/datasets/large-test-6-20210810-223731',
                     7:'learning/experiments/logs/datasets/large-test-7-20210811-173148',
                     8:'learning/experiments/logs/datasets/large-test-8-20210811-173210'}
+    # name of plot to generate: (how to fivide data on y axis, what to show on x axis)
+    all_plot_inds = {'all_trans': [[0,1,2,3],[4]],
+                'classification': [[3], [0,1,2]],
+                'init_state': [[0,3], [1,2]],
+                'acc': [[0,1], [6]]}
+    # which ones to actually plot and save to logger
+    plot_keys = []#['acc']
 
-    # used in both modes
+    ### used in both modes ###
     all_test_num_blocks = [2, 3, 4, 5, 6, 7, 8]     # NOTE: if args.eval_mode == 'accuracy', this must match test_datasets.keys()
     compare_opt = True                              # if want to compare against the optimistic model
     model_paths = {'FULL': ['learning/experiments/logs/models/delta-4-block-random-20210811-171313',
@@ -242,7 +243,7 @@ if __name__ == '__main__':
                     success_data[method][test_num_blocks][model_path] = accuracy
                     #accuracies['heuristic'][train_num_blocks][0].append(test_dataset_logger.args.num_blocks)
                     #accuracies['heuristic'][train_num_blocks][1].append(calc_accuracy(heur_model, test_heur_dataset))
-                    save_transition_figs(transitions, model_logger, test_dataset_logger.args.num_blocks)
+                    save_transition_figs(transitions, model_logger, test_dataset_logger.args.num_blocks, all_plot_inds, plot_keys)
 
     if compare_opt:
         success_data['OPT'] = {}
