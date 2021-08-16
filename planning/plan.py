@@ -5,33 +5,108 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldLearned, ABCBlocksWorldLearnedClass, print_state
+from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldLearned, ABCBlocksWorldLearnedClass, print_state, LogicalState
+from learning.domains.abc_blocks.abc_blocks_data import model_forward
 from learning.active.utils import GoalConditionedExperimentLogger
 from planning.tree import Tree, Node
+
+# this is a temporary HACK
+from learning.evaluate.utils import vec_to_logical_state
+rank_accuracy = 0
 
 def setup_world(args):
     print('Planning with %s model.' % args.model_type)
     if args.model_type == 'learned':
         model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
         model = model_logger.load_trans_model()
-        if model.pred_type != 'class':
-            world = ABCBlocksWorldLearned(args.num_blocks, model)
-        else:
+        if model.pred_type == 'class':
             world = ABCBlocksWorldLearnedClass(args.num_blocks, model)
+        else:
+            world = ABCBlocksWorldLearned(args.num_blocks, model)
         print('Using model %s.' % model_logger.exp_path)
     elif args.model_type == 'true':
         world = ABCBlocksWorldGT(args.num_blocks)
-        print('Planning with %i blocks.' % args.num_blocks)
     elif args.model_type == 'opt':
         world = ABCBlocksWorldGTOpt(args.num_blocks)
-        
     return world
 
-def search(tree, world, node_value_fn, node_select_fn, args):
+def state_exists(tree, state):
+    for node_id, node in tree.nodes.items():
+        if isinstance(state, tuple) and np.array_equal(state[1], node.state[1]):
+            return node.id
+        elif isinstance(state, LogicalState) and state.is_equal(node.state):
+            return node.id
+    return None
+
+def mcts(tree, world, node_value_fn, node_select_fn, node_update, args):
     for t in range(args.timeout):
         sys.stdout.write("Search progress: %i   \r" % (t) )
         sys.stdout.flush()
         parent_node = tree.traverse(node_select_fn)
+        state = parent_node.state
+        ## HACK
+        if not isinstance(state, LogicalState):
+            lstate = vec_to_logical_state(state[1], world)
+        else:
+            lstate = state
+        ##
+        new_actions = [world.random_policy(lstate) for _ in range(args.num_branches)]
+        new_states = [world.transition(state, action) for action in new_actions]
+
+        for new_action, new_state in zip(new_actions, new_states):
+            node_id = state_exists(tree, new_state)
+            if node_id is None: # state not in tree yet
+                new_node = Node(new_state, new_action, parent_node.id)
+                node_id = tree.expand(new_node)
+            node_value = node_value_fn(node_id)
+            node_update(node_id, node_value)
+    return tree
+
+'''
+def a_star(tree, world, args):
+    # setup learned heuristic model_logger
+    model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
+    print('Using heuristic model %s.' % model_logger.exp_path)
+    heur_model = model_logger.load_heur_model()
+
+    # set initial node cost
+    object_features, edge_features = tree.init_node.state.as_vec()
+    goal_edge_features = tree.goal.as_vec()
+    tree.init_node.g = 0
+    tree.init_node.h = model_forward(heur_model, [object_features, edge_features, goal_edge_features])
+
+    # begin search
+    open_nodes = [0] # 0 is the inital node
+    closed_nodes = []
+    for t in range(args.timeout):
+        sys.stdout.write("Search progress: %i   \r" % (t) )
+        sys.stdout.flush()
+        node_current_id = tree.get_min_cost_node(open_nodes)
+        open_nodes.remove(node_current_id)
+        current_node = tree.nodes[node_current_id]
+        if world.is_goal_state(current_node.state, tree.goal):
+            break
+        # expand node if not done yet
+        if len(current_node.children) == 0: # TODO: check that there are actions to try from this state
+            for _ in range(args.num_branches):
+                new_action = world.random_policy(current_node.state)
+                new_state = world.transition(state, action)
+                new_node = Node(new_state, new_action, node_current_id)
+                object_features, edge_features = new_state.as_vec()
+                new_node.g = current_node.g + 1
+                new_node.h = model_forward(heur_model, [object_features, edge_features, goal_edge_features])
+                tree.expand(new_node)
+                open_nodes.append(new_node.id)
+        for child in current_node.children:
+            #if child.id in open_nodes
+            pass
+    return tree
+
+def best_first_search(tree, world, args):
+    for t in range(args.timeout):
+        sys.stdout.write("Search progress: %i   \r" % (t) )
+        sys.stdout.flush()
+        parent_node = tree.traverse()
         state = parent_node.state
         new_actions = [world.random_policy(state) for _ in range(args.num_branches)]
         new_states = [world.transition(state, action) for action in new_actions]
@@ -39,30 +114,33 @@ def search(tree, world, node_value_fn, node_select_fn, args):
                                 in zip(new_states, new_actions)]
         for new_node in new_nodes:
             new_node_id = tree.expand(new_node)
-            rollout_value = node_value_fn(new_node_id)
+            rollout_value = tree.rollout(new_node_id)
             tree.backpropagate(new_node_id, rollout_value)
     return tree
+'''
 
 def run(goal, args):
     world = setup_world(args)
     tree = Tree(world, goal, args)
-    print('Planning method is %s search.' % args.search_mode)
-    if args.search_mode == 'mcts':
+    if args.value_fn == 'rollout':
+        print('Using random model rollouts to estimate node value.')
         node_value_fn = tree.rollout
         node_select_fn = tree.get_uct_node
-    elif args.search_mode == 'heuristic':
+        node_update = tree.backpropagate
+    elif args.value_fn == 'learned':
         model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
         print('Using heuristic model %s.' % model_logger.exp_path)
         heur_model = model_logger.load_heur_model()
         node_value_fn = lambda node_id: tree.get_heuristic(node_id, heur_model)
-        node_select_fn = tree.get_min_value_node
-    tree = search(tree, world, node_value_fn, node_select_fn, args)
+        node_select_fn = tree.get_min_steps_node
+        node_update = tree.update_steps
+    tree = mcts(tree, world, node_value_fn, node_select_fn, node_update, args)
     found_plan = plan_from_tree(world, goal, tree, debug=False)
 
     logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'planning')
     logger.save_planning_data(tree, goal, found_plan)
     print('Saved planning tree, goal and plan to %s.' % logger.exp_path)
-    return found_plan, logger.exp_path
+    return found_plan, logger.exp_path, rank_accuracy
 
 def plan_from_tree(world, goal, tree, debug=False):
     found_plan = None
@@ -117,9 +195,14 @@ if __name__ == '__main__':
                         help='set to run in debug mode')
     parser.add_argument('--model-type',
                         type=str,
-                        choices=['learned', 'true'],
+                        choices=['learned', 'true', 'opt'],
                         default='true',
                         help='plan with learned or ground truth model')
+    parser.add_argument('--value-fn',
+                        type=str,
+                        choices=['rollout', 'learned'],
+                        default='rollout',
+                        help='use random model rollouts to estimate node value or learned value')
     parser.add_argument('--model-exp-path',
                         type=str,
                         help='Path to torch model to use during planning for learned transitions and/or learned heuristic')
@@ -127,11 +210,6 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='experiment name for saving planning results')
-    parser.add_argument('--search-mode',
-                        type=str,
-                        required=True,
-                        choices = ['mcts', 'heuristic'],
-                        help='type of search')
     args = parser.parse_args()
 
     if args.debug:

@@ -240,6 +240,7 @@ if __name__ == '__main__':
 
     trans_success_data = {}
     heur_success_data = {}
+    rank_success_data = {}
     plan_paths = {}
 
     if args.eval_mode == 'planning':
@@ -257,10 +258,12 @@ if __name__ == '__main__':
     for method, method_model_paths in model_paths.items():
         trans_success_data[method] = {}
         heur_success_data[method] = {}
+        rank_success_data[method] = {}
         plan_paths[method] = {}
         for test_num_blocks in all_test_num_blocks:
             trans_success_data[method][test_num_blocks] = {}
             heur_success_data[method][test_num_blocks] = {}
+            rank_success_data[method][test_num_blocks] = {}
             plan_paths[method][test_num_blocks] = {}
             for model_path in method_model_paths:
                 model_logger = GoalConditionedExperimentLogger(model_path)
@@ -275,7 +278,7 @@ if __name__ == '__main__':
                     for goal in test_goals[test_num_blocks]:
                         for _ in range(num_plan_attempts):
                             plan_args.exp_name = 'train_blocks_%i_policy_%s_plan_blocks_%i' % (model_args.num_blocks, model_args.policy, test_num_blocks)
-                            found_plan, plan_exp_path = plan.run(goal, plan_args)
+                            found_plan, plan_exp_path, rank_accuracy = plan.run(goal, plan_args)
                             if found_plan:
                                 test_world = ABCBlocksWorldGT(test_num_blocks)
                                 final_state = test_world.execute_plan([node.action for node in found_plan])
@@ -285,6 +288,7 @@ if __name__ == '__main__':
                             #print_state(goal, world.num_objects)
                             all_successes.append(success)
                             all_plan_exp_paths.append(plan_exp_path)
+                    rank_success_data[method][test_num_blocks][model_path] = rank_accuracy
                     trans_success_data[method][test_num_blocks][model_path] = np.sum(all_successes)/(num_goals*num_plan_attempts)
                     plan_paths[method][test_num_blocks][model_path] = all_plan_exp_paths
                 if args.eval_mode == 'accuracy':
@@ -311,6 +315,7 @@ if __name__ == '__main__':
     if compare_opt:
         trans_success_data['OPT'] = {}
         heur_success_data['OPT'] = {}
+        rank_success_data['OPT'] = {}
         for test_num_blocks in all_test_num_blocks:
             if args.eval_mode == 'planning':
                 plan_args.num_blocks = test_num_blocks
@@ -321,7 +326,7 @@ if __name__ == '__main__':
                 for goal in test_goals[test_num_blocks]:
                     for _ in range(num_plan_attempts):
                         plan_args.exp_name = 'train_blocks_%i_policy_%s_plan_blocks_%i' % (model_args.num_blocks, model_args.policy, test_num_blocks)
-                        found_plan, plan_exp_path = plan.run(goal, plan_args)
+                        found_plan, plan_exp_path, rank_accuracy = plan.run(goal, plan_args)
                         if found_plan:
                             test_world = ABCBlocksWorldGT(test_num_blocks)
                             final_state = test_world.execute_plan([node.action for node in found_plan])
@@ -332,6 +337,7 @@ if __name__ == '__main__':
                         all_plan_exp_paths.append(plan_exp_path)
                 trans_success_data['OPT'][test_num_blocks] = np.sum(all_successes)/(num_goals*num_plan_attempts)
                 plan_paths['OPT'][test_num_blocks] = all_plan_exp_paths
+                rank_success_data['OPT'][test_num_blocks] = rank_accuracy
             elif args.eval_mode == 'accuracy':
                 test_dataset_path = test_datasets[test_num_blocks]
                 test_dataset_logger = GoalConditionedExperimentLogger(test_dataset_path)
@@ -339,7 +345,8 @@ if __name__ == '__main__':
                 test_heur_dataset = test_dataset_logger.load_heur_dataset()
                 test_trans_dataset.set_pred_type('full_state')
                 trans_success_data['OPT'][test_num_blocks] = calc_trans_accuracy('opt', test_trans_dataset, test_num_blocks)
-                heur_success_data['OPT'][test_num_blocks] = calc_heur_error('opt', test_heur_dataset, test_num_blocks)
+                heur_accuracy = calc_heur_error('opt', test_heur_dataset, test_num_blocks)
+                heur_success_data['OPT'][test_num_blocks] = heur_accuracy
 
     # Save data to logger
     logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'eval_models')
@@ -354,6 +361,11 @@ if __name__ == '__main__':
     plot_accuracy(trans_success_data, all_test_num_blocks, trans_title, xlabel, trans_ylabel, logger)
 
     if args.eval_mode == 'accuracy':
-        heur_title = 'Heuristic Model Performance with Learned\nModels in %s Block World' % model_args.num_blocks  # TODO: hack
+        heur_title = 'Heuristic Model MSE with Learned\nModels in %s Block World' % model_args.num_blocks  # TODO: hack
         heur_ylabel = 'Average MSE'
         plot_accuracy(heur_success_data, all_test_num_blocks, heur_title, xlabel, heur_ylabel, logger)
+
+    elif args.eval_mode == 'planning':
+        heur_title = 'Heuristic Model Rank Accuracy with Learned\nModels in %s Block World' % model_args.num_blocks  # TODO: hack
+        heur_ylabel = 'Rank Accuracy'
+        plot_accuracy(rank_success_data, all_test_num_blocks, heur_title, xlabel, heur_ylabel, logger)

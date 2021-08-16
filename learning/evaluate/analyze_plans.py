@@ -3,24 +3,25 @@ import numpy as np
 import pydot
 
 from learning.active.utils import GoalConditionedExperimentLogger
-
+from learning.evaluate.utils import stacked_blocks_to_str
 # learning the delta state saves states as vectors
 # all others (including learning a classifier) save the state as a LogicalState
-def node_to_label(node):
-    if isinstance(node.state, tuple): # vec state
-        str_state = str(node.state[1].squeeze()) # +0 to get rid of -0s
+def state_to_label(state, value):
+    if isinstance(state, tuple): # vec state
+        str_state = str(state[1].squeeze()) # +0 to get rid of -0s
     else: # logical state
-        str_state = stacked_blocks_to_str(node.state.stacked_blocks)
-    str_state += '\n'+str(node.value)
+        str_state = stacked_blocks_to_str(state.stacked_blocks)
+    str_state += '\n'+str(value)
     return str_state
 
 def generate_dot_graph(plan_path):
     plan_logger = GoalConditionedExperimentLogger(plan_path)
     plan_args = plan_logger.load_args()
-    model_path = plan_args.model_exp_path
-    model_logger = GoalConditionedExperimentLogger(model_path)
-    model_args = model_logger.load_args()
-    goal = plan_logger.load_plan_goal()
+    if plan_args.model_type == 'learned':
+        model_path = plan_args.model_exp_path
+        model_logger = GoalConditionedExperimentLogger(model_path)
+        model_args = model_logger.load_args()
+    goal = plan_logger.load_plan_goal() # list of predicates
     tree = plan_logger.load_plan_tree()
     plan = plan_logger.load_final_plan()
 
@@ -28,13 +29,21 @@ def generate_dot_graph(plan_path):
     if plan is not None:
         plan_ids = [node.id for node in plan]
 
-    title = model_args.pred_type+'\n'+model_path+'\n'+model_args.dataset_exp_path
+    title = ''
+    if plan_args.model_type == 'learned':
+        title = model_args.pred_type+'\n'+model_path+'\n'+model_args.dataset_exp_path
     graph = pydot.Dot("my_graph", graph_type="graph", label=title, labelloc="t")
-    # add goal node TODO: make more general
-    graph.add_node(pydot.Node(-1, label=str(goal[0].bottom_num)+'/'+str(goal[0].top_num), color='red'))
+    ## add goal node TODO: make more general
+    from learning.domains.abc_blocks.world import logical_to_vec_state
+    from learning.evaluate.utils import vec_to_logical_state
+    goal_state = logical_to_vec_state(goal, tree.world.num_objects)
+    lgoal_state = vec_to_logical_state(goal_state[1], tree.world)
+    graph.add_node(pydot.Node(-1, label=state_to_label(lgoal_state, 1.0), color='red'))
+    ##
+
     # make all nodes
     for node_id, node in tree.nodes.items():
-        label = node_to_label(node)
+        label = state_to_label(node.state, node.value)
         if node_id in plan_ids:
             graph.add_node(pydot.Node(node_id, label=label, color="green"))
         else:
@@ -44,6 +53,7 @@ def generate_dot_graph(plan_path):
         for child_id in node.children:
             graph.add_edge(pydot.Edge(node_id, child_id))
     plan_logger.save_dot_graph(graph)
+    print('Saved dot graph to %s' % plan_logger.exp_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -58,7 +68,7 @@ if __name__ == '__main__':
     if args.debug:
         import pdb; pdb.set_trace()
 
-    plan_paths = []
+    plan_paths = ['learning/experiments/logs/planning/test-20210816-163713']
 
     if args.exp_path:
         logger = GoalConditionedExperimentLogger(args.exp_path)
@@ -73,8 +83,5 @@ if __name__ == '__main__':
                         generate_dot_graph(plan_path)
     else:
         for plan_path in plan_paths:
-            plan_logger = GoalConditionedExperimentLogger(plan_path)
-            plan_args = plan_logger.load_args()
-            model_path = plan_args.model_exp_path
             print('Generating dot graphs for hardcoded plan_paths in file.')
-            generate_dot_graph(plan_path, model_path)
+            generate_dot_graph(plan_path)
