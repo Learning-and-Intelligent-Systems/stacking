@@ -81,7 +81,7 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         if action is not None:
             bottom_block_num = action[0]
             top_block_num = action[1]
-            condition = top_block_num not in state.stacked_blocks
+            condition = top_block_num not in state.stacked_blocks # TODO: might be redundant after random policy
             if not optimistic:
                 condition = condition and \
                         top_block_num == bottom_block_num + 1
@@ -118,12 +118,46 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
             action = (bottom_block_num, top_block_num)
         return action
 
-    # goal state is already logical
+    # goal is list of predicates (returned by state.as_logical())
     def is_goal_state(self, state, goal):
         in_goal = True
         for goal_pred in goal:
             in_goal = in_goal and goal_pred.in_state(state.as_logical())
         return in_goal
+
+    # NOTE: we only use this function to calculate the ground state steps to goal
+    # given a LEGAL goal state and start state (eg. won't get goal of (3 on 1))
+    def steps_to_goal(self, state, goal_state, optimistic=False):
+        goal_tower_height = len(goal_state.stacked_blocks)
+        # stack hasn't started yet (just need to create stack)
+        if state.stacked_blocks == []:
+            return goal_tower_height-1
+
+        # already reached goal
+        if self.is_goal_state(state, goal_state.as_logical()):
+            return 0
+
+        goal_bottom_block = goal_state.stacked_blocks[0]
+        goal_top_block = goal_state.stacked_blocks[-1]
+
+        # cannot get goal blocks under stack
+        if goal_top_block <= state.stacked_blocks[0]:
+            return 1000
+
+        # stack is partially complete, just need to finish
+        if goal_bottom_block in state.stacked_blocks:
+            return goal_top_block - state.stacked_blocks[-1]
+
+        # can get blocks on top of stack
+        if goal_bottom_block > state.stacked_blocks[-1]:
+            if optimistic:
+                return goal_tower_height
+            else:
+                return goal_top_block - state.stacked_blocks[-1]
+
+        print('unhandled case for calculating steps to goal')
+        import pdb; pdb.set_trace()
+
 
 # Learned Blocks World where learned model is a classifier on top of the ground truth optimistic model
 class ABCBlocksWorldLearnedClass(ABCBlocksWorldGT):
@@ -182,6 +216,9 @@ class ABCBlocksWorldGTOpt(ABCBlocksWorldGT):
 
     def transition(self, state, action):
         return super().transition(state, action, optimistic=True)
+
+    def steps_to_goal(self, state, goal_state):
+        return super().steps_to_goal(state, goal_state, optimistic=True)
 
 # In the ground truth world the state is separate from world so that we can get different
 # state representations (logical and vectorized)
