@@ -3,7 +3,7 @@
 python -m learning.experiments.active_train_towers --block-set-fname="learning/data/may_blocks/blocks/10_random_block_set_2.pkl" \
                                                    --strategy subtower \
                                                    --sampler random \
-                                                   --n-epochs 100 \
+                                                   --n-epochs 1000 \
                                                    --exp-name train-marg-fit-single \
                                                    --pretrained-ensemble-exp-path learning/experiments/logs/latents-train-marginal-bugfix-20210608-215642 \
                                                    --ensemble-tx 40 \

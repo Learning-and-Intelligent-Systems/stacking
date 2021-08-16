@@ -72,9 +72,8 @@ def plot_train_accuracy(logger):
     plt.savefig(logger.get_figure_path('train_accuracy.png'))
     plt.clf()
 
-
-def plot_latent_uncertainty(logger):
-    scales = []
+def plot_latent_means(logger):
+    means = np.zeros((logger.args.max_acquisitions, 4))
 
     # go through each acqisition step
     for tx in range(0, logger.args.max_acquisitions):
@@ -82,16 +81,37 @@ def plot_latent_uncertainty(logger):
 
         # load the dataset and ensemble from that timestep
         ensemble = logger.get_ensemble(tx)
-        scales.append(torch.exp(ensemble.latent_logscales).mean(axis=0).detach().numpy())
+        #scales.append(torch.exp(ensemble.latent_logscales).mean(axis=0).detach().numpy())
+        means[tx, :] = ensemble.latent_locs[-1, :].detach().numpy()
+    plt.plot(means)
 
-    plt.plot(np.array(scales))
+    plt.xlabel('Acquisition Step')
+    plt.ylabel('Latent Value')
+    plt.title('Value of each latent variable during fitting')
+    plt.savefig(logger.get_figure_path('latent_means.png'))
+    plt.clf()
+    #plt.show()
+
+def plot_latent_uncertainty(logger):
+    scales = np.zeros((logger.args.max_acquisitions, 4))
+
+    # go through each acqisition step
+    for tx in range(0, logger.args.max_acquisitions):
+        print('Eval timestep, ', tx)
+
+        # load the dataset and ensemble from that timestep
+        ensemble = logger.get_ensemble(tx)
+        #scales.append(torch.exp(ensemble.latent_logscales).mean(axis=0).detach().numpy())
+        print(ensemble.latent_logscales.shape)
+        scales[tx, :] = torch.exp(ensemble.latent_logscales)[-1, :].detach().numpy()
+    plt.plot(scales)
 
     plt.xlabel('Acquisition Step')
     plt.ylabel('Mean Latent Scale')
     plt.title('Variance along each latent dimension')
     plt.savefig(logger.get_figure_path('latent_scale.png'))
     plt.clf()
-
+    #plt.show()
 
 def get_validation_accuracy(logger, fname):
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -1033,22 +1053,7 @@ def save_collected_tower_images(logger):
         plt.imsave(logger.get_figure_path('tower_%d_%d.png' % (tx, label)), np_im)
         env.disconnect()
 
-def check_redundancy(logger):
-    for tx in range(0, logger.args.max_acquisitions):
-        towers, _ = logger.load_acquisition_data(tx)
 
-        # Check acquire indices to see if we already have that tower.
-        
-        for k in ['2block']:#towers.keys():
-            print(tx, k)
-            block_orders = set()
-            pruned_indices = []
-            for ix in range(0, towers[k]['towers'].shape[0]):
-                masses = tuple(towers[k]['towers'][ix, :, 0].tolist())
-                if masses not in block_orders:
-                    pruned_indices.append(ix)
-                    block_orders.add(masses)
-            print(towers[k]['towers'].shape[0], len(pruned_indices))
 
 def check_stable_bases(logger):
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -1065,7 +1070,6 @@ def check_stable_bases(logger):
                     print('Stable Base')
                 else:
                     print('Unstable Base')
-                    #print(tower_vec)
 
 def plot_latents(logger):
     from learning.viz_latents import viz_latents
@@ -1087,59 +1091,17 @@ if __name__ == '__main__':
     parser.add_argument('--exp-path', type=str, required=True)
     args = parser.parse_args()
     
-    logger = ActiveExperimentLogger(args.exp_path, use_latents=False)
-    logger.args.max_acquisitions = 40
+    logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
+    logger.args.max_acquisitions = 14
 
-    # plot_train_accuracy(logger)
-    # plot_latent_uncertainty(logger)
-
-    #plot_latents(logger)
-
-
-    #plot_sample_efficiency(logger)
-    #analyze_sample_efficiency(logger, 340)
-    # analyze_bald_scores(logger)
-    # get_acquisition_scores_over_time(logger)
-    # plot_acquisition_scores_over_time(logger)
-    #analyze_single_dataset(logger)
-    
-    #check_stable_bases(logger)
-    # get_dataset_statistics(logger)
-
-    #inspect_validation_set('learning/data/1000block_set_(x1000.0)_constructable__val_10block.pkl')
+    plot_latent_uncertainty(logger)
+    plot_latent_means(logger)
 
     accs = get_validation_accuracy(logger,
-                                  'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_1_dict.pkl')
+                                  'learning/data/may_blocks/towers/combined_traineval0.pkl')
+                                  #'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_1_dict.pkl')
                                   #'/Users/izzy/projects/stacking/learning/data/may_cubes/towers/10block_set_(x1000)_seq_a_2_dict.pkl')
-    plot_val_accuracy(logger, init_dataset_size=40, n_acquire=10)
-
-    #plot_val_accuracy(logger, init_dataset_size=2, n_acquire=2)
-
-    # #analyze_collected_2block_towers(logger)
-    # print(accs)
-
-    #analyze_acquisition_value_with_sampling_size(logger)
-    #plot_acquisition_value_with_sampling_size(logger)
-
-    #check_redundancy(logger)
-    # analyze_acquisition_histogram(logger, block_set_fname='learning/data/may_cubes/blocks/set_a.pkl')
-    #single_2block_tower_analysis(logger)
-    #inspect_2block_towers(logger)
-
-    #check_validation_robustness()
-
-    #min_contact_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
-    #tallest_tower_regret_evaluation(logger)
-    #longest_overhang_regret_evaluation(logger)#, block_set='learning/data/block_set_10.pkl')
-    #tallest_tower_regret_evaluation(logger, block_set='learning/data/block_set_1000.pkl')
-    #plot_regret(logger)
-    # plot_constructability_over_time(logger)
-    #validate(logger, 125)
-    #get_stability_composition(logger, tx=245)
-    #validate_by_stability_type(logger, tx=85)
-    # get_percent_stable(logger)
-
-    #save_collected_tower_images(logger)
+    plot_val_accuracy(logger, init_dataset_size=0, n_acquire=2)
 
 
 
