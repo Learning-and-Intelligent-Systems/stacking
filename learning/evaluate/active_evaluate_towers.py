@@ -73,7 +73,7 @@ def plot_train_accuracy(logger):
     plt.clf()
 
 
-def plot_latent_uncertainty(logger):
+def plot_latent_uncertainty(logger, ax=plt.gca()):
     scales = []
 
     # go through each acqisition step
@@ -86,11 +86,11 @@ def plot_latent_uncertainty(logger):
 
     plt.plot(np.array(scales))
 
-    plt.xlabel('Acquisition Step')
-    plt.ylabel('Mean Latent Scale')
-    plt.title('Variance along each latent dimension')
+    ax.set_xlabel('Acquisition Step')
+    ax.set_ylabel('Mean Latent Scale')
+    ax.set_title('Variance along each latent dimension')
     plt.savefig(logger.get_figure_path('latent_scale.png'))
-    plt.clf()
+    ax.cla()
 
 
 def get_validation_accuracy(logger, fname):

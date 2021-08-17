@@ -164,14 +164,15 @@ if __name__ == '__main__':
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--n-objects', type=int, default=10)
 
-    # The following arguments are used when we wanted to fit latents with an already trained model.
     parser.add_argument('--use-latents', action='store_true')
+
+    # The following arguments are used when we wanted to fit latents with an already trained model.
     parser.add_argument('--fitting', action='store_true', help='This will cause only the latents to update during training.')
     parser.add_argument('--latent-ensemble-exp-path', type=str, default='', help='Path to a trained latent ensemble.')
     parser.add_argument('--latent-ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
 
     args = parser.parse_args()
-    
+
 
     run_active_throwing(args)
 

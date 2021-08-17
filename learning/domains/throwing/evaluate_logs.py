@@ -25,7 +25,7 @@ def plot_task_performance(logger, task_score_fn, ax=plt.gca()):
     ax.set_title('Task Performance')
     np.save(logger.get_results_path('task_performance.npy'), np.array(scores))
     plt.savefig(logger.get_figure_path('task_performance.png'))
-    plt.clf()
+    ax.cla()
 
 
 def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
@@ -48,7 +48,7 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
     ax.set_title('Validation Accuracy')
     np.save(logger.get_results_path('val_accuracy.npy'), np.array(scores))
     plt.savefig(logger.get_figure_path('val_accuracy.png'))
-    plt.clf()
+    ax.cla()
 
 
 if __name__ == '__main__':
@@ -61,10 +61,12 @@ if __name__ == '__main__':
     logger.args.max_acquisitions = 100  # lazy
     logger.args.throwing = True # lazy
 
-    # plot_latent_uncertainty(logger)
+    ax = plt.gca()
 
-    # plot_val_accuracy(logger)
+    plot_latent_uncertainty(logger, ax=ax)
+
+    plot_val_accuracy(logger, ax=ax)
 
     objects = logger.get_objects(ThrowingBall)
     task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
-    plot_task_performance(logger, task_score_fn)
+    plot_task_performance(logger, task_score_fn, ax=ax)
