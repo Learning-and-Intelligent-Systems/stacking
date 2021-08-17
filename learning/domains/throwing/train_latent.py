@@ -11,14 +11,15 @@ from torch.utils.data import TensorDataset, DataLoader
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
-from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, make_x_partially_observable
 
 
 def get_predictions(latent_ensemble,
                     unlabeled_data,
                     n_latent_samples=10,
                     marginalize_latents=True,
-                    marginalize_ensemble=True):
+                    marginalize_ensemble=True,
+                    hide_dims=[]):
 
     dataset = TensorDataset(*unlabeled_data)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=64)
@@ -28,6 +29,7 @@ def get_predictions(latent_ensemble,
 
     for batch in dataloader:
         x, z_id = batch
+        x = make_x_partially_observable(x, hide_dims)
         if torch.cuda.is_available():
             x = x.cuda()
             z_id = z_id.cuda()
@@ -47,7 +49,11 @@ def get_predictions(latent_ensemble,
 
     return torch.cat(mus, axis=0), torch.cat(sigmas, axis=0)
 
-def get_both_loss(latent_ensemble, batches, N, N_samples=10):
+def get_both_loss(latent_ensemble,
+                  batches,
+                  N,
+                  N_samples=10,
+                  hide_dims=[]):
     """ compute the loglikelohood of both the latents and the ensemble
 
     Arguments:
@@ -65,13 +71,16 @@ def get_both_loss(latent_ensemble, batches, N, N_samples=10):
 
     for i, batch in enumerate(batches):
         x, z_id, y = batch
+        x = make_x_partially_observable(x, hide_dims)
         N_batch = x.shape[0]
+
         if torch.cuda.is_available():
             x = x.cuda()
             z_id = z_id.cuda()
             y = y.cuda()
 
         # run a forward pass of the network and compute the likeliehood of y
+
         pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples)
         D_pred = pred.shape[-1] // 2
         mu, log_sigma = torch.split(pred, D_pred, dim=-1)
@@ -86,7 +95,9 @@ def get_both_loss(latent_ensemble, batches, N, N_samples=10):
     return (kl_loss + N*likelihood_loss)/N_batch
 
 
-def evaluate(latent_ensemble, dataloader):
+def evaluate(latent_ensemble,
+            dataloader,
+            hide_dims=[]):
     """ computes the data likelihood
 
     Arguments:
@@ -107,6 +118,7 @@ def evaluate(latent_ensemble, dataloader):
 
     for batches in dataloader:
         x, z_id, y = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
+        x = make_x_partially_observable(x, hide_dims)
         if torch.cuda.is_available():
             x = x.cuda()
             z_id = z_id.cuda()
@@ -124,7 +136,8 @@ def evaluate(latent_ensemble, dataloader):
 def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     freeze_latents=False,
     freeze_ensemble=False,
-    return_logs=False):
+    return_logs=False,
+    hide_dims=[]):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
@@ -140,7 +153,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
         for batch_idx, set_of_batches in enumerate(dataloader):
             params_optimizer.zero_grad()
             latent_optimizer.zero_grad()
-            both_loss = get_both_loss(latent_ensemble, set_of_batches, N=len(dataloader.loaders[0].dataset))
+            both_loss = get_both_loss(latent_ensemble, set_of_batches, N=len(dataloader.loaders[0].dataset), hide_dims=hide_dims)
             both_loss.backward()
             if not freeze_latents: latent_optimizer.step()
             if not freeze_ensemble: params_optimizer.step()
@@ -148,7 +161,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 
 
         if val_dataloader is not None:
-            val_acc = evaluate(latent_ensemble, val_dataloader)
+            val_acc = evaluate(latent_ensemble, val_dataloader, hide_dims=hide_dims)
             accs.append(val_acc.item())
             if val_acc > best_acc:
                 best_acc = val_acc
@@ -167,20 +180,26 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--hide-dims', type=str, default='3')
+
     n_objects = 5
     n_latents = n_objects
     n_models = 10
-    d_observe = 11
+    d_observe = 12
     d_latents = 3
     d_pred = 2
 
+    args = parser.parse_args()
 
     # generate training data
     train_objects = generate_objects(n_objects)
     print('Generating Training Data')
-    train_dataset = TensorDataset(*generate_dataset(train_objects, 1000))
+    train_dataset = TensorDataset(*generate_dataset(train_objects, 10))
     print('Generating Validation Data')
-    val_dataset = TensorDataset(*generate_dataset(train_objects, 100))
+    val_dataset = TensorDataset(*generate_dataset(train_objects, 10))
 
     # inialize dataloaders
     train_dataloader = ParallelDataLoader(dataset=train_dataset,
@@ -192,11 +211,13 @@ if __name__ == '__main__':
                                         shuffle=False,
                                         n_dataloaders=1)
 
+    # produce a list of the dimensions of the object propoerties to make hidden
+    hide_dims = [int(d) for d in args.hide_dims.split(',')]
 
     # initialize the LatentEnsemble
     ensemble = Ensemble(base_model=FeedForward,
                         base_args={
-                                    'd_in': d_observe + d_latents,
+                                    'd_in': d_observe + d_latents - len(hide_dims),
                                     'd_out': d_pred,
                                     'h_dims': [64, 32]
                                   },
@@ -205,13 +226,15 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         latent_ensemble = latent_ensemble.cuda()
 
+
     # train the LatentEnsemble
     latent_ensemble.reset_latents(random=False)
     latent_ensemble, accs, latents = train(train_dataloader,
                                            val_dataloader,
                                            latent_ensemble,
                                            n_epochs=100,
-                                           return_logs=True)
+                                           return_logs=True,
+                                           hide_dims=hide_dims)
 
     plt.plot(accs)
     plt.show()

@@ -12,6 +12,8 @@ def truncnorm(lower, upper, mu, sigma, size=(1,)):
     return X.rvs(size)
 
 class ThrowingBall:
+    dim = 10 # vectorized dimensions
+
     """ Represents a throwable ball with visual and physical properties """
     def __init__(self, color=[1,0,0], mass=1.0, radius=0.025,
                  air_drag_linear=1, air_drag_angular=1e-5,
@@ -56,7 +58,7 @@ class ThrowingBall:
                             bounciness=bounciness)
 
     def vectorize(self):
-        v = np.zeros(10)
+        v = np.zeros(self.dim)
         v[:3] = self.color
         v[3] = self.mass
         v[4] = self.radius
@@ -79,6 +81,8 @@ class ThrowingBall:
                             bounciness=v[9])
 
 class ThrowingAction:
+    dim = 2 # vectorized dimensions
+
     """ Represents a throwing action """
     def __init__(self, obj, init_pos=[0,0,0], init_vel=[0,0,0]):
         self.object = obj

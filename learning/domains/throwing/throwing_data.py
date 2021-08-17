@@ -27,14 +27,14 @@ def label_actions(objects, actions, z_ids, as_tensor=False):
     return torch.Tensor(ys) if as_tensor else np.array(ys)
 
 def construct_xs(objects, actions, z_ids):
-    """ construct a vectorized representation of an action and 
+    """ construct a vectorized representation of an action and
     observable object parameters
     """
     xs = []
 
     for a, z_id in zip(actions, z_ids):
         b = objects[z_id]
-        v = b.vectorize()[[0,1,2,4,5,6,7,8,9]]
+        v = b.vectorize()
         x = np.concatenate([a, v])
         xs.append(x)
 
@@ -43,7 +43,10 @@ def construct_xs(objects, actions, z_ids):
 def xs_to_actions(xs):
     return xs[:,:2]
 
-def generate_dataset(objects, n_data, as_tensor=True, label=True):
+def generate_dataset(objects,
+                     n_data,
+                     as_tensor=True,
+                     label=True):
     obj_ids = np.arange(len(objects))
     actions, z_ids = sample_actions(obj_ids, n_samples=n_data)
     xs = construct_xs(objects, actions, z_ids)
@@ -57,6 +60,10 @@ def generate_dataset(objects, n_data, as_tensor=True, label=True):
 def generate_objects(n_objects):
     return [ThrowingBall.random() for _ in range(n_objects)]
 
+def make_x_partially_observable(xs, hide_dims):
+    fully_obs_dim = ThrowingBall.dim + ThrowingAction.dim
+    keep_dims = list(set(np.arange(fully_obs_dim)).difference(set(hide_dims)))
+    return xs[..., keep_dims]
 
 class ParallelDataLoader:
     def __init__(self, dataset, batch_size, shuffle, n_dataloaders=1):
