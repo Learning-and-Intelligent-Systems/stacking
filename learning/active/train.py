@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import matplotlib
-matplotlib.use("TkAgg")
-    
+
 from sklearn.metrics import f1_score # TODO: remove this dependency
 from torch.nn import functional as F
 from torch.optim import Adam
