@@ -71,7 +71,7 @@ class Tree:
             node_id = self.nodes[node_id].parent_id
 
     def update_steps(self, node_id, value):
-        self.nodes[node_id] = value
+        self.nodes[node_id].value = value
         while node_id is not None:
             self.nodes[node_id].visit_count += 1
             node_id = self.nodes[node_id].parent_id
@@ -93,12 +93,7 @@ class Tree:
             step_values[i] = child.steps_to_goal
         min_steps_node_idx = np.argmin(step_values)
         return children[min_steps_node_idx]
-    '''
-    def get_min_cost_node(self, node_ids):
-        node_costs = [self.nodes[node_id].g+self.nodes[node_id].h for node_id in node_ids]
-        min_cost_node_index = np.argmin(node_costs)
-        return node_ids[min_cost_node_index]
-    '''
+
     def expand(self, new_node):
         new_node_id = self.tree_count
         new_node.id = new_node_id

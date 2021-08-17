@@ -5,7 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldLearned, ABCBlocksWorldLearnedClass, print_state, LogicalState
+from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldLearned, \
+                                            ABCBlocksWorldLearnedClass, print_state, \
+                                            ABCBlocksWorldGTOpt, LogicalState
 from learning.domains.abc_blocks.abc_blocks_data import model_forward
 from learning.active.utils import GoalConditionedExperimentLogger
 from planning.tree import Tree, Node
@@ -61,63 +63,6 @@ def mcts(tree, world, node_value_fn, node_select_fn, node_update, args):
             node_value = node_value_fn(node_id)
             node_update(node_id, node_value)
     return tree
-
-'''
-def a_star(tree, world, args):
-    # setup learned heuristic model_logger
-    model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
-    print('Using heuristic model %s.' % model_logger.exp_path)
-    heur_model = model_logger.load_heur_model()
-
-    # set initial node cost
-    object_features, edge_features = tree.init_node.state.as_vec()
-    goal_edge_features = tree.goal.as_vec()
-    tree.init_node.g = 0
-    tree.init_node.h = model_forward(heur_model, [object_features, edge_features, goal_edge_features])
-
-    # begin search
-    open_nodes = [0] # 0 is the inital node
-    closed_nodes = []
-    for t in range(args.timeout):
-        sys.stdout.write("Search progress: %i   \r" % (t) )
-        sys.stdout.flush()
-        node_current_id = tree.get_min_cost_node(open_nodes)
-        open_nodes.remove(node_current_id)
-        current_node = tree.nodes[node_current_id]
-        if world.is_goal_state(current_node.state, tree.goal):
-            break
-        # expand node if not done yet
-        if len(current_node.children) == 0: # TODO: check that there are actions to try from this state
-            for _ in range(args.num_branches):
-                new_action = world.random_policy(current_node.state)
-                new_state = world.transition(state, action)
-                new_node = Node(new_state, new_action, node_current_id)
-                object_features, edge_features = new_state.as_vec()
-                new_node.g = current_node.g + 1
-                new_node.h = model_forward(heur_model, [object_features, edge_features, goal_edge_features])
-                tree.expand(new_node)
-                open_nodes.append(new_node.id)
-        for child in current_node.children:
-            #if child.id in open_nodes
-            pass
-    return tree
-
-def best_first_search(tree, world, args):
-    for t in range(args.timeout):
-        sys.stdout.write("Search progress: %i   \r" % (t) )
-        sys.stdout.flush()
-        parent_node = tree.traverse()
-        state = parent_node.state
-        new_actions = [world.random_policy(state) for _ in range(args.num_branches)]
-        new_states = [world.transition(state, action) for action in new_actions]
-        new_nodes = [Node(new_state, new_action, parent_node.id) for (new_state, new_action) \
-                                in zip(new_states, new_actions)]
-        for new_node in new_nodes:
-            new_node_id = tree.expand(new_node)
-            rollout_value = tree.rollout(new_node_id)
-            tree.backpropagate(new_node_id, rollout_value)
-    return tree
-'''
 
 def run(goal, args):
     world = setup_world(args)
