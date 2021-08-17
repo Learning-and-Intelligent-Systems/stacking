@@ -57,11 +57,11 @@ def plot_horiz_bars(transitions, plot_inds, bar_text_inds, color=False, plot_tit
             plot_text[key] = set()
             plot_text[key].add(bar_text)
 
-    bar_color = lambda vals: 'green' if list(vals)[0]=='1' else 'red'
-    bar_colors = [bar_color(v) for v in plot_text.values()]
-
     fig, ax = plt.subplots()
     if color:
+        # this colors the bar based off of the first value in the bar text (i think)
+        bar_color = lambda vals: 'green' if list(vals)[0]=='1' else 'red'
+        bar_colors = [bar_color(v) for v in plot_text.values()]
         bar_plot = ax.barh(np.arange(len(plot_data)), plot_data.values(), align='center', color=bar_colors)
     else:
         bar_plot = ax.barh(np.arange(len(plot_data)), plot_data.values(), align='center')

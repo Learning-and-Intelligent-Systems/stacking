@@ -10,10 +10,8 @@ from learning.domains.abc_blocks.abc_blocks_data import model_forward
 from learning.evaluate.utils import vec_to_logical_state, plot_horiz_bars, join_strs, \
                                 stacked_blocks_to_str, plot_results, recc_dict
 
-transition_names = ('state', 'action', 'next state', 'gt pred', \
-                'model pred', 'optimistic next state', 'model accuracy')
-
-def plot_transition_figs(transitions, model_logger, test_num_blocks, all_plot_inds, plot_keys):
+def plot_transition_figs(transitions, model_logger, test_num_blocks, all_plot_inds, \
+                        plot_keys, transition_names):
     # The first value is how you want to separate the data
     # The second value is what you want to show on the bars
 
@@ -23,7 +21,7 @@ def plot_transition_figs(transitions, model_logger, test_num_blocks, all_plot_in
         y_label = join_strs(transition_names, y_axis_values)
         x_label = join_strs(transition_names, bar_text_values)
         color = False
-        if plot_key == 'acc':
+        if plot_key in ['acc', 'top on table', 'plus one', 'bottom pos', 'opt+bottom_pos', 'opt+plus_one']:
             color = True
         plot_horiz_bars(transitions, y_axis_values, bar_text_values, plot_title=plot_key, x_label=x_label, y_label=y_label, color=color)
         plot_path = '%s/%s_testblocks_%i.png' % (model_logger.exp_path, plot_key, test_num_blocks)
@@ -55,6 +53,18 @@ def calc_trans_accuracy(model_type, test_dataset, test_num_blocks, model=None, r
             model_pred = model_forward(model, x).round().squeeze()
             gt_pred = y.numpy().squeeze()
         accuracy = int(np.array_equal(gt_pred, model_pred))# TODO: check this works in all model cases
+
+        # calculate state and action features
+        bottom_num = action[0]
+        top_num = action[1]
+        plus_one = str(int(top_num == bottom_num + 1))
+        # NOTE: these are the only 2 cases. we don't sameple actions where
+        # the bottom block is in the middle or bottom of the stack
+        if len(lstate.stacked_blocks) == 0:
+            bottom_pos = '0' # no stack
+        elif lstate.stacked_blocks[-1] == bottom_num:
+            bottom_pos = '1' # top of stack
+
         # turn all transition info into a string
         str_state = stacked_blocks_to_str(lstate.stacked_blocks)
         str_action = '%i/%i' % (action[0], action[1])
@@ -69,7 +79,8 @@ def calc_trans_accuracy(model_type, test_dataset, test_num_blocks, model=None, r
         str_acc = str(accuracy)
 
         transition = (str_state, str_action, str_next_state, str_gt_pred, \
-                                str_pred, str_opt_next_state, str_acc)
+                                str_pred, str_opt_next_state, str_acc, \
+                                plus_one, bottom_pos)
         transitions.append(transition)
         accuracies.append(accuracy)
 
@@ -129,55 +140,63 @@ if __name__ == '__main__':
                     6: 'learning/experiments/logs/datasets/large-test-6-20210810-223731',
                     7:'learning/experiments/logs/datasets/large-test-7-20210811-173148',
                     8:'learning/experiments/logs/datasets/large-test-8-20210811-173210'}
-                    }
+
     # name of plot to generate: (how to divide data on y axis, what to show on x axis)
     # indices are from transition_names at top of file
-    all_plot_inds = {'all_trans': [[0,1,2,3],[4]],
-                'classification': [[3], [0,1,2]],
-                'init_state': [[0,3], [1,2]],
-                'acc': [[0,1], [6]]}
+    transition_names = ('state', 'action', 'next state', 'gt pred', \
+                    'model pred', 'optimistic next state', 'model accuracy', \
+                    'plus one', 'bottom pos')
+    all_plot_inds = {'plus one': [[7, 6], [6]],
+                     'bottom pos': [[8, 6], [6]],
+                     'all_trans': [[0,1,2,3],[4]],
+                     'classification': [[3], [0,1,2]],
+                     'init_state': [[0,3], [1,2]],
+                     'acc': [[0,1], [6]],
+                     'opt': [[3, 4, 6], [6]],
+                     'opt+bottom_pos': [[3, 4, 6, 8], [6]],
+                     'opt+plus_one': [[3, 4, 6,7], [6]]}
     # which ones to actually plot and save to logger
-    plot_keys = []#['acc']
+    plot_keys = ['opt+bottom_pos', 'opt+plus_one']#['plus one', 'bottom pos'] #, 'acc']
     compare_opt = True  # if want to compare against the optimistic model
     model_paths = {'FULL': ['learning/experiments/logs/models/delta-4-block-random-20210811-171313',
                                 'learning/experiments/logs/models/delta-4-block-random-20210811-171322',
                                 'learning/experiments/logs/models/delta-4-block-random-20210811-171330',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171339',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171347',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171356',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171404',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171413',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171421',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171430',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171438',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171447',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171456',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171504',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171513',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171522',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171530',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171539',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171548',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171339',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171347',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171356',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171404',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171413',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171421',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171430',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171438',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171447',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171456',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171504',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171513',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171522',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171530',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171539',
+                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171548',
                                 'learning/experiments/logs/models/delta-4-block-random-20210811-171557'],
                 	'CLASS': ['learning/experiments/logs/models/class-4-block-random-20210811-170709',
                                 'learning/experiments/logs/models/class-4-block-random-20210811-170858',
                                 'learning/experiments/logs/models/class-4-block-random-20210811-170719',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170909',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170730',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170920',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170740',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170936',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170750',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-171043',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170802',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-171054',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170814',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-171125',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170825',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-171142',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170835',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-171210',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170847',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170909',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170730',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170920',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170740',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170936',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170750',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-171043',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170802',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-171054',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170814',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-171125',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170825',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-171142',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170835',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-171210',
+                                #'learning/experiments/logs/models/class-4-block-random-20210811-170847',
                                 'learning/experiments/logs/models/class-4-block-random-20210811-171218']}
 
 ########
@@ -209,7 +228,7 @@ if __name__ == '__main__':
                 trans_success_data[method][test_num_blocks][model_path] = trans_accuracy
                 heur_success_data[method][test_num_blocks][model_path] = heur_accuracy
                 plot_transition_figs(transitions, model_logger, test_num_blocks, \
-                                    all_plot_inds, plot_keys)
+                                    all_plot_inds, plot_keys, transition_names)
 
     if compare_opt:
         for test_num_blocks in test_datasets:
