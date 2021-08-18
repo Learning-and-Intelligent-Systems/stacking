@@ -5,7 +5,6 @@ from copy import copy
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use("TkAgg")
 
 from learning.active.train import train
 from learning.active.utils import GoalConditionedExperimentLogger
@@ -69,13 +68,13 @@ if __name__ == '__main__':
     model_logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'models')
 
     print('Training datasets %s.' % dataset_logger.exp_path)
-    trans_dataloader = DataLoader(trans_dataset, batch_size=args.batch_size, shuffle=False) # TODO: switch to shuffle?
+    trans_dataloader = DataLoader(trans_dataset, batch_size=args.batch_size, shuffle=True)
     trans_model = TransitionGNN(n_of_in=n_of_in,
                                 n_ef_in=n_ef_in,
                                 n_af_in=n_af_in,
                                 n_hidden=args.n_hidden,
                                 pred_type=args.pred_type)
-    heur_dataloader = DataLoader(heur_dataset, batch_size=args.batch_size, shuffle=False) # TODO: switch to shuffle?
+    heur_dataloader = DataLoader(heur_dataset, batch_size=args.batch_size, shuffle=True)
     heur_model = HeuristicGNN(n_of_in=n_of_in,
                                 n_ef_in=n_ef_in,
                                 n_hidden=args.n_hidden)
