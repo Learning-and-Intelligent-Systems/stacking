@@ -8,29 +8,27 @@ from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset, A
 from learning.active.utils import GoalConditionedExperimentLogger
 
 # TODO: generate validation dataset too!!
+# TODO: this doesn't make len(dataset) == args.max_transitions exactly
+# because sequences are added in chunks that might push it past the limit
+# but will be close
 # want to show that this will be improved by an actively collected dataset
 def generate_dataset(args, world, trans_dataset, heur_dataset, policy):
-    final_states = []
     goal = None
-    for seq_i in range(args.max_seq_attempts):
-        new_state = world.get_init_state()
-        action_sequence = []
-        valid_actions = True
-        action_i = 0
-        while valid_actions and action_i < args.max_action_attempts:
+    new_state = world.get_init_state()
+    action_sequence = []
+    while len(trans_dataset) < args.max_transitions:
+        valid_actions = world.expert_policy(new_state) is not None
+        if valid_actions:
             state = new_state
             vec_action = policy(state)
             new_state = world.transition(state, vec_action)
             action_sequence.append((state, vec_action))
-            action_i += 1
-            # no valid actions left
-            if world.expert_policy(new_state) is None:
-                valid_actions = False
-                action = np.zeros(2)
-                action_sequence.append((new_state, vec_action))
-        final_states.append(new_state)
-        add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, world)
-    return final_states
+        else:
+            vec_action = np.zeros(2)
+            action_sequence.append((new_state, vec_action))
+            add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, world)
+            new_state = world.get_init_state()
+            action_sequence = []
 
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, world):
     def helper(sequence, seq_goal, add_to_trans):
@@ -64,14 +62,10 @@ if __name__ == '__main__':
                         choices=['abc_blocks', 'com_blocks'],
                         default='abc_blocks',
                         help='domain to generate data from')
-    parser.add_argument('--max-seq-attempts',
+    parser.add_argument('--max-transitions',
                         type=int,
-                        default=10,
-                        help='max number of times to attempt to reach a given goal')
-    parser.add_argument('--max-action-attempts',
-                        type=int,
-                        default=30,
-                        help='max number of actions in a sequence')
+                        default=300,
+                        help='max number of transitions to save to transition dataset')
     parser.add_argument('--exp-name',
                         type=str,
                         required=True,
@@ -106,7 +100,7 @@ if __name__ == '__main__':
     trans_dataset = ABCBlocksTransDataset()
     heur_dataset = ABCBlocksHeurDataset()
     logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'datasets')
-    final_states = generate_dataset(args, world, trans_dataset, heur_dataset, policy)
+    generate_dataset(args, world, trans_dataset, heur_dataset, policy)
     logger.save_trans_dataset(trans_dataset)
     logger.save_heur_dataset(heur_dataset)
     logger.save_final_states(final_states)
