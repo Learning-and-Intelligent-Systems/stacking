@@ -179,40 +179,76 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
         return latent_ensemble
 
 
-if __name__ == '__main__':
+def generate_or_load_datasets(args):
+    # get datasets
+    if args.train_dataset == '' and args.val_dataset == '':
+        train_objects = generate_objects(args.n_objects)
+        print('Generating Training Data')
+        train_data_tuple = generate_dataset(train_objects, args.n_train)
+        print('Generating Validation Data')
+        val_data_tuple = generate_dataset(train_objects, args.n_val)
 
-    parser = argparse.ArgumentParser()
+        if args.save_train_dataset != '':
+            print('Saving training data to', args.save_train_dataset)
+            with open(args.save_train_dataset, 'wb') as handle:
+                pickle.dump(train_data_tuple, handle)
+        if args.save_val_dataset != '':
+            print('Saving vaidation data to', args.save_val_dataset)
+            with open(args.save_val_dataset, 'wb') as handle:
+                pickle.dump(val_data_tuple, handle)
 
-    parser.add_argument('--hide-dims', type=str, default='3')
+    elif args.train_dataset != '' and args.val_dataset != '':
+        print('Loading Training Data')
+        with open(args.train_dataset, 'rb') as handle:
+            train_data_tuple = pickle.load(handle)
+        print('Loading Validation Data')
+        with open(args.val_dataset, 'rb') as handle:
+            val_data_tuple = pickle.load(handle)
+        print('Warning: Training and Validation data should use same block set.')
 
-    n_objects = 5
-    n_latents = n_objects
-    n_models = 10
-    d_observe = 12
-    d_latents = 3
-    d_pred = 2
+    else:
+        print('Both train and val datasets must be specified to load from file.')
 
-    args = parser.parse_args()
-
-    # generate training data
-    train_objects = generate_objects(n_objects)
-    print('Generating Training Data')
-    train_dataset = TensorDataset(*generate_dataset(train_objects, 10))
-    print('Generating Validation Data')
-    val_dataset = TensorDataset(*generate_dataset(train_objects, 10))
-
-    # inialize dataloaders
+    # inialize datasets and dataloaders
+    train_dataset = TensorDataset(*train_data_tuple)
+    val_dataset = TensorDataset(*val_data_tuple)
     train_dataloader = ParallelDataLoader(dataset=train_dataset,
                                           batch_size=16,
                                           shuffle=True,
-                                          n_dataloaders=n_models)
+                                          n_dataloaders=args.n_models)
     val_dataloader = ParallelDataLoader(dataset=val_dataset,
                                         batch_size=16,
                                         shuffle=False,
                                         n_dataloaders=1)
 
+    return train_dataloader, val_dataloader
+
+
+if __name__ == '__main__':
+    # get commandline arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--hide-dims', type=str, default='3')
+    parser.add_argument('--train-dataset', type=str, default='')
+    parser.add_argument('--val-dataset', type=str, default='')
+    parser.add_argument('--save-train-dataset', type=str, default='')
+    parser.add_argument('--save-val-dataset', type=str, default='')
+    parser.add_argument('--n-train', type=int, default=500)
+    parser.add_argument('--n-val', type=int, default=100)
+    parser.add_argument('--n-objects', type=int, default=5)
+    parser.add_argument('--n-models', type=int, default=10)
+    args = parser.parse_args()
+
+    # get the datasets
+    train_dataloader, val_dataloader = generate_or_load_datasets(args)
+
+    # variables to define the latent ensemble
+    n_latents = args.n_objects
+    n_models = args.n_models
+    d_observe = 12
+    d_latents = 3
+    d_pred = 2
     # produce a list of the dimensions of the object propoerties to make hidden
-    hide_dims = [int(d) for d in args.hide_dims.split(',')]
+    hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
 
     # initialize the LatentEnsemble
     ensemble = Ensemble(base_model=FeedForward,
@@ -225,7 +261,6 @@ if __name__ == '__main__':
     latent_ensemble = ThrowingLatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
     if torch.cuda.is_available():
         latent_ensemble = latent_ensemble.cuda()
-
 
     # train the LatentEnsemble
     latent_ensemble.reset_latents(random=False)
