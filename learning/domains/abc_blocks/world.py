@@ -99,10 +99,14 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         return new_state
 
     def execute_plan(self, plan):
+        trajectory = []
         state = self.get_init_state()
-        for action in plan:
-            state = self.transition(state, action)
-        return state
+        if plan:
+            for action in plan:
+                trajectory.append([state, action])
+                state = self.transition(state, action)
+            trajectory.append([state, np.zeros(2)])
+        return trajectory
 
     # expert once stack is started
     def expert_policy(self, state):
@@ -288,6 +292,10 @@ def logical_to_vec_state(state, num_objects):
         edge_features[bottom_i, top_i, 0] = 1.
 
     return object_features, edge_features
+
+def generate_random_goal(world):
+    top_block_num = np.random.randint(world.min_block_num+1, world.max_block_num+1)
+    return [On(top_block_num-1, top_block_num)]
 
 '''
 def parse_goals_csv(self, goal_file_path):
