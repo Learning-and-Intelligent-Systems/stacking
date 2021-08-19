@@ -116,6 +116,7 @@ def plot_results(success_data, all_test_num_blocks, title, xlabel, ylabel, logge
     axis.set_title(title)
     axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
+    axis.set_ylim(0, 1.1)
     axis.legend(title='Method')
 
     plt.savefig('%s/%s.png' % (logger.exp_path, title))
