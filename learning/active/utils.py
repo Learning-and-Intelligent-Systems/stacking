@@ -362,8 +362,12 @@ class GoalConditionedExperimentLogger:
         with open(os.path.join(self.exp_path, fname), 'wb') as handle:
             pickle.dump(dataset, handle)
 
-    def save_trans_dataset(self, dataset):
-        self.save_dataset(dataset, 'trans_dataset.pkl')
+    def save_trans_dataset(self, dataset, i=None):
+        if i:
+            fname = 'trans_dataset_%i.pkl' % i
+        else:
+            fname = 'trans_dataset.pkl'
+        self.save_dataset(dataset, fname)
 
     def save_heur_dataset(self, dataset):
         self.save_dataset(dataset, 'heur_dataset.pkl')
@@ -373,8 +377,12 @@ class GoalConditionedExperimentLogger:
             dataset = pickle.load(handle)
         return dataset
 
-    def load_trans_dataset(self):
-        return self.load_dataset('trans_dataset.pkl')
+    def load_trans_dataset(self, i=None):
+        if i:
+            fname = 'trans_dataset_%i.pkl' % i
+        else:
+            fname = 'trans_dataset.pkl'
+        return self.load_dataset(fname)
 
     def load_heur_dataset(self):
         return self.load_dataset('heur_dataset.pkl')
@@ -382,13 +390,21 @@ class GoalConditionedExperimentLogger:
     def save_model(self, model):
         torch.save(model.state_dict(), os.path.join(self.exp_path, 'model.pt'))
 
-    def save_trans_model(self, model):
-        torch.save(model.state_dict(), os.path.join(self.exp_path, 'trans_model.pt'))
+    def save_trans_model(self, model, i=None):
+        if i:
+            fname = 'trans_model_%i.pt' % i
+        else:
+            fname = 'trans_model.pt'
+        torch.save(model.state_dict(), os.path.join(self.exp_path, fname))
 
     def save_heur_model(self, model):
         torch.save(model.state_dict(), os.path.join(self.exp_path, 'heur_model.pt'))
 
-    def load_trans_model(self):
+    def load_trans_model(self, i=None):
+        if i:
+            fname = 'trans_model_%i.pt' % i
+        else:
+            fname = 'trans_model.pt'
         n_of_in=1
         n_ef_in=1
         n_af_in=2
@@ -397,7 +413,7 @@ class GoalConditionedExperimentLogger:
                                 n_af_in=n_af_in,
                                 n_hidden=self.args.n_hidden,
                                 pred_type=self.args.pred_type)
-        model.load_state_dict(torch.load(os.path.join(self.exp_path, 'trans_model.pt')))
+        model.load_state_dict(torch.load(os.path.join(self.exp_path, fname)))
         return model
 
     def load_heur_model(self):
