@@ -4,11 +4,13 @@ Copyright 2020 Massachusetts Insititute of Technology
 Izzy Brand
 """
 import argparse
+from learning.domains.towers.tower_data import ParallelDataLoader, TowerDataset
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import random
 import shutil
+import torch
 
 from copy import deepcopy
 from mpl_toolkits.mplot3d import Axes3D
@@ -20,7 +22,7 @@ from agents.teleport_agent import TeleportAgent
 from base_class import BeliefBase
 from block_utils import get_adversarial_blocks, get_com_ranges, \
                         Environment, ParticleDistribution
-from filter_utils import create_uniform_particles, sample_and_wiggle
+from filter_utils import create_uniform_particles, create_gaussian_particles, sample_and_wiggle, sample_particle_distribution
 
 
 class ParticleBelief(BeliefBase):
@@ -123,6 +125,196 @@ class ParticleBelief(BeliefBase):
 
         return self.particles, self.estimated_coms
 
+class DiscreteLikelihoodParticleBelief(BeliefBase):
+    """
+    This particle belief represents a belief. It is assumed that the 
+    observations will come from a Bernoulli distribution.
+
+    This is meant to be compatible with a LatentEnsemble observation
+    model.
+
+    The prior distribution for this belief is N(0, 1). 
+    """
+    def __init__(self, block, D, N=200, likelihood=None, plot=False):
+        self.block = deepcopy(block)
+        self.plot = plot                        # plot the particles
+
+        self.N = N        # number of particles
+        self.D = D        # dimensions of a single particle
+        self.likelihood = likelihood    # LatentEnsemble object that outputs [0, 1]
+
+        self.setup()
+        if self.plot:
+            plt.ion()
+            fig = plt.figure()
+            fig.set_size_inches((4,4))
+            self.ax = Axes3D(fig)
+            self.setup_ax(self.ax)
+            self.plot_particles(self.ax, self.particles.particles, self.particles.weights)
+
+
+    def setup(self):
+        self.particles = create_gaussian_particles(N=self.N, 
+                                                   D=self.D, 
+                                                   means=[0., 0., 0., 0.],
+                                                   stds=[1., 1., 1., 1.])
+        self.experience = None
+        self.estimated_coms = []
+
+    def setup_ax(self, ax):
+        ax.clear()
+        halfdim = 5
+        ax.set_xlim(-halfdim, halfdim)
+        ax.set_ylim(-halfdim, halfdim)
+        ax.set_zlim(-halfdim, halfdim)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        ax.set_title('Latent ParticleBelief')
+        ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+        ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+        ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+
+    def plot_particles(self, ax, particles, weights, t=None, true_com=None):
+        for particle, weight in zip(particles, weights):
+            alpha = 0.25 + 0.75 * weight
+            ax.scatter(*particle[1:], s=10, color=(0, 0, 1), alpha=alpha)
+        plt.draw()
+        plt.pause(0.1)
+
+    def sample_and_wiggle(self, distribution, experience):
+        N, D = distribution.particles.shape
+        # NOTE(izzy): note sure if this is an ok way to get the covariance matrix...
+        # If the weights has collapsed onto a single particle, then the covariance
+        # will collapse too and we won't perturb the particles very much after we
+        # sample them. Maybe this should be a uniform covariance with the magnitude
+        # being equal to the largest variance?
+        # NOTE: (mike): I added a small noise term and a M-H update step which hopefully
+        # prevents complete collapse. The M-H update is useful so that we don't sample
+        # something completely unlikely by chance. It's okay for the noise term to be larger 
+        # as the M-H step should reject bad particles - it may be inefficient if too large (and not accept often).
+        cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3)# + np.eye(D)*2.5e-5
+        particles = sample_particle_distribution(distribution, num_samples=N)
+
+        mean = np.mean(particles, axis=0)
+        proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
+        
+        # TODO: Update M-H update to be compatible with our model.
+        # The commented out code block does M-H update. 
+        if False:
+            # Old particles and new particles.
+            likelihoods = np.zeros((N,2))
+            # Compute likelihood of particles over history so far.
+            for action, T, true_pose in experience:
+                sim_poses = simulate(np.concatenate([particles, proposed_particles], axis=0),
+                                    action,
+                                    T,
+                                    true_block)
+                for ix in range(N):
+                    likelihoods[ix,0] += np.log(multivariate_normal.pdf(true_pose.pos,
+                                                                        mean=sim_poses[ix, :],
+                                                                        cov=obs_model_cov)+1e-8)
+                    likelihoods[ix,1] += np.log(multivariate_normal.pdf(true_pose.pos,
+                                                                        mean=sim_poses[N+ix,:],
+                                                                        cov=obs_model_cov)+1e-8)
+            # Calculate M-H acceptance prob.
+            prop_probs = np.zeros((N,2))
+            for ix in range(N):
+                prop_probs[ix,0] = np.log(multivariate_normal.pdf(particles[ix,:], mean=mean, cov=cov)+1e-8)
+                prop_probs[ix,1] = np.log(multivariate_normal.pdf(proposed_particles[ix,:], mean=mean, cov=cov)+1e-8)
+
+            p_accept = likelihoods[:,1]+prop_probs[:,0] - (likelihoods[:,0]+prop_probs[:,1])
+            accept = np.zeros((N,2))
+            accept = np.min(accept, axis=1)
+
+            # Keep particles based on acceptance probability.
+            u = np.random.uniform(size=N)
+            indices = np.argwhere(u > 1-np.exp(accept)).flatten()
+            particles[indices] = proposed_particles[indices]
+        else:
+            particles = proposed_particles
+
+        weights = np.ones(N)/float(N) # weights become uniform again
+        return ParticleDistribution(particles, weights)
+
+    def get_particle_likelihoods(self, distribution, observation):
+        """
+         
+        """
+        dataset = TowerDataset(tower_dict=observation,
+                               augment=False)
+        dataloader = ParallelDataLoader(dataset=dataset,
+                                        batch_size=1,
+                                        shuffle=False,
+                                        n_dataloaders=1)
+        bernoulli_probs = []  # Contains one prediction for each particle.
+
+        latent_samples = torch.Tensor(distribution.particles)
+        for set_of_batches in dataloader:
+            towers, block_ids, _ = set_of_batches[0]
+            print(towers.shape)
+            for ix in range(0, latent_samples.shape[0]//10):
+                pred = self.likelihood.forward(towers=towers[:, :, 4:],
+                                               block_ids=block_ids,
+                                               N_samples=10,
+                                               collapse_latents=True, 
+                                               collapse_ensemble=True,
+                                               keep_latent_ix=10,
+                                               latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
+                bernoulli_probs.append(pred.detach().numpy())
+
+        return np.concatenate(bernoulli_probs)
+
+    def update(self, observation):
+        """
+        :param observation: tower_dict format for a single tower.
+        """
+        # Resample the distribution
+        self.particles = self.sample_and_wiggle(self.particles, self.experience)
+
+        # Append the current observation to the dataset of all observations so far.
+        if self.experience is None:
+            self.experience = observation
+        else:
+            self.experience = {
+                '2block': {
+                    'towers': np.concatenate([self.experience['2block']['towers'], 
+                                              observation['2block']['towers']], axis=0),
+                    'block_ids': np.concatenate([self.experience['2block']['block_ids'], 
+                                              observation['2block']['block_ids']], axis=0),
+                    'labels': np.concatenate([self.experience['2block']['labels'], 
+                                              observation['2block']['labels']], axis=0),
+                }
+            }
+
+        # Forward simulation using the LatentEnsemble likelihood.
+        bernoulli_probs = self.get_particle_likelihoods(self.particles, observation)
+        label = observation['2block']['labels'][0]
+
+        # TODO: Replace below using the likelihood defined by the NN.
+        # update all particle weights
+        new_weights = []
+
+        for pi, (bern_prob, old_weight) in enumerate(zip(bernoulli_probs, self.particles.weights)):
+            obs_model = bern_prob*label + (1-bern_prob)*(1-label)
+            new_weight = old_weight * obs_model
+            new_weights.append(new_weight)
+
+        # normalize particle weights
+        new_weights = np.array(new_weights)/np.sum(new_weights)
+        # and update the particle distribution with the new weights
+        self.particles = ParticleDistribution(self.particles.particles, new_weights)
+
+        if self.plot:
+            # visualize particles (it's very slow)
+            self.setup_ax(self.ax)
+            self.plot_particles(self.ax, self.particles.particles, new_weights)
+
+        mean = np.array(self.particles.particles).T@np.array(self.particles.weights)
+
+        self.estimated_coms.append(mean)
+
+        return self.particles, self.estimated_coms
 
 # =============================================================
 """

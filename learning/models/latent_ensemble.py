@@ -117,7 +117,7 @@ class LatentEnsemble(nn.Module):
         return samples
 
 
-    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True, keep_latent_ix=-1):
+    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True, keep_latent_ix=-1, latent_samples=None):
         """ predict feasibility of the towers
 
         Arguments:
@@ -155,9 +155,11 @@ class LatentEnsemble(nn.Module):
                     bx_blockset = block_ids[tx, bx_tower]
                     q_z = torch.distributions.normal.Normal(self.latent_locs[bx_blockset],
                                                             torch.exp(self.latent_logscales[bx_blockset]))
-                    if bx_blockset == keep_latent_ix:
+                    if (bx_blockset == keep_latent_ix) and (latent_samples is None):
                         zk_samples = q_z.rsample(sample_shape=[N_samples])  # [N_samples, latent_dim]
                         samples_for_each_tower_in_batch[tx, :, :, bx_tower, :] = zk_samples.unsqueeze(1)
+                    elif bx_blockset == keep_latent_ix:
+                        samples_for_each_tower_in_batch[tx, :, :, bx_tower, :] = latent_samples.unsqueeze(1)
                     else:
                         zk_samples = q_z.rsample(sample_shape=[N_samples, N_samples])  # [N_samples, N_samples, latent_dim]
                         samples_for_each_tower_in_batch[tx, :, :, bx_tower, :] = zk_samples
@@ -170,20 +172,20 @@ class LatentEnsemble(nn.Module):
 
         # reshape the resulting tensor so the batch dimension holds
         # N_batch times N_samples
-        N_batch, N_samples, N_blocks, total_dim = towers_with_latents.shape
+        N_batch, N_total_samples, N_blocks, total_dim = towers_with_latents.shape
         towers_with_latents = towers_with_latents.view(-1, N_blocks, total_dim)
-
+        print('Input:', towers_with_latents.shape)
         # forward pass of the model(s)
         if ensemble_idx is None:
             # prediction for each model in the ensemble ensemble
             # [(N_batch*N_samples) x N_ensemble]
             labels = self.ensemble.forward(towers_with_latents)
-            labels = labels.view(N_batch, N_samples, -1).permute(0, 2, 1)
+            labels = labels.view(N_batch, N_total_samples, -1).permute(0, 2, 1)
         else:
             # prediction of a single model in the ensemble
             labels = self.ensemble.models[ensemble_idx].forward(towers_with_latents)
             labels = labels[:, None, :]
-            labels = labels.view(N_batch, N_samples, -1).permute(0, 2, 1)
+            labels = labels.view(N_batch, N_total_samples, -1).permute(0, 2, 1)
 
         # N_batch x N_ensemble x N_samples
         if collapse_ensemble:

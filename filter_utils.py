@@ -34,9 +34,10 @@ def create_gaussian_particles(N, D, means, stds):
     :param stds: list of of length D of st dev for each state dimension
     '''
     particles = np.empty((N, D))
+    weights = np.ones(N)*(1/N)
     for d in range(D):
         particles[:, d] = means[d] + (np.random.randn(N) * stds[d])
-    return particles
+    return ParticleDistribution(particles, weights)
 
 def sample_particle_distribution(distribution, num_samples=1):
     idxs = np.array(distribution.particles.shape[0])

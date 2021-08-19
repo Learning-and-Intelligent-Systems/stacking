@@ -11,7 +11,6 @@ from learning.models.latent_ensemble import LatentEnsemble
 from learning.models.bottomup_net import BottomUpNet
 from learning.models.gn import FCGN, ConstructableFCGN, FCGNFC
 from learning.models.lstm import TowerLSTM
-from learning.train_latent import LatentEnsemble
 from learning.active.utils import ActiveExperimentLogger
 from agents.panda_agent import PandaAgent, PandaClientAgent
 from tamp.misc import load_blocks
@@ -168,6 +167,9 @@ def run_active_towers(args):
             assert(len(args.eval_block_ixs) == 1)  # Right now the code only supports doing inference for a single block on top of the training blocks.
             train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path,
                                                   use_latents=args.use_latents)
+            if not hasattr(train_logger.args, 'block_set_fname'):
+                print('[WARNING] Training block set was not specified. Using default blocks')
+                train_logger.args.block_set_fname = 'learning/data/may_blocks/blocks/10_random_block_set_1.pkl'
             train_blocks_fname = train_logger.args.block_set_fname
             block_set = load_blocks(train_blocks_fname=train_blocks_fname, 
                                     eval_blocks_fname=args.block_set_fname,

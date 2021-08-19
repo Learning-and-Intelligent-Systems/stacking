@@ -139,7 +139,8 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     disable_latents=False,
     return_logs=False,
     alternate=False,
-    args=None):
+    args=None,
+    show_epochs=False):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
@@ -150,6 +151,8 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     best_weights = None
     best_loss = 1000
     for epoch_idx in range(n_epochs):
+        if show_epochs:
+            print('Epoch', epoch_idx)
         accs = []
         for batch_idx, set_of_batches in enumerate(dataloader):
 

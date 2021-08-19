@@ -1,20 +1,23 @@
 import argparse
 import copy
+from learning.models import latent_ensemble
+from tamp.misc import load_blocks
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import pybullet as p
 import time
 import torch
+from scipy.spatial.transform import Rotation
 
 from block_utils import Object, get_rotated_block, World, Environment
 from learning.active.acquire import bald
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.towers.active_utils import get_sequential_predictions, get_predictions, sample_unlabeled_data, get_labels, sample_sequential_data
 from learning.domains.towers.generate_tower_training_data import sample_random_tower
-from learning.domains.towers.tower_data import TowerDataset, TowerSampler, add_placement_noise, unprocess, recover_dict_from_tower_dataset
+from learning.domains.towers.tower_data import ParallelDataLoader, TowerDataset, TowerSampler, add_placement_noise, unprocess, recover_dict_from_tower_dataset
 from learning.evaluate.planner import EnsemblePlanner
-
+from tamp.misc import load_blocks
 from tower_planner import TowerPlanner
 
 from sklearn.metrics import f1_score, precision_score, recall_score
@@ -74,7 +77,8 @@ def plot_train_accuracy(logger):
 
 def plot_latent_means(logger):
     means = np.zeros((logger.args.max_acquisitions, 4))
-
+    lows = np.zeros((logger.args.max_acquisitions, 4))
+    highs = np.zeros((logger.args.max_acquisitions, 4))
     # go through each acqisition step
     for tx in range(0, logger.args.max_acquisitions):
         print('Eval timestep, ', tx)
@@ -83,7 +87,13 @@ def plot_latent_means(logger):
         ensemble = logger.get_ensemble(tx)
         #scales.append(torch.exp(ensemble.latent_logscales).mean(axis=0).detach().numpy())
         means[tx, :] = ensemble.latent_locs[-1, :].detach().numpy()
-    plt.plot(means)
+        sigma = torch.exp(ensemble.latent_logscales[-1, :]).detach().numpy()
+        lows[tx, :] = means[tx, :] - sigma 
+        highs[tx, :] = means[tx, :] + sigma
+
+    for ix in range(0, 4):
+        plt.plot(means[:,ix])
+        plt.fill_between(np.arange(0, means.shape[0]), lows[:,ix], highs[:,ix], alpha=0.2)
 
     plt.xlabel('Acquisition Step')
     plt.ylabel('Latent Value')
@@ -94,7 +104,7 @@ def plot_latent_means(logger):
 
 def plot_latent_uncertainty(logger):
     scales = np.zeros((logger.args.max_acquisitions, 4))
-
+    
     # go through each acqisition step
     for tx in range(0, logger.args.max_acquisitions):
         print('Eval timestep, ', tx)
@@ -111,7 +121,6 @@ def plot_latent_uncertainty(logger):
     plt.title('Variance along each latent dimension')
     plt.savefig(logger.get_figure_path('latent_scale.png'))
     plt.clf()
-    #plt.show()
 
 def get_validation_accuracy(logger, fname):
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -1085,6 +1094,116 @@ def plot_latents(logger):
     imageio.mimsave(fname, images)
 
 
+def vary_latents_for_fixed_block(logger):
+    latent_ensemble = logger.get_ensemble(logger.args.max_acquisitions-1)
+    top_block_ix = -1
+    # Get blocks for the test tower.
+    train_exp_name = logger.args.pretrained_ensemble_exp_path
+    train_logger = ActiveExperimentLogger(train_exp_name, use_latents=True)
+    block_set = load_blocks(train_blocks_fname=train_logger.args.block_set_fname,
+                            eval_blocks_fname=logger.args.block_set_fname,
+                            eval_block_ixs=[0],
+                            num_blocks=11)
+    bottom_block = block_set[0]
+    top_block = block_set[top_block_ix]
+
+    # rot = 'none'
+    # q = [0, 0, 0, 1]
+    # rot = '90y'
+    # q = p.getQuaternionFromEuler([0., np.pi/2., 0])
+    rot = '90z'
+    q = p.getQuaternionFromEuler([0., 0., np.pi/2.])
+    
+
+    # Create dataset where we manually change the latent value of the top block.
+    template_tower = np.stack([bottom_block.vectorize(), 
+                               top_block.vectorize()])
+    # Put in the correct value for the unrotated latents.
+    template_tower[0, 0:4] = latent_ensemble.latent_locs[0, :].detach().numpy()
+    template_tower[1, 0] = latent_ensemble.latent_locs[top_block_ix, 0]
+
+    # Put in the correct position for the top block.
+    template_tower[1, 10:14] = q
+    if rot == 'none':
+        template_tower[1, 7] = bottom_block.dimensions[0]/2.
+        template_tower[1, 9] = top_block.dimensions[2]/2. + bottom_block.dimensions[2]/2.
+    elif rot == '90y':
+        template_tower[1, 7] = bottom_block.dimensions[0]/2.
+        template_tower[1, 9] = top_block.dimensions[0]/2. + bottom_block.dimensions[2]/2.
+    elif rot == '90z':
+        template_tower[1, 7] = bottom_block.dimensions[0]/2.
+        template_tower[1, 9] = top_block.dimensions[2]/2. + bottom_block.dimensions[2]/2.
+    else:
+        raise NotImplementedError()
+    # Visualize the tower and take screenshot.
+    if True:
+        block_tower = [Object.from_vector(template_tower[ix, :]) for ix in range(2)]
+        w = World(block_tower)
+        env = Environment([w], vis_sim=True, vis_frames=True)
+        input()
+        env.disconnect()
+
+    print(template_tower)
+    towers = []
+    zs = []
+    low_z, high_z, n_z = -5, 5, 25
+    for z1 in np.linspace(low_z, high_z, n_z):
+        for z2 in np.linspace(low_z, high_z, n_z):
+            for z3 in np.linspace(low_z, high_z, n_z):
+                tower = template_tower.copy()
+                
+
+                r = Rotation.from_quat(q)#.as_matrix()
+                #print(r.shape)
+                # apply the rotation to the last three dimensions of the samples
+                z = r.apply([z1, z2, z3])
+                zs.append([z1, z2, z3])
+                tower[1, 1:4] = np.array(z)
+                towers.append(tower)
+
+    tower_dict = {
+        '2block': {
+            'towers': np.stack(towers),
+            'labels': np.zeros(len(towers),),
+            'block_ids': np.zeros((len(towers), 2))
+        }
+    }
+    dataset = TowerDataset(tower_dict, augment=False)
+    dataloader = ParallelDataLoader(dataset, 16, shuffle=False, n_dataloaders=1)
+
+    # Get predictions for each tower.
+    preds = []
+    for batch_idx, set_of_batches in enumerate(dataloader):
+        x, _, _ = set_of_batches[0]
+        pred = latent_ensemble.ensemble.forward(x).mean(1).detach().numpy()
+        preds.append(pred)
+
+    preds = np.concatenate(preds)
+
+    # Plot predictions corresponding to the latents.
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    for ix in range(0, preds.shape[0]): 
+        if preds[ix] > 0.5:
+            c = 'g'
+        else:
+            c = 'r'
+            continue
+        ax.scatter(zs[ix][0], 
+                   zs[ix][1],
+                   zs[ix][2], c=c, alpha=0.2)
+
+
+    ax.set_xlim(low_z, high_z)
+    ax.set_ylim(low_z, high_z)
+    ax.set_zlim(low_z, high_z)
+    ax.set_xlabel('z1')
+    ax.set_ylabel('z2')
+    ax.set_zlabel('z3')
+    plt.show()
+
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -1092,8 +1211,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-    logger.args.max_acquisitions = 14
+    logger.args.max_acquisitions = 10
 
+    vary_latents_for_fixed_block(logger)
+    sys.exit(0)
     plot_latent_uncertainty(logger)
     plot_latent_means(logger)
 
