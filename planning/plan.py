@@ -16,11 +16,11 @@ from planning.tree import Tree, Node
 from learning.evaluate.utils import vec_to_logical_state
 rank_accuracy = 0
 
-def setup_world(args):
+def setup_world(args, model_i=None):
     print('Planning with %s model.' % args.model_type)
     if args.model_type == 'learned':
         model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
-        model = model_logger.load_trans_model()
+        model = model_logger.load_trans_model(model_i)
         if model.pred_type == 'class':
             world = ABCBlocksWorldLearnedClass(args.num_blocks, model)
         else:
@@ -53,7 +53,10 @@ def mcts(tree, world, node_value_fn, node_select_fn, node_update, args):
             lstate = state
         ##
         new_actions = [world.random_policy(lstate) for _ in range(args.num_branches)]
-        new_states = [world.transition(state, action) for action in new_actions]
+        new_states = []
+        for action in new_actions:
+            if action is not None:
+                new_states.append(world.transition(state, action))
 
         for new_action, new_state in zip(new_actions, new_states):
             node_id = state_exists(tree, new_state)
@@ -64,8 +67,8 @@ def mcts(tree, world, node_value_fn, node_select_fn, node_update, args):
             node_update(node_id, node_value)
     return tree
 
-def run(goal, args):
-    world = setup_world(args)
+def run(goal, args, model_i=None):
+    world = setup_world(args, model_i)
     tree = Tree(world, goal, args)
     if args.value_fn == 'rollout':
         print('Using random model rollouts to estimate node value.')
@@ -97,11 +100,12 @@ def plan_from_tree(world, goal, tree, debug=False):
         best_goal_node_idx = goal_node_values.index(max(goal_node_values))
         best_goal_node = goal_nodes[best_goal_node_idx]
 
-        found_plan = [best_goal_node]
+        found_plan = [best_goal_node.action]
         node = best_goal_node
         while node.id != 0:
             node = tree.nodes[node.parent_id]
-            found_plan = [node] + found_plan
+            if node.id != 0: # node 0 has None as action
+                found_plan = [node.action] + found_plan
 
         if debug:
             for node in found_plan:

@@ -4,14 +4,10 @@ import matplotlib.pyplot as plt
 
 from tamp.predicates import On
 from planning import plan
-from learning.domains.abc_blocks.world import ABCBlocksWorldGT
+from learning.domains.abc_blocks.world import ABCBlocksWorldGT, generate_random_goal
 from learning.active.utils import GoalConditionedExperimentLogger
 from learning.domains.abc_blocks.abc_blocks_data import model_forward
 from learning.evaluate.utils import plot_results, recc_dict
-
-def generate_random_goal(world):
-    top_block_num = np.random.randint(world.min_block_num+1, world.max_block_num+1)
-    return [On(top_block_num-1, top_block_num)]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -120,7 +116,8 @@ if __name__ == '__main__':
                             found_plan, plan_exp_path, rank_accuracy = plan.run(goal, plan_args)
                             if found_plan:
                                 test_world = ABCBlocksWorldGT(test_num_blocks)
-                                final_state = test_world.execute_plan([node.action for node in found_plan])
+                                trajectory = test_world.execute_plan(found_plan)
+                                final_state = trajectory[-1][0]
                                 success = test_world.is_goal_state(final_state, goal)
                             else:
                                 success = False

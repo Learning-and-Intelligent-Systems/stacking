@@ -56,7 +56,8 @@ class Tree:
             if state == None:
                 import pdb; pdb.set_trace()
             action = self.world.random_policy(lstate)
-            state = self.world.transition(state, action)
+            if action is not None: # no possible random actions
+                state = self.world.transition(state, action)
             i += 1
         return self.world.reward(state, self.goal)
 
