@@ -400,9 +400,20 @@ class GoalConditionedExperimentLogger:
     def save_heur_model(self, model):
         torch.save(model.state_dict(), os.path.join(self.exp_path, 'heur_model.pt'))
 
-    def load_trans_model(self, i=None):
+    def load_trans_model(self, i=None, max_i=False):
+        if max_i: # get latest model
+            model_files = os.listdir(self.exp_path)
+            if len(model_files) == 0:
+                raise Exception('No models found on args.exp_path.')
+            txs = []
+            for file in model_files:
+                matches = re.match(r'trans_model_(.*).pt', file)
+                if matches: # sometimes system files are saved here, don't parse these
+                    txs += [int(matches.group(1))]
+            i = max(txs)
         if i:
             fname = 'trans_model_%i.pt' % i
+            print('Loading model %s.' % fname)
         else:
             fname = 'trans_model.pt'
         n_of_in=1
