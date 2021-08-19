@@ -1,18 +1,84 @@
 import torch
 import numpy as np
 import argparse
+from argparse import Namespace
+from torch.nn import functional as F
+from torch.utils.data import DataLoader
 
 from tamp.logic import subset
-from learning.domains.abc_blocks.world import ABCBlocksWorldGT
+from learning.domains.abc_blocks.world import ABCBlocksWorldGT, generate_random_goal
 from learning.domains.abc_blocks.abc_blocks_data import ABCBlocksTransDataset, ABCBlocksHeurDataset
 from learning.active.utils import GoalConditionedExperimentLogger
+from learning.models.goal_conditioned import TransitionGNN
+from planning import plan
+from learning.active.train import train
 
-# TODO: generate validation dataset too!!
 # TODO: this doesn't make len(dataset) == args.max_transitions exactly
 # because sequences are added in chunks that might push it past the limit
 # but will be close
-# want to show that this will be improved by an actively collected dataset
-def generate_dataset(args, world, trans_dataset, heur_dataset, policy):
+plan_args = argparse.Namespace(num_branches=10,
+                        timeout=100,
+                        c=.01,
+                        max_ro=10,
+                        exp_name='data_gen')
+model_args = Namespace(pred_type='class',
+                        batch_size=16,
+                        n_epochs=300,
+                        n_hidden = 16)
+
+def random_goals_dataset(args, world, trans_dataset, heur_dataset, dataset_logger):
+    # save initial (empty) dataset
+    logger.save_trans_dataset(trans_dataset, i=0)
+
+    # initialize and save model
+    trans_model = TransitionGNN(n_of_in=1,
+                                n_ef_in=1,
+                                n_af_in=2,
+                                n_hidden=16,
+                                pred_type='class')
+    model_args.dataset_exp_path = logger.exp_path
+    model_args.exp_name = 'model-%s' % args.exp_name
+    model_args.num_blocks = world.num_blocks
+    model_logger = GoalConditionedExperimentLogger.setup_experiment_directory(model_args, 'models')
+    model_logger.save_trans_model(trans_model, i=0)
+
+    # initialize planner
+    plan_args.num_blocks = world.num_blocks
+    if args.mode == 'random-goals-opt':
+        plan_args.model_type = 'opt'
+    elif args.mode == 'random-goals-learned':
+        plan_args.model_type = 'learned'
+        plan_args.model_exp_path = model_logger.exp_path
+    plan_args.value_fn = 'rollout'
+
+    i = 0
+    while len(trans_dataset) < args.max_transitions:
+        print('Run %i |dataset| = %i' % (i, len(trans_dataset)))
+        # generate plan to reach random goal
+        goal = generate_random_goal(world)
+        found_plan, plan_exp_path, rank_accuracy = plan.run(goal, plan_args, model_i=i)
+        trajectory = world.execute_plan(found_plan)
+
+        # add to dataset and save
+        add_sequence_to_dataset(args, trans_dataset, heur_dataset, trajectory, goal, world)
+
+        # initialize and train new model
+        trans_model = TransitionGNN(n_of_in=1,
+                                    n_ef_in=1,
+                                    n_af_in=2,
+                                    n_hidden=16,
+                                    pred_type='class')
+        trans_dataset.set_pred_type('class')
+        if len(trans_dataset) > 0:
+            trans_dataloader = DataLoader(trans_dataset, batch_size=model_args.batch_size, shuffle=True)
+            train(trans_dataloader, None, trans_model, n_epochs=model_args.n_epochs, loss_fn=F.binary_cross_entropy)
+        # save new model and dataset
+        i += 1
+        logger.save_trans_dataset(trans_dataset, i=i)
+        model_logger.save_trans_model(trans_model, i=i)
+        print('Saved model to %s' % model_logger.exp_path)
+
+def random_action_dataset(args, world, trans_dataset, heur_dataset):
     goal = None
     new_state = world.get_init_state()
     action_sequence = []
@@ -20,7 +86,7 @@ def generate_dataset(args, world, trans_dataset, heur_dataset, policy):
         valid_actions = world.expert_policy(new_state) is not None
         if valid_actions:
             state = new_state
-            vec_action = policy(state)
+            vec_action = world.random_policy(state)
             new_state = world.transition(state, vec_action)
             action_sequence.append((state, vec_action))
         else:
@@ -50,7 +116,7 @@ def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, 
 
     # make each reached state a goal (hindsight experience replay)
     for goal_i, (hindsight_goal, _) in enumerate(action_sequence):
-        helper(action_sequence[:goal_i+1], hindsight_goal, goal_i == len(action_sequence)-1) # TODO: check that need add_to_trans
+        helper(action_sequence[:goal_i+1], hindsight_goal, goal_i == len(action_sequence)-1)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -73,38 +139,37 @@ if __name__ == '__main__':
     parser.add_argument('--num-blocks',
                         type=int,
                         default=3)
-    parser.add_argument('--policy',
+    parser.add_argument('--mode',
                         type=str,
-                        choices=['random', 'expert'],
-                        default='random',
-                        help='exploration policy for gathering data')
-
+                        choices=['random-actions', 'random-goals-opt', 'random-goals-learned'],
+                        required=True,
+                        help='method of data collection')
+    parser.add_arguments('--N',
+                        type=int,
+                        default=1,
+                        help='number of models to train')
     args = parser.parse_args()
 
     if args.debug:
         import pdb; pdb.set_trace()
 
-    #try:
-    print('Generating datasets with %i blocks with %s policy.' % (args.num_blocks, args.policy))
+    for _ in range(args.N):
+        #try:
+        if args.domain == 'abc_blocks':
+            world = ABCBlocksWorldGT(args.num_blocks)
+        else:
+            NotImplementedError('Only ABC Blocks world works')
 
-    if args.domain == 'abc_blocks':
-        world = ABCBlocksWorldGT(args.num_blocks)
-    else:
-        NotImplementedError('Only ABC Blocks world works')
+        trans_dataset = ABCBlocksTransDataset()
+        heur_dataset = ABCBlocksHeurDataset()
+        logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'datasets')
+        if args.mode == 'random-actions':
+            random_action_dataset(args, world, trans_dataset, heur_dataset)
+        elif args.mode in ['random-goals-opt', 'random-goals-learned']:
+            random_goals_dataset(args, world, trans_dataset, heur_dataset, logger)
+        logger.save_trans_dataset(trans_dataset)
+        #logger.save_heur_dataset(heur_dataset)
+        print('Datasets (N=%i) and tower info saved to %s.' % (len(trans_dataset), logger.exp_path))
 
-    if args.policy == 'random':
-        policy = world.random_policy
-    elif args.policy == 'expert':
-        policy = world.expert_policy
-
-    trans_dataset = ABCBlocksTransDataset()
-    heur_dataset = ABCBlocksHeurDataset()
-    logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'datasets')
-    generate_dataset(args, world, trans_dataset, heur_dataset, policy)
-    logger.save_trans_dataset(trans_dataset)
-    logger.save_heur_dataset(heur_dataset)
-    logger.save_final_states(final_states)
-    print('Datasets and tower info saved to %s.' % logger.exp_path)
-
-    #except:
-    #    import pdb; pdb.post_mortem()
+        #except:
+        #    import pdb; pdb.post_mortem()
