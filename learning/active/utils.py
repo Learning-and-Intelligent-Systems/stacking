@@ -377,7 +377,17 @@ class GoalConditionedExperimentLogger:
             dataset = pickle.load(handle)
         return dataset
 
-    def load_trans_dataset(self, i=None):
+    def load_trans_dataset(self, i=None, max_i=False):
+        if max_i: # get latest dataset
+            model_files = os.listdir(self.exp_path)
+            if len(model_files) == 0:
+                raise Exception('No datasets found on args.exp_path.')
+            txs = []
+            for file in model_files:
+                matches = re.match(r'trans_dataset_(.*).pkl', file)
+                if matches: # sometimes system files are saved here, don't parse these
+                    txs += [int(matches.group(1))]
+            i = max(txs)
         if i:
             fname = 'trans_dataset_%i.pkl' % i
         else:
