@@ -9,9 +9,7 @@ def sample_actions(obj_ids, n_samples=1):
     """ sample which object to throw, and the parameters of that throw
     """
     z_ids = np.random.choice(a=obj_ids, size=n_samples, replace=True)
-    ang = np.random.uniform(np.pi/8, 3*np.pi/8, size=n_samples)
-    w = np.random.uniform(-10, 10, size=n_samples)
-    return np.stack([ang, w], axis=1), z_ids
+    return ThrowingAction.random_vector(n_samples=n_samples), z_ids
 
 def label_actions(objects, actions, z_ids, as_tensor=False):
     """ produce an outcome for executing an action on an object

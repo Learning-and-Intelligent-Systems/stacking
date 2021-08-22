@@ -25,20 +25,11 @@ class ThrowingAgent:
         """
 
         # Sample a random ball
-        if b is None: np.random.choice(self.objects)
-
-        # Sample random velocities
-        v = 5
-        ang = np.random.uniform(np.pi/8, 3*np.pi/8)
-        w = np.random.uniform(-10, 10)
-
-        # Package up the action
-        init_vel = [
-            v * np.cos(ang),
-            v * np.sin(ang),
-            w, 
-        ]
-        return ThrowingAction(b, init_pos=[0,0,0], init_vel=init_vel)
+        if b is None: b = np.random.choice(self.objects)
+        # and a random throw
+        vec = ThrowingAction.random_vector()
+        # create the ThrowingAction
+        return ThrowingAction.from_vector(b, vec)
 
 
     def run(self, action, do_animate=False, do_plot=False):

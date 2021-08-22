@@ -48,7 +48,7 @@ class ThrowingSimulator:
             action.vy,
             action.w,
         ]
-        
+
         # MAIN SIMULATION LOOP
         weight = b.mass * self.gravity
         for i in range(num_pts-1):

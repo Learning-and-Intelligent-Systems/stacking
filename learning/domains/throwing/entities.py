@@ -48,14 +48,15 @@ class ThrowingBall:
         friction_coef = np.random.uniform(0.1, 1)
         rolling_resistance = np.random.uniform(1e-4, 1e-3)
         bounciness = np.random.uniform(0.1, 0.6)
-        return ThrowingBall(color=color,
+
+        return ThrowingBall(color=np.zeros(3),
                             mass=mass,
                             radius=radius,
-                            air_drag_linear=air_drag_linear,
-                            air_drag_angular=air_drag_angular,
-                            friction_coef=friction_coef,
-                            rolling_resistance=rolling_resistance,
-                            bounciness=bounciness)
+                            air_drag_linear=1.,
+                            air_drag_angular=1e-5,
+                            friction_coef=0.8,
+                            rolling_resistance=1e-3,
+                            bounciness=0.5)
 
     def vectorize(self):
         v = np.zeros(self.dim)
@@ -99,3 +100,12 @@ class ThrowingAction:
             w,
         ]
         return ThrowingAction(b, init_pos=[0,0,0], init_vel=init_vel)
+
+    @staticmethod
+    def random_vector(n_samples=0):
+        ang = np.random.uniform(np.pi/8, 3*np.pi/8, size=n_samples)
+        w = np.random.uniform(-10, 10, size=n_samples)
+        if n_samples == 0:
+            return [ang, w]
+        else:
+            return np.stack([ang, w], axis=1)
