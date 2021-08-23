@@ -5,6 +5,7 @@ from copy import copy
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
 import matplotlib
+import numpy as np
 
 from learning.active.train import train
 from learning.active.utils import GoalConditionedExperimentLogger
@@ -71,6 +72,7 @@ if __name__ == '__main__':
                         'learning/experiments/logs/datasets/random-actions-100-20210818-224845',
                         'learning/experiments/logs/datasets/random-actions-100-20210818-224845_1']
 
+    all_train_errors = []
     for dataset_path in dataset_paths:
         args.dataset_exp_path = dataset_path
         #try:
@@ -105,8 +107,14 @@ if __name__ == '__main__':
             loss_fn = F.mse_loss
         elif args.pred_type == 'full_state' or args.pred_type == 'class':
             loss_fn = F.binary_cross_entropy
+
+        # balance dataset
+        #trans_dataset.balance()
+        #dataset_logger.save_balanced_dataset(trans_dataset)
+
         print('Training transition model with %i datapoints.' % len(trans_dataset))
-        train(trans_dataloader, None, trans_model, n_epochs=args.n_epochs, loss_fn=loss_fn)
+        train_errors = train(trans_dataloader, None, trans_model, n_epochs=args.n_epochs, loss_fn=loss_fn)
+        all_train_errors.append(train_errors)
 
         #print('Training heuristic model with %i datapoints.' % len(heur_dataset))
         #train(heur_dataloader, None, heur_model, n_epochs=args.n_epochs, loss_fn = F.mse_loss)
@@ -114,5 +122,17 @@ if __name__ == '__main__':
         model_logger.save_trans_model(trans_model)
         #model_logger.save_heur_model(heur_model)
         print('Saved models to %s.' % model_logger.exp_path)
-        #except:
-        #    import pdb; pdb.post_mortem()
+
+    # print all training error
+    plt.figure()
+    all_train_errors = np.array(all_train_errors)
+    plt.plot(all_train_errors.mean(axis=0))
+    plt.fill_between(range(all_train_errors.shape[1]),
+                        all_train_errors.min(axis=0),
+                        all_train_errors.max(axis=0),
+                        alpha=0.3)
+    plt.xlabel('Epoch')
+    plt.ylabel('Training Loss')
+    plt.show()
+    #except:
+    #    import pdb; pdb.post_mortem()

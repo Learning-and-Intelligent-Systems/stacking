@@ -369,6 +369,9 @@ class GoalConditionedExperimentLogger:
             fname = 'trans_dataset.pkl'
         self.save_dataset(dataset, fname)
 
+    def save_balanced_dataset(self, dataset):
+        self.save_dataset(dataset, 'balanced_dataset.pkl')
+
     def save_heur_dataset(self, dataset):
         self.save_dataset(dataset, 'heur_dataset.pkl')
 
@@ -377,7 +380,7 @@ class GoalConditionedExperimentLogger:
             dataset = pickle.load(handle)
         return dataset
 
-    def load_trans_dataset(self, i=None, max_i=False):
+    def load_trans_dataset(self, i=None, max_i=False, balanced=False):
         if max_i: # get latest dataset
             model_files = os.listdir(self.exp_path)
             if len(model_files) == 0:
@@ -392,6 +395,8 @@ class GoalConditionedExperimentLogger:
             fname = 'trans_dataset_%i.pkl' % i
         else:
             fname = 'trans_dataset.pkl'
+        if balanced:
+            fname = 'balanced_dataset.pkl'
         return self.load_dataset(fname)
 
     def load_heur_dataset(self):

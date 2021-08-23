@@ -18,7 +18,7 @@ from learning.active.utils import ExperimentLogger
 def evaluate(loader, model, val_metric='f1'):
     acc = []
     losses = []
-    
+
     preds = []
     labels = []
     for x, y in loader:
@@ -28,7 +28,7 @@ def evaluate(loader, model, val_metric='f1'):
         pred = model.forward(x).squeeze()
         if len(pred.shape) == 0: pred = pred.unsqueeze(-1)
         loss = F.binary_cross_entropy(pred, y)
-     
+
         with torch.no_grad():
             preds += (pred > 0.5).cpu().float().numpy().tolist()
             labels += y.cpu().numpy().tolist()
@@ -66,7 +66,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
                 x = x.cuda()
                 y = y.cuda()
             optimizer.zero_grad()
-            
+
             pred = model.forward(x)
             loss = loss_fn(pred, y)
             loss.backward()
@@ -76,7 +76,7 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
 
             # TODO: change accuracy calculation for non binary tasks
             accuracy = ((pred>0.5) == y).float().mean()
-            
+
             all_accs.append(accuracy.item())
             #all_losses.append(loss.item())
             epoch_losses.append(loss.item())
@@ -86,11 +86,11 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_weights = copy.deepcopy(model.state_dict())
-                #print('Saved')  
+                #print('Saved')
         all_losses.append(np.mean(epoch_losses))
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
-    
+
     '''
     fig, ax = plt.subplots()
     #ax.plot(all_accs, label='accuracy')
@@ -100,8 +100,8 @@ def train(dataloader, val_dataloader, model, n_epochs=20, loss_fn=F.binary_cross
     ax.legend()
     plt.show()
     '''
-    
-    return model
+
+    return all_losses
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
