@@ -9,27 +9,16 @@ class GCGNN(nn.Module):
         :param n_ef_in: Dimensionality of edge features
         :param n_hidden: Number of hidden units used throughout the network.
         """
-        super().__init__()
-
-        torch.set_default_dtype(torch.float64) # my data was float64 and model params were float32
-
-        self.n_of_in, self.n_ef_in, self.n_hidden = n_of_in, n_ef_in, n_hidden
+        super(GCGNN).__init__()
 
         # Initial embedding of node features into latent state
-        self.Ni = nn.Sequential(nn.Linear(n_of_in, n_hidden))#,
-                               #nn.Tanh())
+        self.Ni = nn.Sequential(nn.Linear(n_of_in, n_hidden))
 
         # Message function that compute relation between two nodes and outputs a message vector.
-        self.E = nn.Sequential(nn.Linear(2*n_hidden, n_hidden),
-                               nn.Tanh())#,
-                               #nn.Linear(n_hidden, n_hidden),
-                               #nn.Tanh())
+        self.E = nn.Sequential(nn.Linear(2*n_hidden, n_hidden))
 
         # Update function that updates a node based on the sum of its messages.
-        self.N = nn.Sequential(nn.Linear(n_hidden, n_hidden),
-                               nn.Tanh())#,
-                               #nn.Linear(n_hidden, n_hidden),
-                               #nn.Tanh())
+        self.N = nn.Sequential(nn.Linear(n_hidden, n_hidden))
 
     def embed_node(self, input):
         """
@@ -180,16 +169,22 @@ class TransitionGNN(GCGNN):
         super(TransitionGNN, self).__init__(n_of_in, n_ef_in, n_hidden)
 
         # Initial embedding of edge features and action into latent state
-        self.Ei = nn.Sequential(nn.Linear(n_ef_in+n_af_in+2*n_hidden, n_hidden))#,
-                               #nn.Tanh())
+        self.Ei = nn.Sequential(nn.Linear(n_ef_in+n_af_in+2*n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden),
+                               nn.ReLU(),
+                               nn.Linear(n_hidden, n_hidden))
 
         # Final function to get next state edge predictions
         self.Ef = nn.Sequential(nn.Linear(n_hidden, n_hidden),
                                 nn.ReLU(),
                                 nn.Linear(n_hidden, n_hidden),
                                 nn.ReLU(),
-                                nn.Linear(n_hidden,n_ef_in),
-                                nn.Tanh())
+                                nn.Linear(n_hidden,n_ef_in))
 
         self.n_af_in = n_af_in
         self.pred_type = pred_type
