@@ -38,7 +38,6 @@ def calc_trans_accuracy(model_type, test_dataset, test_num_blocks, model=None, r
 
     gt_world = ABCBlocksWorldGT(test_num_blocks)
     opt_world = ABCBlocksWorldGTOpt(test_num_blocks)
-
     for x, y in test_dataset:
         # get all relevant transition info
         vof, vef, va = [xi.detach().numpy() for xi in x]
@@ -157,48 +156,72 @@ if __name__ == '__main__':
                      'opt+plus_one': [[3, 4, 6,7], [6]]}
     # which ones to actually plot and save to logger
     plot_keys = ['opt+bottom_pos', 'opt+plus_one']#['plus one', 'bottom pos'] #, 'acc']
-    compare_opt = True  # if want to compare against the optimistic model
-    model_paths = {'FULL': ['learning/experiments/logs/models/delta-4-block-random-20210811-171313',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171322',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171330',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171339',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171347',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171356',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171404',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171413',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171421',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171430',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171438',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171447',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171456',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171504',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171513',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171522',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171530',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171539',
-                                #'learning/experiments/logs/models/delta-4-block-random-20210811-171548',
-                                'learning/experiments/logs/models/delta-4-block-random-20210811-171557'],
-                	'CLASS': ['learning/experiments/logs/models/class-4-block-random-20210811-170709',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170858',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-170719',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170909',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170730',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170920',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170740',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170936',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170750',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-171043',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170802',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-171054',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170814',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-171125',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170825',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-171142',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170835',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-171210',
-                                #'learning/experiments/logs/models/class-4-block-random-20210811-170847',
-                                'learning/experiments/logs/models/class-4-block-random-20210811-171218']}
+    compare_opt = False  # if want to compare against the optimistic model
 
+    deep = ['learning/experiments/logs/models/deep-20210823-143508',
+                    'learning/experiments/logs/models/deep-20210823-143510',
+                    'learning/experiments/logs/models/deep-20210823-143512',
+                    'learning/experiments/logs/models/deep-20210823-143514',
+                    'learning/experiments/logs/models/deep-20210823-143516',
+                    'learning/experiments/logs/models/deep-20210823-143518',
+                    'learning/experiments/logs/models/deep-20210823-143520',
+                    'learning/experiments/logs/models/deep-20210823-143522',
+                    'learning/experiments/logs/models/deep-20210823-143523',
+                    'learning/experiments/logs/models/deep-20210823-143525',
+                    'learning/experiments/logs/models/deep-20210823-143527',
+                    'learning/experiments/logs/models/deep-20210823-143529',
+                    'learning/experiments/logs/models/deep-20210823-143531',
+                    'learning/experiments/logs/models/deep-20210823-143533',
+                    'learning/experiments/logs/models/deep-20210823-143535',
+                    'learning/experiments/logs/models/deep-20210823-143537',
+                    'learning/experiments/logs/models/deep-20210823-143539',
+                    'learning/experiments/logs/models/deep-20210823-143541',
+                    'learning/experiments/logs/models/deep-20210823-143543',
+                    'learning/experiments/logs/models/deep-20210823-143545']
+    exploit_T_opt_deep = ['learning/experiments/logs/models/model-test-random-goals-opt-20210823-165549',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-165810',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-170034',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-170322',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-170613',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-171415',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-174213',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-174438',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-174637',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-174845',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-175114',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-175401',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-175731',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-175921',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-180142',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-180404',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-180615',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-180734',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-181009',
+                    'learning/experiments/logs/models/model-test-random-goals-opt-20210823-181216']
+    exploit_T_learned_deep = ['learning/experiments/logs/models/model-test-random-goals-learned-20210823-180152',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-165618',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-170031',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-170422',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-171341',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-174239',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-174658',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-175109',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-175726',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-180630',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-181136',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-181550',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-181840',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-183900',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-185941',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-190252',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-190613',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-191022',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-191356',
+                    'learning/experiments/logs/models/model-test-random-goals-learned-20210823-191700']
+
+    model_paths = {'deep': deep,
+                    'exploit-T-opt-deep': exploit_T_opt_deep,
+                    'exploit-T-learned-deep': exploit_T_learned_deep}
 ########
 
     trans_success_data = recc_dict()
@@ -211,24 +234,24 @@ if __name__ == '__main__':
                 model_logger = GoalConditionedExperimentLogger(model_path)
                 model_args = model_logger.load_args()
                 trans_model = model_logger.load_trans_model()
-                heur_model = model_logger.load_heur_model()
+                #heur_model = model_logger.load_heur_model()
                 test_dataset_path = test_datasets[test_num_blocks]
                 test_dataset_logger = GoalConditionedExperimentLogger(test_dataset_path)
                 test_trans_dataset = test_dataset_logger.load_trans_dataset()
                 test_trans_dataset.set_pred_type(trans_model.pred_type)
-                test_heur_dataset = test_dataset_logger.load_heur_dataset()
-                assert test_dataset_logger.args.num_blocks == test_num_blocks, \
-                        'Test dataset path %s does not contain %i blocks' % \
-                        (test_dataset_path, test_num_blocks)
+                #test_heur_dataset = test_dataset_logger.load_heur_dataset()
+                #assert test_dataset_logger.args.num_blocks == test_num_blocks, \
+                #        'Test dataset path %s does not contain %i blocks' % \
+                #        (test_dataset_path, test_num_blocks)
                 trans_accuracy, transitions = calc_trans_accuracy('learned', \
                                                 test_trans_dataset, test_num_blocks, \
                                                 model=trans_model, return_transitions=True)
-                heur_accuracy = calc_heur_error('learned', test_heur_dataset, \
-                                                    test_num_blocks, model=heur_model)
+                #heur_accuracy = calc_heur_error('learned', test_heur_dataset, \
+                #                                    test_num_blocks, model=heur_model)
                 trans_success_data[method][test_num_blocks][model_path] = trans_accuracy
-                heur_success_data[method][test_num_blocks][model_path] = heur_accuracy
-                plot_transition_figs(transitions, model_logger, test_num_blocks, \
-                                    all_plot_inds, plot_keys, transition_names)
+                #heur_success_data[method][test_num_blocks][model_path] = heur_accuracy
+                #plot_transition_figs(transitions, model_logger, test_num_blocks, \
+                #                    all_plot_inds, plot_keys, transition_names)
 
     if compare_opt:
         for test_num_blocks in test_datasets:
@@ -238,8 +261,8 @@ if __name__ == '__main__':
             test_heur_dataset = test_dataset_logger.load_heur_dataset()
             test_trans_dataset.set_pred_type('full_state')
             trans_success_data['OPT'][test_num_blocks] = calc_trans_accuracy('opt', test_trans_dataset, test_num_blocks)
-            heur_accuracy = calc_heur_error('opt', test_heur_dataset, test_num_blocks)
-            heur_success_data['OPT'][test_num_blocks] = heur_accuracy
+            #heur_accuracy = calc_heur_error('opt', test_heur_dataset, test_num_blocks)
+            #heur_success_data['OPT'][test_num_blocks] = heur_accuracy
 
     # Save data to logger
     logger = GoalConditionedExperimentLogger.setup_experiment_directory(args, 'model_accuracy')
@@ -253,6 +276,6 @@ if __name__ == '__main__':
     all_test_num_blocks = list(test_datasets.keys())
     plot_results(trans_success_data, all_test_num_blocks, trans_title, xlabel, trans_ylabel, logger)
 
-    heur_title = 'Heuristic Model MSE with Learned\nModels in %s Block World' % model_args.num_blocks  # TODO: hack
-    heur_ylabel = 'Average MSE'
-    plot_results(heur_success_data, all_test_num_blocks, heur_title, xlabel, heur_ylabel, logger)
+    #heur_title = 'Heuristic Model MSE with Learned\nModels in %s Block World' % model_args.num_blocks  # TODO: hack
+    #heur_ylabel = 'Average MSE'
+    #plot_results(heur_success_data, all_test_num_blocks, heur_title, xlabel, heur_ylabel, logger)

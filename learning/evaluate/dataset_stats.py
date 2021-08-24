@@ -15,9 +15,52 @@ if __name__ == '__main__':
         import pdb; pdb.set_trace()
 
 ### Parameters
-# random-actions
+# random-goals-opt (with exploration for unsolved goals and deeper network)
+random_goals_opt_paths = ['learning/experiments/logs/datasets/test-random-goals-opt-20210823-165549',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-165810',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-170034',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-170322',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-170613',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-171415',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-174213',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-174438',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-174637',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-174845',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-175114',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-175401',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-175731',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-175921',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-180142',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-180404',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-180615',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-180734',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-181009',
+                    'learning/experiments/logs/datasets/test-random-goals-opt-20210823-181216']
 
-dataset_exp_paths = ['learning/experiments/logs/datasets/random-actions-100-20210818-224843',
+# random-goals-learned (with exploration for unsolved goals and deeper network)
+random_goals_learned_paths = ['learning/experiments/logs/datasets/test-random-goals-learned-20210823-165618',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-170031',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-170422',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-171341',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-174239',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-174658',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-175109',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-175726',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-180152',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-180630',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-181136',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-181550',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-181840',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-183900',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-185941',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-190252',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-190613',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-191022',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-191356',
+                    'learning/experiments/logs/datasets/test-random-goals-learned-20210823-191700']
+
+# random-actions
+random_actions_paths = ['learning/experiments/logs/datasets/random-actions-100-20210818-224843',
                     'learning/experiments/logs/datasets/random-actions-100-20210818-224843_1',
                     'learning/experiments/logs/datasets/random-actions-100-20210818-224843_2',
                     'learning/experiments/logs/datasets/random-actions-100-20210818-224843_3',
@@ -38,52 +81,8 @@ dataset_exp_paths = ['learning/experiments/logs/datasets/random-actions-100-2021
                     'learning/experiments/logs/datasets/random-actions-100-20210818-224845',
                     'learning/experiments/logs/datasets/random-actions-100-20210818-224845_1']
 
-# random-goals-opt
-'''
-dataset_exp_paths = ['learning/experiments/logs/datasets/random-goals-opt-100-20210818-222521',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-222730',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-222943',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-223211',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-223422',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-223639',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-223852',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-224121',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-224355',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-224654',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-224925',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-225219',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-225516',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-225858',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-230212',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-230525',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-230847',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-231139',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-231415',
-                    'learning/experiments/logs/datasets/random-goals-opt-100-20210818-231715']
-'''
-# random-goals-learned'
-'''
-dataset_exp_paths = ['learning/experiments/logs/datasets/random-goals-learned-100-20210818-222536',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-223019',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-223632',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-224302',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-224900',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-225521',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-230454',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-231310',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-231830',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-232404',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-233004',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-233550',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210818-235648',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210819-001847',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210819-002409',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210819-004515',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210819-004958',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210819-005427',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210819-010024',
-                    'learning/experiments/logs/datasets/random-goals-learned-100-20210819-010509']
-'''
+dataset_exp_paths = random_actions_paths
+
 ###
 labels = {0: [], 1: []}
 pos_actions = {}
