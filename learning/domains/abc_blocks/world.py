@@ -102,7 +102,8 @@ class ABCBlocksWorldGT(ABCBlocksWorld):
         trajectory = []
         state = self.get_init_state()
         if plan:
-            for action in plan:
+            for node in plan:
+                action = node.action
                 trajectory.append([state, action])
                 state = self.transition(state, action)
             trajectory.append([state, np.zeros(2)])

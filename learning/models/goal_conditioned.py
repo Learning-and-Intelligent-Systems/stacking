@@ -9,8 +9,10 @@ class GCGNN(nn.Module):
         :param n_ef_in: Dimensionality of edge features
         :param n_hidden: Number of hidden units used throughout the network.
         """
-        super(GCGNN).__init__()
-
+        super().__init__()
+        torch.set_default_dtype(torch.float64) # my data was float64 and model params were float32
+        self.n_of_in, self.n_ef_in, self.n_hidden = n_of_in, n_ef_in, n_hidden
+        
         # Initial embedding of node features into latent state
         self.Ni = nn.Sequential(nn.Linear(n_of_in, n_hidden))
 

@@ -64,12 +64,12 @@ class ABCBlocksTransDataset(Dataset):
 
     def add_to_dataset(self, object_features, edge_features, action, next_edge_features, delta_edge_features, optimistic_accuracy):
         if not isinstance(object_features, torch.Tensor):
-            self.object_features = torch.cat([self.object_features, object_features])
-            self.edge_features = torch.cat([self.edge_features, edge_features])
-            self.actions = torch.cat([self.actions, action])
-            self.next_edge_features = torch.cat([self.next_edge_features, next_edge_features])
-            self.delta_edge_features = torch.cat([self.delta_edge_features, delta_edge_features])
-            self.optimistic_accuracy = torch.cat([self.optimistic_accuracy, optimistic_accuracy])
+            self.object_features = torch.cat([self.object_features, torch.tensor([object_features])])
+            self.edge_features = torch.cat([self.edge_features, torch.tensor([edge_features])])
+            self.actions = torch.cat([self.actions, torch.tensor([action])])
+            self.next_edge_features = torch.cat([self.next_edge_features, torch.tensor([next_edge_features])])
+            self.delta_edge_features = torch.cat([self.delta_edge_features, torch.tensor([delta_edge_features])])
+            self.optimistic_accuracy = torch.cat([self.optimistic_accuracy, torch.tensor([optimistic_accuracy])])
         else:
             self.object_features = torch.cat([self.object_features, object_features.unsqueeze(dim=0)])
             self.edge_features = torch.cat([self.edge_features, edge_features.unsqueeze(dim=0)])
@@ -117,6 +117,8 @@ class ABCBlocksTransDataset(Dataset):
             min_label = 0
             n_min = neg
             n_max = pos
+        assert n_min!=0, 'Cannot balance dataset, no %i labels exist' % min_label
+        assert n_max!=0, 'Cannot balance dataset, no %i labels exist' % max_label
         while n_min < n_max:
             match = False
             while not match:

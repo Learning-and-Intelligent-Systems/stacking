@@ -57,9 +57,13 @@ def random_goals_dataset(args, world, trans_dataset, heur_dataset, dataset_logge
         # generate plan to reach random goal
         goal = generate_random_goal(world)
         found_plan, plan_exp_path, rank_accuracy = plan.run(goal, plan_args, model_i=i)
-        trajectory = world.execute_plan(found_plan)
+        if found_plan:
+            trajectory = world.execute_plan(found_plan)
+        else:
+            trajectory = random_action_sequence(world)
 
         # add to dataset and save
+        print('Adding trajectory to dataset.')
         add_sequence_to_dataset(args, trans_dataset, heur_dataset, trajectory, goal, world)
 
         # initialize and train new model
@@ -70,6 +74,7 @@ def random_goals_dataset(args, world, trans_dataset, heur_dataset, dataset_logge
                                     pred_type='class')
         trans_dataset.set_pred_type('class')
         if len(trans_dataset) > 0:
+            print('Training model.')
             trans_dataloader = DataLoader(trans_dataset, batch_size=model_args.batch_size, shuffle=True)
             train(trans_dataloader, None, trans_model, n_epochs=model_args.n_epochs, loss_fn=F.binary_cross_entropy)
         # save new model and dataset
@@ -144,7 +149,7 @@ if __name__ == '__main__':
                         choices=['random-actions', 'random-goals-opt', 'random-goals-learned'],
                         required=True,
                         help='method of data collection')
-    parser.add_arguments('--N',
+    parser.add_argument('--N',
                         type=int,
                         default=1,
                         help='number of models to train')

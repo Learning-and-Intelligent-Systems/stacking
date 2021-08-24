@@ -20,7 +20,7 @@ def setup_world(args, model_i=None):
     print('Planning with %s model.' % args.model_type)
     if args.model_type == 'learned':
         model_logger = GoalConditionedExperimentLogger(args.model_exp_path)
-        model = model_logger.load_trans_model(model_i)
+        model = model_logger.load_trans_model(i=model_i)
         if model.pred_type == 'class':
             world = ABCBlocksWorldLearnedClass(args.num_blocks, model)
         else:
@@ -100,12 +100,12 @@ def plan_from_tree(world, goal, tree, debug=False):
         best_goal_node_idx = goal_node_values.index(max(goal_node_values))
         best_goal_node = goal_nodes[best_goal_node_idx]
 
-        found_plan = [best_goal_node.action]
+        found_plan = [best_goal_node]
         node = best_goal_node
         while node.id != 0:
             node = tree.nodes[node.parent_id]
             if node.id != 0: # node 0 has None as action
-                found_plan = [node.action] + found_plan
+                found_plan = [node] + found_plan
 
         if debug:
             for node in found_plan:
@@ -168,4 +168,4 @@ if __name__ == '__main__':
     from tamp.predicates import On
     goal = [On(1, 2), On(2, 3)]
 
-    tree = run(goal, args)
+    run(goal, args)
