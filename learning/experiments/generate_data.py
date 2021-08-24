@@ -85,21 +85,24 @@ def random_goals_dataset(args, world, trans_dataset, heur_dataset, dataset_logge
 
 def random_action_dataset(args, world, trans_dataset, heur_dataset):
     goal = None
-    new_state = world.get_init_state()
-    action_sequence = []
     while len(trans_dataset) < args.max_transitions:
+        action_sequence = random_action_sequence(world)
+        add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, world)
+
+def random_action_sequence(world):
+    new_state = world.get_init_state()
+    valid_actions = True
+    action_sequence = []
+    while valid_actions:
+        state = new_state
+        vec_action = world.random_policy(state)
+        new_state = world.transition(state, vec_action)
+        action_sequence.append((state, vec_action))
         valid_actions = world.expert_policy(new_state) is not None
-        if valid_actions:
-            state = new_state
-            vec_action = world.random_policy(state)
-            new_state = world.transition(state, vec_action)
-            action_sequence.append((state, vec_action))
-        else:
-            vec_action = np.zeros(2)
-            action_sequence.append((new_state, vec_action))
-            add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, world)
-            new_state = world.get_init_state()
-            action_sequence = []
+    vec_action = np.zeros(2)
+    action_sequence.append((new_state, vec_action))
+    return action_sequence
+
 
 def add_sequence_to_dataset(args, trans_dataset, heur_dataset, action_sequence, goal, world):
     def helper(sequence, seq_goal, add_to_trans):
