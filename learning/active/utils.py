@@ -429,7 +429,7 @@ class GoalConditionedExperimentLogger:
                 if matches: # sometimes system files are saved here, don't parse these
                     txs += [int(matches.group(1))]
             if len(txs) == 0:
-                print('Returning trans_model.pt. No numbered models found on path: %s' % self.exp_path)
+                #print('Returning trans_model.pt. No numbered models found on path: %s' % self.exp_path)
                 fname = 'trans_model.pt'
             else:
                 i = max(txs)

@@ -8,7 +8,57 @@ from learning.domains.abc_blocks.world import ABCBlocksWorldGT, ABCBlocksWorldGT
 from learning.active.utils import GoalConditionedExperimentLogger
 from learning.domains.abc_blocks.abc_blocks_data import model_forward
 from learning.evaluate.utils import vec_to_logical_state, plot_horiz_bars, join_strs, \
-                                stacked_blocks_to_str, plot_results, recc_dict
+                                stacked_blocks_to_str, plot_results, recc_dict, potential_actions
+
+def calc_full_trans_accuracy(model_type, test_num_blocks, model):
+    '''
+    :param model_type: in ['learned', 'opt']
+    '''
+    pos_actions, neg_actions = potential_actions(test_num_blocks)
+    accuracies = {}
+    # NOTE: we test all actions from initial state assuming that the network is ignoring the state
+    world = ABCBlocksWorldGT(test_num_blocks)
+    init_state = world.get_init_state()
+    vof, vef = init_state.as_vec()
+    for gt_pred, actions in zip([1, 0], [pos_actions, neg_actions]):
+        for action in actions:
+            if model_type == 'opt':
+                model_pred = 1. # optimistic model always thinks it's right
+            else:
+                int_action = [int(action[0]), int(action[-1])]
+                model_pred = model_forward(model, [vof, vef, int_action]).round().squeeze()
+            accuracies[(gt_pred, action)] = int(np.array_equal(gt_pred, model_pred))
+    return accuracies
+
+def plot_full_accuracies(method, method_full_trans_success_data):
+    fig, axes = plt.subplots(len(method_full_trans_success_data), 1, sharex=True)
+
+    def plot_accs(avg_acc, std_acc, action, nb, ni):
+        axes[ni].bar(action,
+                    avg_acc,
+                    color='r' if avg_acc<0.5 else 'g',
+                    yerr=std_acc)
+        axes[ni].set_ylabel('Num Blocks = %i' % nb)
+
+    for ni, (num_blocks, num_blocks_data) in enumerate(method_full_trans_success_data.items()):
+        try:
+            all_models = list(num_blocks_data.keys())
+            for (label, action), accs in num_blocks_data[all_models[0]].items(): # NOTE: all models have same keys
+                all_accs = [num_blocks_data[model][(label, action)] for model in all_models]
+                avg_acc = np.mean(all_accs)
+                std_acc = np.std(all_accs)
+                plot_accs(avg_acc, std_acc, action, num_blocks, ni)
+        except: # model is opt, not learned
+            for (action, label), accs in num_blocks_data:
+                avg_acc = accs
+                std_acc = 0
+                plot_accs(avg_acc, std_acc, action, num_blocks, ni)
+
+    fig.suptitle('Accuracy of Method %s on Different Test Set Num Blocks' % method)
+    plt.xlabel('Actions')
+    #plt.show()
+    plt.savefig('all_transition_accuracies_method_%s' % method )
+    #plt.close()
 
 def plot_transition_figs(transitions, model_logger, test_num_blocks, all_plot_inds, \
                         plot_keys, transition_names):
@@ -225,6 +275,7 @@ if __name__ == '__main__':
 ########
 
     trans_success_data = recc_dict()
+    full_trans_success_data = recc_dict()
     heur_success_data = recc_dict()
 
     # run for each method and model
@@ -246,6 +297,10 @@ if __name__ == '__main__':
                 trans_accuracy, transitions = calc_trans_accuracy('learned', \
                                                 test_trans_dataset, test_num_blocks, \
                                                 model=trans_model, return_transitions=True)
+                full_trans_success_data[method][test_num_blocks][model_path] = \
+                                        calc_full_trans_accuracy('learned', \
+                                                                test_num_blocks, \
+                                                                model=trans_model)
                 #heur_accuracy = calc_heur_error('learned', test_heur_dataset, \
                 #                                    test_num_blocks, model=heur_model)
                 trans_success_data[method][test_num_blocks][model_path] = trans_accuracy
@@ -261,6 +316,9 @@ if __name__ == '__main__':
             test_heur_dataset = test_dataset_logger.load_heur_dataset()
             test_trans_dataset.set_pred_type('full_state')
             trans_success_data['OPT'][test_num_blocks] = calc_trans_accuracy('opt', test_trans_dataset, test_num_blocks)
+            full_trans_success_data['OPT'][test_num_blocks] = calc_full_trans_accuracy('opt', \
+                                                            test_num_blocks, \
+                                                            model=trans_model)
             #heur_accuracy = calc_heur_error('opt', test_heur_dataset, test_num_blocks)
             #heur_success_data['OPT'][test_num_blocks] = heur_accuracy
 
@@ -276,6 +334,9 @@ if __name__ == '__main__':
     all_test_num_blocks = list(test_datasets.keys())
     plot_results(trans_success_data, all_test_num_blocks, trans_title, xlabel, trans_ylabel, logger)
 
+    for method, method_data in full_trans_success_data.items():
+        plot_full_accuracies(method, method_data)
+    plt.show()
     #heur_title = 'Heuristic Model MSE with Learned\nModels in %s Block World' % model_args.num_blocks  # TODO: hack
     #heur_ylabel = 'Average MSE'
     #plot_results(heur_success_data, all_test_num_blocks, heur_title, xlabel, heur_ylabel, logger)

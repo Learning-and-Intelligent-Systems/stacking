@@ -2,7 +2,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 
-from learning.active.utils import GoalConditionedExperimentLogger
+from learning.active.utils import GoalConditionedExperimentLogger, potential_actions
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -85,8 +85,6 @@ dataset_exp_paths = random_actions_paths
 
 ###
 labels = {0: [], 1: []}
-pos_actions = {}
-neg_actions = {}
 heights = {}
 
 # NOTE: this only works if all data_exp_paths have the same num blocks:
@@ -94,12 +92,9 @@ dataset_logger = GoalConditionedExperimentLogger(dataset_exp_paths[0])
 num_blocks = dataset_logger.load_args().num_blocks
 
 # init keys for all potential keys
-for bb in range(1, num_blocks+1):
-    for bt in range(1, num_blocks+1):
-        if bt == bb+1:
-            pos_actions[str(bb)+','+str(bt)] = []
-        else:
-            neg_actions[str(bb)+','+str(bt)] = []
+pos_actions, neg_actions = potential_actions(num_blocks)
+pos_actions = {pos_a : [] for pos_a in pos_actions}
+neg_actions = {neg_a : [] for neg_a in neg_actions}
 
 for th in range(1,num_blocks+1): heights[th] = []
 

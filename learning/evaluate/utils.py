@@ -90,6 +90,18 @@ def plot_horiz_bars(transitions, plot_inds, bar_text_inds, color=False, plot_tit
 def recc_dict():
     return defaultdict(recc_dict)
 
+# init keys for all potential keys
+def potential_actions(num_blocks):
+    pos_actions = []
+    neg_actions = []
+    for bb in range(1, num_blocks+1):
+        for bt in range(1, num_blocks+1):
+            if bt == bb+1:
+                pos_actions.append(str(bb)+','+str(bt))
+            elif bt != bb:
+                neg_actions.append(str(bb)+','+str(bt))
+    return pos_actions, neg_actions
+
 def plot_results(success_data, all_test_num_blocks, title, xlabel, ylabel, logger):
     # plot colors
     cs = ['r', 'g', 'b', 'c', 'm', 'y', 'k']
