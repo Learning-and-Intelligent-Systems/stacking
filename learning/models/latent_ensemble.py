@@ -169,9 +169,10 @@ class ThrowingLatentEnsemble(LatentEnsemble):
         q_z = torch.distributions.normal.Normal(self.latent_locs[obj_ids],
                                                 torch.exp(self.latent_logscales[obj_ids]))
 
-        if self.disable_latents: N_samples = 1
+        # if self.disable_latents: N_samples = 1 # NOTE(izzy): debugging
+
         # samples will have shape [N_batch x N_samples x D_latent]
-        z_samples = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2) * float(not self.disable_latents)
+        z_samples = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2) #* float(not self.disable_latents)
         # data will have shape [N_batch x N_samples x (D_observed+D_latent)]
         x_with_z_samples = self.concat_samples(x, z_samples)
 

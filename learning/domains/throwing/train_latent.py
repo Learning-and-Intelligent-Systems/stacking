@@ -13,6 +13,46 @@ from learning.models.mlp import FeedForward
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
 from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, make_x_partially_observable
 
+# NOTE(izzy): work in progress -- the following three functions have very similar
+# structure, so I wanted to consolidate them in this one function
+
+# def predict(latent_ensemble,
+#             batch,
+#             n_latent_samples=10,
+#             marginalize_latents=True,
+#             marginalize_ensemble=True,
+#             mode='train',
+#             hide_dims=[]):
+
+#         # pull out the input
+#         x = batch[0]
+#         x = make_x_partially_observable(x, hide_dims)
+#         z_id = batch[1]
+#         if torch.cuda.is_available():
+#             x = x.cuda()
+#             z_id = z_id.cuda()
+
+#         with torch.set_grad_enabled(mode=='train'): # conditional "torch.no_grad"
+#             pred = latent_ensemble(x, z_id.long(),
+#                        collapse_latents=marginalize_latents,
+#                        collapse_ensemble=marginalize_ensemble,
+#                        N_samples=n_latent_samples).squeeze()
+
+#             if mode == 'predict':
+#                 D_pred = pred.shape[-1] // 2
+#                 mu, log_sigma = torch.split(pred, D_pred, dim=-1)
+#                 sigma = torch.exp(log_sigma)
+#                 result = mu, sigma
+
+#             elif mode == 'loss':
+#                 # NOTE(izzy): full=True means include the constant terms in the
+#                 # log-likelihood computation. In this case, we are
+#                 loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
+
+#                 data_likelihood = loss_func(y[:, None].expand(N_batch, N_samples), mu, torch.exp(log_sigma))
+
+
+#         return result
 
 def get_predictions(latent_ensemble,
                     unlabeled_data,
@@ -110,8 +150,8 @@ def evaluate(latent_ensemble,
     Returns:
         [type] -- [description]
     """
-    total_prob = 0
-    loss_func = nn.GaussianNLLLoss(reduction='none', full=True)
+    total_log_prob = 0
+    loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
 
     # decided whether or not to normalize by the amount of data
     N = dataloader.dataset.tensors[0].shape[0]
@@ -128,9 +168,9 @@ def evaluate(latent_ensemble,
         pred = latent_ensemble(x, z_id.long()).squeeze()
         D_pred = pred.shape[-1] // 2
         mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-        total_prob += torch.exp(-loss_func(y, mu, torch.exp(log_sigma))).sum()
+        total_log_prob += -loss_func(y, mu, torch.exp(log_sigma))
 
-    return total_prob / N
+    return total_log_prob / N
 
 
 def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
@@ -224,28 +264,33 @@ def generate_or_load_datasets(args):
     return train_dataloader, val_dataloader
 
 
-if __name__ == '__main__':
-    # get commandline arguments
+def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--hide-dims', type=str, default='3')
     parser.add_argument('--train-dataset', type=str, default='')
     parser.add_argument('--val-dataset', type=str, default='')
     parser.add_argument('--save-train-dataset', type=str, default='')
     parser.add_argument('--save-val-dataset', type=str, default='')
+    parser.add_argument('--save-accs', type=str, default='')
+    parser.add_argument('--save-latents', type=str, default='')
+    parser.add_argument('--n-epochs', type=int, default=100)
     parser.add_argument('--n-train', type=int, default=500)
     parser.add_argument('--n-val', type=int, default=100)
-    parser.add_argument('--n-objects', type=int, default=5)
+    parser.add_argument('--n-objects', type=int, default=10)
     parser.add_argument('--n-models', type=int, default=10)
-    args = parser.parse_args()
+    parser.add_argument('--d-latent', type=int, default=2)
 
+    return parser
+
+def main(args):
     # get the datasets
     train_dataloader, val_dataloader = generate_or_load_datasets(args)
 
     # variables to define the latent ensemble
     n_latents = args.n_objects
     n_models = args.n_models
+    d_latents = args.d_latent
     d_observe = 12
-    d_latents = 3
     d_pred = 2
     # produce a list of the dimensions of the object propoerties to make hidden
     hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
@@ -267,9 +312,25 @@ if __name__ == '__main__':
     latent_ensemble, accs, latents = train(train_dataloader,
                                            val_dataloader,
                                            latent_ensemble,
-                                           n_epochs=100,
+                                           n_epochs=args.n_epochs,
                                            return_logs=True,
                                            hide_dims=hide_dims)
 
-    plt.plot(accs)
-    plt.show()
+    if args.save_accs != "":
+        print('Saving accuracy data to', args.save_accs)
+        np.save(args.save_accs, np.array(accs))
+    else:
+        plt.plot(accs)
+        plt.show()
+
+    if args.save_latents != "":
+        print('Saving latents data to', args.save_latents)
+        np.save(args.save_latents, np.array(latents))
+
+
+if __name__ == '__main__':
+    # get commandline arguments
+    parser = get_parser()
+    args = parser.parse_args()
+    main(args)
+
