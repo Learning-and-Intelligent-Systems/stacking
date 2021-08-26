@@ -51,22 +51,32 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
     ax.cla()
 
 
+def plot_latents_throughout_training(latents):
+    print(latents.shape)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp-path', type=str, required=True)
+    parser.add_argument('--exp-path', type=str, default="")
     parser.add_argument('--use-latents', action='store_true')
+    parser.add_argument('--latents-log', type=str, default="")
     args = parser.parse_args()
-    
-    logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-    logger.args.max_acquisitions = 100  # lazy
-    logger.args.throwing = True # lazy
+    print(args.latents_log)
 
-    ax = plt.gca()
+    if args.latents_log != "":
+        latents = np.load(args.latents_log)
+        plot_latents_throughout_training(latents)
+    elif args.exp_path != "":
+        logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
+        logger.args.max_acquisitions = 100  # lazy
+        logger.args.throwing = True # lazy
 
-    plot_latent_uncertainty(logger, ax=ax)
+        ax = plt.gca()
 
-    plot_val_accuracy(logger, ax=ax)
+        plot_latent_uncertainty(logger, ax=ax)
 
-    objects = logger.get_objects(ThrowingBall)
-    task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
-    plot_task_performance(logger, task_score_fn, ax=ax)
+        plot_val_accuracy(logger, ax=ax)
+
+        objects = logger.get_objects(ThrowingBall)
+        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
+        plot_task_performance(logger, task_score_fn, ax=ax)

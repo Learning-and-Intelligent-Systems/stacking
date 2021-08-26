@@ -1,3 +1,4 @@
+from multiprocessing import Process
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -55,6 +56,26 @@ def generate_dataset(objects,
         dataset = xs, z_ids
     return tuple(torch.Tensor(d) for d in dataset) if as_tensor else dataset
 
+def generate_dataset_parallel(objects,
+                              n_data,
+                              as_tensor=True,
+                              label=True,
+                              n_workers=8):
+    
+    n_data_per_process = int(np.ceil(n_data/n_workers))
+    processes = [Process(target=generate_dataset,
+                         args=(objects, n_data_per_process),
+                         kwargs={"as_tensor": as_tensor, "label": label}) for _ in range(n_workers)]
+    for p in processes:
+        p.start()
+
+    results = []
+    for p in processes:
+        # TODO(izzy): figure out how to get the result back from the children
+        results.append(p.join())
+
+    return tuple(torch.cat(d, axis=0) for d in zip(results))
+
 def generate_objects(n_objects):
     return [ThrowingBall.random() for _ in range(n_objects)]
 
@@ -104,3 +125,7 @@ class ParallelDataLoader:
         assert n == len(data), "Require same number of tensors"
         self.dataset.tensors = tuple(torch.cat([self.dataset.tensors[i], data[i]], axis=0) for i in range(n))
 
+
+if __name__ == '__main__':
+    objects = generate_objects(10)
+    dataset = generate_dataset_parallel(objects, 30)

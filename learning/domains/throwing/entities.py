@@ -49,14 +49,7 @@ class ThrowingBall:
         rolling_resistance = np.random.uniform(1e-4, 1e-3)
         bounciness = np.random.uniform(0.1, 0.6)
 
-        return ThrowingBall(color=np.zeros(3),
-                            mass=mass,
-                            radius=radius,
-                            air_drag_linear=1.,
-                            air_drag_angular=1e-5,
-                            friction_coef=0.8,
-                            rolling_resistance=1e-3,
-                            bounciness=0.5)
+        return ThrowingBall(mass=mass, radius=radius)
 
     def vectorize(self):
         v = np.zeros(self.dim)
