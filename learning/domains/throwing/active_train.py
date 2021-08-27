@@ -36,8 +36,8 @@ def get_latent_ensemble(args):
                             n_models=args.n_models)
         latent_ensemble = ThrowingLatentEnsemble(ensemble,
                                                  n_latents=n_latents,
-                                                 d_latents=d_latents,
-                                                 disable_latents=not args.use_latents)
+                                                 d_latents=d_latents)
+                                                 #disable_latents=not args.use_latents)
 
     if torch.cuda.is_available():
         latent_ensemble = latent_ensemble.cuda()
@@ -118,8 +118,8 @@ def run_active_throwing(args):
     data_pred_fn = lambda latent_ensemble, unlabeled_data: get_predictions(latent_ensemble,
                                                                            unlabeled_data,
                                                                            n_latent_samples=10,
-                                                                           marginalize_latents=(not args.fitting),
-                                                                           marginalize_ensemble=(args.fitting and args.use_latents),
+                                                                           marginalize_latents=not args.fitting,
+                                                                           marginalize_ensemble=args.fitting,# and args.use_latents),
                                                                            hide_dims=hide_dims)
 
     # first two columns of xs are the action params
@@ -142,10 +142,11 @@ def run_active_throwing(args):
                                          batch_size=args.batch_size,
                                          shuffle=True,
                                          n_dataloaders=args.n_models)
-    val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10*args.n_objects)),
-                                     batch_size=args.batch_size,
-                                     shuffle=True,
-                                     n_dataloaders=1)
+    # val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10*args.n_objects)),
+    #                                  batch_size=args.batch_size,
+    #                                  shuffle=True,
+    #                                  n_dataloaders=1)
+    val_dataloader = None
 
 
     # create a logger and save the object set (in vector form)

@@ -22,7 +22,7 @@ from learning.domains.throwing.throwing_data import generate_objects, generate_d
 #             marginalize_latents=True,
 #             marginalize_ensemble=True,
 #             mode='train',
-#             hide_dims=[]):
+#             hide_dims=[3]):
 
 #         # pull out the input
 #         x = batch[0]
@@ -59,7 +59,7 @@ def get_predictions(latent_ensemble,
                     n_latent_samples=10,
                     marginalize_latents=True,
                     marginalize_ensemble=True,
-                    hide_dims=[]):
+                    hide_dims=[3]):
 
     dataset = TensorDataset(*unlabeled_data)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=64)
@@ -93,7 +93,7 @@ def get_both_loss(latent_ensemble,
                   batches,
                   N,
                   N_samples=10,
-                  hide_dims=[]):
+                  hide_dims=[3]):
     """ compute the loglikelohood of both the latents and the ensemble
 
     Arguments:
@@ -137,7 +137,7 @@ def get_both_loss(latent_ensemble,
 
 def evaluate(latent_ensemble,
             dataloader,
-            hide_dims=[]):
+            hide_dims=[3]):
     """ computes the data likelihood
 
     Arguments:
@@ -177,7 +177,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     freeze_latents=False,
     freeze_ensemble=False,
     return_logs=False,
-    hide_dims=[]):
+    hide_dims=[3]):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
