@@ -13,9 +13,10 @@ from learning.models.latent_ensemble import ThrowingLatentEnsemble
 
 def get_latent_ensemble(args):
     n_latents = args.n_objects
-    d_observe = 11
+    d_observe = 12
     d_latents = 1
     d_pred = 2
+    hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
 
     if args.fitting:
         # if we are fitting latents, then we load the latent ensemble from a previous exp-path
@@ -28,7 +29,7 @@ def get_latent_ensemble(args):
         # if we are fitting the model, then we create a new latent ensemble
         ensemble = Ensemble(base_model=FeedForward,
                             base_args={
-                                        'd_in': d_observe + d_latents,
+                                        'd_in': d_observe + d_latents - len(hide_dims),
                                         'd_out': d_pred,
                                         'h_dims': [64, 32]
                                       },
@@ -82,12 +83,16 @@ def active_train(latent_ensemble, dataloader, val_dataloader, acquire_fn, logger
         if not args.use_latents: pass
         elif args.fitting: latent_ensemble.reset_latents()
         else: latent_ensemble.reset()
+
+        hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
+
         latent_ensemble, accs, latents = train(dataloader,
                                                val_dataloader,
                                                latent_ensemble,
                                                n_epochs=args.n_epochs,
                                                freeze_ensemble=args.fitting,
-                                               return_logs=True)
+                                               return_logs=True,
+                                               hide_dims=hide_dims)
 
         # save the ensemble after training
         logger.save_ensemble(latent_ensemble, tx)
@@ -104,6 +109,7 @@ def active_train(latent_ensemble, dataloader, val_dataloader, acquire_fn, logger
 
 def run_active_throwing(args):
     objects = generate_objects(args.n_objects)
+    hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
 
     # use the sample_action function to get actions, and then preprocess to xs
     data_sampler_fn = lambda n_samples: generate_dataset(objects, args.n_samples, as_tensor=True, label=False)
@@ -113,7 +119,8 @@ def run_active_throwing(args):
                                                                            unlabeled_data,
                                                                            n_latent_samples=10,
                                                                            marginalize_latents=(not args.fitting),
-                                                                           marginalize_ensemble=(args.fitting and args.use_latents))
+                                                                           marginalize_ensemble=(args.fitting and args.use_latents),
+                                                                           hide_dims=hide_dims)
 
     # first two columns of xs are the action params
     data_label_fn = lambda xs, z_ids: label_actions(objects,
@@ -150,7 +157,7 @@ def run_active_throwing(args):
     active_train(latent_ensemble, init_dataloader, val_dataloader, acquire_fn, logger, args)
 
 
-if __name__ == '__main__':
+def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--max-acquisitions',
                         type=int,
@@ -163,6 +170,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--n-objects', type=int, default=10)
+    parser.add_argument('--hide_dims', type=str, default='3')
 
     parser.add_argument('--use-latents', action='store_true')
 
@@ -171,8 +179,11 @@ if __name__ == '__main__':
     parser.add_argument('--latent-ensemble-exp-path', type=str, default='', help='Path to a trained latent ensemble.')
     parser.add_argument('--latent-ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
 
+    return parser
+
+if __name__ == '__main__':
+
+    parser = get_parser()
     args = parser.parse_args()
-
-
     run_active_throwing(args)
 

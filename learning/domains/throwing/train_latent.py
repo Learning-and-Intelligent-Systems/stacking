@@ -185,7 +185,7 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     accs = []
     latents = []
     best_weights = None
-    best_acc = 0
+    best_acc = -np.inf
 
     for epoch_idx in range(n_epochs):
         print(f'Epoch {epoch_idx}')
