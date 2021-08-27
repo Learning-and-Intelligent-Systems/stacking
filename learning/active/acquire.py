@@ -35,16 +35,27 @@ def bald_diagonal_gaussian(mus, sigmas):
     Returns:
         [N_batch]
     """
-    k = sigmas.shape[2]
+    n_batch, n_samples, k = sigmas.shape
     C = 0.5 * k * (1 + np.log(2*np.pi))
 
+    # this is wrong!
+    # m_sigma = torch.mean(sigmas, dim=1)
+
+    # assuming that the predictions from each network are independent, then
+    # we can compute the variance of the mean of the predictions by
+    # m_sigma = torch.sum(sigmas * (1/n_samples)**2, dim=1)
+
+    # assuming that the predictions from each network correspond to a mixture
+    # of gaussians distribution, then we can compute the variance of that
+    # distribution as per: https://en.wikipedia.org/wiki/Mixture_distribution
     m_sigma = torch.mean(sigmas + mus**2, dim=1) - mus.mean(dim=1)**2
+
     m_ent = C + 0.5 * torch.log(m_sigma).sum(axis=1)
 
     ent_per_sample = C + 0.5 * torch.log(sigmas).sum(axis=2)
     ent = torch.mean(ent_per_sample, dim=1)
 
-    bald = m_ent + ent
+    bald = m_ent - ent # NOTE(izzy): sanity check signs
     return bald
 
 def subtower_bald(samples, ensemble, data_pred_fn):

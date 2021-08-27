@@ -129,17 +129,17 @@ if __name__ == '__main__':
         plot_latents_throughout_training(latents)
     elif args.exp_path != "":
         logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-        logger.args.max_acquisitions = 40  # lazy
+        logger.args.max_acquisitions = 60  # lazy
         logger.args.throwing = True # lazy
 
-        # ax = plt.gca()
+        ax = plt.gca()
 
-        # plot_latent_uncertainty(logger, ax=ax)
+        plot_latent_uncertainty(logger, ax=ax)
 
-        # plot_val_accuracy(logger, ax=ax)
+        plot_val_accuracy(logger, ax=ax)
 
-        # objects = logger.get_objects(ThrowingBall)
-        # task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
-        # plot_task_performance(logger, task_score_fn, ax=ax)
+        objects = logger.get_objects(ThrowingBall)
+        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
+        plot_task_performance(logger, task_score_fn, ax=ax)
 
-        visualize_bald_throughout_training(logger)
+        # visualize_bald_throughout_training(logger)

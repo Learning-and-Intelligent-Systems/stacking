@@ -142,11 +142,11 @@ def run_active_throwing(args):
                                          batch_size=args.batch_size,
                                          shuffle=True,
                                          n_dataloaders=args.n_models)
-    # val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10*args.n_objects)),
-    #                                  batch_size=args.batch_size,
-    #                                  shuffle=True,
-    #                                  n_dataloaders=1)
-    val_dataloader = None
+    val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10*args.n_objects)),
+                                     batch_size=args.batch_size,
+                                     shuffle=True,
+                                     n_dataloaders=1)
+    # val_dataloader = None
 
 
     # create a logger and save the object set (in vector form)
