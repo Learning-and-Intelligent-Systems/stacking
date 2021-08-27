@@ -52,7 +52,18 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
 
 
 def plot_latents_throughout_training(latents):
-    print(latents.shape)
+    mu, log_sigma = np.split(latents, 2, axis=-1)
+    for l_idx in range(mu.shape[1]):
+        for d_idx in range(mu.shape[2]):
+            m = mu[:, l_idx, d_idx]
+            s = np.exp(log_sigma[:, l_idx, d_idx])
+            plt.plot(m)
+            plt.fill_between(np.arange(m.size), m-s, m+s, alpha=0.2)
+
+    plt.title('Mean and Variance of 5, one-dimensional latents')
+    plt.ylabel('Latent value')
+    plt.xlabel('Epoch')
+    plt.show()
 
 
 if __name__ == '__main__':
