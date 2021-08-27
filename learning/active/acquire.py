@@ -22,7 +22,7 @@ def bald(predictions, eps=1e-5):
 
     return bald
 
-def bald_diagonal_gaussian(sigma):
+def bald_diagonal_gaussian(mus, sigmas):
     """ Get the BALD score for each example. Only requires variance
 
     see https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Differential_entropy
@@ -35,13 +35,13 @@ def bald_diagonal_gaussian(sigma):
     Returns:
         [N_batch]
     """
-    k = sigma.shape[2]
+    k = sigmas.shape[2]
     C = 0.5 * k * (1 + np.log(2*np.pi))
 
-    m_sigma = torch.mean(sigma, dim=1)
-    m_ent = C + 0.5 * torch.log(m_sigma.prod(axis=1))
+    m_sigma = torch.mean(sigmas + mus**2, dim=1) - mus.mean(dim=1)**2
+    m_ent = C + 0.5 * torch.log(m_sigma).sum(axis=1)
 
-    ent_per_sample = C + 0.5 * torch.log(sigma.prod(axis=2))
+    ent_per_sample = C + 0.5 * torch.log(sigmas).sum(axis=2)
     ent = torch.mean(ent_per_sample, dim=1)
 
     bald = m_ent + ent

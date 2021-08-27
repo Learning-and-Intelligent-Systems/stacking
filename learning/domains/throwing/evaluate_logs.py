@@ -91,7 +91,7 @@ def visualize_bald_throughout_training(logger):
                                     marginalize_ensemble=False,
                                     hide_dims=[3])
 
-        scores = bald_diagonal_gaussian(sigma).numpy()
+        scores = bald_diagonal_gaussian(mu, sigma).numpy()
         scores = scores.reshape(n_objects, n_ang, n_w)
 
         fig, axes = plt.subplots(ncols=n_objects)

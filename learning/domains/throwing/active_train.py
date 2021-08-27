@@ -59,7 +59,7 @@ def acquire_datapoints(latent_ensemble,
     mu, sigma = data_pred_fn(latent_ensemble, unlabeled_data)
 
     # score the predictions
-    scores = bald_diagonal_gaussian(sigma).numpy()
+    scores = bald_diagonal_gaussian(mu, sigma).numpy()
 
     # choose the best ones
     acquire_indices = np.flip(np.argsort(scores))[:n_acquire]

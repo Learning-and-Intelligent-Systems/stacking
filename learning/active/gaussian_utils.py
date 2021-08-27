@@ -8,7 +8,6 @@ def approximate_mixture_with_gaussian(mus, sigmas):
 
     return mu, sigma
 
-
 def entropy_of_gaussian(mu, sigma):
     return 0.5 + 0.5 * np.log(2 * np.pi * sigma)
 
