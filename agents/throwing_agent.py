@@ -32,7 +32,7 @@ class ThrowingAgent:
         return ThrowingAction.from_vector(b, vec)
 
 
-    def run(self, action, do_animate=False, do_plot=False):
+    def run(self, action, do_animate=False, do_plot=False, return_full_results=False):
         """ 
         Simulates a throwing action and collects results for learning
         """
@@ -40,8 +40,5 @@ class ThrowingAgent:
                                           do_animate=do_animate,
                                           do_plot=do_plot)
 
-        # TODO: Parse through the simulation results and pick desired criteria
-        # (e.g. max x direction, number of bounces, etc.)
-        # Then, return learning signal
-        return results["state"][0,-1]
+        return results if return_full_results else results["state"][0,-1]
   

@@ -1,4 +1,5 @@
 import argparse
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
@@ -78,7 +79,7 @@ def visualize_bald_throughout_training(logger):
     grid_data_tuple = generate_grid_dataset(objects, ang_points, w_points, label=False)
 
 
-    for tx in range(10):
+    for tx in range(logger.args.max_acquisitions):
         latent_ensemble = logger.get_ensemble(tx)
 
         dataset = logger.load_dataset(tx)
@@ -93,6 +94,7 @@ def visualize_bald_throughout_training(logger):
 
         scores = bald_diagonal_gaussian(mu, sigma).numpy()
         scores = scores.reshape(n_objects, n_ang, n_w)
+        print(scores.min(), scores.max())
 
         fig, axes = plt.subplots(ncols=n_objects)
         for i in range(n_objects):
@@ -100,8 +102,8 @@ def visualize_bald_throughout_training(logger):
             axes[i].imshow(scores[i],
                            extent=[np.pi/8, 3*np.pi/8, -10, 10],
                            aspect='auto',
-                           vmin=-3,
-                           vmax=3)
+                           vmin=0,
+                           vmax=2)
             # axes[i].set_title('BALD Scores')
             # axes[i].set_xlabel('Spin')
             # axes[i].set_ylabel('Angle')
@@ -115,6 +117,22 @@ def visualize_bald_throughout_training(logger):
 
         plt.show()
 
+def plot_with_variance(x, ys, ax, c=None, label=None, alpha=0.3):
+    x = np.array(x)
+    ys = np.array(ys)
+    # flip the ys as needed
+
+    print(x.shape, ys.shape)
+    if ys.shape[1] != x.shape[0]:
+        ys = ys.T
+        assert ys.shape[1] == x.shape[0], 'x and ys don\'t have matching dimensions'
+
+    mu = np.mean(ys, axis=0)
+    sigma = np.var(ys, axis=0)
+    ax.fill_between(x, mu-sigma, mu+sigma, color=c, alpha=alpha)
+    ax.plot(x, mu, c=c, alpha=alpha, label=label)
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -124,22 +142,82 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args.latents_log)
 
+
     if args.latents_log != "":
+        #######################################################################
+        # plotting non-standard log format
+        #######################################################################
         latents = np.load(args.latents_log)
         plot_latents_throughout_training(latents)
+
     elif args.exp_path != "":
+        #######################################################################
+        # plotting for single logs
+        #######################################################################
         logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-        logger.args.max_acquisitions = 60  # lazy
+        logger.args.max_acquisitions = 50  # lazy
         logger.args.throwing = True # lazy
 
         ax = plt.gca()
 
-        plot_latent_uncertainty(logger, ax=ax)
+        # plot_latent_uncertainty(logger, ax=ax)
 
-        plot_val_accuracy(logger, ax=ax)
+        # plot_val_accuracy(logger, ax=ax)
 
-        objects = logger.get_objects(ThrowingBall)
-        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
-        plot_task_performance(logger, task_score_fn, ax=ax)
+        # objects = logger.get_objects(ThrowingBall)
+        # task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
+        # plot_task_performance(logger, task_score_fn, ax=ax)
 
-        # visualize_bald_throughout_training(logger)
+        visualize_bald_throughout_training(logger)
+    else:
+        #######################################################################
+        # plotting for multipe logs
+        #######################################################################
+
+        runs = [
+            {
+                "prefix": 'throwing_bald_sweep_run_',
+                "label": 'BALD',
+                "data": [],
+                "color": 'b'
+            },
+            {
+                "prefix": 'throwing_random_sweep_run_',
+                "label": 'Random',
+                "data": [],
+                "color": 'r'
+            },
+
+        ]
+        exp_path = 'learning/experiments/logs/'
+        ax = plt.gca()
+        for r in runs:
+            for fname in os.listdir(exp_path):
+                if fname.startswith(r["prefix"]):
+                    path_to_log = exp_path + '/' + fname
+                    path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
+                    print(f'Loading from {fname}')
+                    if not os.path.isfile(path_to_task_performance_file):
+                        print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
+                        logger = ActiveExperimentLogger(path_to_log, use_latents=True)
+                        logger.args.max_acquisitions = 50  # lazy
+                        logger.args.throwing = True # lazy
+                        plot_latent_uncertainty(logger, ax=ax)
+                        plot_val_accuracy(logger, ax=ax)
+                        objects = logger.get_objects(ThrowingBall)
+                        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
+                        plot_task_performance(logger, task_score_fn, ax=ax)
+
+                    r["data"].append(np.load(path_to_task_performance_file))
+
+
+        for r in runs:
+            plot_with_variance(np.arange(50), r["data"], ax, label=r["label"], c=r["color"])
+        plt.legend()
+        plt.xlabel('Acquisition Step')
+        plt.ylabel('Task Error (m)')
+        plt.title('Task Loss Throughout Active Training')
+        plt.show()
+
+
+

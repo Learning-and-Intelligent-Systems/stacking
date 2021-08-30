@@ -50,16 +50,24 @@ def acquire_datapoints(latent_ensemble,
                        n_acquire,
                        data_sampler_fn,
                        data_pred_fn,
-                       data_label_fn):
+                       data_label_fn,
+                       acquisition='bald'):
 
     # sample candidate datapoints
     unlabeled_data = data_sampler_fn(n_samples)
 
-    # compute predictions for each datapoint
-    mu, sigma = data_pred_fn(latent_ensemble, unlabeled_data)
+    if acquisition == 'bald':
+        # compute predictions for each datapoint
+        mu, sigma = data_pred_fn(latent_ensemble, unlabeled_data)
+        # score the predictions
+        scores = bald_diagonal_gaussian(mu, sigma).numpy()
 
-    # score the predictions
-    scores = bald_diagonal_gaussian(mu, sigma).numpy()
+    elif acquisition == 'random':
+        # random scores
+        scores = np.random.rand(unlabeled_data[0].shape[0])
+
+    else:
+        raise NotImplementedError(f"Unknown acquisition strategy: {acquisition}.")
 
     # choose the best ones
     acquire_indices = np.flip(np.argsort(scores))[:n_acquire]
@@ -134,7 +142,9 @@ def run_active_throwing(args):
                                                             args.n_acquire,
                                                             data_sampler_fn,
                                                             data_pred_fn,
-                                                            data_label_fn)
+                                                            data_label_fn,
+                                                            acquisition=args.acquisition.lower())
+
 
 
     print('Generating initialization and validation datasets')
@@ -172,6 +182,7 @@ def get_parser():
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--n-objects', type=int, default=10)
     parser.add_argument('--hide_dims', type=str, default='3')
+    parser.add_argument('--acquisition', type=str, default='bald')
 
     parser.add_argument('--use-latents', action='store_true')
 

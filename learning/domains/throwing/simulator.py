@@ -135,16 +135,18 @@ class ThrowingSimulator:
         return results
 
 
-    def plot_results(self, obj, state):
+    def plot_results(self, obj, state, ax=None, label=None):
         """ Plots simulation trajectory """
-        fig = plt.figure(figsize=(12,8))
-        ax = fig.add_subplot(111, aspect="equal")
+        if ax is None:
+            fig = plt.figure(figsize=(12,8))
+            ax = fig.add_subplot(111)
+
         plt.title("Throwing Trajectory")
 
         x = state[0,:]
         y = state[1,:]
         th = state[2,:]
-        l = plt.plot(x, y, "-")
+        l = plt.plot(x, y, "-", label=label)
 
         circ_init = plt.Circle((x[0], y[0]), obj.radius, color=obj.color)
         circ_final = plt.Circle((x[-1], y[-1]), obj.radius, color=obj.color)
@@ -158,7 +160,10 @@ class ThrowingSimulator:
                                  [y[-1], y[-1] + obj.radius*np.sin(th[-1])], 
                                  color="k")
 
-        plt.show()
+        ax.set_xlabel('Distance (m)')
+        ax.set_ylabel('Height (m)')
+
+        if ax is None: plt.show()
 
 
     def animate_results(self, obj, state, dt=0.01):
