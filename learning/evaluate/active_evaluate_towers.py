@@ -1,5 +1,6 @@
 import argparse
 import copy
+from particle_belief import DiscreteLikelihoodParticleBelief
 from learning.models import latent_ensemble
 from tamp.misc import load_blocks
 import matplotlib.pyplot as plt
@@ -1203,6 +1204,226 @@ def vary_latents_for_fixed_block(logger):
     plt.show()
 
 
+def plot_particle_latents(logger):
+
+    means = np.zeros((logger.args.max_acquisitions, 4))
+    lows = np.zeros((logger.args.max_acquisitions, 4))
+    highs = np.zeros((logger.args.max_acquisitions, 4))
+    # go through each acqisition step
+    for tx in range(0, logger.args.max_acquisitions):
+        print('Eval timestep, ', tx)
+
+        # load the particles for that timestep.
+        particles = logger.load_particles(tx)
+        #scales.append(torch.exp(ensemble.latent_logscales).mean(axis=0).detach().numpy())
+        means[tx, :] = np.mean(particles.particles, axis=0)
+        sigma = np.std(particles.particles, axis=0)
+        lows[tx, :] = means[tx, :] - sigma 
+        highs[tx, :] = means[tx, :] + sigma
+
+    for ix in range(0, 4):
+        plt.plot(means[:,ix])
+        plt.fill_between(np.arange(0, means.shape[0]), lows[:,ix], highs[:,ix], alpha=0.2)
+
+    plt.xlabel('Acquisition Step')
+    plt.ylabel('Latent Value')
+    plt.title('Value of each latent variable during fitting')
+    plt.savefig(logger.get_figure_path('latent_means.png'))
+    plt.clf()
+
+def get_predictions_with_particles(particles, observation, ensemble):
+    dataset = TowerDataset(tower_dict=observation,
+                            augment=False)
+    dataloader = ParallelDataLoader(dataset=dataset,
+                                    batch_size=1,
+                                    shuffle=False,
+                                    n_dataloaders=1)
+    bernoulli_probs = []  # Contains one prediction for each particle.
+
+    latent_samples = torch.Tensor(particles)
+    #print(latent_samples.shape)
+    for set_of_batches in dataloader:
+        towers, block_ids, _ = set_of_batches[0]
+        for ix in range(0, 10):#latent_samples.shape[0]//10):
+            pred = ensemble.forward(towers=towers[:, :, 4:],
+                                    block_ids=block_ids,
+                                    N_samples=10,
+                                    collapse_latents=True, 
+                                    collapse_ensemble=True,
+                                    keep_latent_ix=10,
+                                    latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
+            bernoulli_probs.append(pred.detach().numpy())
+    # print('-----')
+    # print(latent_samples[ix*10:(ix+1)*10,:])
+    # print(bernoulli_probs)
+    return np.concatenate(bernoulli_probs)
+
+def get_pf_validation_accuracy(logger, fname):
+    tower_keys = ['2block', '3block', '4block', '5block']
+    accs = {k: [] for k in tower_keys}
+    
+    with open(fname, 'rb') as handle:
+        val_towers = pickle.load(handle)
+
+
+    for tx in range(0, logger.args.max_acquisitions):
+        if tx % 1 == 0:
+            print('Eval timestep, ', tx)
+        ensemble = logger.get_ensemble(tx)
+        particles = logger.load_particles(tx)
+
+        start = 0
+        preds_list = []
+        for k in tower_keys:
+            end = start + val_towers[k]['towers'].shape[0]
+            for ix in range(0, val_towers[k]['towers'].shape[0]):
+                td = { k: {
+                        'towers': val_towers[k]['towers'][ix:ix+1, :, :],
+                        'block_ids': val_towers[k]['block_ids'][ix:ix+1, :],
+                        'labels': val_towers[k]['labels'][ix:ix+1],
+                    }
+                }
+                #latent = np.mean(particles.particles, axis=0, keepdims=True)
+                latent = np.array(particles.particles).T@np.array(particles.weights)
+                latent = latent.reshape(1, 4)
+
+                pred = get_predictions_with_particles(particles.particles, td, ensemble).mean()
+                preds_list.append(pred)
+
+            preds = np.array(preds_list)
+
+            acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
+            print('Acc:', tx, k, acc)
+            accs[k].append(acc)
+            start = end
+        
+    
+    with open(logger.get_figure_path('val_accuracies.pkl'), 'wb') as handle:
+        pickle.dump(accs, handle)
+    return accs
+
+def plot_particles(logger):
+    from mpl_toolkits.mplot3d import Axes3D
+    import imageio
+    import os
+
+    frames = []
+    for tx in range(logger.args.max_acquisitions):
+        particles = logger.load_particles(tx)
+
+        if not os.path.exists(logger.get_figure_path('particles_%d.png' % tx)):
+            fig = plt.figure()
+            fig.set_size_inches((4,4))
+            ax = Axes3D(fig)
+            ax.clear()
+            halfdim = 5
+            ax.set_xlim(-halfdim, halfdim)
+            ax.set_ylim(-halfdim, halfdim)
+            ax.set_zlim(-halfdim, halfdim)
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_zlabel('z')
+            ax.set_title('Latent ParticleBelief')
+            ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+            ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+            ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+            for particle, weight in zip(particles.particles, particles.weights):
+                alpha = 0.25 + 0.75 * weight
+                ax.scatter(*particle[1:], s=10, color=(0, 0, 1), alpha=alpha)
+            plt.savefig(logger.get_figure_path('particles_%d.png' % tx))
+
+        frames.append(imageio.imread(logger.get_figure_path('particles_%d.png' % tx)))
+
+    imageio.mimsave(logger.get_figure_path('particle_evolution.gif'),
+                    frames,
+                    format='GIF',
+                    fps=2)
+
+COLORS = ['black', 'gray', 'brown', 'red', 'orangered',
+          'darkorange', 'goldenrod', 'yellow', 'olivedrab', 'lawngreen',
+          'green', 'springgreen', 'turquoise', 'teal', 'dodgerblue', 
+          'navy', 'blue', 'indigo', 'plum', 'deeppink']
+def plot_coms():
+    TRAIN_BLOCKS = 'learning/data/may_blocks/blocks/10_random_block_set_1.pkl'
+    EVAL_BLOCKS = 'learning/data/may_blocks/blocks/10_random_block_set_2.pkl'
+
+    from mpl_toolkits.mplot3d import Axes3D
+    import imageio
+    import os
+
+    fig = plt.figure()
+    fig.set_size_inches((4,4))
+    ax = Axes3D(fig)
+    ax.clear()
+    halfdim = 0.075
+    ax.set_xlim(-halfdim, halfdim)
+    ax.set_ylim(-halfdim, halfdim)
+    ax.set_zlim(-halfdim, halfdim)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.set_title('CoM')
+    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+
+    blocks = load_blocks(TRAIN_BLOCKS) + load_blocks(EVAL_BLOCKS)
+    for ix in range(0, 20):
+        ax.scatter(*blocks[ix].com, s=10, color=COLORS[ix])
+    plt.show()
+
+def plot_all_latents():
+    TRAIN_FNAME = 'learning/experiments/logs/latents-train-marginal-bugfix-20210608-215642'
+    EVAL_FNAMES = [
+        'learning/experiments/logs/particle-filter-1000-samples-500-particles-20210820-164647',
+        'learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-1-20210824-095852',
+        'learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-2-20210824-095910',
+        'learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-3-20210824-131532',
+        'learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-4-20210824-131546',
+        '/home/mnosew/workspace/stacking_latents/learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-5-20210824-151922',
+        '/home/mnosew/workspace/stacking_latents/learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-6-20210824-151933',
+        '/home/mnosew/workspace/stacking_latents/learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-7-20210824-181223',
+        '/home/mnosew/workspace/stacking_latents/learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-8-20210824-181236',
+        '/home/mnosew/workspace/stacking_latents/learning/experiments/logs/particle-filter-active-base-1000-samples-250-particles-eval-9-20210824-181247'
+    ]
+
+    from mpl_toolkits.mplot3d import Axes3D
+    import imageio
+    import os
+
+    fig = plt.figure()
+    fig.set_size_inches((4,4))
+    ax = Axes3D(fig)
+    ax.clear()
+    halfdim = 3
+    ax.set_xlim(-halfdim, halfdim)
+    ax.set_ylim(-halfdim, halfdim)
+    ax.set_zlim(-halfdim, halfdim)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.set_title('Latent ParticleBelief')
+    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+
+    train_logger = ActiveExperimentLogger(TRAIN_FNAME, use_latents=True)
+    train_latents = train_logger.get_ensemble(40).latent_locs.detach().numpy()
+    
+    for ix in range(0, 10):
+        ax.scatter(*train_latents[ix, 1:], s=10, color=(1, 0, 0))#COLORS[ix])
+
+
+
+    for ix, fname in enumerate(EVAL_FNAMES):
+        eval_logger = ActiveExperimentLogger(fname, use_latents=True)
+        particles = eval_logger.load_particles(16)
+
+        latent = np.mean(particles.particles, axis=0, keepdims=True)
+        print(latent.shape)
+        ax.scatter(*latent[0, 1:], s=10, color=(0, 0, 1))#COLORS[10+ix])
+    plt.show()
+
 
 
 if __name__ == '__main__':
@@ -1210,13 +1431,25 @@ if __name__ == '__main__':
     parser.add_argument('--exp-path', type=str, required=True)
     args = parser.parse_args()
     
-    logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-    logger.args.max_acquisitions = 10
-
-    vary_latents_for_fixed_block(logger)
+    plot_coms()
+    plot_all_latents()
     sys.exit(0)
-    plot_latent_uncertainty(logger)
-    plot_latent_means(logger)
+    logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
+    logger.args.max_acquisitions = 20
+
+    
+    plot_particle_latents(logger)
+    plot_particles(logger)
+    #sys.exit(0)
+    
+    sys.exit(0)
+    accs = get_pf_validation_accuracy(logger,
+                                'learning/data/may_blocks/towers/combined_traineval0.pkl')
+    plot_val_accuracy(logger, init_dataset_size=0, n_acquire=1)
+    #vary_latents_for_fixed_block(logger)
+    sys.exit(0)
+    #plot_latent_uncertainty(logger)
+    #plot_latent_means(logger)
 
     accs = get_validation_accuracy(logger,
                                   'learning/data/may_blocks/towers/combined_traineval0.pkl')

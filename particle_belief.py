@@ -158,7 +158,7 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
                                                    D=self.D, 
                                                    means=[0., 0., 0., 0.],
                                                    stds=[1., 1., 1., 1.])
-        self.experience = None
+        self.experience = []
         self.estimated_coms = []
 
     def setup_ax(self, ax):
@@ -193,7 +193,7 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
         # prevents complete collapse. The M-H update is useful so that we don't sample
         # something completely unlikely by chance. It's okay for the noise term to be larger 
         # as the M-H step should reject bad particles - it may be inefficient if too large (and not accept often).
-        cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3)# + np.eye(D)*2.5e-5
+        cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3) + np.eye(D)*0.5
         particles = sample_particle_distribution(distribution, num_samples=N)
 
         mean = np.mean(particles, axis=0)
@@ -201,22 +201,43 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
         
         # TODO: Update M-H update to be compatible with our model.
         # The commented out code block does M-H update. 
-        if False:
+        if True:
             # Old particles and new particles.
             likelihoods = np.zeros((N,2))
             # Compute likelihood of particles over history so far.
-            for action, T, true_pose in experience:
-                sim_poses = simulate(np.concatenate([particles, proposed_particles], axis=0),
-                                    action,
-                                    T,
-                                    true_block)
+            n_correct = np.zeros((N, 2))
+            for observation in experience:
+                bern_probs_particles = self.get_particle_likelihoods(particles, observation)
+                bern_probs_proposed = self.get_particle_likelihoods(proposed_particles, observation)
+                
+                # sim_poses = simulate(np.concatenate([particles, proposed_particles], axis=0),
+                #                     action,
+                #                     T,
+                #                     true_block)
+                label = observation['2block']['labels'][0]
                 for ix in range(N):
-                    likelihoods[ix,0] += np.log(multivariate_normal.pdf(true_pose.pos,
-                                                                        mean=sim_poses[ix, :],
-                                                                        cov=obs_model_cov)+1e-8)
-                    likelihoods[ix,1] += np.log(multivariate_normal.pdf(true_pose.pos,
-                                                                        mean=sim_poses[N+ix,:],
-                                                                        cov=obs_model_cov)+1e-8)
+                    #print(bern_probs_particles[ix], bern_probs_particles[ix] > 0.5, label, bern_probs_particles[ix] > 0.5 == label)
+                    if (float(bern_probs_particles[ix] > 0.5) == label):
+                        n_correct[ix, 0] += 1
+                    if (float(bern_probs_proposed[ix] > 0.5) == label):
+                        n_correct[ix, 1] += 1
+                    likelihood_part = label*bern_probs_particles[ix]+(1-label)*(1-bern_probs_particles[ix])
+                    likelihood_prop = label*bern_probs_proposed[ix]+(1-label)*(1-bern_probs_proposed[ix])
+                    likelihoods[ix,0] += np.log(likelihood_part+1e-8)
+                    likelihoods[ix,1] += np.log(likelihood_prop+1e-8)
+                    # likelihoods[ix,0] += np.log(multivariate_normal.pdf(true_pose.pos,
+                    #                                                     mean=sim_poses[ix, :],
+                    #                                                     cov=obs_model_cov)+1e-8)
+                    # likelihoods[ix,1] += np.log(multivariate_normal.pdf(true_pose.pos,
+                    #                                                     mean=sim_poses[N+ix,:],
+                    #                                                     cov=obs_model_cov)+1e-8)
+            #print(np.round(np.exp(likelihoods[0:10, :]), 2))
+            print('Correct of ALL Samples:')
+            # print(len(experience))
+            # print(n_correct/len(experience))
+            print((n_correct/len(experience)).mean())
+            # if len(experience) > 0:
+            #     print((bern_probs_particles > 0.5).any())
             # Calculate M-H acceptance prob.
             prop_probs = np.zeros((N,2))
             for ix in range(N):
@@ -224,12 +245,14 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
                 prop_probs[ix,1] = np.log(multivariate_normal.pdf(proposed_particles[ix,:], mean=mean, cov=cov)+1e-8)
 
             p_accept = likelihoods[:,1]+prop_probs[:,0] - (likelihoods[:,0]+prop_probs[:,1])
+            #p_accept = likelihoods[:,0]+prop_probs[:,1] - (likelihoods[:,1]+prop_probs[:,0])
             accept = np.zeros((N,2))
+            accept[:, 0] = p_accept
             accept = np.min(accept, axis=1)
-
             # Keep particles based on acceptance probability.
             u = np.random.uniform(size=N)
             indices = np.argwhere(u > 1-np.exp(accept)).flatten()
+            print('Accept Rate:', len(indices)/N)
             particles[indices] = proposed_particles[indices]
         else:
             particles = proposed_particles
@@ -237,7 +260,7 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
         weights = np.ones(N)/float(N) # weights become uniform again
         return ParticleDistribution(particles, weights)
 
-    def get_particle_likelihoods(self, distribution, observation):
+    def get_particle_likelihoods(self, particles, observation):
         """
          
         """
@@ -249,20 +272,18 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
                                         n_dataloaders=1)
         bernoulli_probs = []  # Contains one prediction for each particle.
 
-        latent_samples = torch.Tensor(distribution.particles)
+        latent_samples = torch.Tensor(particles)  # (N, 4)
         for set_of_batches in dataloader:
             towers, block_ids, _ = set_of_batches[0]
-            print(towers.shape)
             for ix in range(0, latent_samples.shape[0]//10):
                 pred = self.likelihood.forward(towers=towers[:, :, 4:],
-                                               block_ids=block_ids,
+                                               block_ids=block_ids.long(),
                                                N_samples=10,
                                                collapse_latents=True, 
                                                collapse_ensemble=True,
                                                keep_latent_ix=10,
                                                latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
                 bernoulli_probs.append(pred.detach().numpy())
-
         return np.concatenate(bernoulli_probs)
 
     def update(self, observation):
@@ -273,24 +294,14 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
         self.particles = self.sample_and_wiggle(self.particles, self.experience)
 
         # Append the current observation to the dataset of all observations so far.
-        if self.experience is None:
-            self.experience = observation
-        else:
-            self.experience = {
-                '2block': {
-                    'towers': np.concatenate([self.experience['2block']['towers'], 
-                                              observation['2block']['towers']], axis=0),
-                    'block_ids': np.concatenate([self.experience['2block']['block_ids'], 
-                                              observation['2block']['block_ids']], axis=0),
-                    'labels': np.concatenate([self.experience['2block']['labels'], 
-                                              observation['2block']['labels']], axis=0),
-                }
-            }
+        self.experience.append(observation)
 
         # Forward simulation using the LatentEnsemble likelihood.
-        bernoulli_probs = self.get_particle_likelihoods(self.particles, observation)
+        bernoulli_probs = self.get_particle_likelihoods(self.particles.particles, observation)
         label = observation['2block']['labels'][0]
 
+        n_correct = ((bernoulli_probs > 0.5).astype('float32') == label).sum()
+        print('Correct for CURRENT sample:', n_correct/len(bernoulli_probs), len(bernoulli_probs))
         # TODO: Replace below using the likelihood defined by the NN.
         # update all particle weights
         new_weights = []
@@ -311,7 +322,7 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
             self.plot_particles(self.ax, self.particles.particles, new_weights)
 
         mean = np.array(self.particles.particles).T@np.array(self.particles.weights)
-
+        print(mean)
         self.estimated_coms.append(mean)
 
         return self.particles, self.estimated_coms

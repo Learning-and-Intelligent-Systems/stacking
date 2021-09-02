@@ -174,7 +174,7 @@ class LatentEnsemble(nn.Module):
         # N_batch times N_samples
         N_batch, N_total_samples, N_blocks, total_dim = towers_with_latents.shape
         towers_with_latents = towers_with_latents.view(-1, N_blocks, total_dim)
-        print('Input:', towers_with_latents.shape)
+
         # forward pass of the model(s)
         if ensemble_idx is None:
             # prediction for each model in the ensemble ensemble

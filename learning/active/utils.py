@@ -132,6 +132,17 @@ class ActiveExperimentLogger:
         fname = 'active_%d.pkl' % tx
         with open(os.path.join(self.exp_path, 'datasets', fname), 'wb') as handle:
             pickle.dump(dataset, handle)
+
+    def save_particles(self, particles, tx):
+        fname = 'particles_%d.pkl' % tx
+        with open(os.path.join(self.exp_path, 'models', fname), 'wb') as handle:
+            pickle.dump(particles, handle)
+
+    def load_particles(self, tx):
+        fname = 'particles_%d.pkl' % tx
+        with open(os.path.join(self.exp_path, 'models', fname), 'rb') as handle:
+            particles = pickle.load(handle)
+        return particles
             
     def save_val_dataset(self, val_dataset, tx):
         fname = 'val_active_%d.pkl' % tx
