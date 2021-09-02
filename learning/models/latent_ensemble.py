@@ -1,3 +1,4 @@
+from copy import deepcopy
 import torch
 
 from torch import nn
@@ -200,3 +201,11 @@ class ThrowingLatentEnsemble(LatentEnsemble):
             labels = labels.mean(axis=2, keepdim=True)
 
         return labels
+
+
+def change_number_of_latents(latent_ensemble, n_latents):
+    """ copy the latent_ensemble, but change the number of latents """
+    print(f"Changing the number of latents from {latent_ensemble.n_latents} to {n_latents}")
+    d_latents = latent_ensemble.d_latents
+    ensemble = deepcopy(latent_ensemble.ensemble)
+    return latent_ensemble.__class__(ensemble, n_latents, d_latents)

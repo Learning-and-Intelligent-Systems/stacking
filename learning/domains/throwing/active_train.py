@@ -9,7 +9,7 @@ from learning.domains.throwing.throwing_data import generate_objects, generate_d
 from learning.domains.throwing.train_latent import get_predictions, train
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
-from learning.models.latent_ensemble import ThrowingLatentEnsemble
+from learning.models.latent_ensemble import ThrowingLatentEnsemble, change_number_of_latents
 
 def get_latent_ensemble(args):
     n_latents = args.n_objects
@@ -24,6 +24,8 @@ def get_latent_ensemble(args):
         logger = ActiveExperimentLogger.get_experiments_logger(args.latent_ensemble_exp_path, args)
         logger.args.throwing = True # hack to get it to load a ThrowingLatentEnsemble
         latent_ensemble = logger.get_ensemble(args.latent_ensemble_tx)
+        # hack to change the number of objects we fit to
+        latent_ensemble = change_number_of_latents(latent_ensemble, n_latents)
 
     else:
         # if we are fitting the model, then we create a new latent ensemble
@@ -148,15 +150,15 @@ def run_active_throwing(args):
 
 
     print('Generating initialization and validation datasets')
-    init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10)),
+    init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 1*args.n_objects)),
                                          batch_size=args.batch_size,
                                          shuffle=True,
                                          n_dataloaders=args.n_models)
-    val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10*args.n_objects)),
-                                     batch_size=args.batch_size,
-                                     shuffle=True,
-                                     n_dataloaders=1)
-    # val_dataloader = None
+    # val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10*args.n_objects)),
+    #                                  batch_size=args.batch_size,
+    #                                  shuffle=True,
+    #                                  n_dataloaders=1)
+    val_dataloader = None
 
 
     # create a logger and save the object set (in vector form)

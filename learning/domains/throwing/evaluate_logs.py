@@ -175,17 +175,23 @@ if __name__ == '__main__':
         #######################################################################
 
         runs = [
+            # {
+            #     "prefix": 'throwing_bald_sweep_run_',
+            #     "label": 'BALD',
+            #     "data": [],
+            #     "color": 'b'
+            # },
+            # {
+            #     "prefix": 'throwing_random_sweep_run_',
+            #     "label": 'Random',
+            #     "data": [],
+            #     "color": 'r'
+            # },
             {
-                "prefix": 'throwing_bald_sweep_run_',
+                "prefix": 'throwing_bald_sweep_fitting_run_',
                 "label": 'BALD',
                 "data": [],
                 "color": 'b'
-            },
-            {
-                "prefix": 'throwing_random_sweep_run_',
-                "label": 'Random',
-                "data": [],
-                "color": 'r'
             },
 
         ]
@@ -216,7 +222,7 @@ if __name__ == '__main__':
         plt.legend()
         plt.xlabel('Acquisition Step')
         plt.ylabel('Task Error (m)')
-        plt.title('Task Loss Throughout Active Training')
+        plt.title('Task Loss Throughout Active Fitting')
         plt.show()
 
 
