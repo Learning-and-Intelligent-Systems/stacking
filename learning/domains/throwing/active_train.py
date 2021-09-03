@@ -5,6 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from learning.active.acquire import bald_diagonal_gaussian
 from learning.active.utils import ActiveExperimentLogger
+from learning.domains.throwing.particle_filter import update_particle_filter
 from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, label_actions, ParallelDataLoader, xs_to_actions
 from learning.domains.throwing.train_latent import get_predictions, train
 from learning.models.ensemble import Ensemble
@@ -27,7 +28,7 @@ def get_latent_ensemble(args):
         # change the number of objects we fit to (also resets latents)
         latent_ensemble = latent_ensemble.change_number_of_latents(n_latents)
         # convert to particle filtering version if needed
-        if args.use_partcle_filter:
+        if args.use_particle_filter:
             latent_ensemble = convert_to_particle_filter_latent_ensemble(latent_ensemble)
 
     else:
@@ -85,7 +86,7 @@ def acquire_datapoints(latent_ensemble,
     return xs, z_ids, ys
 
 
-def active_train(latent_ensemble, dataloader, val_dataloader, acquire_fn, logger, args):
+def active_train(latent_ensemble, dataloader, val_dataloader, train_fn, acquire_fn, logger, args):
     for tx in range(args.max_acquisitions):
         print('Acquisition step', tx)
 
@@ -99,13 +100,13 @@ def active_train(latent_ensemble, dataloader, val_dataloader, acquire_fn, logger
 
         hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
 
-        latent_ensemble, accs, latents = train(dataloader,
-                                               val_dataloader,
-                                               latent_ensemble,
-                                               n_epochs=args.n_epochs,
-                                               freeze_ensemble=args.fitting,
-                                               return_logs=True,
-                                               hide_dims=hide_dims)
+        latent_ensemble, accs, latents = train_fn(dataloader,
+                                                  val_dataloader,
+                                                  latent_ensemble,
+                                                  n_epochs=args.n_epochs,
+                                                  freeze_ensemble=args.fitting,
+                                                  return_logs=True,
+                                                  hide_dims=hide_dims)
 
         # save the ensemble after training
         logger.save_ensemble(latent_ensemble, tx)
@@ -150,6 +151,11 @@ def run_active_throwing(args):
                                                             data_label_fn,
                                                             acquisition=args.acquisition.lower())
 
+    # enable training with particle filter or with VI
+    if args.fitting and args.use_particle_filter:
+        train_fn = update_particle_filter
+    else:
+        train_fn = train
 
 
     print('Generating initialization and validation datasets')
@@ -170,7 +176,7 @@ def run_active_throwing(args):
 
     # create the latent ensemble
     latent_ensemble = get_latent_ensemble(args)
-    active_train(latent_ensemble, init_dataloader, val_dataloader, acquire_fn, logger, args)
+    active_train(latent_ensemble, init_dataloader, val_dataloader, train_fn, acquire_fn, logger, args)
 
 
 def get_parser():
@@ -190,7 +196,7 @@ def get_parser():
     parser.add_argument('--acquisition', type=str, default='bald')
 
     parser.add_argument('--use-latents', action='store_true')
-    partser.add_argument('--use-particle-filter', action='store_true')
+    parser.add_argument('--use-particle-filter', action='store_true')
 
     # The following arguments are used when we wanted to fit latents with an already trained model.
     parser.add_argument('--fitting', action='store_true', help='This will cause only the latents to update during training.')

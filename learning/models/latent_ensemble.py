@@ -1,6 +1,6 @@
 from copy import deepcopy
+import numpy as np
 import torch
-
 from torch import nn
 from scipy.spatial.transform import Rotation
 
@@ -225,7 +225,7 @@ class PFThrowingLatentEnsemble(ThrowingLatentEnsemble):
             n_latents {int}: Number of blocks.
             d_latents {int}: Dimension of each latent.
         """
-        super(ThrowingLatentEnsemble, self).__init__()
+        super(PFThrowingLatentEnsemble, self).__init__(ensemble, n_latents, d_latents)
 
         self.ensemble = ensemble
         self.n_latents = n_latents
@@ -234,17 +234,32 @@ class PFThrowingLatentEnsemble(ThrowingLatentEnsemble):
 
         # NOTE(izzy): so that reset works, we'll use the latent_locs
         # to store the particles. latent_scales are not neeced
-        self.latent_locs = nn.Parameter(torch.zeros(n_latents, n_particles, d_latents))
+        self.latent_locs = nn.Parameter(torch.randn(n_latents, n_particles, d_latents))
         self.latent_logscales = nn.Parameter(torch.zeros(0))
         self.disable_latents = disable_latents
+
+        # this variable is used to determine the behavior when sampling from
+        # the latent particles. when True, we don't sample because we want to
+        # evaluate the likelihood of every particle
+        self.fitting = False
+
+    def reset_latents(self, random=False):
+        # NOTE(izzy): the "random" argument is kept for consistency with other
+        # LatentEnsemble classes, but we ignore it here
+        with torch.no_grad():
+            self.latent_locs[:] = torch.randn_like(self.latent_locs)
 
     def sample_latents(self, obj_ids, N_samples):
         # [N_batch x N_particles x D_latent]
         q_z = self.latent_locs[obj_ids]
-        # indices of particles
-        idxs = np.random.randint(0, self.latent_locs.shape[1], size=N_samples)
-        # pull out those particles
-        return q_z[:, idxs]
+
+        if self.fitting:
+            return q_z
+        else:
+            # indices of particles
+            idxs = np.random.randint(0, self.latent_locs.shape[1], size=N_samples)
+            # pull out those particles
+            return q_z[:, idxs]
 
 
 def convert_to_particle_filter_latent_ensemble(latent_ensemble):
