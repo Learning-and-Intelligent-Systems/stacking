@@ -9,7 +9,7 @@ from learning.domains.throwing.throwing_data import generate_objects, generate_d
 from learning.domains.throwing.train_latent import get_predictions, train
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
-from learning.models.latent_ensemble import ThrowingLatentEnsemble, change_number_of_latents
+from learning.models.latent_ensemble import ThrowingLatentEnsemble, convert_to_particle_filter_latent_ensemble
 
 def get_latent_ensemble(args):
     n_latents = args.n_objects
@@ -24,8 +24,11 @@ def get_latent_ensemble(args):
         logger = ActiveExperimentLogger.get_experiments_logger(args.latent_ensemble_exp_path, args)
         logger.args.throwing = True # hack to get it to load a ThrowingLatentEnsemble
         latent_ensemble = logger.get_ensemble(args.latent_ensemble_tx)
-        # hack to change the number of objects we fit to
-        latent_ensemble = change_number_of_latents(latent_ensemble, n_latents)
+        # change the number of objects we fit to (also resets latents)
+        latent_ensemble = latent_ensemble.change_number_of_latents(n_latents)
+        # convert to particle filtering version if needed
+        if args.use_partcle_filter:
+            latent_ensemble = convert_to_particle_filter_latent_ensemble(latent_ensemble)
 
     else:
         # if we are fitting the model, then we create a new latent ensemble
@@ -187,6 +190,7 @@ def get_parser():
     parser.add_argument('--acquisition', type=str, default='bald')
 
     parser.add_argument('--use-latents', action='store_true')
+    partser.add_argument('--use-particle-filter', action='store_true')
 
     # The following arguments are used when we wanted to fit latents with an already trained model.
     parser.add_argument('--fitting', action='store_true', help='This will cause only the latents to update during training.')

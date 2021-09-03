@@ -38,6 +38,13 @@ class LatentEnsemble(nn.Module):
                 self.latent_locs[:] = 0.
                 self.latent_logscales[:] = 0.
 
+    def change_number_of_latents(self, n_latents):
+        """ copy the latent_ensemble, but change the number of latents """
+        print(f"Changing the number of latents from {self.n_latents} to {n_latents}")
+        d_latents = self.d_latents
+        ensemble = deepcopy(self.ensemble)
+        return self.__class__(ensemble, n_latents, d_latents)
+
     def associate(self, samples, block_ids):
         """ given samples from the latent space for each block in the set,
         reorder them so they line up with blocks in towers
@@ -240,9 +247,8 @@ class PFThrowingLatentEnsemble(ThrowingLatentEnsemble):
         return q_z[:, idxs]
 
 
-def change_number_of_latents(latent_ensemble, n_latents):
-    """ copy the latent_ensemble, but change the number of latents """
-    print(f"Changing the number of latents from {latent_ensemble.n_latents} to {n_latents}")
-    d_latents = latent_ensemble.d_latents
+def convert_to_particle_filter_latent_ensemble(latent_ensemble):
     ensemble = deepcopy(latent_ensemble.ensemble)
-    return latent_ensemble.__class__(ensemble, n_latents, d_latents)
+    return PFThrowingLatentEnsemble(ensemble,
+                                    latent_ensemble.n_latents,
+                                    latent_ensemble.d_latents)
