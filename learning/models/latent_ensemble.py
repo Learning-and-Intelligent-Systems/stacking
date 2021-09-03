@@ -161,10 +161,7 @@ class ThrowingLatentEnsemble(LatentEnsemble):
         x = x.unsqueeze(1).expand(-1, N_samples, -1)
         return torch.cat([x, z_samples], 2)
 
-
-    def forward(self, x, obj_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True):
-        assert x.shape[0] == obj_ids.shape[0], "One object per experiment"
-        N_ensemble = self.ensemble.n_models
+    def sample_latents(self, obj_ids, N_samples):
 
         # parameters will have shape [N_batch x D_latent]
         q_z = torch.distributions.normal.Normal(self.latent_locs[obj_ids],
@@ -173,7 +170,16 @@ class ThrowingLatentEnsemble(LatentEnsemble):
         # if self.disable_latents: N_samples = 1 # NOTE(izzy): debugging
 
         # samples will have shape [N_batch x N_samples x D_latent]
-        z_samples = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2) #* float(not self.disable_latents)
+        return q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2) #* float(not self.disable_latents)
+
+
+    def forward(self, x, obj_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True):
+        assert x.shape[0] == obj_ids.shape[0], "One object per experiment"
+        N_ensemble = self.ensemble.n_models
+
+        # samples will have shape [N_batch x N_samples x D_latent]
+        z_samples = self.sample_latents(obj_ids, N_samples)
+
         # data will have shape [N_batch x N_samples x (D_observed+D_latent)]
         x_with_z_samples = self.concat_samples(x, z_samples)
 
@@ -201,6 +207,37 @@ class ThrowingLatentEnsemble(LatentEnsemble):
             labels = labels.mean(axis=2, keepdim=True)
 
         return labels
+
+
+class PFThrowingLatentEnsemble(ThrowingLatentEnsemble):
+    def __init__(self, ensemble, n_latents, d_latents, n_particles=1000, disable_latents=False):
+        """ Use a set of particles to represent the latent distribution, rather
+        than a variation distribution (gaussian)
+
+        Arguments:
+            n_latents {int}: Number of blocks.
+            d_latents {int}: Dimension of each latent.
+        """
+        super(ThrowingLatentEnsemble, self).__init__()
+
+        self.ensemble = ensemble
+        self.n_latents = n_latents
+        self.d_latents = d_latents
+        self.n_particles = n_particles
+
+        # NOTE(izzy): so that reset works, we'll use the latent_locs
+        # to store the particles. latent_scales are not neeced
+        self.latent_locs = nn.Parameter(torch.zeros(n_latents, n_particles, d_latents))
+        self.latent_logscales = nn.Parameter(torch.zeros(0))
+        self.disable_latents = disable_latents
+
+    def sample_latents(self, obj_ids, N_samples):
+        # [N_batch x N_particles x D_latent]
+        q_z = self.latent_locs[obj_ids]
+        # indices of particles
+        idxs = np.random.randint(0, self.latent_locs.shape[1], size=N_samples)
+        # pull out those particles
+        return q_z[:, idxs]
 
 
 def change_number_of_latents(latent_ensemble, n_latents):
