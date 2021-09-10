@@ -67,6 +67,8 @@ def run_particle_filter_fitting(args):
 
     # ----- Likelihood Model -----
     latent_ensemble = train_logger.get_ensemble(args.ensemble_tx)
+    if torch.cuda.is_available():
+        latent_ensemble.cuda()
     latent_ensemble.add_latents(1)
 
     # ----- Initialize particle filter from prior -----
