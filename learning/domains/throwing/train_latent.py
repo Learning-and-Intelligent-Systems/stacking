@@ -121,10 +121,18 @@ def get_both_loss(latent_ensemble,
 
         # run a forward pass of the network and compute the likeliehood of y
 
-        pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples)
+        pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples).squeeze(dim=1)
         D_pred = pred.shape[-1] // 2
         mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-        likelihood_loss += loss_func(y[:, None].expand(N_batch, N_samples), mu, torch.exp(log_sigma))
+        sigma = torch.exp(log_sigma)
+
+        try:
+            likelihood_loss += loss_func(y[:, None, None].expand(N_batch, N_samples, 1),
+                                         mu, sigma)
+        except:
+            print(y[:, None, None].expand(N_batch, N_samples, 1).shape,
+                                     mu.shape, sigma.shape)
+
 
     likelihood_loss = likelihood_loss/N_models/N_samples
 
@@ -168,7 +176,7 @@ def evaluate(latent_ensemble,
         pred = latent_ensemble(x, z_id.long()).squeeze()
         D_pred = pred.shape[-1] // 2
         mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-        total_log_prob += -loss_func(y, mu, torch.exp(log_sigma))
+        total_log_prob += -loss_func(y, mu.squeeze(), torch.exp(log_sigma).squeeze())
 
     return total_log_prob / N
 

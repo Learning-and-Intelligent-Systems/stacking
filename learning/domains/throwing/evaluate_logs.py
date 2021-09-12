@@ -12,6 +12,7 @@ from learning.domains.throwing.throwing_data import generate_dataset, xs_to_acti
 from learning.domains.throwing.task import eval_hit_target
 from learning.domains.throwing.entities import ThrowingBall
 from learning.domains.throwing.sanity_checking.plot_model_vs_data import generate_grid_dataset
+from learning.models.latent_ensemble import ThrowingLatentEnsemble, PFThrowingLatentEnsemble
 
 
 def plot_task_performance(logger, task_score_fn, ax=plt.gca()):
@@ -67,6 +68,27 @@ def plot_latents_throughout_training(latents):
     plt.ylabel('Latent value')
     plt.xlabel('Epoch')
     plt.show()
+
+
+def plot_pf_uncertainty(logger, ax=plt.gca()):
+    scales = []
+
+    # go through each acqisition step
+    for tx in range(0, logger.args.max_acquisitions):
+        print('Eval timestep, ', tx)
+
+        # load the dataset and ensemble from that timestep
+        ensemble = logger.get_ensemble(tx)
+        uncertainty = np.array([np.cov(obj_particles, rowvar=False) for obj_particles in ensemble.latent_locs.detach().numpy()]).mean()
+        scales.append(uncertainty)
+
+    plt.plot(np.array(scales))
+
+    ax.set_xlabel('Acquisition Step')
+    ax.set_ylabel('Mean Latent Scale')
+    ax.set_title('Variance along each latent dimension')
+    plt.savefig(logger.get_figure_path('latent_scale.png'))
+    ax.cla()
 
 
 def visualize_bald_throughout_training(logger):
@@ -160,15 +182,18 @@ if __name__ == '__main__':
 
         ax = plt.gca()
 
-        # plot_latent_uncertainty(logger, ax=ax)
+        if isinstance(logger.get_ensemble(1), PFThrowingLatentEnsemble):
+            plot_pf_uncertainty(logger, ax=ax)
+        else:
+            plot_latent_uncertainty(logger, ax=ax)
 
-        # plot_val_accuracy(logger, ax=ax)
+        plot_val_accuracy(logger, ax=ax)
 
-        # objects = logger.get_objects(ThrowingBall)
-        # task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
-        # plot_task_performance(logger, task_score_fn, ax=ax)
+        objects = logger.get_objects(ThrowingBall)
+        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
+        plot_task_performance(logger, task_score_fn, ax=ax)
 
-        visualize_bald_throughout_training(logger)
+        # visualize_bald_throughout_training(logger)
     else:
         #######################################################################
         # plotting for multipe logs

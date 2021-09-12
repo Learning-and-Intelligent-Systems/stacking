@@ -159,7 +159,7 @@ def run_active_throwing(args):
 
 
     print('Generating initialization and validation datasets')
-    init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 1*args.n_objects)),
+    init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 5*args.n_objects)),
                                          batch_size=args.batch_size,
                                          shuffle=True,
                                          n_dataloaders=args.n_models)

@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from learning.models.ensemble import Ensemble
 from learning.models.mlp_dropout import MLP
-from learning.models.latent_ensemble import LatentEnsemble, ThrowingLatentEnsemble
+from learning.models.latent_ensemble import LatentEnsemble, ThrowingLatentEnsemble, PFThrowingLatentEnsemble
 
 
 class ExperimentLogger:
@@ -188,7 +188,13 @@ class ActiveExperimentLogger:
                             base_args=metadata['base_args'],
                             n_models=metadata['n_models'])
         if self.use_latents:
-            latent_ensemble_class = ThrowingLatentEnsemble if self.args.throwing else LatentEnsemble
+            if self.args.use_particle_filter:
+                latent_ensemble_class = PFThrowingLatentEnsemble
+            elif self.args.throwing:
+                latent_ensemble_class = ThrowingLatentEnsemble
+            else:
+                latent_ensemble_class = LatentEnsemble
+
             ensemble = latent_ensemble_class(ensemble,
                 n_latents=metadata['n_latents'],
                 d_latents=metadata['d_latents'])
