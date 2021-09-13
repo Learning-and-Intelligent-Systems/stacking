@@ -92,12 +92,12 @@ class ThrowingAction:
             vel * np.sin(ang),
             w,
         ]
-        return ThrowingAction(b, init_pos=[0,0,0], init_vel=init_vel)
+        return ThrowingAction(b, init_pos=[0,0.25,0], init_vel=init_vel)
 
     @staticmethod
     def random_vector(n_samples=0):
-        ang = np.random.uniform(np.pi/8, 3*np.pi/8, size=n_samples)
-        w = np.random.uniform(-10, 10, size=n_samples)
+        ang = np.random.uniform(np.pi/8, 3*np.pi/8, size=max(n_samples, 1))
+        w = np.random.uniform(-10, 10, size=max(n_samples, 1))
         if n_samples == 0:
             return [ang, w]
         else:
