@@ -35,9 +35,9 @@ def generate_grid_dataset(objects, ang_points, w_points, label=True):
 def generate_grid_dataset_varying_objects(ang, w):
     # produce a grid dataset with one throw and many different objects
     objects = []
-    for m in np.linspace(0.5, 1.5, 32):
+    for b in np.linspace(0.1, 0.8, 32):
         for r in np.linspace(0.02, 0.06, 32):
-            objects.append(ThrowingBall(mass=m, radius=r))
+            objects.append(ThrowingBall(bounciness=b, radius=r))
 
     actions = np.ones([len(objects),2])
     actions[:, 0] *= ang
@@ -59,10 +59,11 @@ def plot_grid_for_throw(ang, w):
     plt.imshow(dataset[2].numpy().reshape(32, 32), extent=[0.02, 0.06, 0.5, 1.5], aspect='auto')
     plt.colorbar()
     plt.xlabel('Radius (cm)')
-    plt.ylabel('Mass (kg)')
+    plt.ylabel('Coeff of Restitution')
     plt.title(f'Distances for throw ang: {ang}, w: {w}')
-    plt.savefig(f'learning/domains/throwing/sanity_checking/figures/varying_object_parameters/ang_{ang}_w_{w}.png')
-    print('saved')
+    filename = f'learning/domains/throwing/sanity_checking/figures/varying_object_parameters/ang_{ang}_w_{w}.png'
+    plt.savefig(filename)
+    print('saved to', filename)
     plt.clf()
 
 def visualize_grid_data(ax, ang_points, w_points, zs, title=None):
@@ -80,7 +81,7 @@ def visualize_grid_data(ax, ang_points, w_points, zs, title=None):
 def plot_model_vs_data():
     # get commandline arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--hide-dims', type=str, default='3')
+    parser.add_argument('--hide-dims', type=str, default='9')
     parser.add_argument('--save-train-dataset', type=str, default='')
     parser.add_argument('--n-train', type=int, default=500)
     parser.add_argument('--n-val', type=int, default=100)
@@ -162,13 +163,16 @@ def plot_model_vs_data():
 
 if __name__ == '__main__':
 
+    # for a small set of throws, make a higher resolution image of the
+    # outcome when varying the object parameters
     # for ang in np.linspace(0, np.pi/2, 5):
     #     for w in np.linspace(-10, 10, 5):
     #         plot_grid_for_throw(ang, w)
 
-    # plot_model_vs_data()
+    # train an ensemble, and then compare the ensemble to the GT over a range
+    # of throw parameters
+    plot_model_vs_data()
 
-    visualize_bald(1)
 
     
     

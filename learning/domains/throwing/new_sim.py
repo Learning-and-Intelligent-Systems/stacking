@@ -9,8 +9,7 @@ class ThrowingSimulator:
         self.tmax = tmax
         self.objects = objects
         self.vis = vis
-        self.obstacles = np.array([[0.05, 1, 0.05, 0.5, 0, 0.025],
-                                   [0.05, 1, 0.05, 0.9, 0, 0.025]]) # dimensions || position
+        self.obstacles = np.array([[0.06, 1, 0.06, 0.9, 0, 0.03]]) # dimensions || position
 
         self.stop_vel_thresh = 0.01      # Maximum linear velocity before stopping simulation [m/s]
         self.stop_vel_count = 10         # Number of consecutive counts below velocity threshold before simulation is stopped 
@@ -97,6 +96,6 @@ class ThrowingSimulator:
 
         p.removeBody(ballId)
 
-        results["time"] = np.array(results["time"])
-        results["state"] = np.array(results["state"])
+        results["time"] = np.array(results["time"]).T
+        results["state"] = np.array(results["state"]).T
         return results
