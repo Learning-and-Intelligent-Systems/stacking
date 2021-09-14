@@ -44,7 +44,7 @@ def construct_xs(objects, actions, z_ids):
     return np.array(xs)
 
 def xs_to_actions(xs):
-    return xs[:,:2]
+    return xs[:,-2:]
 
 def generate_dataset(objects,
                      n_data,
@@ -54,7 +54,7 @@ def generate_dataset(objects,
     actions, z_ids = sample_actions(obj_ids, n_samples=n_data)
     xs = construct_xs(objects, actions, z_ids)
     if label:
-        ys = label_actions(objects, actions, z_ids, as_tensor=as_tensor)
+        ys = label_actions(objects, actions, z_ids)
         dataset = xs, z_ids, ys
     else:
         dataset = xs, z_ids
@@ -94,23 +94,42 @@ def make_x_partially_observable(xs, hide_dims):
     return xs[..., keep_dims]
 
 def normalize_x(x):
-    x_mean = torch.Tensor([ 1.,  0.,  0.,  1.,
-        4.0470269e-02,  1.,  1e-5,  0.8,
-        1e-4,  4.3595454e-01,  7.8840643e-01, -3.1721351e-01])
-    x_var = torch.Tensor([0., 0., 0., 0.,
-       1.2081314e-04, 0., 0., 0.,
-       0., 4.1699380e-02, 5.3409986e-02, 3.3062962e+01])
+    x_mean = torch.Tensor([ 1.0000000e+00,   # R
+                            0.0000000e+00,   # G
+                            0.0000000e+00,   # B
+                            1.0000000e+00,   # mass
+                            4.0504143e-02,   # radius
+                            1.0000000e+00,   # drag linear
+                            1.0000000e-05,   # drag angular
+                            8.0000000e-01,   # friction
+                            1.0000000e-04,   # rolling resistance
+                            4.8150727e-01,   # bounciness
+                            7.8539816e-01,   # release angle
+                            0.0000000e+00])  # release spin
+
+    x_var = torch.Tensor([  0.0000000e+00,   # R
+                            0.0000000e+00,   # G
+                            0.0000000e+00,   # B
+                            0.0000000e+00,   # mass
+                            1.2525999e-04,   # radius
+                            0.0000000e+00,   # drag linear
+                            0.0000000e+00,   # drag angular
+                            0.0000000e+00,   # friction
+                            0.0000000e+00,   # rolling resista
+                            3.6030598e-02,   # bounciness
+                            5.2659944e-02,   # release angle
+                            3.3095131e+01])  # release spin
 
     return (x - x_mean)/torch.sqrt(x_var + 1e-6)
 
 def normalize_y(y):
-    y_mean = 1.0001804
-    y_var = 0.21319202
+    y_mean = 0.9944
+    y_var = 0.2188
     return (y - y_mean)/np.sqrt(y_var)
 
 def unnormalize_y(y):
-    y_mean = 1.0001804
-    y_var = 0.21319202
+    y_mean = 0.9944
+    y_var = 0.2188
     return y * np.sqrt(y_var) + y_mean
 
 def preprocess_batch(batch, hide_dims, normalize):

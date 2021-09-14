@@ -11,16 +11,17 @@ from learning.domains.throwing.train_latent import main, get_parser
 args = get_parser().parse_args()
 args.n_train = 500
 args.n_val = 100
-args.n_epochs = 500
+args.n_epochs = 200
 args.n_objects = 10
+args.use_normalization = True
 
 labels = ['fully_observed', 'restitution_hidden', 'radius_hidden', 'restitution_and_radius_hidden']
 hide_dims = ['', '9', '4', '9,4']
 
 processes = []
 
-n_max = 3
-d_max = 3
+n_max = 4
+d_max = 4
 
 # execute the commands in parallel using multiprocess
 for n in range(n_max):
