@@ -12,9 +12,10 @@ class ThrowingSimulator:
         self.obstacles = np.array([[0.06, 1, 0.06, 0.9, 0, 0.03]]) # dimensions || position
 
         self.stop_vel_thresh = 0.01      # Maximum linear velocity before stopping simulation [m/s]
-        self.stop_vel_count = 10         # Number of consecutive counts below velocity threshold before simulation is stopped 
+        self.stop_vel_count = 10         # Number of consecutive counts below velocity threshold before simulation is stopped
 
         self.setup()
+        self.trace = False
 
     def setup(self):
         # set up the simulator
@@ -53,7 +54,7 @@ class ThrowingSimulator:
         b = action.object
 
         # create a sphere
-        ballId = p.createMultiBody(b.mass, 
+        ballId = p.createMultiBody(b.mass,
             p.createCollisionShape(p.GEOM_SPHERE, radius=b.radius),
             p.createVisualShape(p.GEOM_SPHERE, radius=b.radius, rgbaColor=list(b.color) + [1]))
 
@@ -77,11 +78,16 @@ class ThrowingSimulator:
         }
 
         stop_count = 0
+        trace_ids = []
 
         for t in np.arange(0, self.tmax, dt):
             p.stepSimulation()
             results["state"].append(self.get_state(p, ballId))
             results["time"].append(t)
+
+            if self.trace:
+                trace_ids.append(p.createMultiBody(0, baseVisualShapeIndex=p.createVisualShape(p.GEOM_SPHERE, radius=0.01, rgbaColor=[1,0,0,0.2]),
+                    basePosition=p.getBasePositionAndOrientation(ballId)[0]))
 
             v = np.linalg.norm(results["state"][-1][3:5])
             if v < self.stop_vel_thresh:
@@ -95,6 +101,8 @@ class ThrowingSimulator:
             if self.vis: time.sleep(dt)
 
         p.removeBody(ballId)
+        for t_id in trace_ids:
+            p.removeBody(t)
 
         results["time"] = np.array(results["time"]).T
         results["state"] = np.array(results["state"]).T

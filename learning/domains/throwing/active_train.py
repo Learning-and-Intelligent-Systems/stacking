@@ -188,11 +188,11 @@ def get_parser():
     parser.add_argument('--exp-name', type=str, default='throwing', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--n-models', type=int, default=10)
-    parser.add_argument('--n-epochs', type=int, default=50)
+    parser.add_argument('--n-epochs', type=int, default=500)
     parser.add_argument('--n-samples', type=int, default=10000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--n-objects', type=int, default=10)
-    parser.add_argument('--hide_dims', type=str, default='3')
+    parser.add_argument('--hide_dims', type=str, default='9')
     parser.add_argument('--acquisition', type=str, default='bald')
 
     parser.add_argument('--use-latents', action='store_true')

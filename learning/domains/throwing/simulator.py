@@ -14,7 +14,7 @@ class ThrowingSimulator:
     gravity = 9.80665           # Acceleration due to gravity [m/s^2]
     bounce_vel_thresh = -0.05   # Threshold velocity before stopping bouncing [m/s]
     stop_vel_thresh = 0.01      # Maximum linear velocity before stopping simulation [m/s]
-    stop_vel_count = 10         # Number of consecutive counts below velocity threshold before simulation is stopped 
+    stop_vel_count = 10         # Number of consecutive counts below velocity threshold before simulation is stopped
 
 
     def __init__(self, objects, dt=0.0005, tmax=5):
@@ -54,7 +54,7 @@ class ThrowingSimulator:
         for i in range(num_pts-1):
             x, y, theta, vx, vy, w = state[:,i]
             forces = np.array([0.0, 0.0, 0.0])
-            
+
             # Gravity force
             forces += [
                 0,
@@ -75,10 +75,10 @@ class ThrowingSimulator:
                 v_ground = vx + b.radius*w
                 f_friction = b.friction_coef * weight
                 forces += [
-                    -np.sign(v_ground) * f_friction, 
+                    -np.sign(v_ground) * f_friction,
                     0,
                     -b.rolling_resistance * w,
-                ] 
+                ]
 
             # Propagate state with Newton's 2nd law and first-order integration step
             state_dot = np.array([
@@ -93,7 +93,7 @@ class ThrowingSimulator:
 
             # Bounce/collision dynamics:
             # If the height is less than zero, force it to zero.
-            # Also, correct velocity by bouncing if past a specified velocity 
+            # Also, correct velocity by bouncing if past a specified velocity
             # threshold, else setting the vertical velocity to zero.
             if state[1,i+1] < 0:
                 state[1,i+1] = 0
@@ -125,7 +125,7 @@ class ThrowingSimulator:
             self.animate_results(b, state)
         elif do_plot:
             self.plot_results(b, state)
-            
+
         # Package results
         results = {
             "time": tvec,
@@ -154,10 +154,10 @@ class ThrowingSimulator:
         ax.add_patch(circ_final)
 
         ori_line_init, = ax.plot([x[0], x[0] + obj.radius*np.cos(th[0])],
-                                 [y[0], y[0] + obj.radius*np.sin(th[0])], 
+                                 [y[0], y[0] + obj.radius*np.sin(th[0])],
                                  color="k")
         ori_line_final, = ax.plot([x[-1], x[-1] + obj.radius*np.cos(th[-1])],
-                                 [y[-1], y[-1] + obj.radius*np.sin(th[-1])], 
+                                 [y[-1], y[-1] + obj.radius*np.sin(th[-1])],
                                  color="k")
 
         ax.set_xlabel('Distance (m)')
@@ -207,7 +207,7 @@ class ThrowingSimulator:
             x_ori = [x, x + obj.radius*np.cos(th)]
             y_ori = [y, y + obj.radius*np.sin(th)]
             ori_line.set_data(x_ori, y_ori)
-            
+
             # Close the figure if this is the last step
             # NOTE: This is not reliable, and will lead to a core dump if
             # you use blit=True in animation.FuncAnimation
@@ -221,6 +221,6 @@ class ThrowingSimulator:
         pts_skip = int(dt/self.dt)
         frames = np.arange(0, state.shape[1], pts_skip)
         ani = animation.FuncAnimation(
-            fig, animate, init_func=init, frames=frames, 
+            fig, animate, init_func=init, frames=frames,
             blit=False, repeat=False, interval=dt*1000)
         plt.show()

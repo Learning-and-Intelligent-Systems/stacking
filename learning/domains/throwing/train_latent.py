@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
-from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, make_x_partially_observable
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred
 
 # NOTE(izzy): work in progress -- the following three functions have very similar
 # structure, so I wanted to consolidate them in this one function
@@ -22,15 +22,12 @@ from learning.domains.throwing.throwing_data import generate_objects, generate_d
 #             marginalize_latents=True,
 #             marginalize_ensemble=True,
 #             mode='train',
-#             hide_dims=[3]):
+#             hide_dims=[]):
 
 #         # pull out the input
-#         x = batch[0]
-#         x = make_x_partially_observable(x, hide_dims)
-#         z_id = batch[1]
-#         if torch.cuda.is_available():
-#             x = x.cuda()
-#             z_id = z_id.cuda()
+#           batch = preprocess_batch(batch, hide_dims)
+#           x = batch[0]
+#           z_id = batch[1]
 
 #         with torch.set_grad_enabled(mode=='train'): # conditional "torch.no_grad"
 #             pred = latent_ensemble(x, z_id.long(),
@@ -59,7 +56,8 @@ def get_predictions(latent_ensemble,
                     n_latent_samples=10,
                     marginalize_latents=True,
                     marginalize_ensemble=True,
-                    hide_dims=[3]):
+                    hide_dims=[],
+                    use_normalization=True):
 
     dataset = TensorDataset(*unlabeled_data)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=64)
@@ -68,11 +66,7 @@ def get_predictions(latent_ensemble,
     sigmas = []
 
     for batch in dataloader:
-        x, z_id = batch
-        x = make_x_partially_observable(x, hide_dims)
-        if torch.cuda.is_available():
-            x = x.cuda()
-            z_id = z_id.cuda()
+        x, z_id = preprocess_batch(batch, hide_dims, normalize=use_normalization)
 
         with torch.no_grad():
             # run a forward pass of the network and compute the likeliehood of y
@@ -80,9 +74,8 @@ def get_predictions(latent_ensemble,
                                    collapse_latents=marginalize_latents,
                                    collapse_ensemble=marginalize_ensemble,
                                    N_samples=n_latent_samples).squeeze()
-            D_pred = pred.shape[-1] // 2
-            mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-            sigma = torch.exp(log_sigma)
+
+            mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
 
         mus.append(mu)
         sigmas.append(sigma)
@@ -93,7 +86,8 @@ def get_both_loss(latent_ensemble,
                   batches,
                   N,
                   N_samples=10,
-                  hide_dims=[3]):
+                  hide_dims=[],
+                  use_normalization=True):
     """ compute the loglikelohood of both the latents and the ensemble
 
     Arguments:
@@ -110,22 +104,14 @@ def get_both_loss(latent_ensemble,
     loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
 
     for i, batch in enumerate(batches):
-        x, z_id, y = batch
-        x = make_x_partially_observable(x, hide_dims)
+        x, z_id, y = preprocess_batch(batch, hide_dims, normalize=use_normalization)
         N_batch = x.shape[0]
 
-        if torch.cuda.is_available():
-            x = x.cuda()
-            z_id = z_id.cuda()
-            y = y.cuda()
-
-        # run a forward pass of the network and compute the likeliehood of y
-
+        # run a forward pass of the network
         pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples).squeeze(dim=1)
-        D_pred = pred.shape[-1] // 2
-        mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-        sigma = torch.exp(log_sigma)
 
+        # and compute the likeliehood of y (no need to un-normalize, because label will already be normalized)
+        mu, sigma = postprocess_pred(pred, unnormalize=False)
         try:
             likelihood_loss += loss_func(y[:, None, None].expand(N_batch, N_samples, 1),
                                          mu, sigma)
@@ -145,7 +131,8 @@ def get_both_loss(latent_ensemble,
 
 def evaluate(latent_ensemble,
             dataloader,
-            hide_dims=[3]):
+            hide_dims=[],
+            use_normalization=True):
     """ computes the data likelihood
 
     Arguments:
@@ -165,27 +152,27 @@ def evaluate(latent_ensemble,
     N = dataloader.dataset.tensors[0].shape[0]
 
     for batches in dataloader:
-        x, z_id, y = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
-        x = make_x_partially_observable(x, hide_dims)
-        if torch.cuda.is_available():
-            x = x.cuda()
-            z_id = z_id.cuda()
-            y = y.cuda()
+        # pull out a batch
+        batch = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
+        x, z_id, y = preprocess_batch(batch, hide_dims, normalize=use_normalization)
 
-        # run a forward pass of the network and compute the likeliehood of y
+        # run a forward pass of the network
         pred = latent_ensemble(x, z_id.long()).squeeze()
-        D_pred = pred.shape[-1] // 2
-        mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-        total_log_prob += -loss_func(y, mu.squeeze(), torch.exp(log_sigma).squeeze())
+
+        # and compute the likelihood of y (no need to un-normalize, because label will already be normalized)
+        mu, sigma = postprocess_pred(pred, unnormalize=False)
+        total_log_prob += -loss_func(y, mu.squeeze(), sigma.squeeze())
 
     return total_log_prob / N
 
 
-def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
+def train(dataloader, val_dataloader, latent_ensemble,
+    n_epochs=30,
     freeze_latents=False,
     freeze_ensemble=False,
     return_logs=False,
-    hide_dims=[3]):
+    hide_dims=[],
+    use_normalization=True):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
@@ -201,7 +188,12 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
         for batch_idx, set_of_batches in enumerate(dataloader):
             params_optimizer.zero_grad()
             latent_optimizer.zero_grad()
-            both_loss = get_both_loss(latent_ensemble, set_of_batches, N=len(dataloader.loaders[0].dataset), hide_dims=hide_dims)
+
+            both_loss = get_both_loss(latent_ensemble, set_of_batches,
+                N=len(dataloader.loaders[0].dataset),
+                hide_dims=hide_dims,
+                use_normalization=use_normalization)
+
             both_loss.backward()
             if not freeze_latents: latent_optimizer.step()
             if not freeze_ensemble: params_optimizer.step()
@@ -209,7 +201,10 @@ def train(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
 
 
         if val_dataloader is not None:
-            val_acc = evaluate(latent_ensemble, val_dataloader, hide_dims=hide_dims)
+            val_acc = evaluate(latent_ensemble, val_dataloader,
+                hide_dims=hide_dims,
+                use_normalization=use_normalization)
+
             accs.append(val_acc.item())
             if val_acc > best_acc:
                 best_acc = val_acc
@@ -274,7 +269,7 @@ def generate_or_load_datasets(args):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--hide-dims', type=str, default='3')
+    parser.add_argument('--hide-dims', type=str, default='9')
     parser.add_argument('--train-dataset', type=str, default='')
     parser.add_argument('--val-dataset', type=str, default='')
     parser.add_argument('--save-train-dataset', type=str, default='')
@@ -287,6 +282,7 @@ def get_parser():
     parser.add_argument('--n-objects', type=int, default=10)
     parser.add_argument('--n-models', type=int, default=10)
     parser.add_argument('--d-latent', type=int, default=2)
+    parser.add_argument('--use-normalization', action='store_true')
 
     return parser
 
@@ -322,7 +318,8 @@ def main(args):
                                            latent_ensemble,
                                            n_epochs=args.n_epochs,
                                            return_logs=True,
-                                           hide_dims=hide_dims)
+                                           hide_dims=hide_dims,
+                                           use_normalization=args.use_normalization)
 
     if args.save_accs != "":
         print('Saving accuracy data to', args.save_accs)

@@ -14,36 +14,36 @@ args.n_val = 100
 args.n_epochs = 500
 args.n_objects = 10
 
-labels = ['fully_observed', 'mass_hidden', 'radius_hidden', 'mass_and_radius_hidden']
-hide_dims = ['', '3', '4', '3,4']
+labels = ['fully_observed', 'restitution_hidden', 'radius_hidden', 'restitution_and_radius_hidden']
+hide_dims = ['', '9', '4', '9,4']
 
 processes = []
 
-n_max = 5
+n_max = 3
 d_max = 3
 
-# # execute the commands in parallel using multiprocess
-# for n in range(n_max):
-#     for l, h in zip(labels, hide_dims):
-#         for d in range(d_max):
-#             args.d_latent = d
-#             args.hide_dims = h
-#             args.save_accs = f"learning/domains/throwing/sanity_checking/data/500_epochs/{l}_{d}d_latent_run_{n}.npy"
+# execute the commands in parallel using multiprocess
+for n in range(n_max):
+    for l, h in zip(labels, hide_dims):
+        for d in range(d_max):
+            args.d_latent = d
+            args.hide_dims = h
+            args.save_accs = f"learning/domains/throwing/sanity_checking/data/500_epochs/{l}_{d}d_latent_run_{n}.npy"
 
-#             # main(args)
-#             if len(processes) > 13:
-#                 print('[WARNING] Waiting for a process to complete!')
-#                 processes[0].join()
-#                 processes.pop(0)
+            # main(args)
+            if len(processes) > 13:
+                print('[WARNING] Waiting for a process to complete!')
+                processes[0].join()
+                processes.pop(0)
 
-#             processes.append(Process(target=main, args=(deepcopy(args),)))
-#             np.random.seed() # this is critical!
-#             torch.random.seed() # this is critical!
-#             processes[-1].start()
+            processes.append(Process(target=main, args=(deepcopy(args),)))
+            np.random.seed() # this is critical!
+            torch.random.seed() # this is critical!
+            processes[-1].start()
 
 
-# for p in processes:
-#     p.join()
+for p in processes:
+    p.join()
 
 
 

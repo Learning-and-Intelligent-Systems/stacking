@@ -28,8 +28,9 @@ if __name__ == '__main__':
 
     args.use_latents = True
     args.n_objects = 1
-    args.n_epochs = 1000
+    args.n_epochs = 500
     args.max_acquisitions = 50
+    args.hide_dims="9"
     args.latent_ensemble_tx = args.max_acquisitions - 1
 
     processes = []

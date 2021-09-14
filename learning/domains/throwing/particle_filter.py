@@ -27,14 +27,8 @@ def get_particle_likelihoods(dataloader, latent_ensemble, hide_dims):
             # we take in a ParallelDataloader to match the typical
             # train_latent.train spec, but we don't need all the
             # parallel batches
-            x, z_id, y = set_of_batches[0]
-            x = make_x_partially_observable(x, hide_dims)
+            x, z_id, y = preprocess_batch(set_of_batches[0], hide_dims)
             N_batch = x.shape[0]
-
-            if torch.cuda.is_available():
-                x = x.cuda()
-                z_id = z_id.cuda()
-                y = y.cuda()
 
             # pred should be [N_batch x N_particles x 2*D_output]
             pred = latent_ensemble(x, z_id.long(),
@@ -75,7 +69,7 @@ def resample(particles, weights):
     # cov = np.cov(resampled_particles, rowvar=False) + np.eye(D)*0.5
     # proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
 
-    
+
 
 def update_particle_filter(dataloader, val_dataloader, latent_ensemble, n_epochs=30,
     freeze_latents=False,
@@ -91,7 +85,7 @@ def update_particle_filter(dataloader, val_dataloader, latent_ensemble, n_epochs
         for epoch_idx in range(n_epochs):
             print(f'Epoch {epoch_idx}')
             particle_likelihoods = get_particle_likelihoods(dataloader, latent_ensemble, hide_dims)
-     
+
             # resample the each latent variable individually
             for i in range(latent_ensemble.n_latents):
                 particles = latent_ensemble.latent_locs[i].detach().numpy()

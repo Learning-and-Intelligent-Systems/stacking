@@ -169,7 +169,6 @@ class ThrowingLatentEnsemble(LatentEnsemble):
         return torch.cat([x, z_samples], 2)
 
     def sample_latents(self, obj_ids, N_samples):
-
         # parameters will have shape [N_batch x D_latent]
         q_z = torch.distributions.normal.Normal(self.latent_locs[obj_ids],
                                                 torch.exp(self.latent_logscales[obj_ids]))

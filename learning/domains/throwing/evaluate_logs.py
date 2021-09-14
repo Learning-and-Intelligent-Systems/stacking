@@ -200,27 +200,21 @@ if __name__ == '__main__':
         #######################################################################
 
         runs = [
-            # {
-            #     "prefix": 'throwing_bald_sweep_run_',
-            #     "label": 'BALD',
-            #     "data": [],
-            #     "color": 'b'
-            # },
-            # {
-            #     "prefix": 'throwing_random_sweep_run_',
-            #     "label": 'Random',
-            #     "data": [],
-            #     "color": 'r'
-            # },
             {
-                "prefix": 'throwing_bald_sweep_fitting_run_',
+                "prefix": 'active',
                 "label": 'BALD',
                 "data": [],
                 "color": 'b'
             },
+            {
+                "prefix": 'random',
+                "label": 'Random',
+                "data": [],
+                "color": 'r'
+            },
 
         ]
-        exp_path = 'learning/experiments/logs/'
+        exp_path = 'learning/experiments/logs/new_throwing'
         ax = plt.gca()
         for r in runs:
             for fname in os.listdir(exp_path):
@@ -244,6 +238,7 @@ if __name__ == '__main__':
 
         for r in runs:
             plot_with_variance(np.arange(50), r["data"], ax, label=r["label"], c=r["color"])
+
         plt.legend()
         plt.xlabel('Acquisition Step')
         plt.ylabel('Task Error (m)')
