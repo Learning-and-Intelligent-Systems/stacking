@@ -8,7 +8,7 @@ from learning.active.acquire import bald_diagonal_gaussian
 from learning.active.utils import ActiveExperimentLogger
 from learning.evaluate.active_evaluate_towers import plot_latent_uncertainty
 from learning.domains.throwing.train_latent import evaluate, get_predictions
-from learning.domains.throwing.throwing_data import generate_dataset, xs_to_actions
+from learning.domains.throwing.throwing_data import generate_dataset, xs_to_actions, parse_hide_dims
 from learning.domains.throwing.task import eval_hit_target
 from learning.domains.throwing.entities import ThrowingBall
 from learning.domains.throwing.sanity_checking.plot_model_vs_data import generate_grid_dataset
@@ -16,6 +16,7 @@ from learning.models.latent_ensemble import ThrowingLatentEnsemble, PFThrowingLa
 
 
 def plot_task_performance(logger, task_score_fn, ax=plt.gca()):
+    print("Plot task performance throughout training")
     scores = []
     for tx in range(logger.args.max_acquisitions):
         latent_ensemble = logger.get_ensemble(tx)
@@ -33,6 +34,7 @@ def plot_task_performance(logger, task_score_fn, ax=plt.gca()):
 
 
 def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
+    print("Plot validation accuracy throughout training")
     objects = logger.get_objects(ThrowingBall)
 
     print('Generating a validation dataset')
@@ -42,7 +44,9 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
     scores = []
     for tx in range(logger.args.max_acquisitions):
         latent_ensemble = logger.get_ensemble(tx)
-        score = evaluate(latent_ensemble, val_dataloader)
+        score = evaluate(latent_ensemble, val_dataloader,
+            hide_dims=parse_hide_dims(logger.args.hide_dims),
+            use_normalization=logger.args.use_normalization)
         print(f'Step {tx}. Score {score}')
         scores.append(score)
 
@@ -56,6 +60,7 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
 
 
 def plot_latents_throughout_training(latents):
+    print("Plot latents throughout training")
     mu, log_sigma = np.split(latents, 2, axis=-1)
     for l_idx in range(mu.shape[1]):
         for d_idx in range(mu.shape[2]):
@@ -71,6 +76,7 @@ def plot_latents_throughout_training(latents):
 
 
 def plot_pf_uncertainty(logger, ax=plt.gca()):
+    print("Plot PF Uncertainty")
     scales = []
 
     # go through each acqisition step
@@ -190,7 +196,12 @@ if __name__ == '__main__':
         plot_val_accuracy(logger, ax=ax)
 
         objects = logger.get_objects(ThrowingBall)
-        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
+        # function that predicts the outcome of each throw
+        data_pred_fn = lambda latent_ensemble, xs: get_predictions(latent_ensemble, xs,
+            hide_dims=parse_hide_dims(logger.args.hide_dims),
+            use_normalization=logger.args.use_normalization)
+        # score that prediction function for each latent ensemble
+        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, data_pred_fn)
         plot_task_performance(logger, task_score_fn, ax=ax)
 
         # visualize_bald_throughout_training(logger)
@@ -230,7 +241,7 @@ if __name__ == '__main__':
                         plot_latent_uncertainty(logger, ax=ax)
                         plot_val_accuracy(logger, ax=ax)
                         objects = logger.get_objects(ThrowingBall)
-                        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects)
+                        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, use_normalization=logger.args.use_normalization)
                         plot_task_performance(logger, task_score_fn, ax=ax)
 
                     r["data"].append(np.load(path_to_task_performance_file))

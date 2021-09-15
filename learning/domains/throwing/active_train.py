@@ -106,7 +106,8 @@ def active_train(latent_ensemble, dataloader, val_dataloader, train_fn, acquire_
                                                   n_epochs=args.n_epochs,
                                                   freeze_ensemble=args.fitting,
                                                   return_logs=True,
-                                                  hide_dims=hide_dims)
+                                                  hide_dims=hide_dims,
+                                                  use_normalization=args.use_normalization)
 
         # save the ensemble after training
         logger.save_ensemble(latent_ensemble, tx)
@@ -134,7 +135,8 @@ def run_active_throwing(args):
                                                                            n_latent_samples=10,
                                                                            marginalize_latents=not args.fitting,
                                                                            marginalize_ensemble=args.fitting,# and args.use_latents),
-                                                                           hide_dims=hide_dims)
+                                                                           hide_dims=hide_dims,
+                                                                           use_normalization=args.use_normalization)
 
     # first two columns of xs are the action params
     data_label_fn = lambda xs, z_ids: label_actions(objects,
@@ -163,11 +165,11 @@ def run_active_throwing(args):
                                          batch_size=args.batch_size,
                                          shuffle=True,
                                          n_dataloaders=args.n_models)
-    # val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 10*args.n_objects)),
-    #                                  batch_size=args.batch_size,
-    #                                  shuffle=True,
-    #                                  n_dataloaders=1)
-    val_dataloader = None
+    val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 5*args.n_objects)),
+                                     batch_size=args.batch_size,
+                                     shuffle=True,
+                                     n_dataloaders=1)
+    # val_dataloader = None
 
 
     # create a logger and save the object set (in vector form)
@@ -196,6 +198,7 @@ def get_parser():
     parser.add_argument('--acquisition', type=str, default='bald')
 
     parser.add_argument('--use-latents', action='store_true')
+    parser.add_argument('--use-normalization', action='store_true')
     parser.add_argument('--use-particle-filter', action='store_true')
 
     # The following arguments are used when we wanted to fit latents with an already trained model.

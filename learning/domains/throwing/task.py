@@ -5,10 +5,10 @@ from scipy.stats import norm
 from learning.domains.throwing.throwing_data import generate_dataset, xs_to_actions, label_actions
 from learning.domains.throwing.train_latent import get_predictions
 
-def eval_hit_target(latent_ensemble, objects, n_samples=10000, n_targets=10):
+def eval_hit_target(latent_ensemble, objects, data_pred_fn, n_samples=10000, n_targets=10):
 	# sample a bunch of (xs, z_ids) and forward pass them to get predictions
 	candidate_plans = generate_dataset(objects, n_samples, label=False)
-	mus, sigmas = get_predictions(latent_ensemble, candidate_plans)
+	mus, sigmas = data_pred_fn(latent_ensemble, candidate_plans)
 
 	# NOTE(izzy): this is kinda bad, but I don't want to choose targets that are outside what is feasible...
 	targets = np.random.normal(loc=mus.mean(), scale=sigmas.mean(), size=n_targets)

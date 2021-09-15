@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
-from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred, parse_hide_dims
 
 # NOTE(izzy): work in progress -- the following three functions have very similar
 # structure, so I wanted to consolidate them in this one function
@@ -65,10 +65,11 @@ def get_predictions(latent_ensemble,
     mus = []
     sigmas = []
 
-    for batch in dataloader:
-        x, z_id = preprocess_batch(batch, hide_dims, normalize=use_normalization)
 
-        with torch.no_grad():
+    with torch.no_grad():
+        for batch in dataloader:
+            x, z_id = preprocess_batch(batch, hide_dims, normalize=use_normalization)
+
             # run a forward pass of the network and compute the likeliehood of y
             pred = latent_ensemble(x, z_id.long(),
                                    collapse_latents=marginalize_latents,
@@ -77,8 +78,8 @@ def get_predictions(latent_ensemble,
 
             mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
 
-        mus.append(mu)
-        sigmas.append(sigma)
+            mus.append(mu)
+            sigmas.append(sigma)
 
     return torch.cat(mus, axis=0), torch.cat(sigmas, axis=0)
 
@@ -297,7 +298,7 @@ def main(args):
     d_observe = 12
     d_pred = 2
     # produce a list of the dimensions of the object propoerties to make hidden
-    hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
+    hide_dims = parse_hide_dims(args.hide_dims)
 
     # initialize the LatentEnsemble
     ensemble = Ensemble(base_model=FeedForward,

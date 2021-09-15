@@ -87,6 +87,9 @@ def generate_objects(n_objects):
 # data pre/post processing for NN training
 ###############################################################################
 
+def parse_hide_dims(hide_dims):
+    return [int(d) for d in hide_dims.split(',')] if hide_dims != "" else []
+
 def make_x_partially_observable(xs, hide_dims):
     # the fully observed dimension is the ball parameters and the throw parameters
     fully_obs_dim = ThrowingBall.dim + ThrowingAction.dim
