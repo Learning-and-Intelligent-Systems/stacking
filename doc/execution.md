@@ -148,9 +148,9 @@ python3 -m learning.experiments.run_towers_evaluation --real --use-vision --use-
 
 ### Evaluate Task Performance with the Simulator
 
-With the robot evaluations we only evaluate a single acquisition step at a time, but in simulation we can evaluate over many acquisition steps with a single command. Use the following:
+With the robot evaluations we only evaluate a single acquisition step at a time, but in simulation we can evaluate over many acquisition steps with a single command. This step will save performance data to a .pkl file which will be used later to generate figures. Use the following:
 ```
-python3 -m learning.evaluate.plan_evaluate_models --problem <problem> --block-set-fname learning/domains/towers/eval_sim_block_set_10.pkl --exp-path learning/experiments/logs/<experiment-name> --max-acqusitions <max-acquisitions> --n-towers <n-towers> --exec-mode <exec-mode> --planning-model <planning-model> --exec-xy-noise <exec-xy-noise> --plan-xy-noise <plan-xy-noise>
+python3 -m learning.evaluate.plan_evaluate_models --problem <problem> --block-set-fname learning/domains/towers/eval_sim_block_set_10.pkl --exp-path learning/experiments/logs/<experiment-name> --max-acquisitions <max-acquisitions> --n-towers <n-towers> --exec-mode <exec-mode> --planning-model <planning-model> --exec-xy-noise <exec-xy-noise> --plan-xy-noise <plan-xy-noise>
 ```
 ```<problem>``` can be one of: ['tallest', 'overhang', 'min-contact', 'cumulative-overhang'].
 
@@ -188,20 +188,19 @@ This will output an accuracy plot to ```<output-img>.png```.
 
 To plot the accuracy of several different methods, each used to train several models in simulation, you have to go into ```learning/evaluate/plot_compare_model_accuracy.py``` and change the ```exp_paths``` variable. It is a dictionary where they key corresponds to a method (and the word that will appear in the plot legend), and the key is a list of paths to models of the same type that will be aggregated. Then run the following:
 ```
-python3 -m learning.evaluate.plot_compare_model_accuracy --max-acquisitions <tx> --plot-step <ps> --test-set-fname <dataset-output> --output-fname <output-img>
 ```
 
 This will output an accuracy plot to ```<output-img>.png```.
 
 ### Task Performance
 
-To plot task performance, you have to have generated the pickle files storing the regret results (see above section "Evaluate Task Performance with the Simulator"). Then to generate plots for comparing task performance, go into ```learning/evaluate/plot_combine_plan_evaluate_models``` and change the ```y_axis``` variable to the metric you want to plot (they are listed there). Also change the ```exp_paths``` dictionary to the paths to experiments you want to compare. The keys are the methods (will show up in the legend of the final plot), and the values are lists of file paths to the experiments of the same type. The results will be aggregated across all experiments in the list. The ```color_map``` indicates what color (as a hex color code) you want each method to show up as in the final plot. Make sure it is the same length as the ```exp_paths``` dictionary. 
+To plot task performance, you have to have generated the pickle files storing the regret results (see above section "Evaluate Task Performance with the Simulator"). Then to generate plots for comparing task performance, go into ```learning/evaluate/plot_combine_plan_evaluate_models``` and change the ```y_axis``` variable to the metric you want to plot (they are listed there). Also change the ```exp_paths``` dictionary to the paths to experiments you want to compare. The keys are the methods (will show up in the legend of the final plot), and the values are lists of file paths to the experiments of the same type. The results will be aggregated across all experiments in the list. The ```color_map``` indicates what color (as a hex color code) you want each method to show up as in the final plot. Make sure it is the same length as the ```exp_paths``` dictionary.
 
 ```
 python3 -m learning.evaluate.plot_combine_plan_evaluate_models --max-acquisitions <tx> --problems <problems>
 ```
 
-This will plot performance for every 10 acquisition steps from 0 to ```<tx>```.
+This will plot performance for every 10 acquisition steps from 0 to ```<tx>``` and save the resulting plot in ```stacking/figures/```.
 
 ```<problems>``` is a list of problems to generate plot for: ['tallest', 'min_contact', 'max_overhang']
 

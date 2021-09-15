@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 
 from learning.active.utils import ActiveExperimentLogger
-from learning.domains.towers.active_utils import get_sequential_predictions
+from learning.domains.towers.active_utils import get_sequential_predictions, get_predictions
 
 tower_heights = [2, 3, 4, 5, 6, 7]
 min_towers_acq = 40         # number of towers in initial dataset
