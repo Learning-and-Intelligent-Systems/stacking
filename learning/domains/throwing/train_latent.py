@@ -13,43 +13,6 @@ from learning.models.mlp import FeedForward
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
 from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred, parse_hide_dims
 
-# NOTE(izzy): work in progress -- the following three functions have very similar
-# structure, so I wanted to consolidate them in this one function
-
-# def predict(latent_ensemble,
-#             batch,
-#             n_latent_samples=10,
-#             marginalize_latents=True,
-#             marginalize_ensemble=True,
-#             mode='train',
-#             hide_dims=[]):
-
-#         # pull out the input
-#           batch = preprocess_batch(batch, hide_dims)
-#           x = batch[0]
-#           z_id = batch[1]
-
-#         with torch.set_grad_enabled(mode=='train'): # conditional "torch.no_grad"
-#             pred = latent_ensemble(x, z_id.long(),
-#                        collapse_latents=marginalize_latents,
-#                        collapse_ensemble=marginalize_ensemble,
-#                        N_samples=n_latent_samples).squeeze()
-
-#             if mode == 'predict':
-#                 D_pred = pred.shape[-1] // 2
-#                 mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-#                 sigma = torch.exp(log_sigma)
-#                 result = mu, sigma
-
-#             elif mode == 'loss':
-#                 # NOTE(izzy): full=True means include the constant terms in the
-#                 # log-likelihood computation. In this case, we are
-#                 loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
-
-#                 data_likelihood = loss_func(y[:, None].expand(N_batch, N_samples), mu, torch.exp(log_sigma))
-
-
-#         return result
 
 def get_predictions(latent_ensemble,
                     unlabeled_data,
@@ -68,7 +31,9 @@ def get_predictions(latent_ensemble,
 
     with torch.no_grad():
         for batch in dataloader:
-            x, z_id = preprocess_batch(batch, hide_dims, normalize=use_normalization)
+            x, z_id = preprocess_batch(batch, hide_dims,
+                normalize_x=use_normalization,
+                normalize_y=use_normalization)
 
             # run a forward pass of the network and compute the likeliehood of y
             pred = latent_ensemble(x, z_id.long(),
@@ -105,7 +70,9 @@ def get_both_loss(latent_ensemble,
     loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
 
     for i, batch in enumerate(batches):
-        x, z_id, y = preprocess_batch(batch, hide_dims, normalize=use_normalization)
+        x, z_id, y = preprocess_batch(batch, hide_dims,
+            normalize_x=use_normalization,
+            normalize_y=use_normalization)
         N_batch = x.shape[0]
 
         # run a forward pass of the network
@@ -115,7 +82,7 @@ def get_both_loss(latent_ensemble,
         mu, sigma = postprocess_pred(pred, unnormalize=False)
         try:
             likelihood_loss += loss_func(y[:, None, None].expand(N_batch, N_samples, 1),
-                                         mu, sigma)
+                                         mu, sigma**2)
         except:
             print(y[:, None, None].expand(N_batch, N_samples, 1).shape,
                                      mu.shape, sigma.shape)
@@ -147,7 +114,7 @@ def evaluate(latent_ensemble,
         [type] -- [description]
     """
     total_log_prob = 0
-    loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
+    loss_func = nn.GaussianNLLLoss(reduction='sum', full=True) # log-liklihood loss
 
     # decided whether or not to normalize by the amount of data
     N = dataloader.dataset.tensors[0].shape[0]
@@ -155,14 +122,23 @@ def evaluate(latent_ensemble,
     for batches in dataloader:
         # pull out a batch
         batch = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
-        x, z_id, y = preprocess_batch(batch, hide_dims, normalize=use_normalization)
+        # NOTE: in the loss computation, we want to compute the data=likelihood
+        # in a normalized space. here we want an interpretable "score", so we
+        # do not normalize the output
+        x, z_id, y = preprocess_batch(batch, hide_dims,
+            normalize_x=use_normalization,
+            normalize_y=False)
 
         # run a forward pass of the network
         pred = latent_ensemble(x, z_id.long()).squeeze()
+        mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
 
-        # and compute the likelihood of y (no need to un-normalize, because label will already be normalized)
-        mu, sigma = postprocess_pred(pred, unnormalize=False)
-        total_log_prob += -loss_func(y, mu.squeeze(), sigma.squeeze())
+        # and compute the likelihood of y (in the unnnormalized space)
+        total_log_prob += -loss_func(y, mu.squeeze(), sigma.squeeze()**2)
+
+        # compute mean absolute error
+        # total_log_prob += (y - mu).abs().sum()
+
 
     return total_log_prob / N
 
@@ -287,6 +263,7 @@ def get_parser():
 
     return parser
 
+
 def main(args):
     # get the datasets
     train_dataloader, val_dataloader = generate_or_load_datasets(args)
@@ -339,4 +316,3 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
     main(args)
-

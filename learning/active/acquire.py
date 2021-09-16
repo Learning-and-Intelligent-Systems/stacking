@@ -48,7 +48,7 @@ def bald_diagonal_gaussian(mus, sigmas):
     # assuming that the predictions from each network correspond to a mixture
     # of gaussians distribution, then we can compute the variance of that
     # distribution as per: https://en.wikipedia.org/wiki/Mixture_distribution
-    m_sigma = torch.mean(sigmas + mus**2, dim=1) - mus.mean(dim=1)**2
+    m_sigma = torch.sqrt(torch.mean(sigmas**2 + mus**2, dim=1) - mus.mean(dim=1)**2)
 
     m_ent = C + 0.5 * torch.log(m_sigma).sum(axis=1)
 

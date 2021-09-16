@@ -96,7 +96,7 @@ def make_x_partially_observable(xs, hide_dims):
     keep_dims = list(set(np.arange(fully_obs_dim)).difference(set(hide_dims)))
     return xs[..., keep_dims]
 
-def normalize_x(x):
+def _normalize_x(x):
     x_mean = torch.Tensor([ 1.0000000e+00,   # R
                             0.0000000e+00,   # G
                             0.0000000e+00,   # B
@@ -123,19 +123,20 @@ def normalize_x(x):
                             5.2659944e-02,   # release angle
                             3.3095131e+01])  # release spin
 
-    return (x - x_mean)/torch.sqrt(x_var + 1e-6)
+    return (x - x_mean)/torch.maximum(torch.sqrt(x_var), torch.Tensor([1e-6]))
 
-def normalize_y(y):
+def _normalize_y(y):
     y_mean = 0.9944
     y_var = 0.2188
     return (y - y_mean)/np.sqrt(y_var)
 
-def unnormalize_y(y):
-    y_mean = 0.9944
+def _unnormalize_y(y, use_mean=True):
+    y_mean = 0.9944 * use_mean
     y_var = 0.2188
     return y * np.sqrt(y_var) + y_mean
 
-def preprocess_batch(batch, hide_dims, normalize):
+
+def preprocess_batch(batch, hide_dims, normalize_x, normalize_y):
     """ batch preprocessing before feeding into the NN """
     x = batch[0]
     z_id = batch[1]
@@ -147,10 +148,10 @@ def preprocess_batch(batch, hide_dims, normalize):
         if y is not None:
             y = y.cuda()
 
-    if normalize:
-        x = normalize_x(x)
-        if y is not None:
-            y = normalize_y(y)
+    if normalize_x:
+        x = _normalize_x(x)
+    if normalize_y and y is not None:
+        y = _normalize_y(y)
 
     x = make_x_partially_observable(x, hide_dims)
 
@@ -164,7 +165,7 @@ def postprocess_pred(pred, unnormalize):
     mu, log_sigma = torch.split(pred, D_pred, dim=-1)
     sigma = torch.exp(log_sigma)
     if unnormalize:
-        return unnormalize_y(mu), unnormalize_y(sigma)
+        return _unnormalize_y(mu), _unnormalize_y(sigma, use_mean=False)
     else:
         return mu, sigma
 

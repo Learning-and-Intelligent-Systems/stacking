@@ -14,7 +14,7 @@ def eval_hit_target(latent_ensemble, objects, data_pred_fn, n_samples=10000, n_t
 	_, _, targets = generate_dataset(objects, n_targets, label=True)
 	
 	# compute the likelihood of hitting each target under each sample
-	plan_scores = norm.pdf(targets[None, :], loc=mus, scale=sigmas)
+	plan_scores = norm.pdf(targets[None, :], loc=mus, scale=sigmas**2)
 
 	# get the best plans indices
 	best_plan_idxs = np.argmax(plan_scores, axis=0)

@@ -61,11 +61,11 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
 
 def plot_latents_throughout_training(latents):
     print("Plot latents throughout training")
-    mu, log_sigma = np.split(latents, 2, axis=-1)
+    mu, log_scales = np.split(latents, 2, axis=-1)
     for l_idx in range(mu.shape[1]):
         for d_idx in range(mu.shape[2]):
             m = mu[:, l_idx, d_idx]
-            s = np.exp(log_sigma[:, l_idx, d_idx])
+            s = np.sqrt(np.exp(log_scales[:, l_idx, d_idx]))
             plt.plot(m)
             plt.fill_between(np.arange(m.size), m-s, m+s, alpha=0.2)
 
@@ -156,7 +156,7 @@ def plot_with_variance(x, ys, ax, c=None, label=None, alpha=0.3):
         assert ys.shape[1] == x.shape[0], 'x and ys don\'t have matching dimensions'
 
     mu = np.mean(ys, axis=0)
-    sigma = np.var(ys, axis=0)
+    sigma = np.sqrt(np.var(ys, axis=0))
     ax.fill_between(x, mu-sigma, mu+sigma, color=c, alpha=alpha)
     ax.plot(x, mu, c=c, alpha=alpha, label=label)
 
