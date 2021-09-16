@@ -10,8 +10,8 @@ def eval_hit_target(latent_ensemble, objects, data_pred_fn, n_samples=10000, n_t
 	candidate_plans = generate_dataset(objects, n_samples, label=False)
 	mus, sigmas = data_pred_fn(latent_ensemble, candidate_plans)
 
-	# NOTE(izzy): this is kinda bad, but I don't want to choose targets that are outside what is feasible...
-	targets = np.random.normal(loc=mus.mean(), scale=sigmas.mean(), size=n_targets)
+	# targets come from the same distribution
+	_, _, targets = generate_dataset(objects, n_targets, label=True)
 	
 	# compute the likelihood of hitting each target under each sample
 	plan_scores = norm.pdf(targets[None, :], loc=mus, scale=sigmas)

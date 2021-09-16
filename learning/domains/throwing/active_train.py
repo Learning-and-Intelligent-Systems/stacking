@@ -169,7 +169,6 @@ def run_active_throwing(args):
                                      batch_size=args.batch_size,
                                      shuffle=True,
                                      n_dataloaders=1)
-    # val_dataloader = None
 
 
     # create a logger and save the object set (in vector form)
