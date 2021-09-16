@@ -5,6 +5,7 @@ import pickle
 import time
 import torch
 import datetime
+import sys
 
 from torch.utils.data import DataLoader
 
@@ -225,9 +226,15 @@ class ActiveExperimentLogger:
             return
 
         # Save ensemble metadata.
-        metadata = {'base_model': ensemble.base_model,
-                    'base_args': ensemble.base_args,
-                    'n_models': ensemble.n_models}
+        try:
+            metadata = {'base_model': ensemble.base_model,
+                        'base_args': ensemble.base_args,
+                        'n_models': ensemble.n_models}
+        except Exception as e:
+            print(e)
+            print('Perhaps you\'re trying to save a LatentEnsemble? use the flag --use-latents')
+            sys.exit(1)
+
         path = os.path.join(self.exp_path, 'models', 'metadata.pkl')
         with open(path, 'wb') as handle:
             pickle.dump(metadata, handle)
