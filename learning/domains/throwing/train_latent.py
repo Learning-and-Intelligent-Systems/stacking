@@ -33,7 +33,7 @@ def get_predictions(latent_ensemble,
         for batch in dataloader:
             x, z_id = preprocess_batch(batch, hide_dims,
                 normalize_x=use_normalization,
-                normalize_y=use_normalization)
+                normalize_y=True) # doesn't matter, because there is no y
 
             # run a forward pass of the network and compute the likeliehood of y
             pred = latent_ensemble(x, z_id.long(),
@@ -80,13 +80,7 @@ def get_both_loss(latent_ensemble,
 
         # and compute the likeliehood of y (no need to un-normalize, because we want to compute the loss in the normalized space)
         mu, sigma = postprocess_pred(pred, unnormalize=False)
-        try:
-            likelihood_loss += loss_func(y[:, None, None].expand(N_batch, N_samples, 1),
-                                         mu, sigma**2)
-            # likelihood_loss += (y - mu).abs().sum()
-        except:
-            print(y[:, None, None].expand(N_batch, N_samples, 1).shape,
-                                     mu.shape, sigma.shape)
+        likelihood_loss += loss_func(mu, y[:, None, None].expand(N_batch, N_samples, 1), sigma**2)
 
 
     likelihood_loss = likelihood_loss/N_models/N_samples
@@ -130,6 +124,7 @@ def evaluate(latent_ensemble,
     # decided whether or not to normalize by the amount of data
     N = dataloader.dataset.tensors[0].shape[0]
 
+    ses = []
     for batches in dataloader:
         # pull out a batch
         batch = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
@@ -142,9 +137,10 @@ def evaluate(latent_ensemble,
 
         # run a forward pass of the network
         pred = latent_ensemble(x, z_id.long()).squeeze()
-        mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
+        mu, sigma = postprocess_pred(pred, unnormalize=False)
 
         # and compute the likelihood of y (in the unnnormalized space)
+# <<<<<<< HEAD
         total_log_prob += -nll_func(y, mu.squeeze(), sigma.squeeze()**2)
         total_mse += mse_func(y, mu.squeeze())
         total_l1 += l1_func(y, mu.squeeze())
@@ -156,6 +152,22 @@ def evaluate(latent_ensemble,
                       total_l1 / N,
                       total_var / N])
     return stats[[likelihood, rmse, l1, var]]
+# =======
+#         total_log_prob += -loss_func(mu.squeeze(), y, sigma.squeeze()**2)
+
+#         # compute mean absolute error
+#         # total_log_prob += (y - mu).abs().sum()
+#         print(y.shape)
+#         if use_normalization:
+#             error = (_unnormalize_y(mu.squeeze()) - _unnormalize_y(y))**2
+#         else:
+#             error = (mu.squeeze() - y)**2
+#         ses += error.detach().numpy().tolist()
+
+#     if return_rmse:
+#         return np.sqrt(np.mean(ses))
+#     return total_log_prob / N
+# >>>>>>> 7a42208102d0ccc1f72bf08421c87ff6bd965ce2
 
 
 def train(dataloader, val_dataloader, latent_ensemble,
