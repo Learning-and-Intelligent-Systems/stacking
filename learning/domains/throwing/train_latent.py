@@ -124,7 +124,7 @@ def evaluate(latent_ensemble,
         # do not normalize the output
         x, z_id, y = preprocess_batch(batch, hide_dims,
             normalize_x=use_normalization,
-            normalize_y=False)
+            normalize_y=True)
 
         # run a forward pass of the network
         pred = latent_ensemble(x, z_id.long()).squeeze()
@@ -135,7 +135,6 @@ def evaluate(latent_ensemble,
 
         # compute mean absolute error
         # total_log_prob += (y - mu).abs().sum()
-        print(y.shape)
         if use_normalization:
             error = (_unnormalize_y(mu.squeeze()) - _unnormalize_y(y))**2
         else:
