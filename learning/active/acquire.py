@@ -22,7 +22,7 @@ def bald(predictions, eps=1e-5):
 
     return bald
 
-def bald_diagonal_gaussian(mus, sigmas):
+def bald_diagonal_gaussian(mus, sigmas, return_components=False):
     """ Get the BALD score for each example. Only requires variance
 
     see https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Differential_entropy
@@ -56,6 +56,8 @@ def bald_diagonal_gaussian(mus, sigmas):
     ent = torch.mean(ent_per_sample, dim=1)
 
     bald = m_ent - ent # NOTE(izzy): sanity check signs
+    if return_components:
+        return bald, m_ent, ent
     return bald
 
 def subtower_bald(samples, ensemble, data_pred_fn):

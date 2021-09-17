@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
-from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred, parse_hide_dims
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred, parse_hide_dims, unnormalize_y
 
 # NOTE(izzy): work in progress -- the following three functions have very similar
 # structure, so I wanted to consolidate them in this one function
@@ -113,12 +113,7 @@ def get_both_loss(latent_ensemble,
 
         # and compute the likeliehood of y (no need to un-normalize, because label will already be normalized)
         mu, sigma = postprocess_pred(pred, unnormalize=False)
-        try:
-            likelihood_loss += loss_func(y[:, None, None].expand(N_batch, N_samples, 1),
-                                         mu, sigma)
-        except:
-            print(y[:, None, None].expand(N_batch, N_samples, 1).shape,
-                                     mu.shape, sigma.shape)
+        likelihood_loss += loss_func(mu, y[:, None, None].expand(N_batch, N_samples, 1), sigma)
 
 
     likelihood_loss = likelihood_loss/N_models/N_samples
@@ -133,7 +128,8 @@ def get_both_loss(latent_ensemble,
 def evaluate(latent_ensemble,
             dataloader,
             hide_dims=[],
-            use_normalization=True):
+            use_normalization=True,
+            return_rmse=False):
     """ computes the data likelihood
 
     Arguments:
@@ -148,10 +144,10 @@ def evaluate(latent_ensemble,
     """
     total_log_prob = 0
     loss_func = nn.GaussianNLLLoss(reduction='sum', full=True)
-
     # decided whether or not to normalize by the amount of data
     N = dataloader.dataset.tensors[0].shape[0]
 
+    ses = []
     for batches in dataloader:
         # pull out a batch
         batch = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
@@ -162,8 +158,15 @@ def evaluate(latent_ensemble,
 
         # and compute the likelihood of y (no need to un-normalize, because label will already be normalized)
         mu, sigma = postprocess_pred(pred, unnormalize=False)
-        total_log_prob += -loss_func(y, mu.squeeze(), sigma.squeeze())
+        total_log_prob += -loss_func(mu.squeeze(), y, sigma.squeeze())
+        if use_normalization:
+            error = (unnormalize_y(mu.squeeze()) - unnormalize_y(y))**2
+        else:
+            error = (mu.squeeze() - y)**2
+        ses += error.detach().numpy().tolist()
 
+    if return_rmse:
+        return np.sqrt(np.mean(ses))
     return total_log_prob / N
 
 

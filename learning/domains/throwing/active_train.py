@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import torch
+import copy
 from torch.utils.data import TensorDataset, DataLoader
 
 from learning.active.acquire import bald_diagonal_gaussian
@@ -37,7 +38,7 @@ def get_latent_ensemble(args):
                             base_args={
                                         'd_in': d_observe + d_latents - len(hide_dims),
                                         'd_out': d_pred,
-                                        'h_dims': [64, 32]
+                                        'h_dims': [64, 32, 32]
                                       },
                             n_models=args.n_models)
         latent_ensemble = ThrowingLatentEnsemble(ensemble,
@@ -83,7 +84,7 @@ def acquire_datapoints(latent_ensemble,
     # label the acquired data
     ys = data_label_fn(xs, z_ids)
 
-    return xs, z_ids, ys
+    return (xs, z_ids, ys), unlabeled_data
 
 
 def active_train(latent_ensemble, dataloader, val_dataloader, train_fn, acquire_fn, logger, args):
@@ -113,13 +114,34 @@ def active_train(latent_ensemble, dataloader, val_dataloader, train_fn, acquire_
         logger.save_ensemble(latent_ensemble, tx)
 
         # get new data using the BALD score
-        new_data = acquire_fn(latent_ensemble)
+        new_data, unlabeled_data = acquire_fn(latent_ensemble)
 
         # save teh acquired data
-        logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
+        logger.save_acquisition_data(new_data, unlabeled_data, tx)#new_data, all_samples, tx)
 
         # add that data to the dataset
-        dataloader.add(*new_data)
+        train_data, val_data = split_data(new_data, 2)
+        dataloader.add(*train_data)
+        val_dataloader.add(*val_data)
+
+
+def split_data(data, n_val):
+    """
+    Choose n_val of the chosen data points to add to the validation set.
+    Return 2 tower_dict structures.
+    """    
+    total = data[0].shape[0]
+    val_ixs = np.random.choice(np.arange(0, total), n_val, replace=False)
+    
+    train_mask = np.ones(total, dtype=bool)
+    train_mask[val_ixs] = False
+    train_data = (data[0][train_mask, ...].clone(), data[1][train_mask].clone(), data[2][train_mask].clone())
+
+    val_mask = np.zeros(total, dtype=bool)
+    val_mask[val_ixs] = True
+    val_data = (data[0][val_mask, ...].clone(), data[1][val_mask].clone(), data[2][val_mask].clone())
+
+    return train_data, val_data
 
 
 def run_active_throwing(args):
@@ -166,9 +188,9 @@ def run_active_throwing(args):
                                          shuffle=True,
                                          n_dataloaders=args.n_models)
     val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 5*args.n_objects)),
-                                     batch_size=args.batch_size,
-                                     shuffle=True,
-                                     n_dataloaders=1)
+                                        batch_size=args.batch_size,
+                                        shuffle=True,
+                                        n_dataloaders=1)
     # val_dataloader = None
 
 
@@ -191,7 +213,7 @@ def get_parser():
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--n-models', type=int, default=10)
     parser.add_argument('--n-epochs', type=int, default=500)
-    parser.add_argument('--n-samples', type=int, default=10000)
+    parser.add_argument('--n-samples', type=int, default=1000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--n-objects', type=int, default=10)
     parser.add_argument('--hide_dims', type=str, default='9')
