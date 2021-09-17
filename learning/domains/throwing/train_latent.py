@@ -128,20 +128,20 @@ def evaluate(latent_ensemble,
     for batches in dataloader:
         # pull out a batch
         batch = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
-        # NOTE: in the loss computation, we want to compute the data=likelihood
-        # in a normalized space. here we want an interpretable "score", so we
-        # do not normalize the output
+        # NOTE: in the loss computation, we wanted to compute the data
+        # likelihood in a normalized space. here we want an interpretable
+        # "score", so we do not normalize the target. and we un-normalize
+        # the prediction as needed
         x, z_id, y = preprocess_batch(batch, hide_dims,
             normalize_x=use_normalization,
             normalize_y=False)
 
-        # run a forward pass of the network
+        # run a forward pass of the network ()
         pred = latent_ensemble(x, z_id.long()).squeeze()
-        mu, sigma = postprocess_pred(pred, unnormalize=False)
+        mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
 
         # and compute the likelihood of y (in the unnnormalized space)
-# <<<<<<< HEAD
-        total_log_prob += -nll_func(y, mu.squeeze(), sigma.squeeze()**2)
+        total_log_prob += -nll_func(mu.squeeze(), y, sigma.squeeze()**2)
         total_mse += mse_func(y, mu.squeeze())
         total_l1 += l1_func(y, mu.squeeze())
         total_var += (sigma**2).sum()
@@ -152,22 +152,6 @@ def evaluate(latent_ensemble,
                       total_l1 / N,
                       total_var / N])
     return stats[[likelihood, rmse, l1, var]]
-# =======
-#         total_log_prob += -loss_func(mu.squeeze(), y, sigma.squeeze()**2)
-
-#         # compute mean absolute error
-#         # total_log_prob += (y - mu).abs().sum()
-#         print(y.shape)
-#         if use_normalization:
-#             error = (_unnormalize_y(mu.squeeze()) - _unnormalize_y(y))**2
-#         else:
-#             error = (mu.squeeze() - y)**2
-#         ses += error.detach().numpy().tolist()
-
-#     if return_rmse:
-#         return np.sqrt(np.mean(ses))
-#     return total_log_prob / N
-# >>>>>>> 7a42208102d0ccc1f72bf08421c87ff6bd965ce2
 
 
 def train(dataloader, val_dataloader, latent_ensemble,
