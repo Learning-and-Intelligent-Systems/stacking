@@ -46,7 +46,8 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
         latent_ensemble = logger.get_ensemble(tx)
         score = evaluate(latent_ensemble, val_dataloader,
             hide_dims=parse_hide_dims(logger.args.hide_dims),
-            use_normalization=logger.args.use_normalization)
+            use_normalization=logger.args.use_normalization,
+            return_rmse=True)
         print(f'Step {tx}. Score {score}')
         scores.append(score)
 
@@ -145,6 +146,154 @@ def visualize_bald_throughout_training(logger):
 
         plt.show()
 
+def visualize_acquired_and_bald(logger, show_labels=False):
+    objects = logger.get_objects(ThrowingBall)
+    n_objects = len(objects)
+    print('N Objects: ', n_objects)
+
+    n_ang, n_w = 25, 25
+    ang_points = np.linspace(np.pi/8, 3*np.pi/8, n_ang)
+    w_points = np.linspace(-10, 10, n_w)
+    
+    # Returns single-dimensional list. 
+    grid_data_tuple = generate_grid_dataset(objects, ang_points, w_points, label=show_labels)
+
+    for tx in range(35, logger.args.max_acquisitions):
+        fig, axes = plt.subplots(ncols=n_objects, nrows=4)
+        latent_ensemble = logger.get_ensemble(tx)
+        # Load the dataset.
+        dataset = logger.load_dataset(tx)
+        xs, z_ids, ys = dataset.tensors
+        # Load the acquired data.
+        acquired = logger.load_acquisition_data(tx)
+        ac_xs, ac_z_ids, ac_ys = acquired[0]
+        unlab_xs, unlab_z_ids = acquired[1]
+
+        mu, sigma = get_predictions(latent_ensemble,
+                                    (grid_data_tuple[0], grid_data_tuple[1]),
+                                    n_latent_samples=10,
+                                    marginalize_latents=True,
+                                    marginalize_ensemble=False,
+                                    hide_dims=[9],
+                                    use_normalization=logger.args.use_normalization)
+        # Scores are in the same order as grid_data_tuple.
+        scores, m_ent, ent = bald_diagonal_gaussian(mu, sigma, return_components=True)
+        scores, m_ent, ent = scores.numpy(), m_ent.numpy(), ent.numpy()
+        print('Scores:', scores.min(), scores.max())
+
+        for i in range(n_objects):
+
+            img = np.zeros((n_ang, n_w))
+            img_m_ent = np.zeros((n_ang, n_w))
+            img_ent = np.zeros((n_ang, n_w))
+            for im_x in range(0, n_ang):
+                for im_y in range(0, n_w):
+                    obj_start_ix = i*n_ang*n_w
+                    
+                    img[im_x, im_y] = scores[obj_start_ix + n_ang*im_x + im_y]
+                    img_m_ent[im_x, im_y] = m_ent[obj_start_ix + n_ang*im_x + im_y]
+                    img_ent[im_x, im_y] = ent[obj_start_ix + n_ang*im_x + im_y]
+            
+            if show_labels:
+                true_img = np.zeros((n_ang, n_w))
+                for im_x in range(0, n_ang):
+                    for im_y in range(0, n_w):
+                        obj_start_ix = i*n_ang*n_w
+                        
+                        true_img[im_x, im_y] = grid_data_tuple[2][obj_start_ix + n_ang*im_x + im_y]
+                axes[1][i].imshow(true_img.T,
+                            extent=[np.pi/8, 3*np.pi/8, -10, 10],
+                            aspect='auto',
+                            vmin=grid_data_tuple[2].min(),
+                            vmax=grid_data_tuple[2].max(),
+                            origin='lower')
+
+            axes[0][i].imshow(img.T,
+                            extent=[np.pi/8, 3*np.pi/8, -10, 10],
+                            aspect='auto',
+                            vmin=scores.min(),
+                            vmax=scores.max(),
+                            origin='lower')
+            axes[2][i].imshow(img_m_ent.T,
+                            extent=[np.pi/8, 3*np.pi/8, -10, 10],
+                            aspect='auto',
+                            vmin=m_ent.min(),
+                            vmax=m_ent.max(),
+                            origin='lower')
+            axes[3][i].imshow(img_ent.T,
+                            extent=[np.pi/8, 3*np.pi/8, -10, 10],
+                            aspect='auto',
+                            vmin=ent.min(),
+                            vmax=ent.max(),
+                            origin='lower')
+            
+            # pull out the throwing data for this object
+            xs_for_this_object = xs[z_ids == i]
+            acs_for_this_object = ac_xs[ac_z_ids == i]
+            unlab_for_this_object = unlab_xs[unlab_z_ids == i]
+            a = xs_to_actions(xs_for_this_object)
+            ac_as = xs_to_actions(acs_for_this_object)
+            unlab_as = xs_to_actions(unlab_for_this_object)
+            #axes[i].scatter(*a.T, c='r', s=3)
+            axes[0][i].scatter(*unlab_as.T, c='r', s=1)
+            axes[0][i].scatter(*ac_as.T, c='g', s=10)
+
+            axes[1][i].scatter(*a.T, c='r', s=3)
+            print(ac_as.shape, a.shape)
+            #axes[i].set_axis_off()
+
+        plt.show()
+
+def visualize_dataset(logger, tx):
+    latent_ensemble = logger.get_ensemble(tx)
+
+    objects = logger.get_objects(ThrowingBall)[:5]
+    n_objects = len(objects)
+    print('N Objects: ', n_objects)
+    dataset = logger.load_dataset(tx)
+    xs, z_ids, ys = dataset.tensors
+
+    n_ang = 5
+    n_w = 5
+    ang_points = np.linspace(0, np.pi/2, n_ang)
+    w_points = np.linspace(-20, 20, n_w)
+    
+    grid_data_tuple = generate_grid_dataset(objects, ang_points, w_points, label=True)
+    fig, axes = plt.subplots(ncols=n_objects, nrows=2)
+    for i in range(n_objects):
+        labels = grid_data_tuple[2].reshape(n_objects, n_ang, n_w)
+        print('Labels:', labels.min(), labels.max())
+
+        mu, sigma = get_predictions(latent_ensemble,
+                                    (grid_data_tuple[0], grid_data_tuple[1]),
+                                    n_latent_samples=10,
+                                    marginalize_latents=True,
+                                    marginalize_ensemble=False,
+                                    hide_dims=[9])
+
+        scores = bald_diagonal_gaussian(mu, sigma).numpy()
+        scores = scores.reshape(n_objects, n_ang, n_w)
+        scores = sigma.mean(dim=1).reshape(n_objects, n_ang, n_w).numpy()
+        print('Scores:', scores.min(), scores.max())
+
+        axes[0][i].imshow(labels[i],
+                        extent=[np.pi/8, 3*np.pi/8, -10, 10],
+                        aspect='auto',
+                        vmin=0,
+                        vmax=2)
+        axes[1][i].imshow(scores[i],
+                        extent=[np.pi/8, 3*np.pi/8, -10, 10],
+                        aspect='auto',
+                        vmin=1,#0,
+                        vmax=14)#0.7)
+        # pull out the throwing data for this object
+        xs_for_this_object = xs[z_ids == i]
+        a = xs_to_actions(xs_for_this_object)
+        axes[0][i].scatter(*a.T, c='r', s=3)
+        #axes[i].set_axis_off()
+
+    plt.show()
+
 def plot_with_variance(x, ys, ax, c=None, label=None, alpha=0.3):
     x = np.array(x)
     ys = np.array(ys)
@@ -183,17 +332,19 @@ if __name__ == '__main__':
         # plotting for single logs
         #######################################################################
         logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-        logger.args.max_acquisitions = 50  # lazy
+        logger.args.max_acquisitions = 40  # lazy
         logger.args.throwing = True # lazy
 
+        #visualize_acquired_and_bald(logger, True)
+        #sys.exit()
         ax = plt.gca()
-
         if isinstance(logger.get_ensemble(1), PFThrowingLatentEnsemble):
             plot_pf_uncertainty(logger, ax=ax)
         else:
             plot_latent_uncertainty(logger, ax=ax)
 
-        plot_val_accuracy(logger, ax=ax)
+        plot_val_accuracy(logger, ax=ax, n_data=1000)
+        sys.exit()
 
         objects = logger.get_objects(ThrowingBall)
         # function that predicts the outcome of each throw
