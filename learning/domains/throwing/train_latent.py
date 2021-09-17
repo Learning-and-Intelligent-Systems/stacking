@@ -28,25 +28,21 @@ def get_predictions(latent_ensemble,
     mus = []
     sigmas = []
 
-
     with torch.no_grad():
-        for batch in dataloader:
-            x, z_id = preprocess_batch(batch, hide_dims,
-                normalize_x=use_normalization,
-                normalize_y=True) # doesn't matter, because there is no y
+        normed = preprocess_batch(unlabeled_data, hide_dims,
+            normalize_x=use_normalization,
+            normalize_y=True) # doesn't matter, because there is no y
+        x = normed[0]
+        z_id = normed[1]
+        pred = latent_ensemble(x, z_id.long(),
+                               collapse_latents=marginalize_latents,
+                               collapse_ensemble=marginalize_ensemble,
+                               N_samples=n_latent_samples).squeeze()
 
-            # run a forward pass of the network and compute the likeliehood of y
-            pred = latent_ensemble(x, z_id.long(),
-                                   collapse_latents=marginalize_latents,
-                                   collapse_ensemble=marginalize_ensemble,
-                                   N_samples=n_latent_samples).squeeze()
+        mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
 
-            mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
+    return mu, sigma
 
-            mus.append(mu)
-            sigmas.append(sigma)
-
-    return torch.cat(mus, axis=0), torch.cat(sigmas, axis=0)
 
 def get_both_loss(latent_ensemble,
                   batches,
@@ -112,45 +108,23 @@ def evaluate(latent_ensemble,
     Returns:
         [type] -- [description]
     """
-    total_log_prob = 0
-    total_mse = 0
-    total_l1 = 0
-    total_var = 0
 
-    nll_func = nn.GaussianNLLLoss(reduction='sum', full=True) # log-liklihood loss
-    mse_func = nn.MSELoss(reduction='sum')
-    l1_func = nn.L1Loss(reduction='sum')
+    nll_func = nn.GaussianNLLLoss(reduction='mean', full=True) # log-liklihood loss
+    mse_func = nn.MSELoss(reduction='mean')
+    l1_func = nn.L1Loss(reduction='mean')
 
-    # decided whether or not to normalize by the amount of data
-    N = dataloader.dataset.tensors[0].shape[0]
+    mu, sigma = get_predictions(latent_ensemble, dataloader.dataset.tensors,
+        hide_dims=hide_dims,
+        use_normalization=use_normalization)
+    y = dataloader.dataset.tensors[2]
 
-    ses = []
-    for batches in dataloader:
-        # pull out a batch
-        batch = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
-        # NOTE: in the loss computation, we wanted to compute the data
-        # likelihood in a normalized space. here we want an interpretable
-        # "score", so we do not normalize the target. and we un-normalize
-        # the prediction as needed
-        x, z_id, y = preprocess_batch(batch, hide_dims,
-            normalize_x=use_normalization,
-            normalize_y=False)
+    stats = np.array([
+        -nll_func(mu.squeeze(), y, sigma.squeeze()**2),
+        torch.sqrt(mse_func(y, mu.squeeze())),
+        l1_func(y, mu.squeeze()),
+        (sigma**2).mean()
+    ])
 
-        # run a forward pass of the network ()
-        pred = latent_ensemble(x, z_id.long()).squeeze()
-        mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
-
-        # and compute the likelihood of y (in the unnnormalized space)
-        total_log_prob += -nll_func(mu.squeeze(), y, sigma.squeeze()**2)
-        total_mse += mse_func(y, mu.squeeze())
-        total_l1 += l1_func(y, mu.squeeze())
-        total_var += (sigma**2).sum()
-
-
-    stats = np.array([total_log_prob / N,
-                      torch.sqrt(total_mse / N),
-                      total_l1 / N,
-                      total_var / N])
     return stats[[likelihood, rmse, l1, var]]
 
 
