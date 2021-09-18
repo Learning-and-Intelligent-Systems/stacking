@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
-from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred, parse_hide_dims, _unnormalize_y
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred, parse_hide_dims
 
 
 def get_predictions(latent_ensemble,
@@ -33,7 +33,7 @@ def get_predictions(latent_ensemble,
         for batch in dataloader:
             x, z_id = preprocess_batch(batch, hide_dims,
                 normalize_x=use_normalization,
-                normalize_y=use_normalization)
+                normalize_y=True) # doesn't matter, because there is no y
 
             # run a forward pass of the network and compute the likeliehood of y
             pred = latent_ensemble(x, z_id.long(),
@@ -78,7 +78,7 @@ def get_both_loss(latent_ensemble,
         # run a forward pass of the network
         pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples).squeeze(dim=1)
 
-        # and compute the likelihood of y (no need to un-normalize, because label will already be normalized)
+        # and compute the likeliehood of y (no need to un-normalize, because we want to compute the loss in the normalized space)
         mu, sigma = postprocess_pred(pred, unnormalize=False)
         likelihood_loss += loss_func(mu, y[:, None, None].expand(N_batch, N_samples, 1), sigma**2)
 
@@ -96,7 +96,10 @@ def evaluate(latent_ensemble,
             dataloader,
             hide_dims=[],
             use_normalization=True,
-            return_rmse=False):
+            likelihood=True,
+            rmse=True,
+            l1=True,
+            var=True):
     """ computes the data likelihood
 
     Arguments:
@@ -110,7 +113,13 @@ def evaluate(latent_ensemble,
         [type] -- [description]
     """
     total_log_prob = 0
-    loss_func = nn.GaussianNLLLoss(reduction='sum', full=True) # log-liklihood loss
+    total_mse = 0
+    total_l1 = 0
+    total_var = 0
+
+    nll_func = nn.GaussianNLLLoss(reduction='sum', full=True) # log-liklihood loss
+    mse_func = nn.MSELoss(reduction='sum')
+    l1_func = nn.L1Loss(reduction='sum')
 
     # decided whether or not to normalize by the amount of data
     N = dataloader.dataset.tensors[0].shape[0]
@@ -119,31 +128,30 @@ def evaluate(latent_ensemble,
     for batches in dataloader:
         # pull out a batch
         batch = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
-        # NOTE: in the loss computation, we want to compute the data=likelihood
-        # in a normalized space. here we want an interpretable "score", so we
-        # do not normalize the output
+        # NOTE: in the loss computation, we wanted to compute the data
+        # likelihood in a normalized space. here we want an interpretable
+        # "score", so we do not normalize the target. and we un-normalize
+        # the prediction as needed
         x, z_id, y = preprocess_batch(batch, hide_dims,
             normalize_x=use_normalization,
-            normalize_y=True)
+            normalize_y=False)
 
-        # run a forward pass of the network
+        # run a forward pass of the network ()
         pred = latent_ensemble(x, z_id.long()).squeeze()
-        mu, sigma = postprocess_pred(pred, unnormalize=False)
+        mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
 
         # and compute the likelihood of y (in the unnnormalized space)
-        total_log_prob += -loss_func(mu.squeeze(), y, sigma.squeeze()**2)
+        total_log_prob += -nll_func(mu.squeeze(), y, sigma.squeeze()**2)
+        total_mse += mse_func(y, mu.squeeze())
+        total_l1 += l1_func(y, mu.squeeze())
+        total_var += (sigma**2).sum()
 
-        # compute mean absolute error
-        # total_log_prob += (y - mu).abs().sum()
-        if use_normalization:
-            error = (_unnormalize_y(mu.squeeze()) - _unnormalize_y(y))**2
-        else:
-            error = (mu.squeeze() - y)**2
-        ses += error.detach().numpy().tolist()
 
-    if return_rmse:
-        return np.sqrt(np.mean(ses))
-    return total_log_prob / N
+    stats = np.array([total_log_prob / N,
+                      torch.sqrt(total_mse / N),
+                      total_l1 / N,
+                      total_var / N])
+    return stats[[likelihood, rmse, l1, var]]
 
 
 def train(dataloader, val_dataloader, latent_ensemble,
@@ -157,10 +165,10 @@ def train(dataloader, val_dataloader, latent_ensemble,
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
 
-    accs = []
+    scores = []
     latents = []
     best_weights = None
-    best_acc = -np.inf
+    best_L = -np.inf
 
     for epoch_idx in range(n_epochs):
         print(f'Epoch {epoch_idx}')
@@ -181,15 +189,18 @@ def train(dataloader, val_dataloader, latent_ensemble,
 
 
         if val_dataloader is not None:
-            val_acc = evaluate(latent_ensemble, val_dataloader,
+            val_score = evaluate(latent_ensemble, val_dataloader,
                 hide_dims=hide_dims,
                 use_normalization=use_normalization)
 
-            accs.append(val_acc.item())
-            if val_acc > best_acc:
-                best_acc = val_acc
+            scores.append(val_score)
+
+            # early stopping based on log likelihood
+            L = val_score[0].item() # pull out the log-likelihood score
+            if L > best_L:
+                best_L = L
                 best_weights = copy.deepcopy(latent_ensemble.state_dict())
-                print('New best validation score.', val_acc.item())
+                print('New best validation score.', L)
 
         latents.append(np.hstack([latent_ensemble.latent_locs.cpu().detach().numpy(),
                                   torch.exp(latent_ensemble.latent_logscales).cpu().detach().numpy()]))
@@ -197,7 +208,7 @@ def train(dataloader, val_dataloader, latent_ensemble,
     if val_dataloader is not None:
         latent_ensemble.load_state_dict(best_weights)
     if return_logs:
-        return latent_ensemble, accs, latents
+        return latent_ensemble, scores, latents
     else:
         return latent_ensemble
 
@@ -294,7 +305,7 @@ def main(args):
 
     # train the LatentEnsemble
     latent_ensemble.reset_latents(random=False)
-    latent_ensemble, accs, latents = train(train_dataloader,
+    latent_ensemble, scores, latents = train(train_dataloader,
                                            val_dataloader,
                                            latent_ensemble,
                                            n_epochs=args.n_epochs,
@@ -306,7 +317,10 @@ def main(args):
         print('Saving accuracy data to', args.save_accs)
         np.save(args.save_accs, np.array(accs))
     else:
-        plt.plot(accs)
+        scores = np.array(scores)
+        for data, label in zip(scores.T, ["NLL", "RMSE", "L1", "Var"]):
+            plt.plot(data, label=label)
+        plt.legend()
         plt.show()
 
     if args.save_latents != "":
