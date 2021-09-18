@@ -163,7 +163,7 @@ def preprocess_batch(batch, hide_dims, normalize_x, normalize_y):
 def postprocess_pred(pred, unnormalize):
     D_pred = pred.shape[-1] // 2
     mu, log_sigma = torch.split(pred, D_pred, dim=-1)
-    sigma = torch.exp(log_sigma)
+    sigma = 0.1 + torch.exp(log_sigma)
     if unnormalize:
         return _unnormalize_y(mu), _unnormalize_y(sigma, use_mean=False)
     else:
