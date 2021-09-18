@@ -151,14 +151,14 @@ def visualize_acquired_and_bald(logger, show_labels=False):
     n_objects = len(objects)
     print('N Objects: ', n_objects)
 
-    n_ang, n_w = 25, 25
+    n_ang, n_w = 15, 15
     ang_points = np.linspace(np.pi/8, 3*np.pi/8, n_ang)
     w_points = np.linspace(-10, 10, n_w)
     
     # Returns single-dimensional list. 
     grid_data_tuple = generate_grid_dataset(objects, ang_points, w_points, label=show_labels)
 
-    for tx in range(35, logger.args.max_acquisitions):
+    for tx in range(50, logger.args.max_acquisitions):
         fig, axes = plt.subplots(ncols=n_objects, nrows=4)
         latent_ensemble = logger.get_ensemble(tx)
         # Load the dataset.
@@ -176,8 +176,9 @@ def visualize_acquired_and_bald(logger, show_labels=False):
                                     marginalize_ensemble=False,
                                     hide_dims=[9],
                                     use_normalization=logger.args.use_normalization)
+        print(sigma.min(), sigma.max())
         # Scores are in the same order as grid_data_tuple.
-        scores, m_ent, ent = bald_diagonal_gaussian(mu, sigma, return_components=True)
+        scores, m_ent, ent = bald_diagonal_gaussian(mu, sigma, return_components=True, use_mc=False)
         scores, m_ent, ent = scores.numpy(), m_ent.numpy(), ent.numpy()
         print('Scores:', scores.min(), scores.max())
 
@@ -223,8 +224,8 @@ def visualize_acquired_and_bald(logger, show_labels=False):
             axes[3][i].imshow(img_ent.T,
                             extent=[np.pi/8, 3*np.pi/8, -10, 10],
                             aspect='auto',
-                            vmin=ent.min(),
-                            vmax=ent.max(),
+                            vmin=m_ent.min(),
+                            vmax=m_ent.max(),
                             origin='lower')
             
             # pull out the throwing data for this object
@@ -332,11 +333,11 @@ if __name__ == '__main__':
         # plotting for single logs
         #######################################################################
         logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-        logger.args.max_acquisitions = 40  # lazy
+        logger.args.max_acquisitions = 80  # lazy
         logger.args.throwing = True # lazy
 
-        #visualize_acquired_and_bald(logger, True)
-        #sys.exit()
+        # visualize_acquired_and_bald(logger, show_labels=False)
+        # sys.exit()
         ax = plt.gca()
         if isinstance(logger.get_ensemble(1), PFThrowingLatentEnsemble):
             plot_pf_uncertainty(logger, ax=ax)
