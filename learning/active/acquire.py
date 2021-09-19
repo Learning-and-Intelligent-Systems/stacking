@@ -22,7 +22,7 @@ def bald(predictions, eps=1e-5):
 
     return bald
 
-def bald_diagonal_gaussian(mus, sigmas, return_components=False, use_mc=True):
+def bald_diagonal_gaussian(mus, sigmas, return_components=False, use_mc=False):
     """ Get the BALD score for each example. Only requires variance
 
     see https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Differential_entropy

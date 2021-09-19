@@ -47,7 +47,10 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
         score = evaluate(latent_ensemble, val_dataloader,
             hide_dims=parse_hide_dims(logger.args.hide_dims),
             use_normalization=logger.args.use_normalization,
-            return_rmse=True)
+            likelihood=False,
+            rmse=True,
+            l1=False,
+            var=False)
         print(f'Step {tx}. Score {score}')
         scores.append(score)
 
@@ -158,7 +161,7 @@ def visualize_acquired_and_bald(logger, show_labels=False):
     # Returns single-dimensional list. 
     grid_data_tuple = generate_grid_dataset(objects, ang_points, w_points, label=show_labels)
 
-    for tx in range(50, logger.args.max_acquisitions):
+    for tx in range(35, logger.args.max_acquisitions):
         fig, axes = plt.subplots(ncols=n_objects, nrows=4)
         latent_ensemble = logger.get_ensemble(tx)
         # Load the dataset.
@@ -333,10 +336,10 @@ if __name__ == '__main__':
         # plotting for single logs
         #######################################################################
         logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-        logger.args.max_acquisitions = 80  # lazy
+        logger.args.max_acquisitions = 50  # lazy
         logger.args.throwing = True # lazy
 
-        # visualize_acquired_and_bald(logger, show_labels=False)
+        # visualize_acquired_and_bald(logger, show_labels=True)
         # sys.exit()
         ax = plt.gca()
         if isinstance(logger.get_ensemble(1), PFThrowingLatentEnsemble):
