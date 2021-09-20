@@ -184,7 +184,7 @@ def train(dataloader, val_dataloader, latent_ensemble,
     if val_dataloader is not None:
         latent_ensemble.load_state_dict(best_weights)
     if return_logs:
-        return latent_ensemble, scores, latents
+        return latent_ensemble, scores, np.array(latents)
     else:
         return latent_ensemble
 
@@ -272,7 +272,7 @@ def main(args):
                         base_args={
                                     'd_in': d_observe + d_latents - len(hide_dims),
                                     'd_out': d_pred,
-                                    'h_dims': [64, 32]
+                                    'h_dims': [16, 64]
                                   },
                         n_models=n_models)
     latent_ensemble = ThrowingLatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
@@ -289,6 +289,7 @@ def main(args):
                                            hide_dims=hide_dims,
                                            use_normalization=args.use_normalization)
 
+
     if args.save_accs != "":
         print('Saving accuracy data to', args.save_accs)
         np.save(args.save_accs, np.array(accs))
@@ -296,7 +297,10 @@ def main(args):
         scores = np.array(scores)
         for data, label in zip(scores.T, ["NLL", "RMSE", "L1", "Var"]):
             plt.plot(data, label=label)
+
+        plt.plot((latents[:,:,-d_latents:]).mean(axis=1), label="Latent Var")
         plt.legend()
+        plt.title('Layer sizes: ' + str(ensemble.base_args['h_dims']))
         plt.show()
 
     if args.save_latents != "":
