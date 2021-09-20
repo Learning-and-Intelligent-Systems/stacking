@@ -20,7 +20,8 @@ def get_predictions(latent_ensemble,
                     marginalize_latents=True,
                     marginalize_ensemble=True,
                     hide_dims=[],
-                    use_normalization=True):
+                    use_normalization=True,
+                    return_normalized=False):
 
     dataset = TensorDataset(*unlabeled_data)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=64)
@@ -39,7 +40,7 @@ def get_predictions(latent_ensemble,
                                collapse_ensemble=marginalize_ensemble,
                                N_samples=n_latent_samples).squeeze()
 
-        mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
+        mu, sigma = postprocess_pred(pred, unnormalize=(use_normalization and not return_normalized))
 
     return mu, sigma
 
@@ -47,7 +48,7 @@ def get_predictions(latent_ensemble,
 def get_both_loss(latent_ensemble,
                   batches,
                   N,
-                  N_samples=10,
+                  n_latent_samples=10,
                   hide_dims=[],
                   use_normalization=True):
     """ compute the loglikelohood of both the latents and the ensemble
@@ -58,7 +59,7 @@ def get_both_loss(latent_ensemble,
         N {int} -- total number of training examples
 
     Keyword Arguments:
-        N_samples {number} -- number of samples from z (default: {10})
+        n_latent_samples {number} -- number of samples from z (default: {10})
     """
 
     likelihood_loss = 0
@@ -72,14 +73,14 @@ def get_both_loss(latent_ensemble,
         N_batch = x.shape[0]
 
         # run a forward pass of the network
-        pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples).squeeze(dim=1)
+        pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=n_latent_samples).squeeze(dim=1)
 
         # and compute the likeliehood of y (no need to un-normalize, because we want to compute the loss in the normalized space)
         mu, sigma = postprocess_pred(pred, unnormalize=False)
-        likelihood_loss += loss_func(mu, y[:, None, None].expand(N_batch, N_samples, 1), sigma**2)
+        likelihood_loss += loss_func(mu, y[:, None, None].expand(N_batch, n_latent_samples, 1), sigma**2)
 
 
-    likelihood_loss = likelihood_loss/N_models/N_samples
+    likelihood_loss = likelihood_loss/N_models/n_latent_samples
 
     q_z = torch.distributions.normal.Normal(latent_ensemble.latent_locs, torch.exp(latent_ensemble.latent_logscales))
     p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
@@ -153,6 +154,7 @@ def train(dataloader, val_dataloader, latent_ensemble,
 
             both_loss = get_both_loss(latent_ensemble, set_of_batches,
                 N=len(dataloader.loaders[0].dataset),
+                n_latent_samples=10,
                 hide_dims=hide_dims,
                 use_normalization=use_normalization)
 

@@ -1,5 +1,6 @@
 from multiprocessing import Process
 import numpy as np
+from tqdm.contrib import tzip
 import torch
 from torch.utils.data import DataLoader
 
@@ -22,7 +23,7 @@ def label_actions(objects, actions, z_ids, as_tensor=False):
     agent = ThrowingAgent(objects)
     ys = []
 
-    for a, z_id in zip(actions, z_ids):
+    for a, z_id in tzip(actions, z_ids): # tzip for progress bar 
         b = objects[int(z_id)]
         act = ThrowingAction.from_vector(b, a)
         ys.append(agent.run(act))

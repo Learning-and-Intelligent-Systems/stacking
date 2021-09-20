@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
@@ -44,12 +45,12 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
     scores = []
     for tx in range(logger.args.max_acquisitions):
         latent_ensemble = logger.get_ensemble(tx)
-        score = evaluate(latent_ensemble, val_dataloader,
+        rmse, = evaluate(latent_ensemble, val_dataloader,
             hide_dims=parse_hide_dims(logger.args.hide_dims),
             use_normalization=logger.args.use_normalization,
-            return_rmse=True)
-        print(f'Step {tx}. Score {score}')
-        scores.append(score)
+            l1=False, likelihood=False, rmse=True, var=False)
+        print(f'Step {tx}. Score {rmse}')
+        scores.append(rmse)
 
     ax.plot(scores)
     ax.set_xlabel('Acquisition Step')
@@ -155,10 +156,12 @@ def visualize_acquired_and_bald(logger, show_labels=False):
     ang_points = np.linspace(np.pi/8, 3*np.pi/8, n_ang)
     w_points = np.linspace(-10, 10, n_w)
     
-    # Returns single-dimensional list. 
+    # Returns single-dimensional list.
+    print("Generating grid dataset.")
     grid_data_tuple = generate_grid_dataset(objects, ang_points, w_points, label=show_labels)
 
     for tx in range(35, logger.args.max_acquisitions):
+        print("Acquisition Step", tx)
         fig, axes = plt.subplots(ncols=n_objects, nrows=4)
         latent_ensemble = logger.get_ensemble(tx)
         # Load the dataset.
@@ -201,14 +204,14 @@ def visualize_acquired_and_bald(logger, show_labels=False):
                         obj_start_ix = i*n_ang*n_w
                         
                         true_img[im_x, im_y] = grid_data_tuple[2][obj_start_ix + n_ang*im_x + im_y]
-                axes[1][i].imshow(true_img.T,
+                axes[0][i].imshow(true_img.T,
                             extent=[np.pi/8, 3*np.pi/8, -10, 10],
                             aspect='auto',
                             vmin=grid_data_tuple[2].min(),
                             vmax=grid_data_tuple[2].max(),
                             origin='lower')
 
-            axes[0][i].imshow(img.T,
+            axes[1][i].imshow(img.T,
                             extent=[np.pi/8, 3*np.pi/8, -10, 10],
                             aspect='auto',
                             vmin=scores.min(),
@@ -235,13 +238,14 @@ def visualize_acquired_and_bald(logger, show_labels=False):
             ac_as = xs_to_actions(acs_for_this_object)
             unlab_as = xs_to_actions(unlab_for_this_object)
             #axes[i].scatter(*a.T, c='r', s=3)
-            axes[0][i].scatter(*unlab_as.T, c='r', s=1)
-            axes[0][i].scatter(*ac_as.T, c='g', s=10)
+            axes[0][i].scatter(*a.T, c='r', s=3) # the whole dataset
+            axes[1][i].scatter(*unlab_as.T, c='w', s=1) # data we did not acquire
+            axes[1][i].scatter(*ac_as.T, c='r', s=10) # data we did acquire
 
-            axes[1][i].scatter(*a.T, c='r', s=3)
             print(ac_as.shape, a.shape)
             #axes[i].set_axis_off()
 
+        plt.suptitle("Cols: Objects -- Rows: y, BALD, H(y|x), E[H(y|x,z,theta)]")
         plt.show()
 
 def visualize_dataset(logger, tx):
@@ -314,29 +318,20 @@ def plot_with_variance(x, ys, ax, c=None, label=None, alpha=0.3):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path', type=str, default="")
-    parser.add_argument('--use-latents', action='store_true')
     parser.add_argument('--latents-log', type=str, default="")
     args = parser.parse_args()
-    print(args.latents_log)
 
-
-    if args.latents_log != "":
-        #######################################################################
-        # plotting non-standard log format
-        #######################################################################
-        latents = np.load(args.latents_log)
-        plot_latents_throughout_training(latents)
-
-    elif args.exp_path != "":
+    if args.exp_path != "":
         #######################################################################
         # plotting for single logs
         #######################################################################
         logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-        logger.args.max_acquisitions = 40  # lazy
+        logger.args.max_acquisitions = 50  # lazy
         logger.args.throwing = True # lazy
 
-        #visualize_acquired_and_bald(logger, True)
-        #sys.exit()
+        # visualize_acquired_and_bald(logger, show_labels=True)
+        # sys.exit()
+
         ax = plt.gca()
         if isinstance(logger.get_ensemble(1), PFThrowingLatentEnsemble):
             plot_pf_uncertainty(logger, ax=ax)

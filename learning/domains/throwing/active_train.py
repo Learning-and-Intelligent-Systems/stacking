@@ -154,11 +154,12 @@ def run_active_throwing(args):
     # forward pass of the latent ensemble, and marginalize the desired axes
     data_pred_fn = lambda latent_ensemble, unlabeled_data: get_predictions(latent_ensemble,
                                                                            unlabeled_data,
-                                                                           n_latent_samples=10,
+                                                                           n_latent_samples=args.n_latent_samples,
                                                                            marginalize_latents=not args.fitting,
                                                                            marginalize_ensemble=args.fitting,# and args.use_latents),
                                                                            hide_dims=hide_dims,
-                                                                           use_normalization=args.use_normalization)
+                                                                           use_normalization=args.use_normalization,
+                                                                           return_normalized=True) # we want to compute BALD in normalized space
 
     # first two columns of xs are the action params
     data_label_fn = lambda xs, z_ids: label_actions(objects,
@@ -211,11 +212,12 @@ def get_parser():
     parser.add_argument('--exp-name', type=str, default='throwing', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--n-models', type=int, default=10)
+    parser.add_argument('--n-latent-samples', type=int, default=10)
     parser.add_argument('--n-epochs', type=int, default=500)
     parser.add_argument('--n-samples', type=int, default=1000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--n-objects', type=int, default=10)
-    parser.add_argument('--hide_dims', type=str, default='9')
+    parser.add_argument('--hide-dims', type=str, default='9')
     parser.add_argument('--acquisition', type=str, default='bald')
 
     parser.add_argument('--use-latents', action='store_true')
