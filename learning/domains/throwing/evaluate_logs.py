@@ -152,7 +152,7 @@ def visualize_acquired_and_bald(logger, show_labels=False):
     n_objects = len(objects)
     print('N Objects: ', n_objects)
 
-    n_ang, n_w = 25, 25
+    n_ang, n_w = 15, 15
     ang_points = np.linspace(np.pi/8, 3*np.pi/8, n_ang)
     w_points = np.linspace(-10, 10, n_w)
     
@@ -179,8 +179,9 @@ def visualize_acquired_and_bald(logger, show_labels=False):
                                     marginalize_ensemble=False,
                                     hide_dims=[9],
                                     use_normalization=logger.args.use_normalization)
+        print(sigma.min(), sigma.max())
         # Scores are in the same order as grid_data_tuple.
-        scores, m_ent, ent = bald_diagonal_gaussian(mu, sigma, return_components=True)
+        scores, m_ent, ent = bald_diagonal_gaussian(mu, sigma, return_components=True, use_mc=False)
         scores, m_ent, ent = scores.numpy(), m_ent.numpy(), ent.numpy()
         print('Scores:', scores.min(), scores.max())
 
@@ -226,8 +227,8 @@ def visualize_acquired_and_bald(logger, show_labels=False):
             axes[3][i].imshow(img_ent.T,
                             extent=[np.pi/8, 3*np.pi/8, -10, 10],
                             aspect='auto',
-                            vmin=ent.min(),
-                            vmax=ent.max(),
+                            vmin=m_ent.min(),
+                            vmax=m_ent.max(),
                             origin='lower')
             
             # pull out the throwing data for this object
@@ -329,8 +330,8 @@ if __name__ == '__main__':
         logger.args.max_acquisitions = 50  # lazy
         logger.args.throwing = True # lazy
 
-        # visualize_acquired_and_bald(logger, show_labels=True)
-        # sys.exit()
+        visualize_acquired_and_bald(logger, show_labels=True)
+        sys.exit()
 
         ax = plt.gca()
         if isinstance(logger.get_ensemble(1), PFThrowingLatentEnsemble):

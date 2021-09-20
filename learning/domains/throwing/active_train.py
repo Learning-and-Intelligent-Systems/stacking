@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import copy
 from torch.utils.data import TensorDataset, DataLoader
+import pickle
 
 from learning.active.acquire import bald_diagonal_gaussian
 from learning.active.utils import ActiveExperimentLogger
@@ -145,7 +146,12 @@ def split_data(data, n_val):
 
 
 def run_active_throwing(args):
-    objects = generate_objects(args.n_objects)
+    if len(args.object_fname) == 0:
+        objects = generate_objects(args.n_objects)
+    else:
+        with open(args.object_fname, 'rb') as handle:
+            objects = pickle.load(handle)
+    
     hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
 
     # use the sample_action function to get actions, and then preprocess to xs
@@ -219,6 +225,7 @@ def get_parser():
     parser.add_argument('--n-objects', type=int, default=10)
     parser.add_argument('--hide-dims', type=str, default='9')
     parser.add_argument('--acquisition', type=str, default='bald')
+    parser.add_argument('--object-fname', type=str, default='')
 
     parser.add_argument('--use-latents', action='store_true')
     parser.add_argument('--use-normalization', action='store_true')

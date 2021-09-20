@@ -22,7 +22,7 @@ def bald(predictions, eps=1e-5):
 
     return bald
 
-def bald_diagonal_gaussian(mus, sigmas, return_components=False):
+def bald_diagonal_gaussian(mus, sigmas, return_components=False, use_mc=False):
     """ Get the BALD score for each example. Only requires variance
 
     see https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Differential_entropy
@@ -48,8 +48,48 @@ def bald_diagonal_gaussian(mus, sigmas, return_components=False):
     # assuming that the predictions from each network correspond to a mixture
     # of gaussians distribution, then we can compute the variance of that
     # distribution as per: https://en.wikipedia.org/wiki/Mixture_distribution
-    m_sigma = torch.sqrt(torch.mean(sigmas**2 + mus**2, dim=1) - mus.mean(dim=1)**2)
+    
+    if use_mc:
+        mc_m_ent = torch.zeros(n_batch)
+        mc_ent = torch.zeros(n_batch)
 
+        from scipy.stats import norm
+        n_mc=100
+
+        for bx in range(0, n_batch):
+            print('M_ENT:', bx, '/', n_batch)
+            gaussians = [norm(loc=mus[bx, gx, 0], scale=sigmas[bx, gx, 0]) for gx in range(0, n_samples)]
+            g_ixs = np.random.choice(np.arange(n_samples), size=n_mc)
+
+            scales = sigmas[bx, g_ixs, 0]
+            means = mus[bx, g_ixs, 0]
+            randn = np.random.randn(n_mc) 
+            samples = scales**2 * randn + means
+
+            probs = np.zeros((n_mc, n_samples))
+            for gx in range(0, n_samples):
+                probs[:, gx] = gaussians[gx].pdf(samples)
+            m_probs = probs.mean(axis=1)
+            mc_m_ent[bx] = (-np.log(m_probs)).mean()
+
+        for bx in range(0, n_batch):
+            print('ENT:', bx, '/', n_batch)
+            g_ixs = np.random.choice(np.arange(n_samples), size=n_mc)
+            
+            ents = np.zeros((n_samples,))
+            for gx in range(0, n_samples):
+                gaussian = norm(loc=mus[bx, gx, 0], scale=sigmas[bx, gx, 0])
+                samples = gaussian.rvs(n_mc)
+                probs = gaussian.pdf(samples)
+                ents[gx] = (-np.log(probs)).mean()
+            mc_ent[bx] = ents.mean()
+            
+        mc_bald = mc_m_ent - mc_ent
+        if return_components:
+            return mc_bald, mc_m_ent, mc_ent
+        return mc_bald
+
+    m_sigma = torch.sqrt(torch.mean(sigmas**2 + mus**2, dim=1) - mus.mean(dim=1)**2)
     m_ent = C + 0.5 * torch.log(m_sigma).sum(axis=1)
 
     ent_per_sample = C + 0.5 * torch.log(sigmas).sum(axis=2)
