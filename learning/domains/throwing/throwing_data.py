@@ -61,6 +61,27 @@ def generate_dataset(objects,
         dataset = xs, z_ids
     return tuple(torch.Tensor(d) for d in dataset) if as_tensor else dataset
 
+def generate_dataset_with_repeated_actions(objects,
+                                           n_actions,
+                                           as_tensor=True,
+                                           label=True):
+    """ same as generate_dataset, but all the actions are the same for each object """
+    n_objects = len(objects)
+    base_z_ids = np.arange(n_objects)
+    base_actions = ThrowingAction.random_vector(n_samples=n_actions)
+    actions = np.vstack([np.meshgrid(acts, base_z_ids)[0].ravel() for acts in base_actions.T]).T
+    z_ids = np.meshgrid(base_actions[:,0], base_z_ids)[1].ravel().astype(int)
+    print(actions)
+    print(z_ids)
+    xs = construct_xs(objects, actions, z_ids)
+    if label:
+        ys = label_actions(objects, actions, z_ids)
+        dataset = xs, z_ids, ys
+    else:
+        dataset = xs, z_ids
+    return tuple(torch.Tensor(d) for d in dataset) if as_tensor else dataset
+
+
 def generate_dataset_parallel(objects,
                               n_data,
                               as_tensor=True,

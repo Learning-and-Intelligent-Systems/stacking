@@ -8,7 +8,7 @@ import pickle
 from learning.active.acquire import bald_diagonal_gaussian
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.throwing.particle_filter import update_particle_filter
-from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, label_actions, ParallelDataLoader, xs_to_actions
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, label_actions, ParallelDataLoader, xs_to_actions, generate_dataset_with_repeated_actions
 from learning.domains.throwing.train_latent import get_predictions, train
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward
@@ -39,7 +39,7 @@ def get_latent_ensemble(args):
                             base_args={
                                         'd_in': d_observe + d_latents - len(hide_dims),
                                         'd_out': d_pred,
-                                        'h_dims': [64, 32, 32]
+                                        'h_dims': [16, 64]
                                       },
                             n_models=args.n_models)
         latent_ensemble = ThrowingLatentEnsemble(ensemble,
@@ -190,6 +190,7 @@ def run_active_throwing(args):
 
 
     print('Generating initialization and validation datasets')
+    # init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset_with_repeated_actions(objects, 5)),
     init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 5*args.n_objects)),
                                          batch_size=args.batch_size,
                                          shuffle=True,

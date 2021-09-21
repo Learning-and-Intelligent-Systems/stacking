@@ -114,10 +114,18 @@ def evaluate(latent_ensemble,
     mse_func = nn.MSELoss(reduction='mean')
     l1_func = nn.L1Loss(reduction='mean')
 
+    # mu, sigma = get_predictions(latent_ensemble, dataloader.dataset.tensors,
+    #     hide_dims=hide_dims,
+    #     use_normalization=use_normalization)
+
     mu, sigma = get_predictions(latent_ensemble, dataloader.dataset.tensors,
         hide_dims=hide_dims,
+        marginalize_ensemble=False,
         use_normalization=use_normalization)
-    y = dataloader.dataset.tensors[2]
+
+    # expand y to match the shape of mu and sigma
+    m_y = dataloader.dataset.tensors[2]
+    y = torch.tile(m_y[:, None], [1, latent_ensemble.ensemble.n_models])
 
     stats = np.array([
         -nll_func(mu.squeeze(), y, sigma.squeeze()**2),
