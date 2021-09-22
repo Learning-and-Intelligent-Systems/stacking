@@ -50,7 +50,7 @@ class ThrowingBall:
         bounciness = np.random.uniform(0.1, 0.8)
 
         # only vary some of the propreties randomly
-        return ThrowingBall(bounciness=bounciness, radius=radius)
+        return ThrowingBall(bounciness=bounciness, mass=mass)
 
     def vectorize(self):
         v = np.zeros(self.dim)

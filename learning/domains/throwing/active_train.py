@@ -161,8 +161,8 @@ def run_active_throwing(args):
     data_pred_fn = lambda latent_ensemble, unlabeled_data: get_predictions(latent_ensemble,
                                                                            unlabeled_data,
                                                                            n_latent_samples=args.n_latent_samples,
-                                                                           marginalize_latents=not args.fitting,
-                                                                           marginalize_ensemble=args.fitting,# and args.use_latents),
+                                                                           marginalize_latents=False,# not args.fitting,
+                                                                           marginalize_ensemble=False, # args.fitting,# and args.use_latents),
                                                                            hide_dims=hide_dims,
                                                                            use_normalization=args.use_normalization,
                                                                            return_normalized=True) # we want to compute BALD in normalized space
