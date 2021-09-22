@@ -40,7 +40,7 @@ def get_latent_ensemble(args):
                                         'd_in': d_observe + d_latents - len(hide_dims),
                                         'd_out': d_pred,
                                         'd_latent': d_latents,
-                                        'h_dims': [16, 64]#[64, 32, 32]
+                                        'h_dims': [16, 64]
                                       },
                             n_models=args.n_models)
         latent_ensemble = ThrowingLatentEnsemble(ensemble,

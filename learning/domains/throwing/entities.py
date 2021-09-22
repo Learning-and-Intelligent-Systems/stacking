@@ -47,7 +47,7 @@ class ThrowingBall:
         air_drag_angular = np.random.uniform(5e-6, 5e-5)
         friction_coef = np.random.uniform(0.1, 1)
         rolling_resistance = np.random.uniform(1e-4, 1e-3)
-        bounciness = np.random.uniform(0.1, 0.8)
+        bounciness = np.random.uniform(0.01, 0.3)
 
         # only vary some of the propreties randomly
         return ThrowingBall(bounciness=bounciness, mass=mass)

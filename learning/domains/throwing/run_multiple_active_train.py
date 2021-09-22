@@ -21,10 +21,7 @@ def find_experiment_path_by_name(exp_name,
 
 
 def run_with_multiprocessing():
-    parser = get_parser()
-    parser.add_argument('--n-runs', type=int, default=5)
-    parser.add_argument('--sweep-name', type=str, default='sweep')
-    args = parser.parse_args()
+
 
     args.use_latents = True
     args.n_objects = 1
@@ -35,13 +32,13 @@ def run_with_multiprocessing():
 
     processes = []
     for n in range(args.n_runs):
-        args.exp_name = args.sweep_name + f"_run_{n}"
+        args.exp_name = args.prefix + f"_run_{n}"
 
         if args.fitting:
             # if we're fitting, we need to find the corresponding training run
             # and change the name of the experiment log to say "fitting"
             args.latent_ensemble_exp_path = find_experiment_path_by_name(args.exp_name)
-            args.exp_name = args.sweep_name + f"_fitting_run_{n}"
+            args.exp_name = args.prefix + f"_fitting_run_{n}"
             args.n_acquire = 1
 
         np.random.seed() # this is critical!
@@ -55,22 +52,27 @@ def run_with_multiprocessing():
         p.join()
 
 
-def run_with_subprocess(n_runs, dry=False):
-    args = [
-        "--use-latents",
-        "--use-normalization",
-        "--n-objects=10",
-        "--max-acquisitions=50",
-        "--hide-dims=3,9",
-        "--n-epochs=200"
-    ]
+def args_to_command(cmd, args, skip_args=[]):
+    """ takes an argparse namespace and converts it to a string for calling
+    with os.system or subprocess. args in skip_args are left out """
 
+    for k, v in args.__dict__.items():
+        if k in skip_args: continue
+        elif v == True: cmd += f" --{k.replace('_', '-')}"
+        elif v == False: continue
+        else: cmd += f" --{k.replace('_', '-')}={v}"
+
+    return cmd
+
+def run_with_subprocess(args, dry=False):
     commands = []
-    for i in range(n_runs):
-        cmd = "python -m learning.domains.throwing.active_train"
-        cmd += " " + " ".join(args)
-        cmd += " " + f"--exp-name=test_run_{i}"
-
+    for i in range(args.n_runs):
+        # set the experiment logging directory name
+        args.exp_name = args.prefix + f"_run_{i}"
+        # generate the CLI command
+        cmd = args_to_command("python -m learning.domains.throwing.active_train",
+            args, skip_args=["prefix", "n_runs", "dry"])
+        # print it (for dry run viewing)
         print(cmd)
         commands.append(cmd)
 
@@ -86,7 +88,6 @@ def run_with_subprocess(n_runs, dry=False):
                 else:
                     break
 
-
         except KeyboardInterrupt:
             print("[TERMINATING ALL EXPERIMENTS]")
             for p in processes:
@@ -94,5 +95,11 @@ def run_with_subprocess(n_runs, dry=False):
 
 
 if __name__ == '__main__':
-    run_with_subprocess(10, dry=False)
-   
+    parser = get_parser()
+    parser.add_argument('--n-runs', type=int, default=5)
+    parser.add_argument('--prefix', type=str, default='throwing')
+    parser.add_argument('--dry', action='store_true')
+    args = parser.parse_args()
+
+    run_with_subprocess(args, dry=args.dry)
+    # print(args_to_command(args))
