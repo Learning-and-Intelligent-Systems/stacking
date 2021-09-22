@@ -1,4 +1,5 @@
 from multiprocessing import Process
+from subprocess import Popen
 import numpy as np
 import os
 import torch
@@ -18,38 +19,57 @@ def find_experiment_path_by_name(exp_name,
         return ""
 
 
+def run_with_os(n_runs, dry=False):
+    args = [
+        "--use-latents",
+        "--use-normalization",
+        "--n-objects=10",
+        "--max-acquisitions=50",
+        "--hide-dims=3,9",
+        "--n-epochs=200"
+    ]
+
+    for i in range(n_runs):
+        cmd = "python -m learning.domains.throwing.active_train"
+        cmd += " " + " ".join(args)
+        cmd += " " + f"--exp-name=throwing_fully_hidden_sweep_run_{i}"
+
+        print(cmd)
+        if not dry: Popen(cmd, shell=True)
+
 if __name__ == '__main__':
-    
+    run_with_os(10, dry=False)
 
-    parser = get_parser()
-    parser.add_argument('--n-runs', type=int, default=5)
-    parser.add_argument('--sweep-name', type=str, default='sweep')
-    args = parser.parse_args()
 
-    args.use_latents = True
-    args.n_objects = 1
-    args.n_epochs = 500
-    args.max_acquisitions = 50
-    args.hide_dims="9"
-    args.latent_ensemble_tx = args.max_acquisitions - 1
+    # parser = get_parser()
+    # parser.add_argument('--n-runs', type=int, default=5)
+    # parser.add_argument('--sweep-name', type=str, default='sweep')
+    # args = parser.parse_args()
 
-    processes = []
-    for n in range(args.n_runs):
-        args.exp_name = args.sweep_name + f"_run_{n}"
+    # args.use_latents = True
+    # args.n_objects = 1
+    # args.n_epochs = 500
+    # args.max_acquisitions = 50
+    # args.hide_dims="9"
+    # args.latent_ensemble_tx = args.max_acquisitions - 1
 
-        if args.fitting:
-            # if we're fitting, we need to find the corresponding training run
-            # and change the name of the experiment log to say "fitting"
-            args.latent_ensemble_exp_path = find_experiment_path_by_name(args.exp_name)
-            args.exp_name = args.sweep_name + f"_fitting_run_{n}"
-            args.n_acquire = 1
+    # processes = []
+    # for n in range(args.n_runs):
+    #     args.exp_name = args.sweep_name + f"_run_{n}"
 
-        np.random.seed() # this is critical!
-        torch.random.seed() # this is critical!
-        processes.append(Process(target=run_active_throwing, args=(args,)))
-        np.random.seed() # this is critical!
-        torch.random.seed() # this is critical!
-        processes[-1].start()
+    #     if args.fitting:
+    #         # if we're fitting, we need to find the corresponding training run
+    #         # and change the name of the experiment log to say "fitting"
+    #         args.latent_ensemble_exp_path = find_experiment_path_by_name(args.exp_name)
+    #         args.exp_name = args.sweep_name + f"_fitting_run_{n}"
+    #         args.n_acquire = 1
 
-    for p in processes:
-        p.join()
+    #     np.random.seed() # this is critical!
+    #     torch.random.seed() # this is critical!
+    #     processes.append(Process(target=run_active_throwing, args=(args,)))
+    #     np.random.seed() # this is critical!
+    #     torch.random.seed() # this is critical!
+    #     processes[-1].start()
+
+    # for p in processes:
+    #     p.join()
