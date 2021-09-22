@@ -20,7 +20,8 @@ def get_predictions(latent_ensemble,
                     marginalize_latents=True,
                     marginalize_ensemble=True,
                     hide_dims=[],
-                    use_normalization=True):
+                    use_normalization=True,
+                    return_normalized=False):
 
     dataset = TensorDataset(*unlabeled_data)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=64)
@@ -28,30 +29,26 @@ def get_predictions(latent_ensemble,
     mus = []
     sigmas = []
 
-
     with torch.no_grad():
-        for batch in dataloader:
-            x, z_id = preprocess_batch(batch, hide_dims,
-                normalize_x=use_normalization,
-                normalize_y=True) # doesn't matter, because there is no y
+        normed = preprocess_batch(unlabeled_data, hide_dims,
+            normalize_x=use_normalization,
+            normalize_y=True) # doesn't matter, because there is no y
+        x = normed[0]
+        z_id = normed[1]
+        pred = latent_ensemble(x, z_id.long(),
+                               collapse_latents=marginalize_latents,
+                               collapse_ensemble=marginalize_ensemble,
+                               N_samples=n_latent_samples).squeeze()
 
-            # run a forward pass of the network and compute the likeliehood of y
-            pred = latent_ensemble(x, z_id.long(),
-                                   collapse_latents=marginalize_latents,
-                                   collapse_ensemble=marginalize_ensemble,
-                                   N_samples=n_latent_samples).squeeze()
+        mu, sigma = postprocess_pred(pred, unnormalize=(use_normalization and not return_normalized))
 
-            mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
+    return mu, sigma
 
-            mus.append(mu)
-            sigmas.append(sigma)
-
-    return torch.cat(mus, axis=0), torch.cat(sigmas, axis=0)
 
 def get_both_loss(latent_ensemble,
                   batches,
                   N,
-                  N_samples=2,
+                  n_latent_samples=2,
                   hide_dims=[],
                   use_normalization=True):
     """ compute the loglikelohood of both the latents and the ensemble
@@ -62,7 +59,7 @@ def get_both_loss(latent_ensemble,
         N {int} -- total number of training examples
 
     Keyword Arguments:
-        N_samples {number} -- number of samples from z (default: {10})
+        n_latent_samples {number} -- number of samples from z (default: {10})
     """
 
     likelihood_loss = 0
@@ -76,14 +73,14 @@ def get_both_loss(latent_ensemble,
         N_batch = x.shape[0]
 
         # run a forward pass of the network
-        pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=N_samples).squeeze(dim=1)
+        pred = latent_ensemble(x, z_id.long(), ensemble_idx=i, collapse_latents=False, collapse_ensemble=False, N_samples=n_latent_samples).squeeze(dim=1)
 
         # and compute the likeliehood of y (no need to un-normalize, because we want to compute the loss in the normalized space)
         mu, sigma = postprocess_pred(pred, unnormalize=False)
-        likelihood_loss += loss_func(mu, y[:, None, None].expand(N_batch, N_samples, 1), sigma**2)
+        likelihood_loss += loss_func(mu, y[:, None, None].expand(N_batch, n_latent_samples, 1), sigma**2)
 
 
-    likelihood_loss = likelihood_loss/N_models/N_samples
+    likelihood_loss = likelihood_loss/N_models/n_latent_samples
 
     q_z = torch.distributions.normal.Normal(latent_ensemble.latent_locs, torch.exp(latent_ensemble.latent_logscales))
     p_z = torch.distributions.normal.Normal(torch.zeros_like(q_z.loc), torch.ones_like(q_z.scale))
@@ -112,45 +109,31 @@ def evaluate(latent_ensemble,
     Returns:
         [type] -- [description]
     """
-    total_log_prob = 0
-    total_mse = 0
-    total_l1 = 0
-    total_var = 0
 
-    nll_func = nn.GaussianNLLLoss(reduction='sum', full=True) # log-liklihood loss
-    mse_func = nn.MSELoss(reduction='sum')
-    l1_func = nn.L1Loss(reduction='sum')
+    nll_func = nn.GaussianNLLLoss(reduction='mean', full=True) # log-liklihood loss
+    mse_func = nn.MSELoss(reduction='mean')
+    l1_func = nn.L1Loss(reduction='mean')
 
-    # decided whether or not to normalize by the amount of data
-    N = dataloader.dataset.tensors[0].shape[0]
+    # mu, sigma = get_predictions(latent_ensemble, dataloader.dataset.tensors,
+    #     hide_dims=hide_dims,
+    #     use_normalization=use_normalization)
 
-    ses = []
-    for batches in dataloader:
-        # pull out a batch
-        batch = batches[0] if isinstance(dataloader, ParallelDataLoader) else batches
-        # NOTE: in the loss computation, we wanted to compute the data
-        # likelihood in a normalized space. here we want an interpretable
-        # "score", so we do not normalize the target. and we un-normalize
-        # the prediction as needed
-        x, z_id, y = preprocess_batch(batch, hide_dims,
-            normalize_x=use_normalization,
-            normalize_y=False)
+    mu, sigma = get_predictions(latent_ensemble, dataloader.dataset.tensors,
+        hide_dims=hide_dims,
+        marginalize_ensemble=False,
+        use_normalization=use_normalization)
 
-        # run a forward pass of the network ()
-        pred = latent_ensemble(x, z_id.long()).squeeze()
-        mu, sigma = postprocess_pred(pred, unnormalize=use_normalization)
+    # expand y to match the shape of mu and sigma
+    m_y = dataloader.dataset.tensors[2]
+    y = torch.tile(m_y[:, None], [1, latent_ensemble.ensemble.n_models])
 
-        # and compute the likelihood of y (in the unnnormalized space)
-        total_log_prob += -nll_func(mu.squeeze(), y, sigma.squeeze()**2)
-        total_mse += mse_func(y, mu.squeeze())
-        total_l1 += l1_func(y, mu.squeeze())
-        total_var += (sigma**2).sum()
+    stats = np.array([
+        -nll_func(mu.squeeze(), y, sigma.squeeze()**2),
+        torch.sqrt(mse_func(y, mu.squeeze())),
+        l1_func(y, mu.squeeze()),
+        (sigma**2).mean()
+    ])
 
-
-    stats = np.array([total_log_prob / N,
-                      torch.sqrt(total_mse / N),
-                      total_l1 / N,
-                      total_var / N])
     return stats[[likelihood, rmse, l1, var]]
 
 
@@ -178,6 +161,7 @@ def train(dataloader, val_dataloader, latent_ensemble,
             latent_optimizer.zero_grad()
             both_loss = get_both_loss(latent_ensemble, set_of_batches,
                 N=len(dataloader.loaders[0].dataset),
+                n_latent_samples=10,
                 hide_dims=hide_dims,
                 use_normalization=use_normalization)
 
@@ -207,7 +191,7 @@ def train(dataloader, val_dataloader, latent_ensemble,
     if val_dataloader is not None:
         latent_ensemble.load_state_dict(best_weights)
     if return_logs:
-        return latent_ensemble, scores, latents
+        return latent_ensemble, scores, np.array(latents)
     else:
         return latent_ensemble
 
@@ -295,7 +279,7 @@ def main(args):
                         base_args={
                                     'd_in': d_observe + d_latents - len(hide_dims),
                                     'd_out': d_pred,
-                                    'h_dims': [64, 32]
+                                    'h_dims': [16, 64]
                                   },
                         n_models=n_models)
     latent_ensemble = ThrowingLatentEnsemble(ensemble, n_latents=n_latents, d_latents=d_latents)
@@ -312,6 +296,7 @@ def main(args):
                                            hide_dims=hide_dims,
                                            use_normalization=args.use_normalization)
 
+
     if args.save_accs != "":
         print('Saving accuracy data to', args.save_accs)
         np.save(args.save_accs, np.array(accs))
@@ -319,7 +304,10 @@ def main(args):
         scores = np.array(scores)
         for data, label in zip(scores.T, ["NLL", "RMSE", "L1", "Var"]):
             plt.plot(data, label=label)
+
+        plt.plot((latents[:,:,-d_latents:]).mean(axis=1), label="Latent Var")
         plt.legend()
+        plt.title('Layer sizes: ' + str(ensemble.base_args['h_dims']))
         plt.show()
 
     if args.save_latents != "":

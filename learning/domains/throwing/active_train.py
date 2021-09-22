@@ -8,7 +8,7 @@ import pickle
 from learning.active.acquire import bald_diagonal_gaussian
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.throwing.particle_filter import update_particle_filter
-from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, label_actions, ParallelDataLoader, xs_to_actions
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, label_actions, ParallelDataLoader, xs_to_actions, generate_dataset_with_repeated_actions
 from learning.domains.throwing.train_latent import get_predictions, train
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward, FeedForwardWithSkipConnections
@@ -184,11 +184,12 @@ def run_active_throwing(args):
     # forward pass of the latent ensemble, and marginalize the desired axes
     data_pred_fn = lambda latent_ensemble, unlabeled_data: get_predictions(latent_ensemble,
                                                                            unlabeled_data,
-                                                                           n_latent_samples=10,
+                                                                           n_latent_samples=args.n_latent_samples,
                                                                            marginalize_latents=not args.fitting,
                                                                            marginalize_ensemble=args.fitting,# and args.use_latents),
                                                                            hide_dims=hide_dims,
-                                                                           use_normalization=args.use_normalization)
+                                                                           use_normalization=args.use_normalization,
+                                                                           return_normalized=True) # we want to compute BALD in normalized space
 
     # first two columns of xs are the action params
     data_label_fn = lambda xs, z_ids: label_actions(objects,
@@ -242,6 +243,7 @@ def get_parser():
     parser.add_argument('--exp-name', type=str, default='throwing', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--n-models', type=int, default=10)
+    parser.add_argument('--n-latent-samples', type=int, default=10)
     parser.add_argument('--n-epochs', type=int, default=500)
     parser.add_argument('--n-samples', type=int, default=1000)
     parser.add_argument('--n-acquire', type=int, default=10)

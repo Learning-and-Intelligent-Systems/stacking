@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
@@ -51,10 +52,7 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca(), use_training_dataset=Fal
         score = evaluate(latent_ensemble, val_dataloader,
             hide_dims=parse_hide_dims(logger.args.hide_dims),
             use_normalization=logger.args.use_normalization,
-            likelihood=False,
-            rmse=True,
-            l1=False,
-            var=False)
+            l1=False, likelihood=False, rmse=True, var=False)
         print(f'Step {tx}. Score {score}')
         scores.append(score)
 
@@ -166,7 +164,8 @@ def visualize_acquired_and_bald(logger, show_labels=False):
     ang_points = np.linspace(np.pi/8, 3*np.pi/8, n_ang)
     w_points = np.linspace(-10, 10, n_w)
     
-    # Returns single-dimensional list. 
+    # Returns single-dimensional list.
+    print("Generating grid dataset.")
     grid_data_tuple = generate_grid_dataset(objects, ang_points, w_points, label=show_labels)
 
     for tx in range(0, logger.args.max_acquisitions, 1):
@@ -250,7 +249,7 @@ def visualize_acquired_and_bald(logger, show_labels=False):
                 pass
 
 
-            axes[0][i].imshow(img.T,
+            axes[1][i].imshow(img.T,
                             extent=[np.pi/8, 3*np.pi/8, -10, 10],
                             aspect='auto',
                             vmin=scores.min(),
@@ -280,14 +279,16 @@ def visualize_acquired_and_bald(logger, show_labels=False):
             val_xs_for_this_object = val_xs[val_z_ids == i]
             val_as = xs_to_actions(val_xs_for_this_object)
             #axes[i].scatter(*a.T, c='r', s=3)
-            axes[0][i].scatter(*unlab_as.T, c='r', s=1)
-            axes[0][i].scatter(*ac_as.T, c='g', s=10)
+            axes[0][i].scatter(*a.T, c='r', s=3) # the whole dataset
+            axes[1][i].scatter(*unlab_as.T, c='w', s=1) # data we did not acquire
+            axes[1][i].scatter(*ac_as.T, c='r', s=10) # data we did acquire
 
             axes[1][i].scatter(*a.T, c='r', s=3)
             axes[1][i].scatter(*val_as.T, c='b', s=3)
             print(ac_as.shape, a.shape)
             #axes[i].set_axis_off()
 
+        plt.suptitle("Cols: Objects -- Rows: y, BALD, H(y|x), E[H(y|x,z,theta)]")
         plt.show()
 
 def visualize_dataset(logger, tx):
@@ -360,20 +361,10 @@ def plot_with_variance(x, ys, ax, c=None, label=None, alpha=0.3):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path', type=str, default="")
-    parser.add_argument('--use-latents', action='store_true')
     parser.add_argument('--latents-log', type=str, default="")
     args = parser.parse_args()
-    print(args.latents_log)
 
-
-    if args.latents_log != "":
-        #######################################################################
-        # plotting non-standard log format
-        #######################################################################
-        latents = np.load(args.latents_log)
-        plot_latents_throughout_training(latents)
-
-    elif args.exp_path != "":
+    if args.exp_path != "":
         #######################################################################
         # plotting for single logs
         #######################################################################
