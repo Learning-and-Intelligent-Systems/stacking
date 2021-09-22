@@ -3,13 +3,14 @@ import copy
 from matplotlib import pyplot as plt
 import numpy as np
 import pickle
+import tqdm
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
 from learning.models.ensemble import Ensemble
-from learning.models.mlp import FeedForward
+from learning.models.mlp import FeedForward, FeedForwardWithSkipConnections
 from learning.models.latent_ensemble import ThrowingLatentEnsemble
 from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, ParallelDataLoader, preprocess_batch, postprocess_pred, parse_hide_dims
 
@@ -48,7 +49,7 @@ def get_predictions(latent_ensemble,
 def get_both_loss(latent_ensemble,
                   batches,
                   N,
-                  n_latent_samples=2,
+                  n_latent_samples=10,
                   hide_dims=[],
                   use_normalization=True):
     """ compute the loglikelohood of both the latents and the ensemble
@@ -77,6 +78,7 @@ def get_both_loss(latent_ensemble,
 
         # and compute the likeliehood of y (no need to un-normalize, because we want to compute the loss in the normalized space)
         mu, sigma = postprocess_pred(pred, unnormalize=False)
+        # print(sigma)
         likelihood_loss += loss_func(mu, y[:, None, None].expand(N_batch, n_latent_samples, 1), sigma**2)
 
 
@@ -143,7 +145,8 @@ def train(dataloader, val_dataloader, latent_ensemble,
     freeze_ensemble=False,
     return_logs=False,
     hide_dims=[],
-    use_normalization=True):
+    use_normalization=True,
+    suppress_printing=True):
 
     params_optimizer = optim.Adam(latent_ensemble.ensemble.parameters(), lr=1e-3)
     latent_optimizer = optim.Adam([latent_ensemble.latent_locs, latent_ensemble.latent_logscales], lr=1e-3)
@@ -153,8 +156,10 @@ def train(dataloader, val_dataloader, latent_ensemble,
     best_weights = None
     best_L = -np.inf
 
-    for epoch_idx in range(n_epochs):
-        print(f'Epoch {epoch_idx}')
+    range_fn = tqdm.trange if suppress_printing else range
+
+    for epoch_idx in tqdm.trange(n_epochs):
+        if not suppress_printing: print(f'Epoch {epoch_idx}')
 
         for batch_idx, set_of_batches in enumerate(dataloader):
             params_optimizer.zero_grad()
@@ -168,8 +173,6 @@ def train(dataloader, val_dataloader, latent_ensemble,
             both_loss.backward()
             if not freeze_latents: latent_optimizer.step()
             if not freeze_ensemble: params_optimizer.step()
-            batch_loss = both_loss.item()
-
 
         if val_dataloader is not None:
             val_score = evaluate(latent_ensemble, val_dataloader,
@@ -183,7 +186,7 @@ def train(dataloader, val_dataloader, latent_ensemble,
             if L > best_L:
                 best_L = L
                 best_weights = copy.deepcopy(latent_ensemble.state_dict())
-                print('New best validation score.', L)
+                if not suppress_printing: print('New best validation score.', L)
 
         latents.append(np.hstack([latent_ensemble.latent_locs.cpu().detach().numpy(),
                                   torch.exp(latent_ensemble.latent_logscales).cpu().detach().numpy()]))
@@ -261,7 +264,7 @@ def get_parser():
     return parser
 
 
-def main(args):
+def run_train_latent(args):
     # get the datasets
     train_dataloader, val_dataloader = generate_or_load_datasets(args)
 
@@ -275,10 +278,11 @@ def main(args):
     hide_dims = parse_hide_dims(args.hide_dims)
 
     # initialize the LatentEnsemble
-    ensemble = Ensemble(base_model=FeedForward,
+    ensemble = Ensemble(base_model=FeedForwardWithSkipConnections,
                         base_args={
                                     'd_in': d_observe + d_latents - len(hide_dims),
                                     'd_out': d_pred,
+                                    'd_latent': d_latents,
                                     'h_dims': [16, 64]
                                   },
                         n_models=n_models)
@@ -294,7 +298,8 @@ def main(args):
                                            n_epochs=args.n_epochs,
                                            return_logs=True,
                                            hide_dims=hide_dims,
-                                           use_normalization=args.use_normalization)
+                                           use_normalization=args.use_normalization,
+                                           suppress_printing=False)
 
 
     if args.save_accs != "":
@@ -319,4 +324,4 @@ if __name__ == '__main__':
     # get commandline arguments
     parser = get_parser()
     args = parser.parse_args()
-    main(args)
+    run_train_latent(args)
