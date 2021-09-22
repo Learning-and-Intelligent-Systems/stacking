@@ -48,7 +48,7 @@ def get_predictions(latent_ensemble,
 def get_both_loss(latent_ensemble,
                   batches,
                   N,
-                  n_latent_samples=10,
+                  n_latent_samples=2,
                   hide_dims=[],
                   use_normalization=True):
     """ compute the loglikelohood of both the latents and the ensemble
@@ -159,7 +159,6 @@ def train(dataloader, val_dataloader, latent_ensemble,
         for batch_idx, set_of_batches in enumerate(dataloader):
             params_optimizer.zero_grad()
             latent_optimizer.zero_grad()
-
             both_loss = get_both_loss(latent_ensemble, set_of_batches,
                 N=len(dataloader.loaders[0].dataset),
                 n_latent_samples=10,

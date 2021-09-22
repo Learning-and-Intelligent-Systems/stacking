@@ -56,3 +56,41 @@ class FeedForward(nn.Module):
     def forward(self, *xs):
         x = torch.cat(xs, axis=1)
         return self.layers(x)
+
+class FeedForwardWithSkipConnections(nn.Module):
+    """ FeedForward Network with separate heads for mean and sigma predictions.
+
+    Extends:
+        nn.Module
+    """
+    def __init__(self, d_in, d_out, d_latent, h_dims=[32, 32]):
+        super(FeedForwardWithSkipConnections, self).__init__()
+        self.d_in = d_in
+        self.d_out = d_out
+        self.h_dims = h_dims
+        self.d_latent = d_latent
+        in_dims = [d_in] + [d + d_latent for d in h_dims] 
+        out_dims = h_dims + [d_out]
+
+        # create a linear layer and nonlinearity for each hidden dim
+        modules = []
+        for i in range(len(in_dims)):
+            modules.append(nn.Linear(in_dims[i], out_dims[i]))
+        
+        self.relu = nn.ReLU()
+
+        self.layers = nn.ModuleList(modules)  # add modules to net
+
+
+
+    def forward(self, *xs):
+        x = torch.cat(xs, axis=1)
+        latents = x[:, -self.d_latent:]
+
+        x = self.relu(self.layers[0](x))
+        for lx in range(1, len(self.layers)):
+            x = torch.cat([x, latents], dim=1)
+            x = self.layers[lx](x)
+            if lx != len(self.layers) - 1:
+                x = self.relu(x)
+        return x

@@ -11,13 +11,13 @@ from learning.domains.throwing.particle_filter import update_particle_filter
 from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, label_actions, ParallelDataLoader, xs_to_actions, generate_dataset_with_repeated_actions
 from learning.domains.throwing.train_latent import get_predictions, train
 from learning.models.ensemble import Ensemble
-from learning.models.mlp import FeedForward
+from learning.models.mlp import FeedForward, FeedForwardWithSkipConnections
 from learning.models.latent_ensemble import ThrowingLatentEnsemble, convert_to_particle_filter_latent_ensemble
 
 def get_latent_ensemble(args):
     n_latents = args.n_objects
     d_observe = 12
-    d_latents = 1
+    d_latents = 2
     d_pred = 2
     hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
 
@@ -35,11 +35,12 @@ def get_latent_ensemble(args):
 
     else:
         # if we are fitting the model, then we create a new latent ensemble
-        ensemble = Ensemble(base_model=FeedForward,
+        ensemble = Ensemble(base_model=FeedForwardWithSkipConnections,
                             base_args={
                                         'd_in': d_observe + d_latents - len(hide_dims),
                                         'd_out': d_pred,
-                                        'h_dims': [16, 64]
+                                        'd_latent': d_latents,
+                                        'h_dims': [16, 64]#[64, 32, 32]
                                       },
                             n_models=args.n_models)
         latent_ensemble = ThrowingLatentEnsemble(ensemble,
@@ -59,11 +60,12 @@ def acquire_datapoints(latent_ensemble,
                        data_sampler_fn,
                        data_pred_fn,
                        data_label_fn,
-                       acquisition='bald'):
+                       acquisition='bald',
+                       per_object=False):
 
     # sample candidate datapoints
     unlabeled_data = data_sampler_fn(n_samples)
-
+    
     if acquisition == 'bald':
         # compute predictions for each datapoint
         mu, sigma = data_pred_fn(latent_ensemble, unlabeled_data)
@@ -78,9 +80,30 @@ def acquire_datapoints(latent_ensemble,
         raise NotImplementedError(f"Unknown acquisition strategy: {acquisition}.")
 
     # choose the best ones
-    acquire_indices = np.flip(np.argsort(scores))[:n_acquire]
-    xs = torch.Tensor(unlabeled_data[0].numpy()[acquire_indices])
-    z_ids = torch.Tensor(unlabeled_data[1].numpy()[acquire_indices])
+    if per_object:
+        all_xs = unlabeled_data[0].numpy()
+        all_zs = unlabeled_data[1].numpy()
+        n_objects = len(set(unlabeled_data[1].numpy().tolist())) 
+
+        xs_list, z_ids_list = [], []
+        for ix in range(n_objects):
+            obj_ix_xs = all_xs[all_zs == ix]
+            obj_ix_scores = scores[all_zs == ix]
+            obj_ix_zs = all_zs[all_zs == ix]
+
+            acquire_indices = np.flip(np.argsort(obj_ix_scores))[:1]
+            xs = torch.Tensor(obj_ix_xs[acquire_indices])
+            z_ids = torch.Tensor(obj_ix_zs[acquire_indices])
+            
+            xs_list.append(xs)
+            z_ids_list.append(z_ids)
+        
+        xs = torch.cat(xs_list, dim=0)
+        z_ids = torch.cat(z_ids_list, dim=0)
+    else:
+        acquire_indices = np.flip(np.argsort(scores))[:n_acquire]
+        xs = torch.Tensor(unlabeled_data[0].numpy()[acquire_indices])
+        z_ids = torch.Tensor(unlabeled_data[1].numpy()[acquire_indices])
 
     # label the acquired data
     ys = data_label_fn(xs, z_ids)
@@ -94,6 +117,7 @@ def active_train(latent_ensemble, dataloader, val_dataloader, train_fn, acquire_
 
         # save the current dataset
         logger.save_dataset(dataloader.dataset, tx)
+        logger.save_val_dataset(val_dataloader.dataset, tx)
 
         # reset and train the model on the current dataset
         if not args.use_latents: pass
@@ -180,7 +204,8 @@ def run_active_throwing(args):
                                                             data_sampler_fn,
                                                             data_pred_fn,
                                                             data_label_fn,
-                                                            acquisition=args.acquisition.lower())
+                                                            acquisition=args.acquisition.lower(),
+                                                            per_object=False)
 
     # enable training with particle filter or with VI
     if args.fitting and args.use_particle_filter:
@@ -190,8 +215,7 @@ def run_active_throwing(args):
 
 
     print('Generating initialization and validation datasets')
-    # init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset_with_repeated_actions(objects, 5)),
-    init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 5*args.n_objects)),
+    init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 5*args.n_objects, duplicate=False)),
                                          batch_size=args.batch_size,
                                          shuffle=True,
                                          n_dataloaders=args.n_models)
@@ -224,7 +248,7 @@ def get_parser():
     parser.add_argument('--n-samples', type=int, default=1000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--n-objects', type=int, default=10)
-    parser.add_argument('--hide-dims', type=str, default='9')
+    parser.add_argument('--hide_dims', type=str, default='0,1,2,3,4,5,6,7,8,9')
     parser.add_argument('--acquisition', type=str, default='bald')
     parser.add_argument('--object-fname', type=str, default='')
 
