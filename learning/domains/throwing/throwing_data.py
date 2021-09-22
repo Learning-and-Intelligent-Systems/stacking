@@ -184,7 +184,8 @@ def preprocess_batch(batch, hide_dims, normalize_x, normalize_y):
 
 def postprocess_pred(pred, unnormalize):
     D_pred = pred.shape[-1] // 2
-    pred = torch.flatten(pred, start_dim=1, end_dim=-2) # if neither dim is marginalized, flatten them
+    if len(pred.shape) > 3:
+        pred = torch.flatten(pred, start_dim=1, end_dim=2) # if neither dim is marginalized, flatten them
     mu, log_sigma = torch.split(pred, D_pred, dim=-1)
     sigma = 0.1 + torch.exp(log_sigma)
     if unnormalize:
