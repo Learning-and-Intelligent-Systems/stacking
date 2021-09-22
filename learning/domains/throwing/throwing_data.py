@@ -16,6 +16,19 @@ def sample_actions(obj_ids, n_samples=1):
     z_ids = np.random.choice(a=obj_ids, size=n_samples, replace=True)
     return ThrowingAction.random_vector(n_samples=n_samples), z_ids
 
+def sample_same_actions(obj_ids, n_samples=1):
+    """ sample which object to throw, and the parameters of that throw
+    """
+    samples_per_obj = n_samples//len(obj_ids)
+    base_actions = ThrowingAction.random_vector(n_samples=samples_per_obj)
+    z_ids = np.zeros((n_samples,), dtype=np.int16)
+    actions = np.zeros((n_samples, 2))
+    for ix in range(0, len(obj_ids)):
+        actions[ix*samples_per_obj:(ix+1)*samples_per_obj, :] = base_actions
+        z_ids[ix*samples_per_obj:(ix+1)*samples_per_obj] = ix
+    
+    return actions, z_ids
+
 def label_actions(objects, actions, z_ids, as_tensor=False):
     """ produce an outcome for executing an action on an object
     """
@@ -49,9 +62,13 @@ def xs_to_actions(xs):
 def generate_dataset(objects,
                      n_data,
                      as_tensor=True,
-                     label=True):
+                     label=True,
+                     duplicate=False):
     obj_ids = np.arange(len(objects))
-    actions, z_ids = sample_actions(obj_ids, n_samples=n_data)
+    if not duplicate:
+        actions, z_ids = sample_actions(obj_ids, n_samples=n_data)
+    else:
+        actions, z_ids = sample_same_actions(obj_ids, n_samples=n_data)
     xs = construct_xs(objects, actions, z_ids)
     if label:
         ys = label_actions(objects, actions, z_ids)
