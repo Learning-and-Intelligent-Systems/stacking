@@ -58,17 +58,33 @@ def args_to_command(cmd, args, skip_args=[]):
 
     for k, v in args.__dict__.items():
         if k in skip_args: continue
-        elif v == True: cmd += f" --{k.replace('_', '-')}"
-        elif v == False: continue
+        elif isinstance(v, bool) and v == True: cmd += f" --{k.replace('_', '-')}"
+        elif isinstance(v, bool) and v == False: continue
         else: cmd += f" --{k.replace('_', '-')}={v}"
 
     return cmd
 
+def find_path_to_exp(prefix, exp_path="learning/experiments/logs"):
+    for fname in os.listdir(exp_path):
+        if fname.startswith(prefix):
+            return exp_path + '/' + fname
+    return None
+
 def run_with_subprocess(args, dry=False):
     commands = []
     for i in range(args.n_runs):
-        # set the experiment logging directory name
-        args.exp_name = args.prefix + f"_run_{i}"
+        if not args.fitting:
+            args.exp_name = args.prefix + f"_run_{i}"
+
+        else:
+            args.exp_name = args.prefix + f"_fitting_run_{i}"
+            train_exp_path = find_path_to_exp(args.prefix + f"_run_{i}")
+            if train_exp_path is not None:
+                args.latent_ensemble_exp_path = train_exp_path
+            else:
+                print("Failed to find experiment with prefix", args.prefix)
+                continue
+
         # generate the CLI command
         cmd = args_to_command("python -m learning.domains.throwing.active_train",
             args, skip_args=["prefix", "n_runs", "dry"])
