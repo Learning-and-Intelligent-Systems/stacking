@@ -248,7 +248,7 @@ def get_parser():
     parser.add_argument('--n-samples', type=int, default=1000)
     parser.add_argument('--n-acquire', type=int, default=10)
     parser.add_argument('--n-objects', type=int, default=10)
-    parser.add_argument('--hide_dims', type=str, default='0,1,2,3,4,5,6,7,8,9')
+    parser.add_argument('--hide-dims', type=str, default='0,1,2,3,4,5,6,7,8,9')
     parser.add_argument('--acquisition', type=str, default='bald')
     parser.add_argument('--object-fname', type=str, default='')
 
