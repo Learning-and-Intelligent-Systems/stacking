@@ -33,17 +33,21 @@ def plot_task_performance(logger, task_score_fn, ax=plt.gca()):
     ax.cla()
 
 
-def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
+def plot_val_accuracy(logger, n_data=200, ax=plt.gca(), use_training_dataset=False):
     print("Plot validation accuracy throughout training")
     objects = logger.get_objects(ThrowingBall)
 
     print('Generating a validation dataset')
-    val_dataset = TensorDataset(*generate_dataset(objects, n_data))
-    val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=64)
+    if not use_training_dataset:
+        val_dataset = TensorDataset(*generate_dataset(objects, n_data))
+        val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=64)
 
     scores = []
     for tx in range(logger.args.max_acquisitions):
         latent_ensemble = logger.get_ensemble(tx)
+        if use_training_dataset:
+            val_dataset = logger.load_dataset(tx)
+            val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=64)
         score = evaluate(latent_ensemble, val_dataloader,
             hide_dims=parse_hide_dims(logger.args.hide_dims),
             use_normalization=logger.args.use_normalization,
@@ -58,8 +62,12 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca()):
     ax.set_xlabel('Acquisition Step')
     ax.set_ylabel('Accuracy (likelihood of data)')
     ax.set_title('Validation Accuracy')
-    np.save(logger.get_results_path('val_accuracy.npy'), np.array(scores))
-    plt.savefig(logger.get_figure_path('val_accuracy.png'))
+    if use_training_dataset:
+        np.save(logger.get_results_path('train_accuracy.npy'), np.array(scores))
+        plt.savefig(logger.get_figure_path('train_accuracy.png'))
+    else:
+        np.save(logger.get_results_path('val_accuracy.npy'), np.array(scores))
+        plt.savefig(logger.get_figure_path('val_accuracy.png'))
     ax.cla()
 
 
@@ -154,19 +162,22 @@ def visualize_acquired_and_bald(logger, show_labels=False):
     n_objects = len(objects)
     print('N Objects: ', n_objects)
 
-    n_ang, n_w = 15, 15
+    n_ang, n_w = 25, 25
     ang_points = np.linspace(np.pi/8, 3*np.pi/8, n_ang)
     w_points = np.linspace(-10, 10, n_w)
     
     # Returns single-dimensional list. 
     grid_data_tuple = generate_grid_dataset(objects, ang_points, w_points, label=show_labels)
 
-    for tx in range(35, logger.args.max_acquisitions):
+    for tx in range(0, logger.args.max_acquisitions, 1):
+        print('Iteration:', tx)
         fig, axes = plt.subplots(ncols=n_objects, nrows=4)
         latent_ensemble = logger.get_ensemble(tx)
         # Load the dataset.
         dataset = logger.load_dataset(tx)
+        val_dataset = logger.load_val_dataset(tx)
         xs, z_ids, ys = dataset.tensors
+        val_xs, val_z_ids, val_ys = val_dataset.tensors
         # Load the acquired data.
         acquired = logger.load_acquisition_data(tx)
         ac_xs, ac_z_ids, ac_ys = acquired[0]
@@ -177,7 +188,7 @@ def visualize_acquired_and_bald(logger, show_labels=False):
                                     n_latent_samples=10,
                                     marginalize_latents=True,
                                     marginalize_ensemble=False,
-                                    hide_dims=[9],
+                                    hide_dims=parse_hide_dims(logger.args.hide_dims),
                                     use_normalization=logger.args.use_normalization)
         print(sigma.min(), sigma.max())
         # Scores are in the same order as grid_data_tuple.
@@ -185,11 +196,15 @@ def visualize_acquired_and_bald(logger, show_labels=False):
         scores, m_ent, ent = scores.numpy(), m_ent.numpy(), ent.numpy()
         print('Scores:', scores.min(), scores.max())
 
+
+
         for i in range(n_objects):
 
             img = np.zeros((n_ang, n_w))
             img_m_ent = np.zeros((n_ang, n_w))
             img_ent = np.zeros((n_ang, n_w))
+            img_sigma = np.zeros((n_ang, n_w))
+
             for im_x in range(0, n_ang):
                 for im_y in range(0, n_w):
                     obj_start_ix = i*n_ang*n_w
@@ -197,20 +212,43 @@ def visualize_acquired_and_bald(logger, show_labels=False):
                     img[im_x, im_y] = scores[obj_start_ix + n_ang*im_x + im_y]
                     img_m_ent[im_x, im_y] = m_ent[obj_start_ix + n_ang*im_x + im_y]
                     img_ent[im_x, im_y] = ent[obj_start_ix + n_ang*im_x + im_y]
+                    img_sigma[im_x, im_y] = sigma[obj_start_ix + n_ang*im_x + im_y,2]
             
             if show_labels:
                 true_img = np.zeros((n_ang, n_w))
+                img_miscal = np.zeros((n_ang, n_w))
                 for im_x in range(0, n_ang):
                     for im_y in range(0, n_w):
                         obj_start_ix = i*n_ang*n_w
                         
-                        true_img[im_x, im_y] = grid_data_tuple[2][obj_start_ix + n_ang*im_x + im_y]
-                axes[1][i].imshow(true_img.T,
+                        gt_label = grid_data_tuple[2][obj_start_ix + n_ang*im_x + im_y]
+                        p, s = mu[obj_start_ix + n_ang*im_x + im_y, 0], sigma[obj_start_ix + n_ang*im_x + im_y, 0]
+                        if gt_label < p + s and gt_label > p - s:
+                            img_miscal[im_x, im_y] = 1.
+
+                        true_img[im_x, im_y] = gt_label
+
+                # axes[1][i].imshow(true_img.T,
+                #             extent=[np.pi/8, 3*np.pi/8, -10, 10],
+                #             aspect='auto',
+                #             vmin=grid_data_tuple[2].min(),
+                #             vmax=grid_data_tuple[2].max(),
+                #             origin='lower')
+                axes[1][i].imshow(img_miscal.T,
                             extent=[np.pi/8, 3*np.pi/8, -10, 10],
                             aspect='auto',
-                            vmin=grid_data_tuple[2].min(),
-                            vmax=grid_data_tuple[2].max(),
+                            vmin=0,
+                            vmax=1,
                             origin='lower')
+            else:
+                # axes[1][i].imshow(img_sigma.T,
+                #             extent=[np.pi/8, 3*np.pi/8, -10, 10],
+                #             aspect='auto',
+                #             vmin=img_sigma.min(),
+                #             vmax=img_sigma.max(),
+                #             origin='lower')
+                pass
+
 
             axes[0][i].imshow(img.T,
                             extent=[np.pi/8, 3*np.pi/8, -10, 10],
@@ -238,11 +276,15 @@ def visualize_acquired_and_bald(logger, show_labels=False):
             a = xs_to_actions(xs_for_this_object)
             ac_as = xs_to_actions(acs_for_this_object)
             unlab_as = xs_to_actions(unlab_for_this_object)
+
+            val_xs_for_this_object = val_xs[val_z_ids == i]
+            val_as = xs_to_actions(val_xs_for_this_object)
             #axes[i].scatter(*a.T, c='r', s=3)
             axes[0][i].scatter(*unlab_as.T, c='r', s=1)
             axes[0][i].scatter(*ac_as.T, c='g', s=10)
 
             axes[1][i].scatter(*a.T, c='r', s=3)
+            axes[1][i].scatter(*val_as.T, c='b', s=3)
             print(ac_as.shape, a.shape)
             #axes[i].set_axis_off()
 
@@ -312,7 +354,7 @@ def plot_with_variance(x, ys, ax, c=None, label=None, alpha=0.3):
     sigma = np.sqrt(np.var(ys, axis=0))
     ax.fill_between(x, mu-sigma, mu+sigma, color=c, alpha=alpha)
     ax.plot(x, mu, c=c, alpha=alpha, label=label)
-
+   
 
 
 if __name__ == '__main__':
@@ -336,10 +378,10 @@ if __name__ == '__main__':
         # plotting for single logs
         #######################################################################
         logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-        logger.args.max_acquisitions = 50  # lazy
+        logger.args.max_acquisitions = 50 # lazy
         logger.args.throwing = True # lazy
 
-        # visualize_acquired_and_bald(logger, show_labels=True)
+        # visualize_acquired_and_bald(logger, show_labels=False)
         # sys.exit()
         ax = plt.gca()
         if isinstance(logger.get_ensemble(1), PFThrowingLatentEnsemble):
@@ -347,7 +389,7 @@ if __name__ == '__main__':
         else:
             plot_latent_uncertainty(logger, ax=ax)
 
-        plot_val_accuracy(logger, ax=ax, n_data=1000)
+        plot_val_accuracy(logger, ax=ax, n_data=1000, use_training_dataset=False)
         sys.exit()
 
         objects = logger.get_objects(ThrowingBall)
@@ -365,51 +407,107 @@ if __name__ == '__main__':
         # plotting for multipe logs
         #######################################################################
 
-        runs = [
-            {
-                "prefix": 'active',
-                "label": 'BALD',
-                "data": [],
-                "color": 'b'
-            },
-            {
-                "prefix": 'random',
-                "label": 'Random',
-                "data": [],
-                "color": 'r'
-            },
+        # RANDOM_FNAMES = ['learning/experiments/logs/hide-all-random-1-20210921-144141',
+        #                  'learning/experiments/logs/hide-all-ranndom-2-20210921-144157',
+        #                  'learning/experiments/logs/hide-all-ranndom-3-20210921-153009',
+        #                  'learning/experiments/logs/hide-all-random-4-20210921-153017',
+        #                  'learning/experiments/logs/hide-all-random-5-20210921-162048',
+        #                  'learning/experiments/logs/hide-all-random-6-20210921-162320'
 
+                         
+        # ]
+        # BALD_FNAMES = ['learning/experiments/logs/hide-all-bald-1-20210921-121332',
+        #                'learning/experiments/logs/hide-all-bald-2-20210921-122048',
+        #                'learning/experiments/logs/hide-all-bald-3-20210921-130609',
+        #                'learning/experiments/logs/hide-all-bald-4-20210921-130617',
+        #                'learning/experiments/logs/hide-all-bald-5-20210921-135200',
+        #                'learning/experiments/logs/hide-all-bald-6-20210921-135209'              
+        # ]
+        RANDOM_FNAMES = ['learning/experiments/logs/hide-all-skip-random-run-1-20210921-214806',
+                         'learning/experiments/logs/hide-all-skip-random-run-2-20210921-223524',
+                         'learning/experiments/logs/hide-all-skip-random-run-3-20210921-232039',
+                         'learning/experiments/logs/hide-all-skip-random-run-4-20210922-000546',
+                         'learning/experiments/logs/hide-all-skip-random-run-5-20210922-005053',
+                         'learning/experiments/logs/hide-all-skip-random-run-6-20210922-013544'
+
+                         
         ]
-        exp_path = 'learning/experiments/logs/new_throwing'
-        ax = plt.gca()
-        for r in runs:
-            for fname in os.listdir(exp_path):
-                if fname.startswith(r["prefix"]):
-                    path_to_log = exp_path + '/' + fname
-                    path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
-                    print(f'Loading from {fname}')
-                    if not os.path.isfile(path_to_task_performance_file):
-                        print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
-                        logger = ActiveExperimentLogger(path_to_log, use_latents=True)
-                        logger.args.max_acquisitions = 50  # lazy
-                        logger.args.throwing = True # lazy
-                        plot_latent_uncertainty(logger, ax=ax)
-                        plot_val_accuracy(logger, ax=ax)
-                        objects = logger.get_objects(ThrowingBall)
-                        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, use_normalization=logger.args.use_normalization)
-                        plot_task_performance(logger, task_score_fn, ax=ax)
+        BALD_FNAMES = ['learning/experiments/logs/hide-all-skip-bald-run-1-20210921-214801',
+                       'learning/experiments/logs/hide-all-skip-bald-run-2-20210921-223513',
+                       'learning/experiments/logs/hide-all-skip-bald-run-3-20210921-232130',
+                       'learning/experiments/logs/hide-all-skip-bald-run-4-20210922-000634',
+                       'learning/experiments/logs/hide-all-skip-bald-run-5-20210922-005215',
+                       'learning/experiments/logs/hide-all-skip-bald-run-6-20210922-013753'              
+        ]
 
-                    r["data"].append(np.load(path_to_task_performance_file))
+        for name, logdirs in zip(['random', 'bald'], [RANDOM_FNAMES, BALD_FNAMES]):
+            
+            results = np.zeros((len(logdirs), 50))
+            for lx, logdir in enumerate(logdirs):
+                logger = ActiveExperimentLogger(exp_path=logdir, use_latents=True)
+                accs = np.load(logger.get_results_path('val_accuracy.npy'), allow_pickle=True)
+                results[lx, :accs.shape[0]] = accs[:, 0]
 
-
-        for r in runs:
-            plot_with_variance(np.arange(50), r["data"], ax, label=r["label"], c=r["color"])
-
+            mean = results.mean(axis=0)
+            std = results.std(axis=0)
+            low25 = np.quantile(results, q=0.25, axis=0)
+            high25 = np.quantile(results, q=0.75, axis=0)
+            xs = np.arange(0, results.shape[1])
+            plt.plot(xs, results.mean(axis=0), label=name)
+            plt.fill_between(xs, low25, high25, alpha=0.2)
         plt.legend()
-        plt.xlabel('Acquisition Step')
-        plt.ylabel('Task Error (m)')
-        plt.title('Task Loss Throughout Active Fitting')
         plt.show()
+                
+
+
+
+        
+
+        # runs = [
+        #     {
+        #         "prefix": 'active',
+        #         "label": 'BALD',
+        #         "data": [],
+        #         "color": 'b'
+        #     },
+        #     {
+        #         "prefix": 'random',
+        #         "label": 'Random',
+        #         "data": [],
+        #         "color": 'r'
+        #     },
+
+        # ]
+        # exp_path = 'learning/experiments/logs/new_throwing'
+        # ax = plt.gca()
+        # for r in runs:
+        #     for fname in os.listdir(exp_path):
+        #         if fname.startswith(r["prefix"]):
+        #             path_to_log = exp_path + '/' + fname
+        #             path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
+        #             print(f'Loading from {fname}')
+        #             if not os.path.isfile(path_to_task_performance_file):
+        #                 print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
+        #                 logger = ActiveExperimentLogger(path_to_log, use_latents=True)
+        #                 logger.args.max_acquisitions = 50  # lazy
+        #                 logger.args.throwing = True # lazy
+        #                 plot_latent_uncertainty(logger, ax=ax)
+        #                 plot_val_accuracy(logger, ax=ax)
+        #                 objects = logger.get_objects(ThrowingBall)
+        #                 task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, use_normalization=logger.args.use_normalization)
+        #                 plot_task_performance(logger, task_score_fn, ax=ax)
+
+        #             r["data"].append(np.load(path_to_task_performance_file))
+
+
+        # for r in runs:
+        #     plot_with_variance(np.arange(50), r["data"], ax, label=r["label"], c=r["color"])
+
+        # plt.legend()
+        # plt.xlabel('Acquisition Step')
+        # plt.ylabel('Task Error (m)')
+        # plt.title('Task Loss Throughout Active Fitting')
+        # plt.show()
 
 
 
