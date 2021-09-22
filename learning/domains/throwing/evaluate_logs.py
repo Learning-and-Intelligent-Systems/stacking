@@ -327,11 +327,11 @@ if __name__ == '__main__':
         # plotting for single logs
         #######################################################################
         logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-        logger.args.max_acquisitions = 50  # lazy
+        logger.args.max_acquisitions = 30  # lazy
         logger.args.throwing = True # lazy
 
-        visualize_acquired_and_bald(logger, show_labels=True)
-        sys.exit()
+        # visualize_acquired_and_bald(logger, show_labels=True)
+        # sys.exit()
 
         ax = plt.gca()
         if isinstance(logger.get_ensemble(1), PFThrowingLatentEnsemble):
@@ -359,48 +359,53 @@ if __name__ == '__main__':
 
         runs = [
             {
-                "prefix": 'active',
+                "prefix": 'throwing_fully_hidden_sweep',
                 "label": 'BALD',
                 "data": [],
                 "color": 'b'
             },
-            {
-                "prefix": 'random',
-                "label": 'Random',
-                "data": [],
-                "color": 'r'
-            },
+            # {
+            #     "prefix": 'random',
+            #     "label": 'Random',
+            #     "data": [],
+            #     "color": 'r'
+            # },
 
         ]
-        exp_path = 'learning/experiments/logs/new_throwing'
+        exp_path = 'learning/experiments/logs'
         ax = plt.gca()
         for r in runs:
             for fname in os.listdir(exp_path):
                 if fname.startswith(r["prefix"]):
                     path_to_log = exp_path + '/' + fname
                     path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
+                    path_to_val_accuracy_file = path_to_log + '/results/val_accuracy.npy'
                     print(f'Loading from {fname}')
                     if not os.path.isfile(path_to_task_performance_file):
                         print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
                         logger = ActiveExperimentLogger(path_to_log, use_latents=True)
-                        logger.args.max_acquisitions = 50  # lazy
+                        logger.args.max_acquisitions = 49  # lazy
                         logger.args.throwing = True # lazy
                         plot_latent_uncertainty(logger, ax=ax)
                         plot_val_accuracy(logger, ax=ax)
                         objects = logger.get_objects(ThrowingBall)
-                        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, use_normalization=logger.args.use_normalization)
+                        data_pred_fn = lambda latent_ensemble, xs: get_predictions(latent_ensemble, xs,
+                            hide_dims=parse_hide_dims(logger.args.hide_dims),
+                            use_normalization=logger.args.use_normalization)
+                        # score that prediction function for each latent ensemble
+                        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, data_pred_fn)
                         plot_task_performance(logger, task_score_fn, ax=ax)
 
-                    r["data"].append(np.load(path_to_task_performance_file))
+                    r["data"].append(np.load(path_to_val_accuracy_file))
 
 
         for r in runs:
-            plot_with_variance(np.arange(50), r["data"], ax, label=r["label"], c=r["color"])
+            plot_with_variance(np.arange(49), r["data"], ax, label=r["label"], c=r["color"])
 
         plt.legend()
         plt.xlabel('Acquisition Step')
-        plt.ylabel('Task Error (m)')
-        plt.title('Task Loss Throughout Active Fitting')
+        plt.ylabel('Validatation RMSE (m)')
+        plt.title('Validatation Error Throughout Training')
         plt.show()
 
 
