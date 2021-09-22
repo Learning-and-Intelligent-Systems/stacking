@@ -49,12 +49,12 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca(), use_training_dataset=Fal
         if use_training_dataset:
             val_dataset = logger.load_dataset(tx)
             val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=64)
-        score = evaluate(latent_ensemble, val_dataloader,
+        rmse, = evaluate(latent_ensemble, val_dataloader,
             hide_dims=parse_hide_dims(logger.args.hide_dims),
             use_normalization=logger.args.use_normalization,
             l1=False, likelihood=False, rmse=True, var=False)
-        print(f'Step {tx}. Score {score}')
-        scores.append(score)
+        print(f'Step {tx}. Score {rmse}')
+        scores.append(rmse)
 
     ax.plot(scores)
     ax.set_xlabel('Acquisition Step')
@@ -341,21 +341,26 @@ def visualize_dataset(logger, tx):
 
     plt.show()
 
-def plot_with_variance(x, ys, ax, c=None, label=None, alpha=0.3):
+def plot_with_quantiles(x, ys, ax, c=None, label=None, alpha=0.3):
     x = np.array(x)
     ys = np.array(ys)
-    # flip the ys as needed
 
-    print(x.shape, ys.shape)
+    # flip the ys as needed
     if ys.shape[1] != x.shape[0]:
         ys = ys.T
         assert ys.shape[1] == x.shape[0], 'x and ys don\'t have matching dimensions'
 
-    mu = np.mean(ys, axis=0)
-    sigma = np.sqrt(np.var(ys, axis=0))
-    ax.fill_between(x, mu-sigma, mu+sigma, color=c, alpha=alpha)
-    ax.plot(x, mu, c=c, alpha=alpha, label=label)
-   
+    # mean and std dev
+    # mu = np.mean(ys, axis=0)
+    # s = np.std(ys, axis=0)
+    # ax.fill_between(x, mu-s, mu+s, color=c, alpha=alpha)
+    # ax.plot(x, np.median(ys, axis=0), c=c, alpha=alpha, label=label)
+
+    # median and quartiles
+    low25 = np.quantile(ys, q=0.25, axis=0)
+    high25 = np.quantile(ys, q=0.75, axis=0)
+    ax.fill_between(x, low25, high25, color=c, alpha=alpha)
+    ax.plot(x, np.median(ys, axis=0), c=c, alpha=alpha, label=label)
 
 
 if __name__ == '__main__':
@@ -400,160 +405,93 @@ if __name__ == '__main__':
         # plotting for multipe logs
         #######################################################################
 
-<<<<<<< HEAD
         runs = [
             {
-                "prefix": 'throwing_fully_hidden_sweep',
+                "prefix": 'throwing_fully_hidden',
                 "label": 'BALD',
                 "data": [],
                 "color": 'b'
             },
-            # {
-            #     "prefix": 'random',
-            #     "label": 'Random',
-            #     "data": [],
-            #     "color": 'r'
-            # },
+            {
+                "prefix": 'throwing_fully_hidden_random',
+                "label": 'Random',
+                "data": [],
+                "color": 'r'
+            },
 
         ]
         exp_path = 'learning/experiments/logs'
         ax = plt.gca()
         for r in runs:
             for fname in os.listdir(exp_path):
-                if fname.startswith(r["prefix"]):
+                if fname.startswith(r["prefix"] + "_run"):
                     path_to_log = exp_path + '/' + fname
                     path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
                     path_to_val_accuracy_file = path_to_log + '/results/val_accuracy.npy'
                     print(f'Loading from {fname}')
-                    if not os.path.isfile(path_to_task_performance_file):
+                    if not os.path.isfile(path_to_val_accuracy_file):
                         print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
                         logger = ActiveExperimentLogger(path_to_log, use_latents=True)
                         logger.args.max_acquisitions = 49  # lazy
                         logger.args.throwing = True # lazy
                         plot_latent_uncertainty(logger, ax=ax)
                         plot_val_accuracy(logger, ax=ax)
-                        objects = logger.get_objects(ThrowingBall)
-                        data_pred_fn = lambda latent_ensemble, xs: get_predictions(latent_ensemble, xs,
-                            hide_dims=parse_hide_dims(logger.args.hide_dims),
-                            use_normalization=logger.args.use_normalization)
-                        # score that prediction function for each latent ensemble
-                        task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, data_pred_fn)
-                        plot_task_performance(logger, task_score_fn, ax=ax)
+                        # objects = logger.get_objects(ThrowingBall)
+                        # data_pred_fn = lambda latent_ensemble, xs: get_predictions(latent_ensemble, xs,
+                        #     hide_dims=parse_hide_dims(logger.args.hide_dims),
+                        #     use_normalization=logger.args.use_normalization)
+                        # # score that prediction function for each latent ensemble
+                        # task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, data_pred_fn)
+                        # plot_task_performance(logger, task_score_fn, ax=ax)
 
                     r["data"].append(np.load(path_to_val_accuracy_file))
 
 
         for r in runs:
-            plot_with_variance(np.arange(49), r["data"], ax, label=r["label"], c=r["color"])
-=======
-        # RANDOM_FNAMES = ['learning/experiments/logs/hide-all-random-1-20210921-144141',
-        #                  'learning/experiments/logs/hide-all-ranndom-2-20210921-144157',
-        #                  'learning/experiments/logs/hide-all-ranndom-3-20210921-153009',
-        #                  'learning/experiments/logs/hide-all-random-4-20210921-153017',
-        #                  'learning/experiments/logs/hide-all-random-5-20210921-162048',
-        #                  'learning/experiments/logs/hide-all-random-6-20210921-162320'
+            plot_with_quantiles(np.arange(49), r["data"], ax, label=r["label"], c=r["color"])
+
+        # RANDOM_FNAMES = ['learning/experiments/logs/hide-all-skip-random-run-1-20210921-214806',
+        #                  'learning/experiments/logs/hide-all-skip-random-run-2-20210921-223524',
+        #                  'learning/experiments/logs/hide-all-skip-random-run-3-20210921-232039',
+        #                  'learning/experiments/logs/hide-all-skip-random-run-4-20210922-000546',
+        #                  'learning/experiments/logs/hide-all-skip-random-run-5-20210922-005053',
+        #                  'learning/experiments/logs/hide-all-skip-random-run-6-20210922-013544'
 
                          
         # ]
-        # BALD_FNAMES = ['learning/experiments/logs/hide-all-bald-1-20210921-121332',
-        #                'learning/experiments/logs/hide-all-bald-2-20210921-122048',
-        #                'learning/experiments/logs/hide-all-bald-3-20210921-130609',
-        #                'learning/experiments/logs/hide-all-bald-4-20210921-130617',
-        #                'learning/experiments/logs/hide-all-bald-5-20210921-135200',
-        #                'learning/experiments/logs/hide-all-bald-6-20210921-135209'              
+        # BALD_FNAMES = ['learning/experiments/logs/hide-all-skip-bald-run-1-20210921-214801',
+        #                'learning/experiments/logs/hide-all-skip-bald-run-2-20210921-223513',
+        #                'learning/experiments/logs/hide-all-skip-bald-run-3-20210921-232130',
+        #                'learning/experiments/logs/hide-all-skip-bald-run-4-20210922-000634',
+        #                'learning/experiments/logs/hide-all-skip-bald-run-5-20210922-005215',
+        #                'learning/experiments/logs/hide-all-skip-bald-run-6-20210922-013753'              
         # ]
-        RANDOM_FNAMES = ['learning/experiments/logs/hide-all-skip-random-run-1-20210921-214806',
-                         'learning/experiments/logs/hide-all-skip-random-run-2-20210921-223524',
-                         'learning/experiments/logs/hide-all-skip-random-run-3-20210921-232039',
-                         'learning/experiments/logs/hide-all-skip-random-run-4-20210922-000546',
-                         'learning/experiments/logs/hide-all-skip-random-run-5-20210922-005053',
-                         'learning/experiments/logs/hide-all-skip-random-run-6-20210922-013544'
 
-                         
-        ]
-        BALD_FNAMES = ['learning/experiments/logs/hide-all-skip-bald-run-1-20210921-214801',
-                       'learning/experiments/logs/hide-all-skip-bald-run-2-20210921-223513',
-                       'learning/experiments/logs/hide-all-skip-bald-run-3-20210921-232130',
-                       'learning/experiments/logs/hide-all-skip-bald-run-4-20210922-000634',
-                       'learning/experiments/logs/hide-all-skip-bald-run-5-20210922-005215',
-                       'learning/experiments/logs/hide-all-skip-bald-run-6-20210922-013753'              
-        ]
->>>>>>> 362068de7895612184af810840f0991f9d50fca1
-
-        for name, logdirs in zip(['random', 'bald'], [RANDOM_FNAMES, BALD_FNAMES]):
+        # for name, logdirs in zip(['random', 'bald'], [RANDOM_FNAMES, BALD_FNAMES]):
             
-            results = np.zeros((len(logdirs), 50))
-            for lx, logdir in enumerate(logdirs):
-                logger = ActiveExperimentLogger(exp_path=logdir, use_latents=True)
-                accs = np.load(logger.get_results_path('val_accuracy.npy'), allow_pickle=True)
-                results[lx, :accs.shape[0]] = accs[:, 0]
+        #     results = np.zeros((len(logdirs), 50))
+        #     for lx, logdir in enumerate(logdirs):
+        #         logger = ActiveExperimentLogger(exp_path=logdir, use_latents=True)
+        #         accs = np.load(logger.get_results_path('val_accuracy.npy'), allow_pickle=True)
+        #         results[lx, :accs.shape[0]] = accs[:, 0]
 
-            mean = results.mean(axis=0)
-            std = results.std(axis=0)
-            low25 = np.quantile(results, q=0.25, axis=0)
-            high25 = np.quantile(results, q=0.75, axis=0)
-            xs = np.arange(0, results.shape[1])
-            plt.plot(xs, results.mean(axis=0), label=name)
-            plt.fill_between(xs, low25, high25, alpha=0.2)
-        plt.legend()
-<<<<<<< HEAD
+        #     mean = results.mean(axis=0)
+        #     std = results.std(axis=0)
+        #     low25 = np.quantile(results, q=0.25, axis=0)
+        #     high25 = np.quantile(results, q=0.75, axis=0)
+        #     xs = np.arange(0, results.shape[1])
+        #     plt.plot(xs, results.mean(axis=0), label=name)
+        #     plt.fill_between(xs, low25, high25, alpha=0.2)
+        # plt.legend()
+
+
         plt.xlabel('Acquisition Step')
         plt.ylabel('Validatation RMSE (m)')
         plt.title('Validatation Error Throughout Training')
-=======
->>>>>>> 362068de7895612184af810840f0991f9d50fca1
+        plt.legend()
         plt.show()
                 
 
-
-
-        
-
-        # runs = [
-        #     {
-        #         "prefix": 'active',
-        #         "label": 'BALD',
-        #         "data": [],
-        #         "color": 'b'
-        #     },
-        #     {
-        #         "prefix": 'random',
-        #         "label": 'Random',
-        #         "data": [],
-        #         "color": 'r'
-        #     },
-
-        # ]
-        # exp_path = 'learning/experiments/logs/new_throwing'
-        # ax = plt.gca()
-        # for r in runs:
-        #     for fname in os.listdir(exp_path):
-        #         if fname.startswith(r["prefix"]):
-        #             path_to_log = exp_path + '/' + fname
-        #             path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
-        #             print(f'Loading from {fname}')
-        #             if not os.path.isfile(path_to_task_performance_file):
-        #                 print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
-        #                 logger = ActiveExperimentLogger(path_to_log, use_latents=True)
-        #                 logger.args.max_acquisitions = 50  # lazy
-        #                 logger.args.throwing = True # lazy
-        #                 plot_latent_uncertainty(logger, ax=ax)
-        #                 plot_val_accuracy(logger, ax=ax)
-        #                 objects = logger.get_objects(ThrowingBall)
-        #                 task_score_fn = lambda latent_ensemble: eval_hit_target(latent_ensemble, objects, use_normalization=logger.args.use_normalization)
-        #                 plot_task_performance(logger, task_score_fn, ax=ax)
-
-        #             r["data"].append(np.load(path_to_task_performance_file))
-
-
-        # for r in runs:
-        #     plot_with_variance(np.arange(50), r["data"], ax, label=r["label"], c=r["color"])
-
-        # plt.legend()
-        # plt.xlabel('Acquisition Step')
-        # plt.ylabel('Task Error (m)')
-        # plt.title('Task Loss Throughout Active Fitting')
-        # plt.show()
 
 
 
