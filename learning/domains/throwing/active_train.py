@@ -8,7 +8,7 @@ import pickle
 from learning.active.acquire import bald_diagonal_gaussian
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.throwing.particle_filter import update_particle_filter
-from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, label_actions, ParallelDataLoader, xs_to_actions, generate_dataset_with_repeated_actions
+from learning.domains.throwing.throwing_data import generate_objects, generate_dataset, label_actions, ParallelDataLoader, xs_to_actions
 from learning.domains.throwing.train_latent import get_predictions, train
 from learning.models.ensemble import Ensemble
 from learning.models.mlp import FeedForward, FeedForwardWithSkipConnections

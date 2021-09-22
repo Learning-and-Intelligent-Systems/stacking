@@ -5,7 +5,7 @@ import os
 from multiprocessing import Process
 import torch
 
-from learning.domains.throwing.train_latent import main, get_parser
+from learning.domains.throwing.train_latent import run_train_latent, get_parser
 
 #create a default args object that we'll modify for each run
 args = get_parser().parse_args()
@@ -31,13 +31,13 @@ d_max = 3
 #             args.hide_dims = h
 #             args.save_accs = f"learning/domains/throwing/sanity_checking/data/500_epochs/{l}_{d}d_latent_run_{n}.npy"
 
-#             # main(args)
+#             # run_train_latent(args)
 #             if len(processes) > 13:
 #                 print('[WARNING] Waiting for a process to complete!')
 #                 processes[0].join()
 #                 processes.pop(0)
 
-#             processes.append(Process(target=main, args=(deepcopy(args),)))
+#             processes.append(Process(target=run_train_latent, args=(deepcopy(args),)))
 #             np.random.seed() # this is critical!
 #             torch.random.seed() # this is critical!
 #             processes[-1].start()
@@ -74,7 +74,7 @@ plt.show()
 #     args.n_val = 100
 #     args.n_epochs = 500
 #     args.save_accs = f"learning/domains/throwing/sanity_checking/data/repeatability_test/run_{n}.npy"
-#     processes.append(Process(target=main, args=(args,)))
+#     processes.append(Process(target=run_train_latent, args=(args,)))
 #     np.random.seed() # this is critical!
 #     torch.random.seed() # this is critical!
 #     processes[-1].start()

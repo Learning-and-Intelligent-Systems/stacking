@@ -30,13 +30,14 @@ def sample_same_actions(obj_ids, n_samples=1):
     
     return actions, z_ids
 
-def label_actions(objects, actions, z_ids, as_tensor=False):
+def label_actions(objects, actions, z_ids, as_tensor=False, progress_bar=False):
     """ produce an outcome for executing an action on an object
     """
     agent = ThrowingAgent(objects)
     ys = []
 
-    for a, z_id in tzip(actions, z_ids): # tzip for progress bar 
+    zip_fn = tzip if progress_bar else zip
+    for a, z_id in zip_fn(actions, z_ids): # tzip for progress bar 
         b = objects[int(z_id)]
         act = ThrowingAction.from_vector(b, a)
         ys.append(agent.run(act))
@@ -72,52 +73,11 @@ def generate_dataset(objects,
         actions, z_ids = sample_same_actions(obj_ids, n_samples=n_data)
     xs = construct_xs(objects, actions, z_ids)
     if label:
-        ys = label_actions(objects, actions, z_ids)
+        ys = label_actions(objects, actions, z_ids, progress_bar=True)
         dataset = xs, z_ids, ys
     else:
         dataset = xs, z_ids
     return tuple(torch.Tensor(d) for d in dataset) if as_tensor else dataset
-
-def generate_dataset_with_repeated_actions(objects,
-                                           n_actions,
-                                           as_tensor=True,
-                                           label=True):
-    """ same as generate_dataset, but all the actions are the same for each object """
-    n_objects = len(objects)
-    base_z_ids = np.arange(n_objects)
-    base_actions = ThrowingAction.random_vector(n_samples=n_actions)
-    actions = np.vstack([np.meshgrid(acts, base_z_ids)[0].ravel() for acts in base_actions.T]).T
-    z_ids = np.meshgrid(base_actions[:,0], base_z_ids)[1].ravel().astype(int)
-    print(actions)
-    print(z_ids)
-    xs = construct_xs(objects, actions, z_ids)
-    if label:
-        ys = label_actions(objects, actions, z_ids)
-        dataset = xs, z_ids, ys
-    else:
-        dataset = xs, z_ids
-    return tuple(torch.Tensor(d) for d in dataset) if as_tensor else dataset
-
-
-def generate_dataset_parallel(objects,
-                              n_data,
-                              as_tensor=True,
-                              label=True,
-                              n_workers=8):
-
-    n_data_per_process = int(np.ceil(n_data/n_workers))
-    processes = [Process(target=generate_dataset,
-                         args=(objects, n_data_per_process),
-                         kwargs={"as_tensor": as_tensor, "label": label}) for _ in range(n_workers)]
-    for p in processes:
-        p.start()
-
-    results = []
-    for p in processes:
-        # TODO(izzy): figure out how to get the result back from the children
-        results.append(p.join())
-
-    return tuple(torch.cat(d, axis=0) for d in zip(results))
 
 def generate_objects(n_objects):
     return [ThrowingBall.random() for _ in range(n_objects)]
