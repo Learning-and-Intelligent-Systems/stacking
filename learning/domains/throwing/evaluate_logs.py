@@ -46,6 +46,7 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca(), use_training_dataset=Fal
     scores = []
     for tx in range(logger.args.max_acquisitions):
         latent_ensemble = logger.get_ensemble(tx)
+        # latent_ensemble.reset_latents() # NOTE(izzy): DELETE THIS!!! testing impact of latents
         if use_training_dataset:
             val_dataset = logger.load_dataset(tx)
             val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=64)
@@ -429,7 +430,7 @@ if __name__ == '__main__':
                     path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
                     path_to_val_accuracy_file = path_to_log + '/results/val_accuracy.npy'
                     print(f'Loading from {fname}')
-                    if not os.path.isfile(path_to_val_accuracy_file):
+                    if not os.path.isfile(path_to_task_performance_file):
                         print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
                         logger = ActiveExperimentLogger(path_to_log, use_latents=True)
                         logger.args.max_acquisitions = 49  # lazy
@@ -487,7 +488,7 @@ if __name__ == '__main__':
 
         plt.xlabel('Acquisition Step')
         plt.ylabel('Validatation RMSE (m)')
-        plt.title('Validatation Error Throughout Training')
+        plt.title('Validatation Error Throughout Fitting')
         plt.legend()
         plt.show()
                 

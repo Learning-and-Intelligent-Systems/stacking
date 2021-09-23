@@ -42,6 +42,8 @@ def label_actions(objects, actions, z_ids, as_tensor=False, progress_bar=False):
         act = ThrowingAction.from_vector(b, a)
         ys.append(agent.run(act))
 
+    agent.simulator.disconnect()
+
     return torch.Tensor(ys) if as_tensor else np.array(ys)
 
 def construct_xs(objects, actions, z_ids):

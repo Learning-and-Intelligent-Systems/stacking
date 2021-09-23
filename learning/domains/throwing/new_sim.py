@@ -9,7 +9,7 @@ class ThrowingSimulator:
         self.tmax = tmax
         self.objects = objects
         self.vis = vis
-        self.obstacles = np.array([[0.06, 1, 0.06, 0.9, 0, 0.03]]) # dimensions || position
+        self.obstacles = np.array([[0.06, 1, 0.06, 0.9, 0, -0.01, 0., np.pi/4., 0.]]) # dimensions || position || roll-pitch-yaw
 
         self.stop_vel_thresh = 0.01      # Maximum linear velocity before stopping simulation [m/s]
         self.stop_vel_count = 10         # Number of consecutive counts below velocity threshold before simulation is stopped
@@ -38,10 +38,14 @@ class ThrowingSimulator:
         # and create obstacles
         for obs in self.obstacles:
             obsId = p.createMultiBody(0,
-                p.createCollisionShape(p.GEOM_BOX, halfExtents=obs[:3]/2),
-                p.createVisualShape(p.GEOM_BOX, halfExtents=obs[:3]/2, rgbaColor=np.ones(4)),
-                basePosition=obs[3:])
+                p.createCollisionShape(p.GEOM_BOX, halfExtents=obs[0:3]/2),
+                p.createVisualShape(p.GEOM_BOX, halfExtents=obs[0:3]/2, rgbaColor=np.ones(4)),
+                basePosition=obs[3:6],
+                baseOrientation=p.getQuaternionFromEuler(obs[6:9]))
             p.changeDynamics(obsId, -1, restitution=1)
+
+    def disconnect(self):
+        p.disconnect()
 
     def get_state(self, p, ballId):
         (x, y, z), orientation = p.getBasePositionAndOrientation(ballId)
