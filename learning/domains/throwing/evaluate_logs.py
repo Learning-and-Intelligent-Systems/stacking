@@ -45,7 +45,7 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca(), use_training_dataset=Fal
 
     scores = []
     for tx in range(logger.args.max_acquisitions):
-        latent_ensemble = logger.get_ensemble(tx+1)
+        latent_ensemble = logger.get_ensemble(tx)
         # latent_ensemble.reset_latents() # NOTE(izzy): DELETE THIS!!! testing impact of latents
         if use_training_dataset:
             val_dataset = logger.load_dataset(tx)
@@ -408,13 +408,13 @@ if __name__ == '__main__':
 
         runs = [
             {
-                "prefix": 'throwing_improved_domain',
+                "prefix": 'throwing_20_objects',
                 "label": 'BALD',
                 "data": [],
                 "color": 'b'
             },
             {
-                "prefix": 'throwing_improved_domain_random',
+                "prefix": 'throwing_20_objects_random',
                 "label": 'Random',
                 "data": [],
                 "color": 'r'
@@ -423,6 +423,9 @@ if __name__ == '__main__':
         ]
         exp_path = 'learning/experiments/logs'
         ax = plt.gca()
+        min_dataset_size = 0 # these will be updated as we process the logs
+        max_dataset_size = 0
+
         for r in runs:
             for fname in os.listdir(exp_path):
                 if fname.startswith(r["prefix"] + "_run"):
@@ -430,13 +433,19 @@ if __name__ == '__main__':
                     path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
                     path_to_val_accuracy_file = path_to_log + '/results/val_accuracy.npy'
                     print(f'Loading from {fname}')
-                    if not os.path.isfile(path_to_val_accuracy_file):
+                    if not os.path.isfile("bl"):
                         print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
                         logger = ActiveExperimentLogger(path_to_log, use_latents=True)
-                        logger.args.max_acquisitions = 50  # lazy
+                        logger.args.max_acquisitions = 100  # lazy
                         logger.args.throwing = True # lazy
                         plot_latent_uncertainty(logger, ax=ax)
                         plot_val_accuracy(logger, ax=ax)
+
+
+                        min_dataset_size = logger.load_dataset(0).tensors[0].shape[0]
+                        max_dataset_size = logger.load_dataset(logger.args.max_acquisitions).tensors[0].shape[0]
+
+                        # task performance
                         # objects = logger.get_objects(ThrowingBall)
                         # data_pred_fn = lambda latent_ensemble, xs: get_predictions(latent_ensemble, xs,
                         #     hide_dims=parse_hide_dims(logger.args.hide_dims),
@@ -449,46 +458,15 @@ if __name__ == '__main__':
 
 
         for r in runs:
-            plot_with_quantiles(np.arange(50), r["data"], ax, label=r["label"], c=r["color"])
-
-        # RANDOM_FNAMES = ['learning/experiments/logs/hide-all-skip-random-run-1-20210921-214806',
-        #                  'learning/experiments/logs/hide-all-skip-random-run-2-20210921-223524',
-        #                  'learning/experiments/logs/hide-all-skip-random-run-3-20210921-232039',
-        #                  'learning/experiments/logs/hide-all-skip-random-run-4-20210922-000546',
-        #                  'learning/experiments/logs/hide-all-skip-random-run-5-20210922-005053',
-        #                  'learning/experiments/logs/hide-all-skip-random-run-6-20210922-013544'
-
-                         
-        # ]
-        # BALD_FNAMES = ['learning/experiments/logs/hide-all-skip-bald-run-1-20210921-214801',
-        #                'learning/experiments/logs/hide-all-skip-bald-run-2-20210921-223513',
-        #                'learning/experiments/logs/hide-all-skip-bald-run-3-20210921-232130',
-        #                'learning/experiments/logs/hide-all-skip-bald-run-4-20210922-000634',
-        #                'learning/experiments/logs/hide-all-skip-bald-run-5-20210922-005215',
-        #                'learning/experiments/logs/hide-all-skip-bald-run-6-20210922-013753'              
-        # ]
-
-        # for name, logdirs in zip(['random', 'bald'], [RANDOM_FNAMES, BALD_FNAMES]):
-            
-        #     results = np.zeros((len(logdirs), 50))
-        #     for lx, logdir in enumerate(logdirs):
-        #         logger = ActiveExperimentLogger(exp_path=logdir, use_latents=True)
-        #         accs = np.load(logger.get_results_path('val_accuracy.npy'), allow_pickle=True)
-        #         results[lx, :accs.shape[0]] = accs[:, 0]
-
-        #     mean = results.mean(axis=0)
-        #     std = results.std(axis=0)
-        #     low25 = np.quantile(results, q=0.25, axis=0)
-        #     high25 = np.quantile(results, q=0.75, axis=0)
-        #     xs = np.arange(0, results.shape[1])
-        #     plt.plot(xs, results.mean(axis=0), label=name)
-        #     plt.fill_between(xs, low25, high25, alpha=0.2)
-        # plt.legend()
+            plot_with_quantiles(np.linspace(min_dataset_size, max_dataset_size, 100),
+                r["data"], ax, label=r["label"], c=r["color"])
 
 
-        plt.xlabel('Acquisition Step')
+        phase_name = "Fitting" if "fitting" in runs[0]["prefix"] else "Training"
+
+        plt.xlabel('Number of throws')
         plt.ylabel('Validatation RMSE (m)')
-        plt.title('Validatation Error Throughout Training')
+        plt.title(f'Validatation Error Throughout {phase_name}')
         plt.legend()
         plt.show()
                 
