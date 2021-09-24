@@ -7,7 +7,7 @@ from learning.domains.throwing.throwing_data import label_actions
 from learning.domains.throwing.entities import ThrowingAction, ThrowingBall
 
 data_save_folder = "learning/domains/throwing/sanity_checking/data/"
-data_save_file = "choosing_latent_params_rotated_obstacle.npy"
+data_save_file = "choosing_latent_params_shelf.npy"
 data_save_path = os.path.join(data_save_folder, data_save_file)
 
 attributes = [
@@ -61,5 +61,5 @@ for i in range(n_attributes):
     axes.flat[i].set_xlabel(attributes[i])
     axes.flat[i].set_ylabel("Distance (m)")
 
-plt.suptitle("How distance is affected by hidden params (rotated obstacle)")
+plt.suptitle("How distance is affected by hidden params (shelf)")
 plt.show()

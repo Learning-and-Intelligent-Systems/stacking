@@ -9,7 +9,7 @@ class ThrowingSimulator:
         self.tmax = tmax
         self.objects = objects
         self.vis = vis
-        self.obstacles = np.array([[0.06, 1, 0.06, 0.9, 0, -0.01, 0., np.pi/4., 0.]]) # dimensions || position || roll-pitch-yaw
+        self.obstacles = np.array([[20., 1., 0.2, 11., 0, 0.1, 0., 0., 0.]]) # dimensions || position || roll-pitch-yaw
 
         self.stop_vel_thresh = 0.01      # Maximum linear velocity before stopping simulation [m/s]
         self.stop_vel_count = 10         # Number of consecutive counts below velocity threshold before simulation is stopped

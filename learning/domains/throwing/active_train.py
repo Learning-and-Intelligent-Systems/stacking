@@ -65,7 +65,7 @@ def acquire_datapoints(latent_ensemble,
 
     # sample candidate datapoints
     unlabeled_data = data_sampler_fn(n_samples)
-    
+
     if acquisition == 'bald':
         # compute predictions for each datapoint
         mu, sigma = data_pred_fn(latent_ensemble, unlabeled_data)
@@ -83,7 +83,7 @@ def acquire_datapoints(latent_ensemble,
     if per_object:
         all_xs = unlabeled_data[0].numpy()
         all_zs = unlabeled_data[1].numpy()
-        n_objects = len(set(unlabeled_data[1].numpy().tolist())) 
+        n_objects = len(set(unlabeled_data[1].numpy().tolist()))
 
         xs_list, z_ids_list = [], []
         for ix in range(n_objects):
@@ -94,10 +94,10 @@ def acquire_datapoints(latent_ensemble,
             acquire_indices = np.flip(np.argsort(obj_ix_scores))[:1]
             xs = torch.Tensor(obj_ix_xs[acquire_indices])
             z_ids = torch.Tensor(obj_ix_zs[acquire_indices])
-            
+
             xs_list.append(xs)
             z_ids_list.append(z_ids)
-        
+
         xs = torch.cat(xs_list, dim=0)
         z_ids = torch.cat(z_ids_list, dim=0)
     else:
@@ -115,9 +115,10 @@ def active_train(latent_ensemble, dataloader, val_dataloader, train_fn, acquire_
     for tx in range(args.max_acquisitions):
         print('Acquisition step', tx)
 
-        # save the current dataset
+        # save the current dataset and model
         logger.save_dataset(dataloader.dataset, tx)
         logger.save_val_dataset(val_dataloader.dataset, tx)
+        logger.save_ensemble(latent_ensemble, tx)
 
         # reset and train the model on the current dataset
         if not args.use_latents: pass
@@ -135,8 +136,6 @@ def active_train(latent_ensemble, dataloader, val_dataloader, train_fn, acquire_
                                                   hide_dims=hide_dims,
                                                   use_normalization=args.use_normalization)
 
-        # save the ensemble after training
-        logger.save_ensemble(latent_ensemble, tx)
 
         # get new data using the BALD score
         new_data, unlabeled_data = acquire_fn(latent_ensemble)
@@ -149,15 +148,20 @@ def active_train(latent_ensemble, dataloader, val_dataloader, train_fn, acquire_
         dataloader.add(*train_data)
         val_dataloader.add(*val_data)
 
+    # save the final dataset and model
+    logger.save_dataset(dataloader.dataset, args.max_acquisitions)
+    logger.save_val_dataset(val_dataloader.dataset, args.max_acquisitions)
+    logger.save_ensemble(latent_ensemble, args.max_acquisitions)
+
 
 def split_data(data, n_val):
     """
     Choose n_val of the chosen data points to add to the validation set.
     Return 2 tower_dict structures.
-    """    
+    """
     total = data[0].shape[0]
     val_ixs = np.random.choice(np.arange(0, total), n_val, replace=False)
-    
+
     train_mask = np.ones(total, dtype=bool)
     train_mask[val_ixs] = False
     train_data = (data[0][train_mask, ...].clone(), data[1][train_mask].clone(), data[2][train_mask].clone())
@@ -175,7 +179,7 @@ def run_active_throwing(args):
     else:
         with open(args.object_fname, 'rb') as handle:
             objects = pickle.load(handle)
-    
+
     hide_dims = [int(d) for d in args.hide_dims.split(',')] if args.hide_dims else []
 
     # use the sample_action function to get actions, and then preprocess to xs

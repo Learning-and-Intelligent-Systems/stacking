@@ -45,7 +45,7 @@ def plot_val_accuracy(logger, n_data=200, ax=plt.gca(), use_training_dataset=Fal
 
     scores = []
     for tx in range(logger.args.max_acquisitions):
-        latent_ensemble = logger.get_ensemble(tx)
+        latent_ensemble = logger.get_ensemble(tx+1)
         # latent_ensemble.reset_latents() # NOTE(izzy): DELETE THIS!!! testing impact of latents
         if use_training_dataset:
             val_dataset = logger.load_dataset(tx)
@@ -349,7 +349,7 @@ def plot_with_quantiles(x, ys, ax, c=None, label=None, alpha=0.3):
     # flip the ys as needed
     if ys.shape[1] != x.shape[0]:
         ys = ys.T
-        assert ys.shape[1] == x.shape[0], 'x and ys don\'t have matching dimensions'
+        assert ys.shape[1] == x.shape[0], f'x and ys don\'t have matching dimensions ({x.shape, y.shape})'
 
     # mean and std dev
     # mu = np.mean(ys, axis=0)
@@ -408,13 +408,13 @@ if __name__ == '__main__':
 
         runs = [
             {
-                "prefix": 'throwing_fully_hidden',
+                "prefix": 'throwing_improved_domain',
                 "label": 'BALD',
                 "data": [],
                 "color": 'b'
             },
             {
-                "prefix": 'throwing_fully_hidden_random',
+                "prefix": 'throwing_improved_domain_random',
                 "label": 'Random',
                 "data": [],
                 "color": 'r'
@@ -430,10 +430,10 @@ if __name__ == '__main__':
                     path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
                     path_to_val_accuracy_file = path_to_log + '/results/val_accuracy.npy'
                     print(f'Loading from {fname}')
-                    if not os.path.isfile(path_to_task_performance_file):
+                    if not os.path.isfile(path_to_val_accuracy_file):
                         print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
                         logger = ActiveExperimentLogger(path_to_log, use_latents=True)
-                        logger.args.max_acquisitions = 49  # lazy
+                        logger.args.max_acquisitions = 50  # lazy
                         logger.args.throwing = True # lazy
                         plot_latent_uncertainty(logger, ax=ax)
                         plot_val_accuracy(logger, ax=ax)
@@ -449,7 +449,7 @@ if __name__ == '__main__':
 
 
         for r in runs:
-            plot_with_quantiles(np.arange(49), r["data"], ax, label=r["label"], c=r["color"])
+            plot_with_quantiles(np.arange(50), r["data"], ax, label=r["label"], c=r["color"])
 
         # RANDOM_FNAMES = ['learning/experiments/logs/hide-all-skip-random-run-1-20210921-214806',
         #                  'learning/experiments/logs/hide-all-skip-random-run-2-20210921-223524',
@@ -488,7 +488,7 @@ if __name__ == '__main__':
 
         plt.xlabel('Acquisition Step')
         plt.ylabel('Validatation RMSE (m)')
-        plt.title('Validatation Error Throughout Fitting')
+        plt.title('Validatation Error Throughout Training')
         plt.legend()
         plt.show()
                 
