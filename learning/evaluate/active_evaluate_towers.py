@@ -1,5 +1,6 @@
 import argparse
 import copy
+from tamp.misc import get_train_and_fit_blocks, load_blocks
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
@@ -10,7 +11,7 @@ from block_utils import Object, World, Environment
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.towers.active_utils import get_sequential_predictions
 from learning.domains.towers.tower_data import ParallelDataLoader, TowerDataset
-from learning.evaluate.planner import EnsemblePlanner
+from learning.evaluate.planner import LatentEnsemblePlanner
 from tower_planner import TowerPlanner
 
 
@@ -192,9 +193,9 @@ def min_contact_regret_evaluation(logger, block_set, fname, args, save_imgs=Fals
     return evaluate_planner(logger, block_set, contact_area, fname, args, save_imgs, img_prefix='contact')
 
 def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, img_prefix=''):
-    tower_keys = [str(ts)+'block' for ts in args.tower_sizes]
+    tower_keys, tower_sizes  = ['5block'], [5]
     tp = TowerPlanner(stability_mode='contains')
-    ep = EnsemblePlanner(logger)
+    ep = LatentEnsemblePlanner(logger)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
@@ -212,7 +213,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
         if torch.cuda.is_available():
             ensemble = ensemble.cuda()
             
-        for k, size in zip(tower_keys, args.tower_sizes):
+        for k, size in zip(tower_keys, tower_sizes):
             print('Tower size', k)
             num_failures, num_pw_failures = 0, 0
             curr_regrets = []
@@ -220,67 +221,29 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
             for t in range(0, args.n_towers):
                 print('Tower number', t)
                 
-                if blocks is not None:
-                    plan_blocks = np.random.choice(blocks, size, replace=False)	
-                    plan_blocks = copy.deepcopy(plan_blocks)	
-                else:
-                    plan_blocks = [Object.random() for _ in range(size)]
+                plan_blocks = np.random.choice(blocks, size, replace=False)	
+                plan_blocks = copy.deepcopy(plan_blocks)	
                     
-                tower, reward, max_reward, tower_block_ids = ep.plan(plan_blocks, 
-                                                                ensemble, 
-                                                                reward_fn,
-                                                                args,
-                                                                num_blocks=size,
-                                                                n_tower=t)
-                                
+                tower, reward, max_reward, tower_block_ids, rotated_tower = ep.plan(plan_blocks, 
+                                                                     ensemble, 
+                                                                     reward_fn,
+                                                                     args,
+                                                                     num_blocks=size,
+                                                                     n_tower=t)
+                                                                 
+                # perturb tower if evaluating with noisy model
                 block_tower = []
-                for vec_block, block_id in zip(tower, tower_block_ids):
+                for vec_block, block_id in zip(rotated_tower, tower_block_ids):
+                    vec_block[7:9] += np.random.randn(2)*args.exec_xy_noise
                     block = Object.from_vector(vec_block)
                     block.name = 'obj_%d' % block_id
-                    block_tower.append(block)         
-                                           
-                # save tower info to /evaluation_towers
-                if args.exec_mode is None:
-                    if args.planning_model == 'noisy-model':
-                        logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem, noise=args.plan_xy_noise)
-                    else:
-                        logger.save_evaluation_tower(block_tower, reward, max_reward, tx, args.planning_model, args.problem)
-
-                # perturb tower if evaluating with noisy model
-                if args.exec_mode == 'noisy-model':
-                    block_tower = []
-                    for vec_block, block_id in zip(tower, tower_block_ids):
-                        vec_block[7:9] += np.random.randn(2)*args.exec_xy_noise
-                        block = Object.from_vector(vec_block)
-                        block.name = 'obj_%d' % block_id
-                        block_tower.append(block)     
+                    block_tower.append(block)     
     
                 # build found tower
-                if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-                    if not tp.tower_is_constructable(block_tower):
-                        reward = 0
-                        num_failures += 1
-                        if tp.tower_is_pairwise_stable(block_tower):
-                            num_pw_failures += 1
-                        else:
-                            pairs = []
-                            dists = []
-                            for i in range(len(tower) - 1):
-                                # check that each pair of blocks is stably individually
-                                top = block_tower[i+1]
-                                bottom = block_tower[i]
-                                if not tp.pair_is_stable(bottom, top): 
-                                    pairs.append(False)
-                                else:
-                                    pairs.append(True)
-                                top_rel_pos = np.array(top.pose.pos) - np.array(bottom.pose.pos)
-                                top_rel_com = top_rel_pos + top.com
-                                dists.append((np.abs(top_rel_com)*2 - bottom.dimensions)[:2])
-                            #print('Pairs:', pairs, dists)
-                            
-                    #print('PW Stable:', tp.tower_is_pairwise_stable(block_tower))
-                    #print('Global Stable:', tp.tower_is_stable(block_tower))
-                    
+                if not tp.tower_is_constructable(block_tower):
+                    reward = 0
+                    num_failures += 1
+
                     if False and reward != 0:
                         print(reward, max_reward)
                         w = World(block_tower)
@@ -290,52 +253,44 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                             env.step(vis_frames=True)
                             time.sleep(1/240.)
                         env.disconnect()
-                
-                    # Note that in general max reward may not be the best possible due to sampling.
-                    #ground_truth = np.sum([np.max(b.dimensions) for b in blocks])
-                    #print(max_reward, ground_truth)
 
-                    # Compare heights and calculate regret.
-                    regret = (max_reward - reward)/max_reward
-                    #print(reward, max_reward)
-                    #print(regret)
-                    curr_regrets.append(regret)
-                    curr_rewards.append(reward)
+                # Compare heights and calculate regret.
+                regret = (max_reward - reward)/max_reward
+                curr_regrets.append(regret)
+                curr_rewards.append(reward)
+                print('Reward: %.2f\tMax: %.2f\tRegret: %.2f' % (reward, max_reward, regret))
 
-            if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-                regrets[k].append(curr_regrets)
-                rewards[k].append(curr_rewards)
+            regrets[k].append(curr_regrets)
+            rewards[k].append(curr_rewards)
 
         if args.max_acquisitions is not None:
-            if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-                with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
-                    pickle.dump(regrets, handle)
-                    
-                with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
-                    pickle.dump(rewards, handle)
+            with open(logger.get_figure_path(fname+'_regrets.pkl'), 'wb') as handle:
+                pickle.dump(regrets, handle)
+                
+            with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
+                pickle.dump(rewards, handle)
             
     # if just ran for one acquisition step, output final regret and reward
     if args.acquisition_step is not None:
-        if args.exec_mode == 'noisy-model' or args.exec_mode == 'simple-model':
-            final_median_regret = np.median(regrets[k][0])
-            final_upper75_regret = np.quantile(regrets[k][0], 0.75)
-            final_lower25_regret = np.quantile(regrets[k][0][0], 0.25)
-            
-            final_median_reward = np.median(rewards[k][0])
-            final_upper75_reward = np.quantile(rewards[k][0], 0.75)
-            final_lower25_reward = np.quantile(rewards[k][0], 0.25)
-            
-            final_average_regret = np.average(regrets[k][0])
-            final_std_regret = np.std(regrets[k][0])
-            
-            final_average_reward = np.average(rewards[k][0])
-            final_std_reward = np.std(rewards[k][0])
-            
-            print('Final Median Regret: (%f) %f (%f)' % (final_lower25_regret, final_median_regret, final_upper75_regret))
-            print('Final Median Reward: (%f) %f (%f)' % (final_lower25_reward, final_median_reward, final_upper75_reward))
-            
-            print('Final Average Regret: %f +/- %f' % (final_average_regret, final_std_regret))
-            print('Final Average Reward: %f +/- %f' % (final_average_reward, final_std_reward))
+        final_median_regret = np.median(regrets[k][0])
+        final_upper75_regret = np.quantile(regrets[k][0], 0.75)
+        final_lower25_regret = np.quantile(regrets[k][0][0], 0.25)
+        
+        final_median_reward = np.median(rewards[k][0])
+        final_upper75_reward = np.quantile(rewards[k][0], 0.75)
+        final_lower25_reward = np.quantile(rewards[k][0], 0.25)
+        
+        final_average_regret = np.average(regrets[k][0])
+        final_std_regret = np.std(regrets[k][0])
+        
+        final_average_reward = np.average(rewards[k][0])
+        final_std_reward = np.std(rewards[k][0])
+        
+        print('Final Median Regret: (%f) %f (%f)' % (final_lower25_regret, final_median_regret, final_upper75_regret))
+        print('Final Median Reward: (%f) %f (%f)' % (final_lower25_reward, final_median_reward, final_upper75_reward))
+        
+        print('Final Average Regret: %f +/- %f' % (final_average_regret, final_std_regret))
+        print('Final Average Reward: %f +/- %f' % (final_average_reward, final_std_reward))
 
 def plot_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:
@@ -382,8 +337,22 @@ if __name__ == '__main__':
     parser.add_argument('--exp-path', type=str, required=True)
     parser.add_argument('--eval-type', type=str, choices=['val', 'task'], required=True)
     # Validation evaluation arguments.
-    parser.add_argument('--val-dataset-fname', type=str, required=True)
-    # TODO: Task performance arguments.
+    parser.add_argument('--val-dataset-fname', type=str)
+    # Task performance arguments.
+    parser.add_argument('--problem', type=str, choices=['min-contact', 'cumulative-overhang', 'tallest'])
+    parser.add_argument('--max-acquisitions',
+                        type=int, 
+                        help='evaluate from 0 to this acquisition step (use either this or --acquisition-step)')
+    parser.add_argument('--acquisition-step',
+                        type=int,
+                        help='acquisition step to evaluate (use either this or --max-acquisition)')
+    parser.add_argument('--n-towers',
+                        default = 50,
+                        type=int,
+                        help = 'number of tall towers to find for each acquisition step')
+    parser.add_argument('--exec-xy-noise',
+                        type=float,
+                        help='noise to add to xy position of blocks if exec-mode==noisy-model')
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
@@ -399,5 +368,28 @@ if __name__ == '__main__':
                                        fname=args.val_dataset_fname)                     
         plot_val_accuracy(logger, init_dataset_size=init_dataset_size, n_acquire=n_acquire)
 
+    elif args.eval_type == 'task':
+        # Load the block set for evaluation.
+        if logger.args.fit:
+            block_set = get_train_and_fit_blocks(pretrained_ensemble_path=logger.args.pretrained_ensemble_exp_path,
+                                                 use_latents=True,
+                                                 fit_blocks_fname=logger.args.block_set_fname,
+                                                 fit_block_ixs=logger.args.eval_block_ixs)
+        else:
+            block_set = load_blocks(train_blocks_fname=logger.args.block_set_fname)
+
+        reward_lookup = {
+            'min-contact': min_contact_regret_evaluation,
+            'tallest': tallest_tower_regret_evaluation,
+            'cumulative-overhang': cumulative_overhang_regret_evaluation
+        }
+
+        # TODO: If fitting, make sure to always include the new block in the block set.
+        reward_lookup[args.problem](logger=logger,
+                                      block_set=block_set,
+                                      fname=args.problem,
+                                      args=args)
+
+        
 
 

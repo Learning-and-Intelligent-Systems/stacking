@@ -13,7 +13,7 @@ from learning.models.gn import FCGN, ConstructableFCGN, FCGNFC
 from learning.models.lstm import TowerLSTM
 from learning.active.utils import ActiveExperimentLogger
 from agents.panda_agent import PandaAgent, PandaClientAgent
-from tamp.misc import load_blocks
+from tamp.misc import get_train_and_fit_blocks, load_blocks
 
 def initialize_model(args, n_blocks):
     n_in = 14
@@ -165,16 +165,10 @@ def run_active_towers(args):
     if args.block_set_fname is not '':
         if args.fit:
             assert(len(args.eval_block_ixs) == 1)  # Right now the code only supports doing inference for a single block on top of the training blocks.
-            train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path,
-                                                  use_latents=args.use_latents)
-            if not hasattr(train_logger.args, 'block_set_fname'):
-                print('[WARNING] Training block set was not specified. Using default blocks')
-                train_logger.args.block_set_fname = 'learning/data/may_blocks/blocks/10_random_block_set_1.pkl'
-            train_blocks_fname = train_logger.args.block_set_fname
-            block_set = load_blocks(train_blocks_fname=train_blocks_fname, 
-                                    eval_blocks_fname=args.block_set_fname,
-                                    eval_block_ixs=args.eval_block_ixs,
-                                    num_blocks=11)
+            block_set = get_train_and_fit_blocks(pretrained_ensemble_path=args.pretrained_ensemble_exp_path,
+                                                 use_latents=args.use_latents,
+                                                 fit_blocks_fname=args.block_set_fname,
+                                                 fit_block_ixs=args.eval_block_ixs)
             args.num_eval_blocks = len(args.eval_block_ixs)
             args.num_train_blocks = len(block_set) - args.num_eval_blocks
         else:

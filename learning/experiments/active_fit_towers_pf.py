@@ -1,9 +1,11 @@
 import argparse
+
+from matplotlib.pyplot import get
 from learning.active import acquire
 import torch
 import numpy as np
 from learning.models import latent_ensemble
-from tamp.misc import load_blocks
+from tamp.misc import get_train_and_fit_blocks, load_blocks
 from learning.active.utils import ActiveExperimentLogger
 from particle_belief import DiscreteLikelihoodParticleBelief
 from learning.domains.towers.active_utils import sample_unlabeled_data, get_labels
@@ -60,15 +62,10 @@ def run_particle_filter_fitting(args):
 
     # ----- Load the block set -----
     assert(len(args.eval_block_ixs) == 1)  # Right now the code only supports doing inference for a single block on top of the training blocks.
-    train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path,
-                                          use_latents=True)
-    if not hasattr(train_logger.args, 'block_set_fname'):
-        print('[WARNING] Training block set was not specified. Using default blocks')
-        train_logger.args.block_set_fname = 'learning/data/may_blocks/blocks/10_random_block_set_1.pkl'
-    block_set = load_blocks(train_blocks_fname=train_logger.args.block_set_fname, 
-                            eval_blocks_fname=args.block_set_fname,
-                            eval_block_ixs=args.eval_block_ixs,
-                            num_blocks=11)
+    block_set = get_train_and_fit_blocks(pretrained_ensemble_path=args.pretrained_ensemble_exp_path,
+                                         use_latents=True,
+                                         fit_blocks_fname=args.block_set_fname,
+                                         fit_block_ixs=args.eval_block_ixs)
     args.num_eval_blocks = len(args.eval_block_ixs)
     args.num_train_blocks = len(block_set) - args.num_eval_blocks
 

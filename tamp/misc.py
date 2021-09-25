@@ -10,6 +10,7 @@ import tamp.primitives as primitives
 from block_utils import object_to_urdf, Object, Pose, Position, all_rotations, Quaternion, get_rotated_block
 from pddlstream.language.generator import from_gen_fn, from_list_fn, from_fn, from_test , BoundedGenerator
 from pddlstream.utils import read
+from learning.active.utils import ActiveExperimentLogger
 
 
 class ExecutionFailure(Exception):
@@ -55,6 +56,20 @@ def load_blocks(train_blocks_fname, eval_blocks_fname='', num_blocks=10, eval_bl
     for ix in sorted(remove_ixs, reverse=True):
         del blocks[ix]
     return blocks[:num_blocks]
+
+def get_train_and_fit_blocks(pretrained_ensemble_path, use_latents, fit_blocks_fname, fit_block_ixs):
+    train_logger = ActiveExperimentLogger(exp_path=pretrained_ensemble_path,
+                                          use_latents=use_latents)
+    if not hasattr(train_logger.args, 'block_set_fname'):
+        print('[WARNING] Training block set was not specified. Using default blocks')
+        train_logger.args.block_set_fname = 'learning/data/may_blocks/blocks/10_random_block_set_1.pkl'
+    train_blocks_fname = train_logger.args.block_set_fname
+    block_set = load_blocks(train_blocks_fname=train_blocks_fname, 
+                            eval_blocks_fname=fit_blocks_fname,
+                            eval_block_ixs=fit_block_ixs,
+                            num_blocks=11)
+    return block_set
+    
 
 def getDirectory():
     '''Get the file path for the location of kinbody
