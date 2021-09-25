@@ -156,7 +156,7 @@ def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_bl
     :return: Dict containining numpy arrays of the towers sorted by size.
     """
     # initialize a dictionary of lists to store the generated data
-    print('Generating data randomly...')
+    #print('Generating data randomly...')
     sampled_towers = {}
     for i in range(range_n_blocks[0], range_n_blocks[1]+1):
         k = f'{i}block'
