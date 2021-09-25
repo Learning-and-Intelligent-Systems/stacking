@@ -1,4 +1,5 @@
 import re
+import numpy as np
 import os
 import pickle
 import time
@@ -80,6 +81,25 @@ class ActiveExperimentLogger:
 
         with open(os.path.join(self.exp_path, 'args.pkl'), 'rb') as handle:
             self.args = pickle.load(handle)
+
+        self.update_max_acquisitions()
+
+    def update_max_acquisitions(self):
+        """ Check that self.args.max_acquisitions corresponds to the number of
+        acquisition steps actually performed.
+        """
+        aq_files = os.listdir(os.path.join(self.exp_path, 'acquisition_data'))
+        max_aq = np.max([int(s.split('_')[1].split('.')[0]) for s in aq_files]) + 1
+        if max_aq != self.args.max_acquisitions:
+            print('[WARNING] Only %d acquisition steps have been executed so far.' % max_aq)
+            self.args.max_acquisitions = max_aq
+    
+    def get_acquisition_params(self):
+        """ Return parameters useful for knowing how much data was collected.
+        :return: init_dataset_size, n_acquire
+        """
+        init_dataset = self.load_dataset(0)
+        return len(init_dataset)//4, self.args.n_acquire
 
     @staticmethod
     def get_experiments_logger(exp_path, args):
