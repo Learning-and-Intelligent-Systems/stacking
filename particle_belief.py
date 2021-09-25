@@ -273,8 +273,14 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
         bernoulli_probs = []  # Contains one prediction for each particle.
 
         latent_samples = torch.Tensor(particles)  # (N, 4)
+        if torch.cuda.is_available():
+            latent_samples = latent_samples.cuda()
         for set_of_batches in dataloader:
             towers, block_ids, _ = set_of_batches[0]
+            if torch.cuda.is_available():
+                towers = towers.cuda()
+                block_ids = block_ids.cuda()
+
             for ix in range(0, latent_samples.shape[0]//10):
                 pred = self.likelihood.forward(towers=towers[:, :, 4:],
                                                block_ids=block_ids.long(),
@@ -283,7 +289,7 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
                                                collapse_ensemble=True,
                                                keep_latent_ix=10,
                                                latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
-                bernoulli_probs.append(pred.detach().numpy())
+                bernoulli_probs.append(pred.cpu().detach().numpy())
         return np.concatenate(bernoulli_probs)
 
     def update(self, observation):

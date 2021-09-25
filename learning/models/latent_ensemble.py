@@ -57,6 +57,9 @@ class LatentEnsemble(nn.Module):
         self.n_latents += n_latents
         new_locs = torch.zeros(n_latents, self.d_latents)
         new_logscales = torch.zeros(n_latents, self.d_latents)
+        if torch.cuda.is_available():
+            new_locs = new_locs.cuda()
+            new_logscales = new_logscales.cuda()
 
         self.latent_locs = nn.Parameter(torch.cat([self.latent_locs.data, new_locs], dim=0))
         self.latent_logscales = nn.Parameter(torch.cat([self.latent_logscales.data, new_logscales], dim=0))

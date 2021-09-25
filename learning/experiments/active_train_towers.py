@@ -178,7 +178,7 @@ def run_active_towers(args):
             args.num_eval_blocks = len(args.eval_block_ixs)
             args.num_train_blocks = len(block_set) - args.num_eval_blocks
         else:
-            block_set = load_blocks(train_block_fname=args.block_set_fname,
+            block_set = load_blocks(train_blocks_fname=args.block_set_fname,
                                     num_blocks=10)
     else:
         raise NotImplementedError()

@@ -8,6 +8,11 @@ from learning.active.utils import ActiveExperimentLogger
 from particle_belief import DiscreteLikelihoodParticleBelief
 from learning.domains.towers.active_utils import sample_unlabeled_data, get_labels
 from learning.active.acquire import bald
+# from learning.evaluate.planner import EnsemblePlanner
+
+
+def plan_task(pf, block_set, logger, args):
+    pass
 
 def find_informative_tower(pf, block_set, logger, args):
     data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1)
@@ -35,6 +40,8 @@ def particle_filter_loop(pf, block_set, logger, strategy, args):
             tower_dict = data_sampler_fn(1)
         elif strategy == 'bald':
             tower_dict = find_informative_tower(pf, block_set, logger, args)
+        elif strategy == 'task':
+            tower_dict = plan_task(pf, block_set, logger, args)
         else:
             raise NotImplementedError()
 
@@ -67,6 +74,8 @@ def run_particle_filter_fitting(args):
 
     # ----- Likelihood Model -----
     latent_ensemble = train_logger.get_ensemble(args.ensemble_tx)
+    if torch.cuda.is_available():
+        latent_ensemble.cuda()
     latent_ensemble.add_latents(1)
 
     # ----- Initialize particle filter from prior -----
@@ -77,7 +86,7 @@ def run_particle_filter_fitting(args):
                                           plot=True)
 
     # ----- Run particle filter loop -----
-    particle_filter_loop(pf, block_set, logger, 'bald', args)
+    particle_filter_loop(pf, block_set, logger, args.strategy, args)
 
 
 if __name__ == '__main__':
@@ -89,6 +98,8 @@ if __name__ == '__main__':
     parser.add_argument('--pretrained-ensemble-exp-path', type=str, default='', help='Path to a trained ensemble.')
     parser.add_argument('--ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
     parser.add_argument('--eval-block-ixs', nargs='+', type=int, default=[0], help='Indices of which eval blocks to use.')
+    parser.add_argument('--strategy', type=str, choices=['bald', 'random', 'task'], default='bald')
+    parser.add_argument('--task', type=str, choices=['overhang', 'tallest', 'min-contact'], default='overhang')
     args = parser.parse_args()
     args.use_latents = True
     args.fit_pf = True
