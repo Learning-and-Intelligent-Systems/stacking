@@ -278,7 +278,7 @@ class LatentEnsemblePlanner:
             rot_tower_vectors.append([b.vectorize() for b in rotated_tower])
         return tower_vectors, tower_block_ids, rot_tower_vectors
 
-    def plan(self, blocks, ensemble, reward_fn, args, num_blocks=None, n_tower=None):
+    def plan(self, blocks, ensemble, reward_fn, args, num_blocks=None, n_tower=None, latent_samples=None, pf_latent_ix=-1):
         # Step (1): Build dataset of potential towers. 
         tower_vectors, tower_block_ids, rotated_tower_vectors= self.generate_candidate_towers(blocks, args, num_blocks, n_tower)
         
@@ -323,11 +323,20 @@ class LatentEnsemblePlanner:
                     tensor = tensor.cuda()
                     b_ids = b_ids.cuda()
                 with torch.no_grad():
-                    pred = ensemble.forward(tensor[:, :, 4:], 
-                                            b_ids,
-                                            N_samples=10,
-                                            collapse_ensemble=True,
-                                            collapse_latents=True).squeeze()
+                    if pf_latent_ix > -1:
+                        pred = ensemble.forward(tensor[:, :, 4:], 
+                                                b_ids,
+                                                N_samples=10,
+                                                collapse_ensemble=True,
+                                                collapse_latents=True,
+                                                pf_latent_ix=10,
+                                                latent_samples=latent_samples).squeeze()
+                    else:
+                        pred = ensemble.forward(tensor[:, :, 4:], 
+                                                b_ids,
+                                                N_samples=10,
+                                                collapse_ensemble=True,
+                                                collapse_latents=True).squeeze()
                     sub_tower_pred.append(pred)
 
             sub_tower_pred = torch.cat(sub_tower_pred, dim=0)[:n_towers]

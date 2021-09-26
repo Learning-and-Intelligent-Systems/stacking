@@ -222,6 +222,13 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
         print('Acquisition step:', tx)
 
         ensemble = logger.get_ensemble(tx)
+        particles = logger.load_particles(tx)
+        if particles is not None:
+            latent_samples = torch.Tensor(particles.particles)[0:10, :]
+            pf_latent_ix = 10
+        else:
+            latent_samples = None
+            pf_latent_ix = -1
         if torch.cuda.is_available():
             ensemble = ensemble.cuda()
             
@@ -233,7 +240,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
             for t in range(0, args.n_towers):
                 print('Tower number', t)
                 
-                if logger.args.fit:
+                if ('fit' in logger.args and logger.args.fit) or (logger.load_particles(0) is not None):
                     # Must include the fitting block.
                     plan_blocks = [block_set[-1]] + list(np.random.choice(block_set[:-1], size-1, replace=False))
                     plan_blocks = copy.deepcopy(plan_blocks)
@@ -241,13 +248,15 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                 else:
                     plan_blocks = np.random.choice(blocks, size, replace=False)	
                     plan_blocks = copy.deepcopy(plan_blocks)	
-                    
+                
                 tower, reward, max_reward, tower_block_ids, rotated_tower = ep.plan(plan_blocks, 
                                                                      ensemble, 
                                                                      reward_fn,
                                                                      args,
                                                                      num_blocks=size,
-                                                                     n_tower=t)
+                                                                     n_tower=t,
+                                                                     pf_latent_ix=pf_latent_ix,
+                                                                     latent_samples=latent_samples)
                                                                  
                 # perturb tower if evaluating with noisy model
                 block_tower = []
@@ -386,7 +395,7 @@ if __name__ == '__main__':
 
     elif args.eval_type == 'task':
         # Load the block set for evaluation.
-        if logger.args.fit:
+        if ('fit' in logger.args and logger.args.fit) or (logger.load_particles(0) is not None):
             block_set = get_train_and_fit_blocks(pretrained_ensemble_path=logger.args.pretrained_ensemble_exp_path,
                                                  use_latents=True,
                                                  fit_blocks_fname=logger.args.block_set_fname,
