@@ -120,7 +120,7 @@ class LatentEnsemble(nn.Module):
         return samples
 
 
-    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True, keep_latent_ix=-1, latent_samples=None):
+    def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True, keep_latent_ix=-1, latent_samples=None, pf_latent_ix=-1):
         """ predict feasibility of the towers
 
         Arguments:
@@ -141,6 +141,12 @@ class LatentEnsemble(nn.Module):
             q_z = torch.distributions.normal.Normal(self.latent_locs[block_ids],
                                                     torch.exp(self.latent_logscales[block_ids]))  # [N_batch, N_blocks, latent_dim]
             samples_for_each_tower_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2, 3)  # [N_batch, N_samples, N_blocks, latent_dim]
+            if pf_latent_ix > -1:
+                for tx in range(0, N_batch):
+                    for bx_tower in range(0, N_blocks):
+                        bx_blockset = block_ids[tx, bx_tower]
+                        if bx_blockset == pf_latent_ix:
+                            samples_for_each_tower_in_batch[tx, :, bx_tower, :] = latent_samples
             samples_for_each_tower_in_batch = self.prerotate_latent_samples(towers, samples_for_each_tower_in_batch)
             towers_with_latents = self.concat_samples(
                 samples_for_each_tower_in_batch, towers)
