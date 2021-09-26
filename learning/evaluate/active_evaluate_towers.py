@@ -145,8 +145,6 @@ def get_pf_validation_accuracy(logger, fname):
             # latent = np.array(particles.particles)[0:10, 4]
             # print(latent.shape)
             
-            
-
             acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
             print('Acc:', tx, k, acc)
             accs[k].append(acc)
@@ -235,8 +233,14 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
             for t in range(0, args.n_towers):
                 print('Tower number', t)
                 
-                plan_blocks = np.random.choice(blocks, size, replace=False)	
-                plan_blocks = copy.deepcopy(plan_blocks)	
+                if logger.args.fit:
+                    # Must include the fitting block.
+                    plan_blocks = [block_set[-1]] + list(np.random.choice(block_set[:-1], size-1, replace=False))
+                    plan_blocks = copy.deepcopy(plan_blocks)
+                    print('Planning with blocks: ', [b.name for b in plan_blocks])
+                else:
+                    plan_blocks = np.random.choice(blocks, size, replace=False)	
+                    plan_blocks = copy.deepcopy(plan_blocks)	
                     
                 tower, reward, max_reward, tower_block_ids, rotated_tower = ep.plan(plan_blocks, 
                                                                      ensemble, 
@@ -339,7 +343,6 @@ def plot_regret(logger, fname):
         axes[kx].legend()
     plt_fname = fname[:-4]+'.png'
     plt.savefig(logger.get_figure_path(plt_fname))
-
 
 
 # Common datasets to use:
