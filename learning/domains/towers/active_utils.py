@@ -197,6 +197,8 @@ def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_bl
     for k in sampled_towers.keys():
         sampled_towers[k]['towers'] = np.array(sampled_towers[k]['towers'])
         sampled_towers[k]['labels'] = np.zeros((sampled_towers[k]['towers'].shape[0],))
+        if sampled_towers[k]['towers'].shape[0] == 0:
+            sampled_towers[k]['towers'] = sampled_towers[k]['towers'].reshape((0, int(k[0]), 21))
         if block_set is not None:
             sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
 

@@ -138,7 +138,7 @@ def get_sampler_fn(args, block_set):
         data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
     elif args.strategy == 'subtower':
         if args.fit:
-            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1)
+            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 5), include_index=args.num_train_blocks+args.num_eval_blocks-1)
         else:
             data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 5))
     else:

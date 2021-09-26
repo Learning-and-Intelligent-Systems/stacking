@@ -89,6 +89,8 @@ class ActiveExperimentLogger:
         acquisition steps actually performed.
         """
         aq_files = os.listdir(os.path.join(self.exp_path, 'models'))
+        if len(aq_files) == 0:
+            return
         max_aq = np.max([int(s.split('_')[1].split('.')[0]) for s in aq_files if '_' in s]) + 1
         if max_aq != self.args.max_acquisitions:
             print('[WARNING] Only %d acquisition steps have been executed so far.' % max_aq)

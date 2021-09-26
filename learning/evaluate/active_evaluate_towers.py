@@ -309,7 +309,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
     if args.acquisition_step is not None:
         final_median_regret = np.median(regrets[k][0])
         final_upper75_regret = np.quantile(regrets[k][0], 0.75)
-        final_lower25_regret = np.quantile(regrets[k][0][0], 0.25)
+        final_lower25_regret = np.quantile(regrets[k][0], 0.25)
         
         final_median_reward = np.median(rewards[k][0])
         final_upper75_reward = np.quantile(rewards[k][0], 0.75)
