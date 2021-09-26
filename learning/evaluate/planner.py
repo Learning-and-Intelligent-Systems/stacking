@@ -202,7 +202,7 @@ class EnsemblePlanner:
 class LatentEnsemblePlanner:
     def __init__(self, logger, n_samples=None):
         self.tower_keys = ['2block', '3block', '4block', '5block']
-        self.n_samples = {2: 5000, 3: 10000, 4: 20000,  5: 10000, 6: 250000, 7:500000}
+        self.n_samples = {2: 5000, 3: 10000, 4: 20000,  5: 100000, 6: 250000, 7:500000}
         self.tp = TowerPlanner(stability_mode='contains')
         self.logger = logger
         self.using_cache = False
@@ -290,44 +290,56 @@ class LatentEnsemblePlanner:
         # Since we are only planning for towers of a single size,
         # always use the '2block' key for simplicity. The rest currently
         # need at least some data for the code to work.
-        labels = np.zeros((towers.shape[0],))
-        tower_dict = {}
-        for k in self.tower_keys:
-            tower_dict[k] = {}
-            if k == '2block':
-                tower_dict[k]['towers'] = towers
-                tower_dict[k]['labels'] = labels
-                tower_dict[k]['block_ids'] = block_ids
-            else:
-                tower_dict[k]['towers'] = towers[:5,...]
-                tower_dict[k]['labels'] = labels[:5]
-                tower_dict[k]['block_ids'] = block_ids[:5,...]
+        valid_ixs = np.arange(0, towers.shape[0])
+        
+        sub_tower_preds = torch.zeros(towers.shape[0], 4)
+        for n_blocks in range(2, towers.shape[1]+1):
+            n_towers = len(valid_ixs)
+            # Create dataset based on current valid_ixs.
+            labels = np.zeros((valid_ixs.shape[0],))
+            tower_dict = {}
+            for k in self.tower_keys:
+                tower_dict[k] = {}
+                if k == '2block':
+                    tower_dict[k]['towers'] = towers[valid_ixs, :n_blocks, :]
+                    tower_dict[k]['labels'] = labels
+                    tower_dict[k]['block_ids'] = block_ids[valid_ixs, :n_blocks]
+                else:
+                    tower_dict[k]['towers'] = towers[:5,...]
+                    tower_dict[k]['labels'] = labels[:5]
+                    tower_dict[k]['block_ids'] = block_ids[:5,...]
 
-        tower_dataset = TowerDataset(tower_dict, augment=False)
-        tower_sampler = TowerSampler(dataset=tower_dataset,
-                                     batch_size=64,
-                                     shuffle=False)
-        tower_loader = DataLoader(dataset=tower_dataset,
-                                  batch_sampler=tower_sampler)
-        preds = []
-        for tensor, b_ids, _ in tower_loader:
-            sub_tower_preds = []
-            b_ids = b_ids.long()
-            for n_blocks in range(2, tensor.shape[1]+1):
+            tower_dataset = TowerDataset(tower_dict, augment=False)
+            tower_sampler = TowerSampler(dataset=tower_dataset,
+                                         batch_size=64,
+                                         shuffle=False)
+            tower_loader = DataLoader(dataset=tower_dataset,
+                                      batch_sampler=tower_sampler)
+            sub_tower_pred = []
+            for tensor, b_ids, _ in tower_loader:
+                # sub_tower_preds = []
+                b_ids = b_ids.long()
                 if torch.cuda.is_available():
                     tensor = tensor.cuda()
                     b_ids = b_ids.cuda()
                 with torch.no_grad():
-                    pred = ensemble.forward(tensor[:, :n_blocks, 4:], 
-                                            b_ids[:, :n_blocks],
+                    pred = ensemble.forward(tensor[:, :, 4:], 
+                                            b_ids,
                                             N_samples=10,
                                             collapse_ensemble=True,
-                                            collapse_latents=True).squeeze(dim=-1)
-                    sub_tower_preds.append(pred)
-            sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
-            preds.append(sub_tower_preds.prod(dim=0))
+                                            collapse_latents=True).squeeze()
+                    sub_tower_pred.append(pred)
 
-        p_stables = torch.cat(preds, dim=0)
+            sub_tower_pred = torch.cat(sub_tower_pred, dim=0)[:n_towers]
+            sub_tower_preds[valid_ixs, n_blocks-2] = sub_tower_pred
+            # sub_tower_preds[valid_ixs, n_blocks-2] = sub_tower_preds.prod(dim=0)
+
+            # Remove towers that will not confidently result in stable towers.
+            likely_stable = sub_tower_pred > 0.3
+            valid_ixs = valid_ixs[likely_stable]
+            print('Remaining: %d' % len(valid_ixs))
+
+        p_stables = sub_tower_preds.prod(dim=1)
 
         # Step (3): Find the tallest tower of a given height.
         max_reward, max_exp_reward, max_tower, max_stable, max_rotated = -100, -100, None, 0, None

@@ -105,7 +105,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-    
-    plot_latents(logger)
-    plot_latent_means(logger)
-    plot_latent_uncertainty(logger)
+
+    if logger.load_particles(tx=0) is None:
+        plot_latents(logger)
+        plot_latent_means(logger)
+        plot_latent_uncertainty(logger)
+    else:
+        plot_particle_latents(logger)

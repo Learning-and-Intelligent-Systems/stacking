@@ -78,28 +78,37 @@ def plot_val_accuracy(logger, init_dataset_size=100, n_acquire=10, separate_axs=
     plt.clf()
 
 def get_predictions_with_particles(particles, observation, ensemble):
+    preds = []
     dataset = TowerDataset(tower_dict=observation,
-                            augment=False)
+                           augment=False)
     dataloader = ParallelDataLoader(dataset=dataset,
-                                    batch_size=1,
+                                    batch_size=64,
                                     shuffle=False,
                                     n_dataloaders=1)
-    bernoulli_probs = []  # Contains one prediction for each particle.
+    
 
     latent_samples = torch.Tensor(particles)
     for set_of_batches in dataloader:
         towers, block_ids, _ = set_of_batches[0]
-        for ix in range(0, 10):#latent_samples.shape[0]//10):
-            pred = ensemble.forward(towers=towers[:, :, 4:],
-                                    block_ids=block_ids,
-                                    N_samples=10,
-                                    collapse_latents=True, 
-                                    collapse_ensemble=True,
-                                    keep_latent_ix=10,
-                                    latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
-            bernoulli_probs.append(pred.detach().numpy())
+        sub_tower_preds = []
+        
+        for n_blocks in range(2, towers.shape[1]+1):
+            if torch.cuda.is_available():
+                tensor = tensor.cuda()
+            with torch.no_grad():
+                for ix in range(0, 1): # Only use first 10 particles as a sample from the particle distribution.
+                    pred = ensemble.forward(towers=towers[:, :n_blocks, 4:],
+                                            block_ids=block_ids[:, :n_blocks],
+                                            N_samples=10,
+                                            collapse_latents=True, 
+                                            collapse_ensemble=True,
+                                            pf_latent_ix=10,
+                                            latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
+                    sub_tower_preds.append(pred)
 
-    return np.concatenate(bernoulli_probs)
+        sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
+        preds.append(sub_tower_preds.prod(dim=0))
+    return torch.cat(preds, dim=0)
 
 def get_pf_validation_accuracy(logger, fname):
     tower_keys = ['2block', '3block', '4block', '5block']
@@ -115,23 +124,28 @@ def get_pf_validation_accuracy(logger, fname):
 
         start = 0
         preds_list = []
+
+        preds = get_predictions_with_particles(particles.particles, val_towers, ensemble)
+        preds_list += preds.cpu().numpy().tolist()
+
+        preds = np.array(preds_list)
+
         for k in tower_keys:
             end = start + val_towers[k]['towers'].shape[0]
-            for ix in range(0, val_towers[k]['towers'].shape[0]):
-                td = { k: {
-                        'towers': val_towers[k]['towers'][ix:ix+1, :, :],
-                        'block_ids': val_towers[k]['block_ids'][ix:ix+1, :],
-                        'labels': val_towers[k]['labels'][ix:ix+1],
-                    }
-                }
-                #latent = np.mean(particles.particles, axis=0, keepdims=True)
-                latent = np.array(particles.particles).T@np.array(particles.weights)
-                latent = latent.reshape(1, 4)
-
-                pred = get_predictions_with_particles(particles.particles, td, ensemble).mean()
-                preds_list.append(pred)
-
-            preds = np.array(preds_list)
+            # for ix in range(0, val_towers[k]['towers'].shape[0]):
+            #     td = { k: {
+            #             'towers': val_towers[k]['towers'][ix:ix+1, :, :],
+            #             'block_ids': val_towers[k]['block_ids'][ix:ix+1, :],
+            #             'labels': val_towers[k]['labels'][ix:ix+1],
+            #         }
+            #     }
+            # TODO: Right now we're averaging the particles before the prediction, we should be marginalizing the predictions.
+            # latent = np.array(particles.particles).T@np.array(particles.weights)
+            # latent = latent.reshape(1, 4)
+            # latent = np.array(particles.particles)[0:10, 4]
+            # print(latent.shape)
+            
+            
 
             acc = ((preds[start:end]>0.5) == val_towers[k]['labels']).mean()
             print('Acc:', tx, k, acc)
@@ -329,7 +343,7 @@ def plot_regret(logger, fname):
 
 
 # Common datasets to use:
-# Fitting: 'learning/data/may_blocks/towers/combined_traineval0.pkl'
+# Fitting: 'learning/data/may_blocks/towers/combined_traineval0.pkl', 'learning/data/may_blocks/towers/combined_traineval1.pkl'
 # Training: 'learning/data/may_blocks/towers/10block_set_(x1000)_nblocks_a_1_dict.pkl'
 
 if __name__ == '__main__':
@@ -359,13 +373,12 @@ if __name__ == '__main__':
 
     if args.eval_type == 'val':
         init_dataset_size, n_acquire = logger.get_acquisition_params()
-        
-        # accs = get_pf_validation_accuracy(logger,
-        #                                   'learning/data/may_blocks/towers/combined_traineval1.pkl')
-        # plot_val_accuracy(logger, init_dataset_size=0, n_acquire=1)
-
-        accs = get_validation_accuracy(logger=logger,
-                                       fname=args.val_dataset_fname)                     
+        if logger.load_particles(tx=0) is not None:
+            accs = get_pf_validation_accuracy(logger,
+                                              fname=args.val_dataset_fname)
+        else:
+            accs = get_validation_accuracy(logger=logger,
+                                           fname=args.val_dataset_fname)                     
         plot_val_accuracy(logger, init_dataset_size=init_dataset_size, n_acquire=n_acquire)
 
     elif args.eval_type == 'task':

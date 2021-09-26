@@ -88,8 +88,8 @@ class ActiveExperimentLogger:
         """ Check that self.args.max_acquisitions corresponds to the number of
         acquisition steps actually performed.
         """
-        aq_files = os.listdir(os.path.join(self.exp_path, 'acquisition_data'))
-        max_aq = np.max([int(s.split('_')[1].split('.')[0]) for s in aq_files]) + 1
+        aq_files = os.listdir(os.path.join(self.exp_path, 'models'))
+        max_aq = np.max([int(s.split('_')[1].split('.')[0]) for s in aq_files if '_' in s]) + 1
         if max_aq != self.args.max_acquisitions:
             print('[WARNING] Only %d acquisition steps have been executed so far.' % max_aq)
             self.args.max_acquisitions = max_aq
@@ -98,6 +98,8 @@ class ActiveExperimentLogger:
         """ Return parameters useful for knowing how much data was collected.
         :return: init_dataset_size, n_acquire
         """
+        if self.load_particles is not None:
+            return 0, 1
         init_dataset = self.load_dataset(0)
         return len(init_dataset)//4, self.args.n_acquire
 
@@ -160,7 +162,10 @@ class ActiveExperimentLogger:
 
     def load_particles(self, tx):
         fname = 'particles_%d.pkl' % tx
-        with open(os.path.join(self.exp_path, 'models', fname), 'rb') as handle:
+        path = os.path.join(self.exp_path, 'models', fname)
+        if not os.path.exists(path):
+            return None
+        with open(path, 'rb') as handle:
             particles = pickle.load(handle)
         return particles
             
