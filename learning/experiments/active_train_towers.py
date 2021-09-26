@@ -195,11 +195,13 @@ def run_active_towers(args):
     # Initialize ensemble.
     if args.fit:
         ensemble = load_ensemble(args)
+        if torch.cuda.is_available():
+            ensemble = ensemble.cuda()
         ensemble.add_latents(args.num_eval_blocks)
     else:
         ensemble = initialize_model(args, len(block_set))    
-    if torch.cuda.is_available():
-        ensemble = ensemble.cuda()
+        if torch.cuda.is_available():
+            ensemble = ensemble.cuda()
 
     # Get an initial dataset.
     dataset, val_dataset = get_initial_dataset(args, block_set, agent, logger)
