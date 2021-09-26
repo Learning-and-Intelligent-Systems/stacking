@@ -202,7 +202,7 @@ class EnsemblePlanner:
 class LatentEnsemblePlanner:
     def __init__(self, logger, n_samples=None):
         self.tower_keys = ['2block', '3block', '4block', '5block']
-        self.n_samples = {2: 5000, 3: 10000, 4: 20000,  5: 100000, 6: 250000, 7:500000}
+        self.n_samples = {2: 5000, 3: 10000, 4: 20000,  5: 50000, 6: 250000, 7:500000}
         self.tp = TowerPlanner(stability_mode='contains')
         self.logger = logger
         self.using_cache = False
@@ -339,7 +339,7 @@ class LatentEnsemblePlanner:
                                                 collapse_latents=True).squeeze()
                     sub_tower_pred.append(pred)
 
-            sub_tower_pred = torch.cat(sub_tower_pred, dim=0)[:n_towers]
+            sub_tower_pred = torch.cat(sub_tower_pred, dim=0)[:n_towers].cpu()
             sub_tower_preds[valid_ixs, n_blocks-2] = sub_tower_pred
             # sub_tower_preds[valid_ixs, n_blocks-2] = sub_tower_preds.prod(dim=0)
 

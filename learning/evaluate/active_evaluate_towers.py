@@ -214,7 +214,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
     rewards = {k: [] for k in tower_keys}
 
     if args.max_acquisitions is not None: 
-        eval_range = range(0, args.max_acquisitions, 1)
+        eval_range = range(0, args.max_acquisitions, 2)
     elif args.acquisition_step is not None: 
         eval_range = [args.acquisition_step]
     
@@ -350,7 +350,7 @@ def plot_regret(logger, fname):
     fig, axes = plt.subplots(4, sharex=True, figsize=(10,20))
     init, n_acquire = logger.get_acquisition_params()
     for kx, k in enumerate(tower_keys):
-        xs = np.arange(init, init+n_acquire*len(median[k]))
+        xs = np.arange(init, init+2*len(median[k]), 2*n_acquire)
         axes[kx].plot(xs, median[k], label=k)
         axes[kx].fill_between(xs, lower25[k], upper75[k], alpha=0.2)
         axes[kx].set_ylim(0.0, 1.1)
