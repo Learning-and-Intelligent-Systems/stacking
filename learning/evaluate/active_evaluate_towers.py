@@ -214,7 +214,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
     rewards = {k: [] for k in tower_keys}
 
     if args.max_acquisitions is not None: 
-        eval_range = range(0, args.max_acquisitions, 10)
+        eval_range = range(0, args.max_acquisitions, 1)
     elif args.acquisition_step is not None: 
         eval_range = [args.acquisition_step]
     
@@ -296,6 +296,14 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                 
             with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
                 pickle.dump(rewards, handle)
+                
+            plot_regret(logger, args.problem + '_regrets.pkl')
+        else:
+            with open(logger.get_figure_path(fname+'_%d_regrets.pkl' % args.acquisition_step), 'wb') as handle:
+                pickle.dump(regrets, handle)
+                
+            with open(logger.get_figure_path(fname+'_%d_rewards.pkl' % args.acquisition_step), 'wb') as handle:
+                pickle.dump(rewards, handle)
             
     # if just ran for one acquisition step, output final regret and reward
     if args.acquisition_step is not None:
@@ -319,11 +327,12 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
         print('Final Average Regret: %f +/- %f' % (final_average_regret, final_std_regret))
         print('Final Average Reward: %f +/- %f' % (final_average_reward, final_std_reward))
 
+
 def plot_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:
         regrets = pickle.load(handle)
 
-    tower_keys = ['2block', '3block', '4block', '5block']
+    tower_keys = ['5block'] # ['2block', '3block', '4block', '5block']
     upper975 = {k: [] for k in tower_keys}
     upper75 = {k: [] for k in tower_keys}
     median = {k: [] for k in tower_keys}
@@ -339,13 +348,11 @@ def plot_regret(logger, fname):
             upper75[k].append(np.quantile(rs[tx], 0.75))
             upper975[k].append(np.quantile(rs[tx], 0.95))
     fig, axes = plt.subplots(4, sharex=True, figsize=(10,20))
+    init, n_acquire = logger.get_acquisition_params()
     for kx, k in enumerate(tower_keys):
-        #xs = np.arange(400, 400+100*len(median[k]), 100)
-        xs = np.arange(40, 40+100*len(median[k]), 100)
-        #xs = np.arange(40, 40+10*len(median[k]), 10)
+        xs = np.arange(init, init+n_acquire*len(median[k]))
         axes[kx].plot(xs, median[k], label=k)
         axes[kx].fill_between(xs, lower25[k], upper75[k], alpha=0.2)
-        #axes[kx].fill_between(xs, lower025[k], upper975[k], alpha=0.2)
         axes[kx].set_ylim(0.0, 1.1)
         axes[kx].set_ylabel('Regret (Normalized)')
         axes[kx].set_xlabel('Number of training towers')
@@ -411,9 +418,9 @@ if __name__ == '__main__':
 
         # TODO: If fitting, make sure to always include the new block in the block set.
         reward_lookup[args.problem](logger=logger,
-                                      block_set=block_set,
-                                      fname=args.problem,
-                                      args=args)
+                                    block_set=block_set,
+                                    fname=args.problem,
+                                    args=args)            
 
         
 
