@@ -330,21 +330,22 @@ class LatentEnsemblePlanner:
                                                 collapse_ensemble=True,
                                                 collapse_latents=True,
                                                 pf_latent_ix=10,
-                                                latent_samples=latent_samples).squeeze()
+                                                latent_samples=latent_samples).squeeze(-1)
                     else:
                         pred = ensemble.forward(tensor[:, :, 4:], 
                                                 b_ids,
                                                 N_samples=10,
                                                 collapse_ensemble=True,
-                                                collapse_latents=True).squeeze()
+                                                collapse_latents=True).squeeze(-1)
+                    #print(pred.shape)
                     sub_tower_pred.append(pred)
 
             sub_tower_pred = torch.cat(sub_tower_pred, dim=0)[:n_towers].cpu()
-            sub_tower_preds[valid_ixs, n_blocks-2] = sub_tower_pred
+            sub_tower_preds[valid_ixs, n_blocks-2] = sub_tower_pred[:,0]
             # sub_tower_preds[valid_ixs, n_blocks-2] = sub_tower_preds.prod(dim=0)
 
             # Remove towers that will not confidently result in stable towers.
-            likely_stable = sub_tower_pred > 0.3
+            likely_stable = sub_tower_pred[:, 0] > 0.3
             valid_ixs = valid_ixs[likely_stable]
             print('Remaining: %d' % len(valid_ixs))
 
