@@ -342,7 +342,7 @@ def visualize_dataset(logger, tx):
 
     plt.show()
 
-def plot_with_quantiles(x, ys, ax, c=None, label=None, alpha=0.3):
+def plot_with_quantiles(x, ys, ax, c=None, label=None, alpha=0.4):
     x = np.array(x)
     ys = np.array(ys)
 
@@ -360,7 +360,7 @@ def plot_with_quantiles(x, ys, ax, c=None, label=None, alpha=0.3):
     # median and quartiles
     low25 = np.quantile(ys, q=0.25, axis=0)
     high25 = np.quantile(ys, q=0.75, axis=0)
-    ax.fill_between(x, low25, high25, color=c, alpha=alpha)
+    ax.fill_between(x, low25, high25, color=c, alpha=alpha/2)
     ax.plot(x, np.median(ys, axis=0), c=c, alpha=alpha, label=label)
 
 
@@ -409,16 +409,22 @@ if __name__ == '__main__':
         runs = [
             {
                 "prefix": 'throwing_20_objects',
-                "label": 'BALD',
+                "label": 'BALD then BALD',
                 "data": [],
                 "color": 'b'
             },
             {
                 "prefix": 'throwing_20_objects_random',
-                "label": 'Random',
+                "label": 'Random then Random',
                 "data": [],
                 "color": 'r'
             },
+            # {
+            #     "prefix": 'throwing_20_objects_random_then_bald_fitting',
+            #     "label": 'Random then BALD',
+            #     "data": [],
+            #     "color": 'g'
+            # },
 
         ]
         exp_path = 'learning/experiments/logs'
@@ -433,7 +439,7 @@ if __name__ == '__main__':
                     path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
                     path_to_val_accuracy_file = path_to_log + '/results/val_accuracy.npy'
                     print(f'Loading from {fname}')
-                    if not os.path.isfile("bl"):
+                    if not os.path.isfile(path_to_task_performance_file):
                         print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
                         logger = ActiveExperimentLogger(path_to_log, use_latents=True)
                         logger.args.max_acquisitions = 100  # lazy
@@ -457,6 +463,7 @@ if __name__ == '__main__':
                     r["data"].append(np.load(path_to_val_accuracy_file))
 
 
+        if min_dataset_size == max_dataset_size: max_dataset_size = 1 # blah
         for r in runs:
             plot_with_quantiles(np.linspace(min_dataset_size, max_dataset_size, 100),
                 r["data"], ax, label=r["label"], c=r["color"])
