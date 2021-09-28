@@ -342,7 +342,7 @@ def visualize_dataset(logger, tx):
 
     plt.show()
 
-def plot_with_quantiles(x, ys, ax, c=None, label=None, alpha=0.4):
+def plot_with_quantiles(x, ys, ax, c=None, label=None, alpha=0.6):
     x = np.array(x)
     ys = np.array(ys)
 
@@ -358,10 +358,14 @@ def plot_with_quantiles(x, ys, ax, c=None, label=None, alpha=0.4):
     # ax.plot(x, np.median(ys, axis=0), c=c, alpha=alpha, label=label)
 
     # median and quartiles
-    low25 = np.quantile(ys, q=0.25, axis=0)
-    high25 = np.quantile(ys, q=0.75, axis=0)
-    ax.fill_between(x, low25, high25, color=c, alpha=alpha/2)
-    ax.plot(x, np.median(ys, axis=0), c=c, alpha=alpha, label=label)
+    # low25 = np.quantile(ys, q=0.25, axis=0)
+    # high25 = np.quantile(ys, q=0.75, axis=0)
+    # ax.fill_between(x, low25, high25, color=c, alpha=alpha/2)
+    # ax.plot(x, np.median(ys, axis=0), c=c, alpha=alpha, label=label)
+
+    # plot each line individually
+    for i, y in enumerate(ys):
+        plt.plot(x, y, alpha=None, label=i)
 
 
 if __name__ == '__main__':
@@ -408,29 +412,44 @@ if __name__ == '__main__':
 
         runs = [
             {
-                "prefix": 'throwing_20_objects',
-                "label": 'BALD then BALD',
+                "prefix": 'throwing_20_objects_repeat',
+                "label": '5 init',
                 "data": [],
-                "color": 'b'
-            },
-            {
-                "prefix": 'throwing_20_objects_random',
-                "label": 'Random then Random',
-                "data": [],
-                "color": 'r'
+                "color": 'b',
+                'n_data_range': [0,1]
             },
             # {
-            #     "prefix": 'throwing_20_objects_random_then_bald_fitting',
+            #     "prefix": 'throwing_20_objects_10_init',
+            #     "label": '10 init',
+            #     "data": [],
+            #     "color": 'r',
+            #     'n_data_range': [0,1]
+            # },
+            # {
+            #     "prefix": 'throwing_20_objects_20_init',
+            #     "label": '20 init',
+            #     "data": [],
+            #     "color": 'g',
+            #     'n_data_range': [0,1]
+            # },
+            # {
+            #     "prefix": 'throwing_20_objects_repeat_random_then_bald_fitting',
             #     "label": 'Random then BALD',
             #     "data": [],
             #     "color": 'g'
             # },
+            # {
+            #     "prefix": 'throwing_20_objects_repeat_bald_then_random_fitting',
+            #     "label": 'BALD then Random',
+            #     "data": [],
+            #     "color": 'm'
+            # },
 
         ]
-        exp_path = 'learning/experiments/logs'
+        exp_path = 'learning/experiments/logs/sept_27th'
         ax = plt.gca()
-        min_dataset_size = 0 # these will be updated as we process the logs
-        max_dataset_size = 0
+
+        max_acquisitions = 100
 
         for r in runs:
             for fname in os.listdir(exp_path):
@@ -439,17 +458,20 @@ if __name__ == '__main__':
                     path_to_task_performance_file = path_to_log + '/results/task_performance.npy'
                     path_to_val_accuracy_file = path_to_log + '/results/val_accuracy.npy'
                     print(f'Loading from {fname}')
-                    if not os.path.isfile(path_to_task_performance_file):
+
+
+                    logger = ActiveExperimentLogger(path_to_log, use_latents=True)
+                    logger.args.max_acquisitions = max_acquisitions  # lazy
+                    logger.args.throwing = True # lazy
+
+                    # get the maximum and minimum size of the training set, to set the x axis on the plot
+                    r["n_data_range"] = [logger.load_dataset(0).tensors[0].shape[0],
+                                        logger.load_dataset(logger.args.max_acquisitions).tensors[0].shape[0]]
+
+                    if not os.path.isfile(path_to_val_accuracy_file):
                         print(f'Failed to find task_performance.npy for {fname}. Processing Log.')
-                        logger = ActiveExperimentLogger(path_to_log, use_latents=True)
-                        logger.args.max_acquisitions = 100  # lazy
-                        logger.args.throwing = True # lazy
                         plot_latent_uncertainty(logger, ax=ax)
                         plot_val_accuracy(logger, ax=ax)
-
-
-                        min_dataset_size = logger.load_dataset(0).tensors[0].shape[0]
-                        max_dataset_size = logger.load_dataset(logger.args.max_acquisitions).tensors[0].shape[0]
 
                         # task performance
                         # objects = logger.get_objects(ThrowingBall)
@@ -463,9 +485,8 @@ if __name__ == '__main__':
                     r["data"].append(np.load(path_to_val_accuracy_file))
 
 
-        if min_dataset_size == max_dataset_size: max_dataset_size = 1 # blah
         for r in runs:
-            plot_with_quantiles(np.linspace(min_dataset_size, max_dataset_size, 100),
+            plot_with_quantiles(np.linspace(*r["n_data_range"], max_acquisitions),
                 r["data"], ax, label=r["label"], c=r["color"])
 
 

@@ -128,11 +128,17 @@ def run_both_phases(args, dry=False):
 
 def run_manually():
     commands = [
-    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_random_then_bald_fitting_run_0 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=150 --n-samples=1000 --n-acquire=5 --n-objects=1 --hide-dims=0,1,2,3,4,5,6,7,8,9 --acquisition=bald --object-fname= --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/sept_24th/throwing_20_objects_random_run_0-20210924-110249 --latent-ensemble-tx=100",
-    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_random_then_bald_fitting_run_1 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=150 --n-samples=1000 --n-acquire=5 --n-objects=1 --hide-dims=0,1,2,3,4,5,6,7,8,9 --acquisition=bald --object-fname= --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/sept_24th/throwing_20_objects_random_run_1-20210924-110250 --latent-ensemble-tx=100",
-    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_random_then_bald_fitting_run_2 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=150 --n-samples=1000 --n-acquire=5 --n-objects=1 --hide-dims=0,1,2,3,4,5,6,7,8,9 --acquisition=bald --object-fname= --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/sept_24th/throwing_20_objects_random_run_2-20210924-110249 --latent-ensemble-tx=100",
-    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_random_then_bald_fitting_run_3 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=150 --n-samples=1000 --n-acquire=5 --n-objects=1 --hide-dims=0,1,2,3,4,5,6,7,8,9 --acquisition=bald --object-fname= --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/sept_24th/throwing_20_objects_random_run_3-20210924-110249 --latent-ensemble-tx=100",
-    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_random_then_bald_fitting_run_4 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=150 --n-samples=1000 --n-acquire=5 --n-objects=1 --hide-dims=0,1,2,3,4,5,6,7,8,9 --acquisition=bald --object-fname= --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/sept_24th/throwing_20_objects_random_run_4-20210924-110249 --latent-ensemble-tx=100"
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_random_then_bald_fitting_run_0 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=bald --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_random_run_0-20210927-120838 --latent-ensemble-tx=100",
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_random_then_bald_fitting_run_1 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=bald --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_random_run_1-20210927-120838 --latent-ensemble-tx=100",
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_random_then_bald_fitting_run_2 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=bald --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_random_run_2-20210927-120839 --latent-ensemble-tx=100",
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_random_then_bald_fitting_run_3 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=bald --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_random_run_3-20210927-120838 --latent-ensemble-tx=100",
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_random_then_bald_fitting_run_4 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=bald --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_random_run_4-20210927-120838 --latent-ensemble-tx=100",
+    
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_bald_then_random_fitting_run_0 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=random --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_run_0-20210927-101736 --latent-ensemble-tx=100",
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_bald_then_random_fitting_run_1 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=random --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_run_1-20210927-101735 --latent-ensemble-tx=100",
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_bald_then_random_fitting_run_2 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=random --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_run_2-20210927-101735 --latent-ensemble-tx=100",
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_bald_then_random_fitting_run_3 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=random --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_run_3-20210927-101735 --latent-ensemble-tx=100",
+    "python -m learning.domains.throwing.active_train --max-acquisitions=100 --exp-name=throwing_20_objects_repeat_bald_then_random_fitting_run_4 --batch-size=16 --n-models=10 --n-latent-samples=10 --n-epochs=100 --n-acquire=5 --n-objects=1 --acquisition=random --use-latents --use-normalization --fitting --latent-ensemble-exp-path=learning/experiments/logs/throwing_20_objects_repeat_run_4-20210927-101736 --latent-ensemble-tx=100"
     ]
 
     print("\n".join(commands))
@@ -140,13 +146,13 @@ def run_manually():
 
 
 if __name__ == '__main__':
-    run_manually()
-    # parser = get_parser() # parser for active_train
-    # # additional arguments for running multiple experiments
-    # parser.add_argument('--n-runs', type=int, default=5)
-    # parser.add_argument('--prefix', type=str, default='throwing')
-    # parser.add_argument('--dry', action='store_true')
-    # args = parser.parse_args()
+    # run_manually()
+    parser = get_parser() # parser for active_train
+    # additional arguments for running multiple experiments
+    parser.add_argument('--n-runs', type=int, default=5)
+    parser.add_argument('--prefix', type=str, default='throwing')
+    parser.add_argument('--dry', action='store_true')
+    args = parser.parse_args()
 
-    # # run_with_subprocess(args, dry=args.dry) # run a single phase
-    # run_both_phases(args, dry=args.dry) # run both phases
+    # run_with_subprocess(args, dry=args.dry) # run a single phase
+    run_both_phases(args, dry=args.dry) # run both phases

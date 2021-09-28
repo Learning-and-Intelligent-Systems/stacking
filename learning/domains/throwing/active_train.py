@@ -219,11 +219,11 @@ def run_active_throwing(args):
 
 
     print('Generating initialization and validation datasets')
-    init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 5*args.n_objects, duplicate=False)),
+    init_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, args.n_init_per_object*args.n_objects, duplicate=False)),
                                          batch_size=args.batch_size,
                                          shuffle=True,
                                          n_dataloaders=args.n_models)
-    val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, 5*args.n_objects)),
+    val_dataloader = ParallelDataLoader(TensorDataset(*generate_dataset(objects, args.n_init_per_object*args.n_objects)),
                                      batch_size=args.batch_size,
                                      shuffle=True,
                                      n_dataloaders=1)
@@ -255,6 +255,7 @@ def get_parser():
     parser.add_argument('--hide-dims', type=str, default='0,1,2,3,4,5,6,7,8,9')
     parser.add_argument('--acquisition', type=str, default='bald')
     parser.add_argument('--object-fname', type=str, default='')
+    parser.add_argument('--n-init-per-object', type=int, default=5)
 
     parser.add_argument('--use-latents', action='store_true')
     parser.add_argument('--use-normalization', action='store_true')
