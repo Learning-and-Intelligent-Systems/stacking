@@ -98,42 +98,42 @@ def make_x_partially_observable(xs, hide_dims):
     return xs[..., keep_dims]
 
 def _normalize_x(x):
-    x_mean = torch.Tensor([ 1.0000000e+00,   # R
-                            0.0000000e+00,   # G
-                            0.0000000e+00,   # B
-                            1.0000000e+00,   # mass
-                            4.0504143e-02,   # radius
-                            1.0000000e+00,   # drag linear
-                            1.0000000e-05,   # drag angular
-                            8.0000000e-01,   # friction
-                            1.0000000e-04,   # rolling resistance
-                            4.8150727e-01,   # bounciness
-                            7.8539816e-01,   # release angle
-                            0.0000000e+00])  # release spin
+    x_mean = torch.Tensor([ 1.0,   # R
+                            0.0,   # G
+                            0.0,   # B
+                            1.0,   # mass
+                            0.024997571,   # radius
+                            1.0348577,   # drag linear
+                            9.99915e-06,   # drag angular
+                            0.7999223,   # friction
+                            0.00055852125,   # rolling resistance
+                            0.5,   # bounciness
+                            0.78535545,   # release angle
+                            0.05847132])  # release spin
 
-    x_var = torch.Tensor([  0.0000000e+00,   # R
-                            0.0000000e+00,   # G
-                            0.0000000e+00,   # B
-                            0.0000000e+00,   # mass
-                            1.2525999e-04,   # radius
-                            0.0000000e+00,   # drag linear
-                            0.0000000e+00,   # drag angular
-                            0.0000000e+00,   # friction
-                            0.0000000e+00,   # rolling resista
-                            3.6030598e-02,   # bounciness
-                            5.2659944e-02,   # release angle
-                            3.3095131e+01])  # release spin
+    x_var = torch.Tensor([  0.0,   # R
+                            0.0,   # G
+                            0.0,   # B
+                            0.0,   # mass
+                            5.900174e-12,   # radius
+                            0.08192061,   # drag linear
+                            7.216509e-19,   # drag angular
+                            6.041778e-09,   # friction
+                            6.484137e-08,   # rolling resista
+                            0.0,   # bounciness
+                            0.051374067,   # release angle
+                            33.987217])  # release spin
 
     return (x - x_mean)/torch.maximum(torch.sqrt(x_var), torch.Tensor([1e-6]))
 
 def _normalize_y(y):
-    y_mean = 0.9944
-    y_var = 0.2188
+    y_mean = 0.94706535
+    y_var = 0.22947912
     return (y - y_mean)/np.sqrt(y_var)
 
 def _unnormalize_y(y, use_mean=True):
-    y_mean = 0.9944 * use_mean
-    y_var = 0.2188
+    y_mean = 0.94706535 * use_mean
+    y_var = 0.22947912
     return y * np.sqrt(y_var) + y_mean
 
 

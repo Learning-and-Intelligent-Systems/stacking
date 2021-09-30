@@ -84,7 +84,7 @@ def plot_latent_uncertainty(logger, ax=plt.gca()):
         ensemble = logger.get_ensemble(tx)
         scales.append(torch.exp(ensemble.latent_logscales).mean(axis=0).detach().numpy())
 
-    plt.plot(np.array(scales))
+    ax.plot(np.array(scales))
 
     ax.set_xlabel('Acquisition Step')
     ax.set_ylabel('Mean Latent Scale')

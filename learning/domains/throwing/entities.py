@@ -43,7 +43,7 @@ class ThrowingBall:
         color = np.random.rand(3)
         mass = np.random.uniform(0.5, 1.5)
         radius = np.random.uniform(0.02, 0.06)
-        air_drag_linear = np.random.uniform(0., 2.)
+        air_drag_linear = np.random.uniform(0.5, 1.5)
         air_drag_angular = np.random.uniform(5e-6, 5e-5)
         friction_coef = np.random.uniform(0.1, 1)
         rolling_resistance = np.random.uniform(1e-4, 1e-3)
