@@ -137,6 +137,7 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
     """
     def __init__(self, block, D, N=200, likelihood=None, plot=False):
         self.block = deepcopy(block)
+        self.block_id = block.get_id()
         self.plot = plot                        # plot the particles
 
         self.N = N        # number of particles
@@ -214,7 +215,9 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
                 #                     action,
                 #                     T,
                 #                     true_block)
-                label = observation['2block']['labels'][0]
+                for k in observation.keys():
+                    if observation[k]['towers'].shape[0] != 0:
+                        label = observation[k]['labels'][0]
                 for ix in range(N):
                     #print(bern_probs_particles[ix], bern_probs_particles[ix] > 0.5, label, bern_probs_particles[ix] > 0.5 == label)
                     if (float(bern_probs_particles[ix] > 0.5) == label):
@@ -287,7 +290,7 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
                                                N_samples=10,
                                                collapse_latents=True, 
                                                collapse_ensemble=True,
-                                               keep_latent_ix=10,
+                                               keep_latent_ix=self.block_id,
                                                latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
                 bernoulli_probs.append(pred.cpu().detach().numpy())
         return np.concatenate(bernoulli_probs)
@@ -304,8 +307,10 @@ class DiscreteLikelihoodParticleBelief(BeliefBase):
 
         # Forward simulation using the LatentEnsemble likelihood.
         bernoulli_probs = self.get_particle_likelihoods(self.particles.particles, observation)
-        label = observation['2block']['labels'][0]
 
+        for k in observation.keys():
+            if observation[k]['towers'].shape[0] != 0:
+                label = observation[k]['labels'][0]
         n_correct = ((bernoulli_probs > 0.5).astype('float32') == label).sum()
         print('Correct for CURRENT sample:', n_correct/len(bernoulli_probs), len(bernoulli_probs))
         # TODO: Replace below using the likelihood defined by the NN.

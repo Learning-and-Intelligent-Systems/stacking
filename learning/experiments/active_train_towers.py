@@ -87,11 +87,11 @@ def get_initial_dataset(args, block_set, agent, logger):
         # If an initial dataset isn't given, sample one based on the sampler type.
         if args.sampler == 'sequential':
             print('Sampling initial dataset sequentially. Dataset NOT sampled on real robot.')
-            towers_dict = sample_sequential_data(block_set, None, 40)
+            towers_dict = sample_sequential_data(block_set, None, 200)
             towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
             dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
 
-            val_towers_dict = sample_sequential_data(block_set, None, 40)
+            val_towers_dict = sample_sequential_data(block_set, None, 200)
             val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
             val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)            
         else:
@@ -173,7 +173,7 @@ def run_active_towers(args):
             args.num_train_blocks = len(block_set) - args.num_eval_blocks
         else:
             block_set = load_blocks(train_blocks_fname=args.block_set_fname,
-                                    num_blocks=10)
+                                    num_blocks=50)
     else:
         raise NotImplementedError()
 

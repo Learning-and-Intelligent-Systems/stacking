@@ -31,7 +31,10 @@ def get_validation_accuracy(logger, fname):
     for tx in range(0, logger.args.max_acquisitions):
         print('Eval timestep, ', tx)
         ensemble = logger.get_ensemble(tx)
-        preds = get_sequential_predictions(val_towers, ensemble, use_latents=logger.use_latents).mean(1).numpy()
+        if torch.cuda.is_available:
+            ensemble = ensemble.cuda()
+
+        preds = get_sequential_predictions(val_towers, ensemble, use_latents=logger.use_latents).mean(1).cpu().numpy()
 
         start = 0
         for k in tower_keys:
@@ -77,7 +80,7 @@ def plot_val_accuracy(logger, init_dataset_size=100, n_acquire=10, separate_axs=
     plt.savefig(logger.get_figure_path('val_accuracy.png'))
     plt.clf()
 
-def get_predictions_with_particles(particles, observation, ensemble):
+def get_predictions_with_particles(particles, observation, ensemble, fitting_block_ix):
     preds = []
     dataset = TowerDataset(tower_dict=observation,
                            augment=False)
@@ -91,19 +94,20 @@ def get_predictions_with_particles(particles, observation, ensemble):
     for set_of_batches in dataloader:
         towers, block_ids, _ = set_of_batches[0]
         sub_tower_preds = []
-        
+
         for n_blocks in range(2, towers.shape[1]+1):
             if torch.cuda.is_available():
-                tensor = tensor.cuda()
+                towers = towers.cuda()
+                block_ids = block_ids.cuda()
             with torch.no_grad():
                 for ix in range(0, 1): # Only use first 10 particles as a sample from the particle distribution.
                     pred = ensemble.forward(towers=towers[:, :n_blocks, 4:],
                                             block_ids=block_ids[:, :n_blocks],
-                                            N_samples=10,
+                                            N_samples=50,
                                             collapse_latents=True, 
                                             collapse_ensemble=True,
-                                            pf_latent_ix=10,
-                                            latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
+                                            pf_latent_ix=fitting_block_ix,
+                                            latent_samples=latent_samples[ix*50:(ix+1)*50,:]).squeeze()
                     sub_tower_preds.append(pred)
 
         sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
@@ -120,12 +124,15 @@ def get_pf_validation_accuracy(logger, fname):
     for tx in range(0, logger.args.max_acquisitions):
         print('Eval timestep, ', tx)
         ensemble = logger.get_ensemble(tx)
+        if torch.cuda.is_available():
+            ensemble = ensemble.cuda()
         particles = logger.load_particles(tx)
+        fitted_block_ix = ensemble.latent_locs.shape[0]-1
 
         start = 0
         preds_list = []
 
-        preds = get_predictions_with_particles(particles.particles, val_towers, ensemble)
+        preds = get_predictions_with_particles(particles.particles, val_towers, ensemble, fitted_block_ix)
         preds_list += preds.cpu().numpy().tolist()
 
         preds = np.array(preds_list)
@@ -205,7 +212,7 @@ def min_contact_regret_evaluation(logger, block_set, fname, args, save_imgs=Fals
     return evaluate_planner(logger, block_set, contact_area, fname, args, save_imgs, img_prefix='contact')
 
 def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, img_prefix=''):
-    tower_keys, tower_sizes  = ['5block'], [5]
+    tower_keys, tower_sizes  = ['2block'], [2]
     tp = TowerPlanner(stability_mode='contains')
     ep = LatentEnsemblePlanner(logger)
 
@@ -224,13 +231,16 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
         ensemble = logger.get_ensemble(tx)
         particles = logger.load_particles(tx)
         if particles is not None:
-            latent_samples = torch.Tensor(particles.particles)[0:10, :]
-            pf_latent_ix = 10
+            latent_samples = torch.Tensor(particles.particles)[0:50, :]
+            # latent_samples[:, 0] = -20.
+            print(latent_samples)
+            pf_latent_ix = ensemble.latent_locs.shape[0]-1
         else:
             latent_samples = None
             pf_latent_ix = -1
         if torch.cuda.is_available():
             ensemble = ensemble.cuda()
+        
             
         for k, size in zip(tower_keys, tower_sizes):
             print('Tower size', k)
@@ -242,13 +252,15 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                 
                 if ('fit' in logger.args and logger.args.fit) or (logger.load_particles(0) is not None):
                     # Must include the fitting block.
-                    plan_blocks = [block_set[-1]] + list(np.random.choice(block_set[:-1], size-1, replace=False))
+                    plan_blocks = list(np.random.choice(block_set[:-1], size-1, replace=False)) + [block_set[-1]]
                     plan_blocks = copy.deepcopy(plan_blocks)
                     print('Planning with blocks: ', [b.name for b in plan_blocks])
+                    fixed_order = True
                 else:
                     plan_blocks = np.random.choice(blocks, size, replace=False)	
                     plan_blocks = copy.deepcopy(plan_blocks)	
-                
+                    fixed_order = False
+
                 tower, reward, max_reward, tower_block_ids, rotated_tower = ep.plan(plan_blocks, 
                                                                      ensemble, 
                                                                      reward_fn,
@@ -256,7 +268,8 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                                                                      num_blocks=size,
                                                                      n_tower=t,
                                                                      pf_latent_ix=pf_latent_ix,
-                                                                     latent_samples=latent_samples)
+                                                                     latent_samples=latent_samples,
+                                                                     fixed_order=fixed_order)
                                                                  
                 # perturb tower if evaluating with noisy model
                 block_tower = []
@@ -271,15 +284,25 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
                     reward = 0
                     num_failures += 1
 
-                    if False and reward != 0:
-                        print(reward, max_reward)
-                        w = World(block_tower)
-                        env = Environment([w], vis_sim=True, vis_frames=True)
-                        input()
-                        for tx in range(240):
-                            env.step(vis_frames=True)
-                            time.sleep(1/240.)
-                        env.disconnect()
+                if False:# and reward != 0:
+                    print(reward, max_reward)
+                    w = World(block_tower)
+                    env = Environment([w], vis_sim=True, vis_frames=True)
+                    input()
+                    # for tx in range(240):
+                    #     env.step(vis_frames=True)
+                    #     time.sleep(1/240.)
+                    env.disconnect()
+
+                    # observation = { k: {
+                    #         'towers': np.array([tower]),
+                    #         'block_ids': np.array([tower_block_ids]),
+                    #         'labels': np.array([0]),
+                    #     }
+                    # }
+                    # p = get_predictions_with_particles(latent_samples, observation, ensemble)
+                    # print('Prediction:', p)
+
 
                 # Compare heights and calculate regret.
                 regret = (max_reward - reward)/max_reward
@@ -332,7 +355,7 @@ def plot_regret(logger, fname):
     with open(logger.get_figure_path(fname), 'rb') as handle:
         regrets = pickle.load(handle)
 
-    tower_keys = ['5block'] # ['2block', '3block', '4block', '5block']
+    tower_keys = ['2block'] # ['2block', '3block', '4block', '5block']
     upper975 = {k: [] for k in tower_keys}
     upper75 = {k: [] for k in tower_keys}
     median = {k: [] for k in tower_keys}
@@ -389,7 +412,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
-
+    
     if args.eval_type == 'val':
         init_dataset_size, n_acquire = logger.get_acquisition_params()
         if logger.load_particles(tx=0) is not None:
@@ -408,6 +431,7 @@ if __name__ == '__main__':
                                                  fit_blocks_fname=logger.args.block_set_fname,
                                                  fit_block_ixs=logger.args.eval_block_ixs)
         else:
+            print('Testing on the training phase blocks.')
             block_set = load_blocks(train_blocks_fname=logger.args.block_set_fname)
 
         reward_lookup = {

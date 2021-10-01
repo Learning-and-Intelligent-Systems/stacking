@@ -80,16 +80,25 @@ if __name__ == '__main__':
     parser.add_argument('--debug',
                         action='store_true',
                         help='set to run in debug mode')
+    parser.add_argument('--n-blocks',
+                        type=int,
+                        required=True)
+    parser.add_argument('--eval-block-ixs', 
+                        nargs='+', 
+                        type=int, 
+                        default=[], 
+                        help='Indices of which eval blocks to use.')
     
     args = parser.parse_args()
     if args.debug:
         import pdb; pdb.set_trace()
  
     if args.train_block_set_fname != '':
+        print(args.eval_block_ixs)
         block_set = load_blocks(train_blocks_fname=args.train_block_set_fname, 
                                 eval_blocks_fname=args.eval_block_set_fname,
-                                eval_block_ixs=[0],
-                                num_blocks=11)
+                                eval_block_ixs=args.eval_block_ixs,
+                                num_blocks=args.n_blocks)
     else:
         block_set = None
     

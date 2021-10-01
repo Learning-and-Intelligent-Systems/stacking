@@ -64,10 +64,12 @@ def get_train_and_fit_blocks(pretrained_ensemble_path, use_latents, fit_blocks_f
         print('[WARNING] Training block set was not specified. Using default blocks')
         train_logger.args.block_set_fname = 'learning/data/may_blocks/blocks/10_random_block_set_1.pkl'
     train_blocks_fname = train_logger.args.block_set_fname
+    with open(train_blocks_fname, 'rb') as handle:
+        n_train = len(pickle.load(handle))
     block_set = load_blocks(train_blocks_fname=train_blocks_fname, 
                             eval_blocks_fname=fit_blocks_fname,
                             eval_block_ixs=fit_block_ixs,
-                            num_blocks=11)
+                            num_blocks=n_train+1)
     return block_set
     
 

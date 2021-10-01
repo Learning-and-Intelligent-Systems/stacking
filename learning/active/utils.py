@@ -81,7 +81,8 @@ class ActiveExperimentLogger:
 
         with open(os.path.join(self.exp_path, 'args.pkl'), 'rb') as handle:
             self.args = pickle.load(handle)
-
+        if 'max_acquisitions' not in self.args:
+            self.args.max_acquisitions = 1
         self.update_max_acquisitions()
 
     def update_max_acquisitions(self):

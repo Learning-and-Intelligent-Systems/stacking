@@ -1,6 +1,7 @@
 import argparse
 from pddlstream.language.statistics import DATA_DIR
 import pickle
+import torch
 
 from learning.domains.towers.tower_data import TowerDataset, ParallelDataLoader
 from learning.active.utils import ActiveExperimentLogger
@@ -68,6 +69,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.use_latents = True
     args.fit = False
+    args.max_acquisitions = 1
 
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
@@ -76,6 +78,8 @@ if __name__ == '__main__':
 
     # Build model.
     ensemble = initialize_model(args)
+    if torch.cuda.is_available():
+        ensemble = ensemble.cuda()
 
     # Train model.
     train_latent(dataloader=train_dataloader,

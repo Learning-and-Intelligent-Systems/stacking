@@ -17,7 +17,7 @@ def plan_task(pf, block_set, logger, args):
     pass
 
 def find_informative_tower(pf, block_set, logger, args):
-    data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1)
+    data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 5), include_index=args.num_train_blocks+args.num_eval_blocks-1)
     
     all_towers = []
     all_preds = []
@@ -62,14 +62,17 @@ def run_particle_filter_fitting(args):
 
     # ----- Load the block set -----
     assert(len(args.eval_block_ixs) == 1)  # Right now the code only supports doing inference for a single block on top of the training blocks.
+    print(args.block_set_fname)
     block_set = get_train_and_fit_blocks(pretrained_ensemble_path=args.pretrained_ensemble_exp_path,
                                          use_latents=True,
                                          fit_blocks_fname=args.block_set_fname,
                                          fit_block_ixs=args.eval_block_ixs)
+    print(len(block_set))
     args.num_eval_blocks = len(args.eval_block_ixs)
     args.num_train_blocks = len(block_set) - args.num_eval_blocks
 
     # ----- Likelihood Model -----
+    train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path, use_latents=True)
     latent_ensemble = train_logger.get_ensemble(args.ensemble_tx)
     if torch.cuda.is_available():
         latent_ensemble.cuda()
@@ -98,6 +101,7 @@ if __name__ == '__main__':
     parser.add_argument('--strategy', type=str, choices=['bald', 'random', 'task'], default='bald')
     parser.add_argument('--task', type=str, choices=['overhang', 'tallest', 'min-contact'], default='overhang')
     args = parser.parse_args()
+    print(args)
     args.use_latents = True
     args.fit_pf = True
 
