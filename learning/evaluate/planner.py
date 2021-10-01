@@ -200,12 +200,13 @@ class EnsemblePlanner:
         return max_tower, max_reward, ground_truth, max_reward_block_ids
 
 class LatentEnsemblePlanner:
-    def __init__(self, logger, n_samples=None):
+    def __init__(self, logger, n_samples=None, R_unstable=0.):
         self.tower_keys = ['2block', '3block', '4block', '5block']
         self.n_samples = {2: 5000, 3: 10000, 4: 20000,  5: 100000, 6: 250000, 7:500000}
         self.tp = TowerPlanner(stability_mode='contains')
         self.logger = logger
         self.using_cache = False
+        self.R_unstable = R_unstable
 
     def get_cached_towers(self, args, num_blocks, blocks, n_tower):
         key = '%dblock' % num_blocks
@@ -365,7 +366,7 @@ class LatentEnsemblePlanner:
             # print(p)
             # print('-----')
             reward = reward_fn(rotated_tower)
-            exp_reward = p*reward
+            exp_reward = (1-p)*self.R_unstable + p*reward
             if exp_reward >= max_exp_reward:# and p > 0.8:
                 #print(p, reward, exp_reward)
                 if exp_reward > max_exp_reward or (exp_reward == max_exp_reward and p > max_stable):

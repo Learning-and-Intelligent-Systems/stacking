@@ -41,13 +41,16 @@ def plot_task_regret(loggers, problem, output_path):
     tower_keys = ['2block']
     fig, axes = plt.subplots(len(tower_keys), sharex=True, figsize=(20,10))
     axes = [axes]
-    regret_fname = '%s_regrets.pkl' % problem
+    regret_fname = '%s_-1.00_regrets.pkl' % problem
     for name, group_loggers in loggers.items():
         # First create one large results dictionary with pooled results from each logger.
         all_regrets = {}
         for logger in group_loggers:
             init, n_acquire = logger.get_acquisition_params()
             regret_path = logger.get_figure_path(regret_fname)
+            if not os.path.exists(regret_path):
+                print('[WARNING] %s not evaluated.' % logger.exp_path)
+                continue
             with open(regret_path, 'rb') as handle:
                 regrets = pickle.load(handle)
             for k in regrets:

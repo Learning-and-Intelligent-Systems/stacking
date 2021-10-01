@@ -214,7 +214,7 @@ def min_contact_regret_evaluation(logger, block_set, fname, args, save_imgs=Fals
 def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, img_prefix=''):
     tower_keys, tower_sizes  = ['2block'], [2]
     tp = TowerPlanner(stability_mode='contains')
-    ep = LatentEnsemblePlanner(logger)
+    ep = LatentEnsemblePlanner(logger, R_unstable=args.R_unstable)
 
     # Store regret for towers of each size.
     regrets = {k: [] for k in tower_keys}
@@ -320,7 +320,7 @@ def evaluate_planner(logger, blocks, reward_fn, fname, args, save_imgs=False, im
             with open(logger.get_figure_path(fname+'_rewards.pkl'), 'wb') as handle:
                 pickle.dump(rewards, handle)
                 
-            plot_regret(logger, args.problem + '_regrets.pkl')
+            plot_regret(logger, fname + '_regrets.pkl')
         else:
             with open(logger.get_figure_path(fname+'_%d_regrets.pkl' % args.acquisition_step), 'wb') as handle:
                 pickle.dump(regrets, handle)
@@ -409,6 +409,9 @@ if __name__ == '__main__':
     parser.add_argument('--exec-xy-noise',
                         type=float,
                         help='noise to add to xy position of blocks if exec-mode==noisy-model')
+    parser.add_argument('--R-unstable',
+                        type=float,
+                        default=0.)
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
@@ -443,7 +446,7 @@ if __name__ == '__main__':
         # TODO: If fitting, make sure to always include the new block in the block set.
         reward_lookup[args.problem](logger=logger,
                                     block_set=block_set,
-                                    fname=args.problem,
+                                    fname='%s_%.2f' % (args.problem, args.R_unstable),
                                     args=args)            
 
         
