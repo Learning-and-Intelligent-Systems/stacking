@@ -11,13 +11,14 @@ from particle_belief import DiscreteLikelihoodParticleBelief
 from learning.domains.towers.active_utils import sample_unlabeled_data, get_labels
 from learning.active.acquire import bald
 # from learning.evaluate.planner import EnsemblePlanner
+import sys
 
 
 def plan_task(pf, block_set, logger, args):
     pass
 
 def find_informative_tower(pf, block_set, logger, args):
-    data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 5), include_index=args.num_train_blocks+args.num_eval_blocks-1)
+    data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1, ignore_rot=args.disable_rotations)
     
     all_towers = []
     all_preds = []
@@ -38,7 +39,7 @@ def particle_filter_loop(pf, block_set, logger, strategy, args):
         
         # Choose a tower to build that includes the new block.
         if strategy == 'random':
-            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1)
+            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1, ignore_rot=args.disable_rotations)
             tower_dict = data_sampler_fn(1)
         elif strategy == 'bald':
             tower_dict = find_informative_tower(pf, block_set, logger, args)
@@ -47,6 +48,7 @@ def particle_filter_loop(pf, block_set, logger, strategy, args):
         else:
             raise NotImplementedError()
 
+        print(tower_dict['2block']['block_ids'])
         # Get the observation for the chosen tower.
         tower_dict = get_labels(tower_dict, 'noisy-model', None, logger, 0.003)
 
@@ -80,13 +82,22 @@ def run_particle_filter_fitting(args):
 
     # ----- Initialize particle filter from prior -----
     pf = DiscreteLikelihoodParticleBelief(block=block_set[-1],
-                                          D=4,
+                                          D=3,
                                           N=250,
                                           likelihood=latent_ensemble,
                                           plot=True)
 
     # ----- Run particle filter loop -----
     particle_filter_loop(pf, block_set, logger, args.strategy, args)
+
+
+def restart_particle_filter(args):
+    """
+    Restart the particle filter using the given logger until the new max_acquisitions is reached.
+
+    Requires experience to be saved...
+    """
+    pass
 
 
 if __name__ == '__main__':
@@ -100,7 +111,14 @@ if __name__ == '__main__':
     parser.add_argument('--eval-block-ixs', nargs='+', type=int, default=[0], help='Indices of which eval blocks to use.')
     parser.add_argument('--strategy', type=str, choices=['bald', 'random', 'task'], default='bald')
     parser.add_argument('--task', type=str, choices=['overhang', 'tallest', 'min-contact'], default='overhang')
+    parser.add_argument('--disable-rotations', action='store_true', default=False)
+    parser.add_argument('--restart', action='store_true', default=False)
     args = parser.parse_args()
+
+    if args.restart:
+        restart_particle_filter(args)
+        sys.exit(0)
+
     print(args)
     args.use_latents = True
     args.fit_pf = True

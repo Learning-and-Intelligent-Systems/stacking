@@ -16,6 +16,8 @@ if __name__ == '__main__':
     parser.add_argument('--n-samples', type=int, default=1000)
     parser.add_argument('--task', type=str, choices=['overhang', 'tallest', 'min-contact'], default='overhang')
     parser.add_argument('--max-acquisitions', type=int, default=20, help='Number of iterations to run the main active learning loop for.')
+    parser.add_argument('--disable-rotations', action='store_true', default=False)
+
     # Our script will change these.
     parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
     parser.add_argument('--eval-block-ixs', nargs='+', type=int, default=[0], help='Indices of which eval blocks to use.')
@@ -29,7 +31,10 @@ if __name__ == '__main__':
     # Run the PF code for each block.
     for bx in range(len(blocks)):
         train_logger = ActiveExperimentLogger(args.pretrained_ensemble_exp_path, use_latents=True)
-        args.exp_name = train_logger.args.exp_name + '_pf-fit-block-%d' % bx
+        if args.strategy == 'bald':
+            args.exp_name = train_logger.args.exp_name + '_pf-fit-block-%d' % bx
+        else:
+            args.exp_name = train_logger.args.exp_name + '_pf-fit-random-block-%d' % bx
         args.eval_block_ixs = [bx]
         run_particle_filter_fitting(args)
 

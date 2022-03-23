@@ -121,7 +121,18 @@ def get_pf_validation_accuracy(logger, fname):
     with open(fname, 'rb') as handle:
         val_towers = pickle.load(handle)
 
-    for tx in range(0, logger.args.max_acquisitions):
+    if args.max_acquisitions is not None: 
+        eval_range = range(0, args.max_acquisitions, 1)
+        output_fname = 'val_accuracies.pkl'
+    elif args.acquisition_step is not None: 
+        eval_range = [args.acquisition_step]
+        output_fname = 'val_accuracies_%d.pkl' % args.acquisition_step
+    else:
+        print('MUST SPECIFY args.max_acquisitions or args.acquisition_step')
+        sys.exit(0)
+
+
+    for tx in eval_range:
         print('Eval timestep, ', tx)
         ensemble = logger.get_ensemble(tx)
         if torch.cuda.is_available():
@@ -158,7 +169,7 @@ def get_pf_validation_accuracy(logger, fname):
             start = end
         
     
-    with open(logger.get_figure_path('val_accuracies.pkl'), 'wb') as handle:
+    with open(logger.get_figure_path(output_fname), 'wb') as handle:
         pickle.dump(accs, handle)
     return accs
 
@@ -182,7 +193,20 @@ def cumulative_overhang_regret_evaluation(logger, block_set, fname, args, save_i
         return total_overhang
     
     return evaluate_planner(logger, block_set, horizontal_overhang, fname, args, save_imgs, img_prefix='cumulative_overhang')
+
+def any_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
+    def any_overhang(tower):
+        if tower.shape[0] > 2: print('[WARNING]: Any overhang is only for 2 block towers.')
+        right_overhang = (tower[1, 7] + tower[1, 4]/2.) - (tower[0, 7] + tower[0, 4]/2.)
+        left_overhang = (tower[0, 7] - tower[0, 4]/2.) - (tower[1, 7] - tower[1, 4]/2.)
+        front_overhang =  (tower[1, 8] + tower[1, 5]/2.) - (tower[0, 8] + tower[0, 5]/2.)
+        back_overhang = (tower[0, 8] - tower[0, 5]/2.) - (tower[1, 8] - tower[1, 5]/2.)
+
+        total_overhang = np.max([right_overhang, left_overhang, front_overhang, back_overhang])
+        return total_overhang
     
+    return evaluate_planner(logger, block_set, any_overhang, fname, args, save_imgs, img_prefix='cumulative_overhang')
+
 def longest_overhang_regret_evaluation(logger, block_set, fname, args, save_imgs=False):
     def horizontal_overhang(tower):
         return (tower[-1, 7] + tower[-1, 4]/2.) - (tower[0, 7] + tower[0, 4]/2.)
@@ -395,7 +419,7 @@ if __name__ == '__main__':
     # Validation evaluation arguments.
     parser.add_argument('--val-dataset-fname', type=str)
     # Task performance arguments.
-    parser.add_argument('--problem', type=str, choices=['min-contact', 'cumulative-overhang', 'tallest'])
+    parser.add_argument('--problem', type=str, choices=['min-contact', 'any-overhang', 'cumulative-overhang', 'tallest'])
     parser.add_argument('--max-acquisitions',
                         type=int, 
                         help='evaluate from 0 to this acquisition step (use either this or --acquisition-step)')
@@ -412,6 +436,7 @@ if __name__ == '__main__':
     parser.add_argument('--R-unstable',
                         type=float,
                         default=0.)
+
     args = parser.parse_args()
     
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
@@ -423,8 +448,9 @@ if __name__ == '__main__':
                                               fname=args.val_dataset_fname)
         else:
             accs = get_validation_accuracy(logger=logger,
-                                           fname=args.val_dataset_fname)                     
-        plot_val_accuracy(logger, init_dataset_size=init_dataset_size, n_acquire=n_acquire)
+                                           fname=args.val_dataset_fname)  
+        if args.max_acquisitions is not None:                   
+            plot_val_accuracy(logger, init_dataset_size=init_dataset_size, n_acquire=n_acquire)
 
     elif args.eval_type == 'task':
         # Load the block set for evaluation.
@@ -440,7 +466,8 @@ if __name__ == '__main__':
         reward_lookup = {
             'min-contact': min_contact_regret_evaluation,
             'tallest': tallest_tower_regret_evaluation,
-            'cumulative-overhang': cumulative_overhang_regret_evaluation
+            'cumulative-overhang': cumulative_overhang_regret_evaluation,
+            'any-overhang': any_overhang_regret_evaluation
         }
 
         # TODO: If fitting, make sure to always include the new block in the block set.

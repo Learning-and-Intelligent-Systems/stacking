@@ -147,7 +147,7 @@ def sample_sequential_data(block_set, dataset, n_samples, prerotate=False):
             sampled_towers[k]['block_ids'] = np.array(sampled_towers[k]['block_ids'])
     return sampled_towers
 
-def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_blocks=(2, 5), include_index=-1):
+def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_blocks=(2, 5), include_index=-1, ignore_rot=False):
     """ Generate n_samples random towers. For now each sample can also have
     random blocks. We should change this later so that the blocks are fixed 
     (i.e., chosen elsewhere) and we only sample the configuration.
@@ -182,7 +182,7 @@ def sample_unlabeled_data(n_samples, block_set=None, prerotate=False, range_n_bl
         else:
             blocks = [Object.random(f'obj_{ix}') for ix in range(n_blocks)]
         # sample a new tower
-        tower = sample_random_tower(blocks)
+        tower = sample_random_tower(blocks, ignore_rot=ignore_rot)
         rotated_tower = [get_rotated_block(b) for b in tower]
         # and save that tower in the sampled_towers dict
         if prerotate:
@@ -315,7 +315,7 @@ def get_sequential_predictions(dataset, ensemble, use_latents=False):
                     sub_tower_preds.append(ensemble.forward(
                         tensor[:, :n_blocks, 4:], block_ids[:, :n_blocks], N_samples=10, collapse_ensemble=True, collapse_latents=True).squeeze(dim=-1))
                 else:
-                    sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]))
+                    sub_tower_preds.append(ensemble.forward(tensor[:, :n_blocks, :]).mean(-1, keepdim=True))
         sub_tower_preds = torch.stack(sub_tower_preds, dim=0)
         #print('SubTowerPreds:', sub_tower_preds.shape)
         #preds.append(sub_tower_preds[-1,:,:])
@@ -367,6 +367,31 @@ def get_predictions(dataset, ensemble, use_latents=False, N_samples=10, collapse
             else:
                 preds.append(ensemble.forward(tensor))
     return torch.cat(preds, dim=0)
+
+def get_predictions_single_ensemble(dataset, ensemble):
+    """
+    :param dataset: A tower_dict structure.
+    :param ensemble: The Ensemble model which to use for predictions.
+    :return: Return (N, K) array of flat predictions. Predictions are 
+    ordered by tower size.
+    """
+    preds = []
+    # Create TowerDataset object.
+    tower_dataset = TowerDataset(dataset, augment=False)
+    tower_sampler = TowerSampler(dataset=tower_dataset,
+                                 batch_size=64,
+                                 shuffle=False)
+    tower_loader = DataLoader(dataset=tower_dataset,
+                              batch_sampler=tower_sampler)
+
+    # Iterate through dataset, getting predictions for each.
+    for tensor, _, _ in tower_loader:
+        if torch.cuda.is_available():
+            tensor = tensor.cuda()
+        with torch.no_grad():
+            preds.append(ensemble.forward(tensor))
+    return torch.cat(preds, dim=0)
+
 
 def get_labels(dataset, exec_mode, agent, logger, xy_noise, save_tower=False, label_subtowers=False):
     """ Takes as input a dictionary from the get_subset function. 

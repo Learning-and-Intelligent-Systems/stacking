@@ -14,9 +14,20 @@ class FCGN(nn.Module):
         # the untransformed features for the edges.
         self.E = nn.Sequential(nn.Linear(n_in, n_hidden))
                                #nn.ReLU())
+        # if remove_com:
+        #     # Make E more complicated so it can do learn identity.
+        #     self.E = nn.Sequential(nn.Linear(n_in, n_hidden),
+        #                            nn.ReLU(),
+        #                            nn.Linear(n_hidden, n_hidden),
+        #                            nn.ReLU(),
+        #                            nn.Linear(n_hidden, n_hidden))            
 
         # Message function that compute relation between two nodes and outputs a message vector.
-        self.M = nn.Sequential(nn.Linear(2*n_in, n_hidden),
+        # if remove_com:
+        #     self.n_edge_in = n_hidden
+        #else:
+        self.n_edge_in = n_in
+        self.M = nn.Sequential(nn.Linear(2*self.n_edge_in, n_hidden),
                                nn.ReLU(),
                                nn.Linear(n_hidden, n_hidden),
                                nn.ReLU(),
@@ -45,10 +56,13 @@ class FCGN(nn.Module):
 
         # Get features between all node. 
         # xx.shape = (N, K, K, 2*n_in)
+        # if self.remove_com:
+        #     x = h
+        #else:
         x = towers 
-        x = x[:, :, None, :].expand(N, K, K, self.n_in)
+        x = x[:, :, None, :].expand(N, K, K, self.n_edge_in)
         xx = torch.cat([x, x.transpose(1, 2)], dim=3)
-        xx = xx.view(-1, 2*self.n_in)
+        xx = xx.view(-1, 2*self.n_edge_in)
 
         # Calculate the edge features for each node 
         # all_edges.shape = (N, K, K, n_hidden)

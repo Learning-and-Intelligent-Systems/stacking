@@ -11,7 +11,7 @@ def get_dataset(args):
     with open(args.block_set_fname, 'rb') as handle:
         block_set = pickle.load(handle)
 
-    towers_dict = sample_unlabeled_data(block_set=block_set, n_samples=args.n_towers)
+    towers_dict = sample_unlabeled_data(block_set=block_set, n_samples=args.n_towers, ignore_rot=args.disable_rotations)
     towers_dict = get_labels(dataset=towers_dict,
                              exec_mode='noisy-model', 
                              agent=None, 
@@ -43,6 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--block-set-fname', type=str, required=True)
     parser.add_argument('--n-towers', type=int, required=True)
     parser.add_argument('--output-fname', type=str, required=True)
+    parser.add_argument('--disable-rotations', action='store_true', default=False)
     args = parser.parse_args()
 
     if not os.path.exists(args.block_set_fname):

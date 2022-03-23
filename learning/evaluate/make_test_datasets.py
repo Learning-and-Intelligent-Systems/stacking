@@ -32,8 +32,8 @@ def make_test_dataset(blocks, args, include_index=-1):
                     tower_blocks = np.random.choice(blocks, k)
                 else:
                     extra_blocks = blocks[:include_index] + blocks[include_index+1:]
-                    tower_blocks = [blocks[include_index]] + list(np.random.choice(extra_blocks, k-1, replace=False))
-            tower = sample_random_tower(tower_blocks, num_blocks=k)
+                    tower_blocks = list(np.random.choice(extra_blocks, k-1, replace=False)) + [blocks[include_index]]
+            tower = sample_random_tower(tower_blocks, num_blocks=k, fixed_order=True, ignore_rot=True)
             rotated_tower = [get_rotated_block(b) for b in tower]
             vec_tower = [block.vectorize() for block in tower]
             
@@ -101,6 +101,6 @@ if __name__ == '__main__':
                                 num_blocks=args.n_blocks)
     else:
         block_set = None
-    
-    make_test_dataset(block_set, args=args, include_index=10)
+    print(len(block_set)-1)
+    make_test_dataset(block_set, args=args, include_index=len(block_set)-1)
     

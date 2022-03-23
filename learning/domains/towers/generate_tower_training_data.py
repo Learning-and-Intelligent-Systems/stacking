@@ -18,7 +18,7 @@ def vectorize(tower):
     return [b.vectorize() for b in tower]
 
 ROTATED_BLOCKS = {}
-def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=False, fixed_order=False):
+def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=False, fixed_order=False, ignore_rot=False):
     if num_blocks is None:
         num_blocks = len(blocks)
 
@@ -27,7 +27,10 @@ def sample_random_tower(blocks, num_blocks=None, ret_rotated=False, discrete=Fal
         blocks = np.random.choice(blocks, num_blocks, replace=False)
 
     # pick random orientations for the blocks
-    orns = sample_with_replacement(QUATERNIONS, k=num_blocks)
+    if not ignore_rot:
+        orns = sample_with_replacement(QUATERNIONS, k=num_blocks)
+    else:
+        orns = sample_with_replacement([QUATERNIONS[0]], k=num_blocks)
     #orns = [Quaternion(*orn.as_quat()) for orn in orns]
     # apply the rotations to each block
     rotated_blocks = []

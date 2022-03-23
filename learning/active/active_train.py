@@ -2,7 +2,7 @@ import argparse
 import copy
 import numpy as np
 import time
-
+import torch
 from learning.active.acquire import acquire_datapoints
 from learning.active.train import train
 from learning.train_latent import train as train_latent
@@ -70,13 +70,17 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
         if args.fit and args.com_repr == 'latent':
             eval_block_ixs = list(range(args.num_train_blocks, args.num_train_blocks+args.num_eval_blocks))
             ensemble.reset_latents(ixs=eval_block_ixs, random=False)
-        elif args.fit and args.com_repr == 'removed':
+        elif args.fit and args.com_repr == 'removed' and not args.reuse_training_datasets:
             # TODO: Implement resetting model to pretrained weights.
-            pass
+            pretrain_logger = ActiveExperimentLogger(args.pretrained_ensemble_exp_path, args.use_latents)
+            ensemble = pretrain_logger.get_ensemble(args.ensemble_tx)
+            if torch.cuda.is_available():
+                ensemble.cuda()
         else:
             ensemble.reset()
         
         # If the dataset is empty, then acquire a dataset first.
+        #print(len(dataset), len(val_dataset))
         if len(dataset) > 0:
             if args.use_latents:
                 train_latent(dataloader, val_dataloader, ensemble, n_epochs=args.n_epochs, freeze_ensemble=args.fit, args=args)
@@ -106,9 +110,10 @@ def active_train(ensemble, dataset, val_dataset, dataloader, val_dataloader, dat
         logger.save_acquisition_data(new_data, None, tx)#new_data, all_samples, tx)
 
         # Add to dataset.
-        if val_dataloader is None:
+        if val_dataloader is None or args.reuse_training_datasets:
             dataset.add_to_dataset(new_data)
         else:
+            print('HERE')
             train_data, val_data = split_data(new_data, n_val=2)
             dataset.add_to_dataset(train_data)
             val_dataset.add_to_dataset(val_data)

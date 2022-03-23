@@ -1,0 +1,4 @@
+#!/bin/sh
+
+python -m learning.experiments.train_towers_single --train-dataset-fname learning/data/iclr_data/train_towers_small/100x25_norot_random_train.pkl --val-dataset-fname learning/data/iclr_data/train_towers_small/100x25_norot_random_val.pkl --n-blocks 100 --block-set-fname learning/data/iclr_data/blocks/100_random_block_set_1.pkl --exp-name 100x25_norot_3d_base-model-random-train --n-epochs 20 --disable-rotations --com-repr latent
+python -m learning.experiments.train_towers_single --train-dataset-fname learning/data/iclr_data/train_towers_small/100x50_norot_random_train.pkl --val-dataset-fname learning/data/iclr_data/train_towers_small/100x50_norot_random_val.pkl --n-blocks 100 --block-set-fname learning/data/iclr_data/blocks/100_random_block_set_1.pkl --exp-name 100x50_norot_3d_base-model-random-train --n-epochs 20 --disable-rotations --com-repr latent

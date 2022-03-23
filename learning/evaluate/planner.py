@@ -202,69 +202,16 @@ class EnsemblePlanner:
 class LatentEnsemblePlanner:
     def __init__(self, logger, n_samples=None, R_unstable=0.):
         self.tower_keys = ['2block', '3block', '4block', '5block']
-        self.n_samples = {2: 5000, 3: 10000, 4: 20000,  5: 100000, 6: 250000, 7:500000}
+        self.n_samples = {2: 1000, 3: 10000, 4: 20000,  5: 100000, 6: 250000, 7:500000}
         self.tp = TowerPlanner(stability_mode='contains')
         self.logger = logger
         self.using_cache = False
         self.R_unstable = R_unstable
-
-    def get_cached_towers(self, args, num_blocks, blocks, n_tower):
-        key = '%dblock' % num_blocks
-        if not self.using_cache:
-            if args.block_set_fname == '':
-                cache_name = 'random_set.pkl'
-            else:
-                cache_name = os.path.basename(args.block_set_fname)
-            
-            # see if cache for this block set exists    
-            try:
-                with open(os.path.join('learning/evaluate/cached_towers', cache_name), 'rb') as handle:
-                    block_set_towers = pickle.load(handle)
-            except:
-                return None, None
-            
-            # if it cached file exists, save it
-            self.cached_towers = block_set_towers
-            if (key in block_set_towers) and \
-              (n_tower in block_set_towers[key]) and \
-              (len(block_set_towers[key][n_tower][0]) >= self.n_samples[num_blocks]):
-                print('Using random planning towers from cache for tower %d' % n_tower)
-                self.using_cache = True
-                return self.cached_towers[key][n_tower][:self.n_samples[num_blocks]]
-            else:
-                return None, None
-        # if already loaded cache, get relevant towers
+        if 'disable_rotations' in logger.args and logger.args.disable_rotations:
+            self.disable_rotations = True
         else:
-            try:
-                towers, block_ids = self.cached_towers[key][n_tower][:self.n_samples[num_blocks]]
-            except:
-                return None, None
-            print('Using saved random planning towers from cache for tower %d' % n_tower)
-            return towers, block_ids
-
-    # NOTE: this will not cache towers if some towers have already previously been found in the cache
-    def cache_towers(self, args, towers, tower_block_ids, n_tower):
-        if not self.using_cache:
-            if args.block_set_fname == '':
-                cache_name = 'random_set.pkl'
-            else:
-                cache_name = os.path.basename(args.block_set_fname)
-                
-            num_blocks = len(towers[0])
-            # see if cache exists
-            try:
-                with open(os.path.join('learning/evaluate/cached_towers', cache_name), 'rb') as handle:
-                    block_set_towers = pickle.load(handle)
-            except:
-                block_set_towers = {}
-            if '%dblock'%num_blocks not in block_set_towers:
-                block_set_towers['%dblock'%num_blocks] = {}    
-            print('Saving randomly generated towers for tower %d' % n_tower)
-            block_set_towers['%dblock'%num_blocks][n_tower] = (towers, tower_block_ids)
-                
-            with open(os.path.join('learning/evaluate/cached_towers', cache_name), 'wb') as handle:
-                pickle.dump(block_set_towers, handle)    
-        
+            self.disable_rotations = False
+       
     def generate_candidate_towers(self, blocks, args, num_blocks=None, n_tower=None, fixed_order=False):
         num_blocks = len(blocks)
         
@@ -272,9 +219,13 @@ class LatentEnsemblePlanner:
         rot_tower_vectors = []
         tower_block_ids = []
         for _ in range(0, self.n_samples[num_blocks]):
-            tower = sample_random_tower(blocks, num_blocks=num_blocks, \
-                                        ret_rotated=False, discrete=False, fixed_order=fixed_order)
-            rotated_tower = [get_rotated_block(b) for b in tower]
+            tower, rotated_tower = sample_random_tower(blocks, 
+                                                       num_blocks=num_blocks, 
+                                                       ret_rotated=True, 
+                                                       discrete=False, 
+                                                       fixed_order=fixed_order,
+                                                       ignore_rot=self.disable_rotations)
+            # rotated_tower = [get_rotated_block(b) for b in tower]
 
             tower_vectors.append([b.vectorize() for b in tower])
             tower_block_ids.append([b.get_id() for b in tower])
@@ -336,11 +287,13 @@ class LatentEnsemblePlanner:
                                                 pf_latent_ix=pf_latent_ix,
                                                 latent_samples=latent_samples).squeeze(-1)
                     else:
-                        pred = ensemble.forward(tensor[:, :, 4:], 
-                                                b_ids,
-                                                N_samples=10,
-                                                collapse_ensemble=True,
-                                                collapse_latents=True).squeeze(-1)
+                        # pred = ensemble.forward(tensor[:, :, 4:], 
+                        #                         b_ids,
+                        #                         N_samples=10,
+                        #                         collapse_ensemble=True,
+                        #                         collapse_latents=True).squeeze(-1)
+                        pred = ensemble.forward(tensor).mean(-1, keepdim=True)
+                                                
                     sub_tower_pred.append(pred)
 
             sub_tower_pred = torch.cat(sub_tower_pred, dim=0)[:n_towers].cpu()

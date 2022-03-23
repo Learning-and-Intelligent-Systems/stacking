@@ -42,6 +42,21 @@ def evaluate(loader, model, val_metric='f1'):
 
     return score
 
+def compute_accuracies(ensemble, data_loader):
+    with torch.no_grad():
+        accs = {2: [], 3:[], 4:[], 5:[]}
+        for val_batches in data_loader:
+            towers, block_ids, labels = val_batches
+            if torch.cuda.is_available():
+                towers = towers.cuda()
+                block_ids = block_ids.cuda()
+                labels = labels.cuda()
+            preds = ensemble.forward(towers).squeeze()
+
+            acc = ((preds > 0.5) == labels).float().mean().item()
+            accs[towers.shape[1]].append(acc)
+
+    return accs
 
 def train(dataloader, val_dataloader, model, n_epochs=20):
     """
@@ -74,13 +89,20 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
             acc.append(accuracy.item())
 
             it += 1
+
         if val_dataloader is not None:
             val_loss = evaluate(val_dataloader, model)
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_weights = copy.deepcopy(model.state_dict())
-                #print('Saved')    
-            #print(np.mean(acc), val_loss, loss)
+                print('Saved')    
+            print(f'Epoch {ex}')
+            print('Train Accuracy:')
+            for k, v in compute_accuracies(model, dataloader).items():
+                print(k, np.mean(v))
+            print('Val Accuracy:')
+            for k, v in compute_accuracies(model, val_dataloader).items():
+                print(k, np.mean(v))
     if val_dataloader is not None:
         model.load_state_dict(best_weights)
 

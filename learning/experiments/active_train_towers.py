@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from learning.active.active_train import active_train
-from learning.domains.towers.active_utils import sample_sequential_data, sample_unlabeled_data, get_predictions, get_labels, get_subset, sample_next_block
+from learning.domains.towers.active_utils import get_predictions_single_ensemble, sample_sequential_data, sample_unlabeled_data, get_predictions, get_labels, get_subset, sample_next_block
 from learning.domains.towers.tower_data import TowerDataset, TowerSampler, ParallelDataLoader
 from learning.models.ensemble import Ensemble
 from learning.models.latent_ensemble import LatentEnsemble
@@ -63,14 +63,20 @@ def load_ensemble(args):
 
 def get_initial_dataset(args, block_set, agent, logger):
     # If we are fitting the latents, start with an empty dataset.
-    if args.fit:
+    if args.fit and not args.reuse_training_datasets:
         towers_dict = sample_sequential_data(block_set, None, 0)
         towers_dict = get_labels(towers_dict, 'noisy-model', agent, logger, args.xy_noise)
-        dataset = TowerDataset(towers_dict, augment=True, K_skip=1)
+        dataset = TowerDataset(towers_dict, augment=not args.disable_rotations, K_skip=1)
 
         val_towers_dict = sample_sequential_data(block_set, None, 0)
         val_towers_dict = get_labels(val_towers_dict, 'noisy-model', agent, logger, args.xy_noise)
         val_dataset = TowerDataset(val_towers_dict, augment=False, K_skip=1)    
+        return dataset, val_dataset
+    elif args.fit and args.reuse_training_datasets:
+        train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path,
+                                              use_latents=False)
+        dataset = train_logger.load_dataset(args.ensemble_tx)
+        val_dataset = train_logger.load_val_dataset(args.ensemble_tx)
         return dataset, val_dataset
 
     # Sample initial dataset. 
@@ -138,7 +144,7 @@ def get_sampler_fn(args, block_set):
         data_sampler_fn = lambda n_samples, bases: sample_next_block(n_samples, bases, block_set)
     elif args.strategy == 'subtower':
         if args.fit:
-            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 5), include_index=args.num_train_blocks+args.num_eval_blocks-1)
+            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1, ignore_rot=args.disable_rotations)
         else:
             data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 5))
     else:
@@ -146,7 +152,10 @@ def get_sampler_fn(args, block_set):
         if args.sampler == 'sequential':
             data_sampler_fn = lambda n_samples: sample_sequential_data(block_set, dataset, n_samples)
         else:
-            data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
+            if args.fit:
+                data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set, range_n_blocks=(2, 2), include_index=args.num_train_blocks+args.num_eval_blocks-1, ignore_rot=args.disable_rotations)
+            else:
+                data_sampler_fn = lambda n: sample_unlabeled_data(n, block_set=block_set)
     return data_sampler_fn
 
 
@@ -158,6 +167,8 @@ def run_active_towers(args):
     elif args.com_repr == 'explicit':
         # This will be the RSS code.
         raise NotImplementedError('This will be implemented when we merge back with main.')
+    elif args.com_repr == 'removed':
+        args.use_latents = False
 
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
@@ -191,7 +202,8 @@ def run_active_towers(args):
         ensemble = load_ensemble(args)
         if torch.cuda.is_available():
             ensemble = ensemble.cuda()
-        ensemble.add_latents(args.num_eval_blocks)
+        if args.use_latents:
+            ensemble.add_latents(args.num_eval_blocks)
     else:
         ensemble = initialize_model(args, len(block_set))    
         if torch.cuda.is_available():
@@ -200,8 +212,8 @@ def run_active_towers(args):
     # Get an initial dataset.
     dataset, val_dataset = get_initial_dataset(args, block_set, agent, logger)
     dataloader, val_dataloader = get_dataloaders(args, dataset, val_dataset)
-    if args.fit:
-        val_dataset, val_dataloader = None, None
+    # if args.fit and not args.reuse_training_datasets:
+    #     val_dataset, val_dataloader = None, None
 
     # Get active learning helper functions.
     data_subset_fn = get_subset
@@ -226,9 +238,8 @@ def run_active_towers(args):
             dataset, ensemble, N_samples=5, use_latents=True,
             collapse_latents=collapse_latents, collapse_ensemble=collapse_ensemble, keep_latent_ix=keep_latent_ix)
 
-
     else:
-        data_pred_fn = get_predictions    
+        data_pred_fn = get_predictions_single_ensemble
 
     # Start training.
     print('Starting training from scratch.')
@@ -287,6 +298,10 @@ if __name__ == '__main__':
     parser.add_argument('--pretrained-ensemble-exp-path', type=str, default='', help='Path to a trained ensemble.')
     parser.add_argument('--ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
     parser.add_argument('--eval-block-ixs', nargs='+', type=int, default=[0], help='Indices of which eval blocks to use.')
+    parser.add_argument('--disable-rotations', action='store_true', default=False)
+    parser.add_argument('--reuse-training-datasets', action='store_true', default=False)
+
+    
     args = parser.parse_args()
 
     if args.debug:
