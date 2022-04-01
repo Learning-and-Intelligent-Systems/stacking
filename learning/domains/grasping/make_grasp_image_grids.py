@@ -6,7 +6,6 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 MASSES = ['%.2f' % m for m in [0.1, 0.5, 1.0, 1.5, 2.0]]
 FRICTIONS = ['%.2f' % f for f in [0.1, 0.5, 1.0]]
 
-
 def get_image_files(args):
     fname_lookup = {}
     for m in MASSES:
@@ -17,7 +16,7 @@ def get_image_files(args):
     for f in FRICTIONS:
         for m in MASSES:
             for cx in range(0, 5):
-                fname = 'images/%s_%sm_%sf_%d_%s.png' % (args.ycb_name, m, f, cx, args.viewpoint)
+                fname = 'learning/domains/grasping/images/%s_%sm_%sf_%d_%s.png' % (args.ycb_name, m, f, cx, args.viewpoint)
                 fname_lookup[m][f].append(fname)
 
     return fname_lookup
