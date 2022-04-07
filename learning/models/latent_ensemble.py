@@ -207,3 +207,72 @@ class LatentEnsemble(nn.Module):
                 labels = labels.mean(axis=3)
 
         return labels
+
+
+class GraspingLatentEnsemble(LatentEnsemble):
+
+    def __init__(self, ensemble, n_latents, d_latents):
+        super(GraspingLatentEnsemble, self).__init__(ensemble, n_latents, d_latents)
+
+    def concat_samples(self, samples, observed):
+        """
+        :param samples: Per grasp LV samples (N_batch, N_samples, N_latent_dim).
+        :param observed: Per grasp observed properties (N_batch, N_obs_dim, N_point).
+        """
+        N_batch, N_samples, N_latent_dim = samples.shape
+        _, _, N_point = observed.shape
+
+        samples = samples.unsqueeze(-1).expand(-1, -1, -1, N_point)
+        observed = observed.unsqueeze(1).expand(-1, N_samples, -1, -1)
+        
+        return torch.cat([observed, samples], dim=2)
+
+    def forward(self, X, object_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True, keep_latent_ix=-1, latent_samples=None, pf_latent_ix=-1):
+        """ Samples from LVs and concatenates each to the observed input before call the ensemble models.
+        :param X: Observed grasping data of shape (batch_size, n_observed_dims, n_points)
+        :param object_ids: List of object ids of shape (batch_size,)
+        :param ensemble_idx: Whether to evaluate a specific ensemble ix or the entire ensemble.
+        :param N_samples: Number of samples to take from the LVs.
+        :param collapse_latents: Average prediction across latent samples. If False, will return predictions for all latent samples.
+        :param collapse_ensemble: Average prediction across ensemble models. If False, will return predictions for all ensembles.
+        :param keep_latent_ix: Not implemented.
+        :param latent_samples: Not implemented.
+        :param pf_latent_ix: Not implemented.
+        """
+        N_batch, N_observed_dims, N_points = X.shape
+
+        q_z = torch.distributions.normal.Normal(
+            self.latent_locs[object_ids],
+            torch.exp(self.latent_logscales[object_ids]))  # [N_batch, latent_dim]
+        samples_for_each_grasp_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2)  # [N_batch, N_samples, latent_dim]
+        
+        grasps_with_latents = self.concat_samples(samples_for_each_grasp_in_batch, X)
+
+        # reshape the resulting tensor so the batch dimension holds
+        # N_batch times N_samples
+        N_batch, N_total_samples, total_dim, N_points = grasps_with_latents.shape
+        grasps_with_latents = grasps_with_latents.view(-1, total_dim, N_points)
+
+        # forward pass of the model(s)
+        if ensemble_idx is None:
+            # prediction for each model in the ensemble ensemble
+            # [(N_batch*N_samples) x N_ensemble]
+            labels = self.ensemble.forward(grasps_with_latents)
+            labels = labels.view(N_batch, N_total_samples, -1).permute(0, 2, 1)
+        else:
+            # prediction of a single model in the ensemble
+            labels = self.ensemble.models[ensemble_idx].forward(grasps_with_latents)
+            labels = labels[:, None, :]
+            labels = labels.view(N_batch, N_total_samples, -1).permute(0, 2, 1)
+
+        # N_batch x N_ensemble x N_samples
+        if collapse_ensemble:
+            labels = labels.mean(axis=1, keepdim=True)
+        if collapse_latents:
+            if keep_latent_ix < 0:
+                labels = labels.mean(axis=2, keepdim=True)
+            else:
+                labels = labels.view(N_batch, -1, N_samples, N_samples)
+                labels = labels.mean(axis=3)
+
+        return labels

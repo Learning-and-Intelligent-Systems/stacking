@@ -4,13 +4,16 @@ import numpy as np
 import pickle
 import torch
 
-from learning.domains.grasping.grasp_data import GraspDataset
 from learning.active.utils import ActiveExperimentLogger
+from learning.domains.grasping.grasp_data import GraspDataset, GraspParallelDataLoader
+from learning.domains.grasping.train_latent import train as train_latent
 from learning.models.ensemble import Ensemble
+from learning.models.latent_ensemble import GraspingLatentEnsemble
 from learning.models.pointnet import PointNetClassifier
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
 from torch.optim import Adam
+
 
 def load_datasets(args):
     with open(args.train_dataset_fname, 'rb') as handle:
@@ -21,8 +24,12 @@ def load_datasets(args):
     train_dataset = GraspDataset(train_data)
     val_dataset = GraspDataset(val_data)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
+    if args.use_latents:
+        train_dataloader = GraspParallelDataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, n_dataloaders=args.n_models)
+        val_dataloader = GraspParallelDataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, n_dataloaders=1)
+    else:
+        train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
     return train_dataset, val_dataset, train_dataloader, val_dataloader
 
 
@@ -37,6 +44,10 @@ def initialize_model(args):
     ensemble = Ensemble(base_model=base_model,
                         base_args=base_args,
                         n_models=args.n_models)
+    if args.use_latents:
+        ensemble = GraspingLatentEnsemble(ensemble=ensemble, 
+                                          n_latents=args.n_objects, 
+                                          d_latents=5)
 
     return ensemble
 
@@ -46,7 +57,8 @@ def evaluate(loader, model, val_metric='acc'):
     
     preds = []
     labels = []
-    for x, y in loader:
+    model.eval()
+    for x, _, y in loader:
         if torch.cuda.is_available():
             x = x.float().cuda()
             y = y.float().cuda()
@@ -83,7 +95,8 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
     for ex in range(n_epochs):
         print('Epoch', ex)
         acc = []
-        for x, y in dataloader:
+        model.train()
+        for x, _, y in dataloader:
             if torch.cuda.is_available():
                 x = x.float().cuda()
                 y = y.float().cuda()
@@ -119,15 +132,18 @@ if __name__ == '__main__':
     # Dataset parameters. 
     parser.add_argument('--train-dataset-fname', type=str, required=True)
     parser.add_argument('--val-dataset-fname', type=str, required=True)
+    parser.add_argument('--n-objects', type=int, required=True)
     # Model parameters.
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--n-hidden', type=int, default=64)
     parser.add_argument('--n-epochs', type=int, default=50)
     parser.add_argument('--model', default='pn', choices=['pn', 'pn++'])
+    parser.add_argument('--property-repr', type=str, required=True, choices=['latent', 'explicit', 'removed'])
     # Ensemble parameters.
     parser.add_argument('--n-models', type=int, default=1)
     args = parser.parse_args()
-    args.use_latents = False
+    args.use_latents = args.property_repr == 'latent'
+    args.fit = False
 
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
@@ -138,12 +154,12 @@ if __name__ == '__main__':
 
     # Train model.
     train_dataset, val_dataset, train_dataloader, val_dataloader = load_datasets(args)
-    
-    # import IPython
-    # IPython.embed()
-    ensemble.reset()
-    for model in ensemble.models:
-        train(train_dataloader, val_dataloader, model, args.n_epochs)
+    if args.use_latents:
+        train_latent(train_dataloader, val_dataloader, ensemble, args.n_epochs, disable_latents=False, args=args, show_epochs=True)
+    else:
+        ensemble.reset()
+        for model in ensemble.models:
+            train(train_dataloader, val_dataloader, model, args.n_epochs)
 
 
     # Save model.

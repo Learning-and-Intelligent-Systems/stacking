@@ -32,16 +32,24 @@ def get_ycb_objects(object_list):
 def generate_datasets(args):
     object_names = get_ycb_objects(args.ycb_objects)
     
-    object_grasps_data, object_grasp_labels = [], []
+    object_grasp_data, object_grasp_ids, object_grasp_labels = [], [], []
+    object_instance_names = []
+    object_instance_properties = []
     for ox, name in enumerate(object_names):
         print('Object %d/%d...' % (ox, len(object_names)))
         for px in range(0, args.n_property_samples):
             print('Property sample %d/%d...' % (px, args.n_property_samples))
+            
+            object_id = ox*len(object_names) + px
+            
             # Sample a new object.
             graspable_body = GraspableBodySampler.sample_random_object_properties(name)
             
             # Get property label vector.
             property_vector = vector_from_graspablebody(graspable_body)
+
+            object_instance_names.append(name)
+            object_instance_properties.append(property_vector)
 
             # Sample random grasps with labels. 
             for gx in range(0, args.n_grasps_per_object):
@@ -87,22 +95,49 @@ def generate_datasets(args):
                 props = np.broadcast_to(property_vector, (X.shape[0], len(property_vector)))
                 X = np.hstack([X, props])
 
-                object_grasps_data.append(X)
+                object_grasp_data.append(X)
+                object_grasp_ids.append(object_id)
                 object_grasp_labels.append(int(label))
 
+    dataset = {
+        'grasp_data': {
+            'grasps': object_grasp_data,
+            'object_ids': object_grasp_ids,
+            'labels': object_grasp_labels
+        },
+        'object_data': {
+            'object_names': object_instance_names,
+            'object_properties': object_instance_properties,
+            'property_names': ['com_x', 'com_y', 'com_z', 'mass', 'friction']
+        },
+        'metadata': args
+    }
     with open('learning/data/grasping/%s.pkl' % args.fname, 'wb') as handle:
-        pickle.dump((object_grasps_data, object_grasp_labels), handle)
+        pickle.dump(dataset, handle)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n-points-per-object', type=int, default=1024, help='Number of points to include in each point cloud.')
-    parser.add_argument('--ycb-objects', required=True, nargs='+', help='Either "all" or a list of Ycb object names to include')
-    parser.add_argument('--n-property-samples', type=int, default=100, help='Number of object instances per each YcbObject geometry type.')
-    parser.add_argument('--n-grasps-per-object', type=int, default=100, help='Number of grasps to label per object.')
+    parser.add_argument('--mode', required=True, choices=['objects', 'grasps'])
     parser.add_argument('--fname', type=str, required=True, help='Base name used for saving all dataset files.')
+    # args.mode == 'objects' parameters
+    parser.add_argument('--ycb-objects', default=['none'], nargs='+', help='Either "all" or a list of Ycb object names to include')
+    parser.add_argument('--n-property-samples', type=int, default=-1, help='Number of object instances per each YcbObject geometry type.')
+    # args.mode == 'grasps' parameters
+    parser.add_argument('--objects-fname', default='', type=str, help='File with data about objects and object properties.')
+    parser.add_argument('--n-points-per-object', type=int, default=-1, help='Number of points to include in each point cloud.')
+    parser.add_argument('--n-grasps-per-object', type=int, default=-1, help='Number of grasps to label per object.')
+   
     args = parser.parse_args()
     print(args)
 
-    generate_datasets(args)
+    if args.mode == 'objects':
+        assert(args.ycb_objects != 'none')
+        assert(args.n_property_samples > 0)
+        generate_objects(args)
+    elif args.mode == 'grasps':
+        assert(len(args.objects_fname) > 0)
+        assert(args.n_points_per_object > 0)
+        assert(args.n_grasps_per_object > 0)
+        generate_datasets(args)
 
