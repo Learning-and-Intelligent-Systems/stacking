@@ -11,7 +11,7 @@ from sklearn.metrics import recall_score, precision_score, accuracy_score
 from torch.utils.data import DataLoader
 
 from learning.active.utils import ActiveExperimentLogger
-from learning.domains.grasping.grasp_data import GraspDataset, visualize_grasp_dataset
+from learning.domains.grasping.grasp_data import GraspDataset, GraspParallelDataLoader, visualize_grasp_dataset
 
 
 def get_labels_predictions(logger, val_dataset_fname):
@@ -101,7 +101,67 @@ def combine_image_grids(logger, prefixes):
             plt.savefig(logger.get_figure_path('combined_%d_%s.png' % (ix, angle)), bbox_inches='tight', dpi=500)
 
 
+def get_predictions_with_particles(particles, grasp_data, ensemble):
+    preds, labels = [], []
+    dataset = GraspDataset(data=grasp_data)
+    dataloader = GraspParallelDataLoader(dataset=dataset,
+                                         batch_size=16,
+                                         shuffle=False,
+                                         n_dataloaders=1)
+    
+    latent_samples = torch.Tensor(particles)
 
+    for set_of_batches in dataloader:
+        grasps, object_ids, y = set_of_batches[0]
+
+        if torch.cuda.is_available():
+            grasps = grasps.cuda()
+            object_ids = object_ids.cuda()
+            
+        with torch.no_grad():
+            for ix in range(0, 1): # Only use first 50 particles as a sample from the particle distribution.
+                latents = latent_samples[ix*50:(ix+1)*50,:]
+                if torch.cuda.is_available():
+                    latents = latents.cuda()
+                pred = ensemble.forward(X=grasps[:, :-5, :],
+                                        object_ids=object_ids,
+                                        N_samples=50,
+                                        collapse_latents=True, 
+                                        collapse_ensemble=True,
+                                        pf_latent_ix=100,
+                                        latent_samples=latents).squeeze()
+
+            preds.append(pred.mean(dim=-1))
+            labels.append(y)
+    return torch.cat(preds, dim=0).cpu(), torch.cat(labels, dim=0).cpu()
+
+
+def get_pf_validation_accuracy(logger, fname):
+    accs = []
+    
+    with open(fname, 'rb') as handle:
+        val_grasp_data = pickle.load(handle)
+
+    eval_range = range(0, logger.args.max_acquisitions, 1)
+    output_fname = 'val_accuracies.pkl'
+
+    for tx in eval_range:
+        print('Eval timestep, ', tx)
+        ensemble = logger.get_ensemble(tx)
+        if torch.cuda.is_available():
+            ensemble = ensemble.cuda()
+
+        particles = logger.load_particles(tx)
+        probs, labels = get_predictions_with_particles(particles.particles, val_grasp_data, ensemble)
+        preds = (probs > 0.5).float()
+
+        acc = accuracy_score(labels, preds)
+        print('Acc:', acc)
+        accs.append(acc)
+    
+    with open(logger.get_figure_path(output_fname), 'wb') as handle:
+        pickle.dump(accs, handle)
+    return accs
             
 
 
@@ -111,8 +171,10 @@ if __name__ == '__main__':
     parser.add_argument('--val-dataset-fname', type=str, required=True)
     args = parser.parse_args()
 
-    logger = ActiveExperimentLogger(args.exp_path, use_latents=False)
+    logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
 
-    get_validation_metrics(logger, args.val_dataset_fname)
+    #get_validation_metrics(logger, args.val_dataset_fname)
     #visualize_predictions(logger, args.val_dataset_fname)
     #combine_image_grids(logger, ['labels', 'predictions', 'correct'])
+
+    get_pf_validation_accuracy(logger, args.val_dataset_fname)

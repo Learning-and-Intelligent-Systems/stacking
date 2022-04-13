@@ -119,7 +119,6 @@ class LatentEnsemble(nn.Module):
         # and return the result
         return samples
 
-
     def forward(self, towers, block_ids, ensemble_idx=None, N_samples=1, collapse_latents=True, collapse_ensemble=True, keep_latent_ix=-1, latent_samples=None, pf_latent_ix=-1):
         """ predict feasibility of the towers
 
@@ -241,11 +240,14 @@ class GraspingLatentEnsemble(LatentEnsemble):
         """
         N_batch, N_observed_dims, N_points = X.shape
 
-        q_z = torch.distributions.normal.Normal(
-            self.latent_locs[object_ids],
-            torch.exp(self.latent_logscales[object_ids]))  # [N_batch, latent_dim]
-        samples_for_each_grasp_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2)  # [N_batch, N_samples, latent_dim]
-        
+        if (pf_latent_ix > -1) and (latent_samples is not None):
+            samples_for_each_grasp_in_batch = latent_samples.unsqueeze(0).expand(N_batch, N_samples, -1)
+        else:
+            q_z = torch.distributions.normal.Normal(
+                self.latent_locs[object_ids],
+                torch.exp(self.latent_logscales[object_ids]))  # [N_batch, latent_dim]
+            samples_for_each_grasp_in_batch = q_z.rsample(sample_shape=[N_samples]).permute(1, 0, 2)  # [N_batch, N_samples, latent_dim]
+
         grasps_with_latents = self.concat_samples(samples_for_each_grasp_in_batch, X)
 
         # reshape the resulting tensor so the batch dimension holds
@@ -269,10 +271,10 @@ class GraspingLatentEnsemble(LatentEnsemble):
         if collapse_ensemble:
             labels = labels.mean(axis=1, keepdim=True)
         if collapse_latents:
-            if keep_latent_ix < 0:
+            if pf_latent_ix < 0:
                 labels = labels.mean(axis=2, keepdim=True)
             else:
-                labels = labels.view(N_batch, -1, N_samples, N_samples)
-                labels = labels.mean(axis=3)
+                labels = labels.view(N_batch, -1, N_samples)
+                #labels = labels.mean(axis=3)
 
         return labels

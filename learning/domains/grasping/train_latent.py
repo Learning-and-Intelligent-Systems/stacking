@@ -238,7 +238,7 @@ def evaluate(latent_ensemble, data_loader, disable_latents, val_metric='loss'):
             pred = latent_ensemble(grasps[:,:-5,:], object_ids.long()).squeeze()
         if len(pred.shape) == 0: pred = pred.unsqueeze(-1)
         loss = F.binary_cross_entropy(pred, label)
-
+        losses.append(loss.item())
         with torch.no_grad():
             preds += (pred > 0.5).cpu().float().numpy().tolist()
             labels += label.cpu().numpy().tolist()

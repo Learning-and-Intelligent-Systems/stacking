@@ -40,7 +40,7 @@ class GraspParallelDataLoader:
         for _ in range(n_dataloaders):
             loader = DataLoader(dataset=dataset,
                                 batch_size=batch_size,
-                                shuffle=True)
+                                shuffle=shuffle)
             self.loaders.append(loader)
 
     def __iter__(self):

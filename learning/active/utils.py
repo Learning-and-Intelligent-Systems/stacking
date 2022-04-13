@@ -10,7 +10,8 @@ from torch.utils.data import DataLoader
 
 from learning.models.ensemble import Ensemble
 from learning.models.mlp_dropout import MLP
-from learning.models.latent_ensemble import LatentEnsemble
+from learning.models.latent_ensemble import LatentEnsemble, GraspingLatentEnsemble
+from learning.models.pointnet import PointNetClassifier
 
 
 class ExperimentLogger:
@@ -219,7 +220,12 @@ class ActiveExperimentLogger:
         ensemble = Ensemble(base_model=metadata['base_model'],
                             base_args=metadata['base_args'],
                             n_models=metadata['n_models'])
-        if self.use_latents:
+
+        if self.use_latents and metadata['base_model'] == PointNetClassifier:
+            ensemble = GraspingLatentEnsemble(ensemble,
+                n_latents=metadata['n_latents'],
+                d_latents=metadata['d_latents'])
+        elif self.use_latents:
             ensemble = LatentEnsemble(ensemble,
                 n_latents=metadata['n_latents'],
                 d_latents=metadata['d_latents'])

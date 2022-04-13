@@ -29,6 +29,47 @@ def get_ycb_objects(object_list):
                 raise ValueError('%s not a valid Ycb Object.' % name)
         return object_list
 
+def sample_grasp_X(graspable_body, property_vector, n_points_per_object):
+    # Sample new point cloud for object.
+    sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
+    mesh_points = np.array(sim_client.mesh.sample(n_points_per_object, return_index=False))
+    mesh_points = np.hstack([mesh_points, np.ones((n_points_per_object, 1))])
+    mesh_points = (sim_client.mesh_tform@(mesh_points.T)).T[:, 0:3]
+    sim_client.disconnect()  
+
+    # Sample grasp.
+    grasp_sampler = GraspSampler(graspable_body=graspable_body, antipodal_tolerance=30, show_pybullet=False)
+    grasp = grasp_sampler.sample_grasp(force=20, show_trimesh=False)
+    grasp_sampler.disconnect()
+
+    # Encode grasp as points.
+    grasp_points = (grasp.pb_point1, grasp.pb_point2, grasp.ee_relpose[0])
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # ax.scatter(mesh_points[:, 0], mesh_points[:, 1], mesh_points[:, 2], color='b')
+    # grasp_xs = [p[0] for p in grasp_points]
+    # grasp_ys = [p[1] for p in grasp_points]
+    # grasp_zs = [p[2] for p in grasp_points]
+    # ax.scatter(grasp_xs, grasp_ys, grasp_zs, color='r')
+    # bound = 0.1
+    # ax.set_xlim(-bound, bound)
+    # ax.set_ylim(-bound, bound)
+    # ax.set_zlim(-bound, bound)
+    # plt.savefig('test.png')
+
+    # Add grasp/object indicator features.
+    grasp_vectors = np.array(grasp_points)
+    grasp_vectors = np.hstack([grasp_vectors, np.eye(3)])
+    mesh_vectors = np.hstack([mesh_points, np.zeros((n_points_per_object, 3))])
+
+    # Concatenate all relevant vectors (points, indicators, properties).
+    X = np.vstack([grasp_vectors, mesh_vectors])
+    props = np.broadcast_to(property_vector, (X.shape[0], len(property_vector)))
+    X = np.hstack([X, props])
+
+    return grasp, X
+
 def generate_datasets(args):
     with open(args.objects_fname, 'rb') as handle:
         object_data = pickle.load(handle)['object_data']
@@ -38,6 +79,9 @@ def generate_datasets(args):
     for px in range(len(object_data['object_names'])):
         print('Property sample %d/%d...' % (px, len(object_data['object_names'])))
         
+        if args.object_ix > -1 and args.object_ix != px:
+            continue
+            
         object_id = px
         object_name = object_data['object_names'][px]
         property_vector = object_data['object_properties'][px]
@@ -46,46 +90,12 @@ def generate_datasets(args):
         # Sample random grasps with labels. 
         for gx in range(0, args.n_grasps_per_object):
             print('Grasp %d/%d...' % (gx, args.n_grasps_per_object))
-            # Sample new point cloud for object.
-            sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
-            mesh_points = np.array(sim_client.mesh.sample(args.n_points_per_object, return_index=False))
-            mesh_points = np.hstack([mesh_points, np.ones((args.n_points_per_object, 1))])
-            mesh_points = (sim_client.mesh_tform@(mesh_points.T)).T[:, 0:3]
-            sim_client.disconnect()  
 
-            grasp_sampler = GraspSampler(graspable_body=graspable_body, antipodal_tolerance=30, show_pybullet=False)
-            grasp = grasp_sampler.sample_grasp(force=20, show_trimesh=False)
-            grasp_sampler.disconnect()
-
-            # Encode grasp as points.
-            grasp_points = (grasp.pb_point1, grasp.pb_point2, grasp.ee_relpose[0])
-
-            # fig = plt.figure()
-            # ax = fig.add_subplot(projection='3d')
-            # ax.scatter(mesh_points[:, 0], mesh_points[:, 1], mesh_points[:, 2], color='b')
-            # grasp_xs = [p[0] for p in grasp_points]
-            # grasp_ys = [p[1] for p in grasp_points]
-            # grasp_zs = [p[2] for p in grasp_points]
-            # ax.scatter(grasp_xs, grasp_ys, grasp_zs, color='r')
-            # bound = 0.1
-            # ax.set_xlim(-bound, bound)
-            # ax.set_ylim(-bound, bound)
-            # ax.set_zlim(-bound, bound)
-            # plt.savefig('test.png')
+            grasp, X = sample_grasp_X(graspable_body, property_vector, args.n_points_per_object)
             
             # Get label.
             labeler = GraspStabilityChecker(stability_direction='all', label_type='relpose')
             label = labeler.get_label(grasp, show_pybullet=False)
-            
-            # Add grasp/object indicator features.
-            grasp_vectors = np.array(grasp_points)
-            grasp_vectors = np.hstack([grasp_vectors, np.eye(3)])
-            mesh_vectors = np.hstack([mesh_points, np.zeros((args.n_points_per_object, 3))])
-
-            # Concatenate all relevant vectors (points, indicators, properties).
-            X = np.vstack([grasp_vectors, mesh_vectors])
-            props = np.broadcast_to(property_vector, (X.shape[0], len(property_vector)))
-            X = np.hstack([X, props])
 
             object_grasp_data.append(X)
             object_grasp_ids.append(object_id)
@@ -147,7 +157,7 @@ if __name__ == '__main__':
     parser.add_argument('--objects-fname', default='', type=str, help='File with data about objects and object properties.')
     parser.add_argument('--n-points-per-object', type=int, default=-1, help='Number of points to include in each point cloud.')
     parser.add_argument('--n-grasps-per-object', type=int, default=-1, help='Number of grasps to label per object.')
-   
+    parser.add_argument('--object-ix', type=int, default=-1, help='Only use the given object in the dataset.')
     args = parser.parse_args()
     print(args)
 
