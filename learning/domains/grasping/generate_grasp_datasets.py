@@ -71,6 +71,7 @@ def sample_grasp_X(graspable_body, property_vector, n_points_per_object):
     return grasp, X
 
 def generate_datasets(args):
+    assert('learning/data/grasping' in args.fname)
     with open(args.objects_fname, 'rb') as handle:
         object_data = pickle.load(handle)['object_data']
 
@@ -81,7 +82,7 @@ def generate_datasets(args):
         
         if args.object_ix > -1 and args.object_ix != px:
             continue
-            
+
         object_id = px
         object_name = object_data['object_names'][px]
         property_vector = object_data['object_properties'][px]
@@ -110,13 +111,13 @@ def generate_datasets(args):
         'object_data': object_data,
         'metadata': args
     }
-    with open('learning/data/grasping/grasps/%s.pkl' % args.fname, 'wb') as handle:
+    with open('%s' % args.fname, 'wb') as handle:
         pickle.dump(dataset, handle)
 
 
 def generate_objects(args):
     object_names = get_ycb_objects(args.ycb_objects)
-    
+    assert('learning/data/grasping' in args.fname)
     object_instance_names = []
     object_instance_properties = []
     for ox, name in enumerate(object_names):
@@ -143,7 +144,7 @@ def generate_objects(args):
         },
         'metadata': args
     }
-    with open('learning/data/grasping/objects/%s.pkl' % args.fname, 'wb') as handle:
+    with open('%s' % args.fname, 'wb') as handle:
         pickle.dump(dataset, handle)
 
 if __name__ == '__main__':
@@ -160,7 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--object-ix', type=int, default=-1, help='Only use the given object in the dataset.')
     args = parser.parse_args()
     print(args)
-
+    
     if args.mode == 'objects':
         assert(args.ycb_objects != ['none'])
         assert(args.n_property_samples > 0)

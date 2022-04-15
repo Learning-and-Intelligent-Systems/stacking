@@ -414,9 +414,13 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         # as the M-H step should reject bad particles - it may be inefficient if too large (and not accept often).
         
         # PROPOSAL 1: Fit mean and cov to current particles and sample from those.
-        # cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3) + np.eye(D)*0.5
-        # particles = sample_particle_distribution(distribution, num_samples=N)
-        # mean = np.mean(particles, axis=0)
+        # particles = distribution.particles
+        # cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3) #+ np.eye(D)*0.5
+        # resampled_particles = sample_particle_distribution(distribution, num_samples=N)
+        # mean = np.mean(resampled_particles, axis=0)
+        # print('Proposal:')
+        # print(mean)
+        # print(np.diag(cov))
         # # mean = np.zeros((5,))
         # # cov = np.eye(5)*2
         # proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
@@ -459,7 +463,7 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
             # for ix in range(N):
             #     prop_probs[ix,0] = np.log(multivariate_normal.pdf(particles[ix,:], mean=mean, cov=cov)+1e-8)
             #     prop_probs[ix,1] = np.log(multivariate_normal.pdf(proposed_particles[ix,:], mean=mean, cov=cov)+1e-8)
-            #p_accept = likelihoods[:,1]+prop_probs[:,0] - (likelihoods[:,0]+prop_probs[:,1])
+            # p_accept = likelihoods[:,1]+prop_probs[:,0] - (likelihoods[:,0]+prop_probs[:,1])
 
             p_accept = likelihoods[:,1] - (likelihoods[:,0])
             accept = np.zeros((N,2))
@@ -499,14 +503,14 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
                 grasps = grasps.cuda()
                 object_ixs = object_ixs.cuda()
 
-            for ix in range(0, latent_samples.shape[0]//10):
+            for ix in range(0, latent_samples.shape[0]//20):
                 pred = self.likelihood.forward(X=grasps[:, :-5, :],
                                                object_ids=object_ixs.long(),
-                                               N_samples=10,
+                                               N_samples=20,
                                                collapse_latents=True, 
                                                collapse_ensemble=True,
                                                pf_latent_ix=self.object_ix,
-                                               latent_samples=latent_samples[ix*10:(ix+1)*10,:]).squeeze()
+                                               latent_samples=latent_samples[ix*20:(ix+1)*20,:]).squeeze()
                 bernoulli_probs.append(pred.cpu().detach().numpy())
         return np.concatenate(bernoulli_probs)
 

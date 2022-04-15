@@ -101,7 +101,7 @@ def combine_image_grids(logger, prefixes):
             plt.savefig(logger.get_figure_path('combined_%d_%s.png' % (ix, angle)), bbox_inches='tight', dpi=500)
 
 
-def get_predictions_with_particles(particles, grasp_data, ensemble):
+def get_predictions_with_particles(particles, grasp_data, ensemble, n_particle_samples=10):
     preds, labels = [], []
     dataset = GraspDataset(data=grasp_data)
     dataloader = GraspParallelDataLoader(dataset=dataset,
@@ -110,7 +110,7 @@ def get_predictions_with_particles(particles, grasp_data, ensemble):
                                          n_dataloaders=1)
     
     latent_samples = torch.Tensor(particles)
-
+    ensemble.eval()
     for set_of_batches in dataloader:
         grasps, object_ids, y = set_of_batches[0]
 
@@ -119,20 +119,28 @@ def get_predictions_with_particles(particles, grasp_data, ensemble):
             object_ids = object_ids.cuda()
             
         with torch.no_grad():
-            for ix in range(0, 1): # Only use first 50 particles as a sample from the particle distribution.
-                latents = latent_samples[ix*50:(ix+1)*50,:]
-                if torch.cuda.is_available():
-                    latents = latents.cuda()
-                pred = ensemble.forward(X=grasps[:, :-5, :],
-                                        object_ids=object_ids,
-                                        N_samples=50,
-                                        collapse_latents=True, 
-                                        collapse_ensemble=True,
-                                        pf_latent_ix=100,
-                                        latent_samples=latents).squeeze()
+            # Sample particles and ensembles models to use to speed up evaluation. Might hurt performance.
+            ensemble_ix = np.random.choice(np.arange(ensemble.ensemble.n_models))
+            latents_ix = np.arange(latent_samples.shape[0])
+            np.random.shuffle(latents_ix)
+            latents_ix = latents_ix[:n_particle_samples]
+
+            #latents = latent_samples[ix*100:(ix+1)*100,:]
+            latents = latent_samples[latents_ix, :]
+            if torch.cuda.is_available():
+                latents = latents.cuda()
+            pred = ensemble.forward(X=grasps[:, :-5, :],
+                                    object_ids=object_ids,
+                                    N_samples=n_particle_samples,
+                                    ensemble_idx=ensemble_ix,
+                                    collapse_latents=True, 
+                                    collapse_ensemble=True,
+                                    pf_latent_ix=100,
+                                    latent_samples=latents).squeeze()
 
             preds.append(pred.mean(dim=-1))
             labels.append(y)
+            # if (len(preds)*16) > 200: break
     return torch.cat(preds, dim=0).cpu(), torch.cat(labels, dim=0).cpu()
 
 

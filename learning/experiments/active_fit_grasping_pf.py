@@ -27,6 +27,7 @@ def find_informative_tower(pf, object_set, logger, args):
     pred_vec = torch.Tensor(np.stack(all_preds))
     scores = bald(pred_vec).cpu().numpy()
     acquire_ix = np.argsort(scores)[::-1][0]
+
     return all_grasps[acquire_ix]
 
 def particle_filter_loop(pf, object_set, logger, strategy, args):
@@ -77,7 +78,7 @@ def run_particle_filter_fitting(args):
     pf = GraspingDiscreteLikelihoodParticleBelief(
         object_set=object_set,
         D=latent_ensemble.d_latents,
-        N=2500,
+        N=args.n_particles,
         likelihood=latent_ensemble,
         plot=True)
 
@@ -95,6 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--ensemble-tx', type=int, default=-1, help='Timestep of the trained ensemble to evaluate.')
     parser.add_argument('--eval-object-ix', type=int, default=0, help='Index of which eval object to use.')
     parser.add_argument('--strategy', type=str, choices=['bald', 'random', 'task'], default='bald')
+    parser.add_argument('--n-particles', type=int, default=100)
     args = parser.parse_args()
 
     print(args)
