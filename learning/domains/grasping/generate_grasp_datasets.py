@@ -32,8 +32,8 @@ def get_ycb_objects(object_list):
 def sample_grasp_X(graspable_body, property_vector, n_points_per_object):
     # Sample new point cloud for object.
     sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
-    mesh_points = np.array(sim_client.mesh.sample(n_points_per_object, return_index=False))
-    mesh_points = np.hstack([mesh_points, np.ones((n_points_per_object, 1))])
+    mesh_points = np.array(sim_client.mesh.sample(n_points_per_object, return_index=False), dtype='float32')
+    mesh_points = np.hstack([mesh_points, np.ones((n_points_per_object, 1), dtype='float32')])
     mesh_points = (sim_client.mesh_tform@(mesh_points.T)).T[:, 0:3]
     sim_client.disconnect()  
 
@@ -59,9 +59,9 @@ def sample_grasp_X(graspable_body, property_vector, n_points_per_object):
     # plt.savefig('test.png')
 
     # Add grasp/object indicator features.
-    grasp_vectors = np.array(grasp_points)
-    grasp_vectors = np.hstack([grasp_vectors, np.eye(3)])
-    mesh_vectors = np.hstack([mesh_points, np.zeros((n_points_per_object, 3))])
+    grasp_vectors = np.array(grasp_points, dtype='float32')
+    grasp_vectors = np.hstack([grasp_vectors, np.eye(3, dtype='float32')])
+    mesh_vectors = np.hstack([mesh_points, np.zeros((n_points_per_object, 3), dtype='float32')])
 
     # Concatenate all relevant vectors (points, indicators, properties).
     X = np.vstack([grasp_vectors, mesh_vectors])
