@@ -125,26 +125,10 @@ def train(dataloader, val_dataloader, model, n_epochs=20):
 
     return model
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
-
-    # Dataset parameters. 
-    parser.add_argument('--train-dataset-fname', type=str, required=True)
-    parser.add_argument('--val-dataset-fname', type=str, required=True)
-    parser.add_argument('--n-objects', type=int, required=True)
-    # Model parameters.
-    parser.add_argument('--batch-size', type=int, default=16)
-    parser.add_argument('--n-hidden', type=int, default=64)
-    parser.add_argument('--n-epochs', type=int, default=50)
-    parser.add_argument('--model', default='pn', choices=['pn', 'pn++'])
-    parser.add_argument('--property-repr', type=str, required=True, choices=['latent', 'explicit', 'removed'])
-    # Ensemble parameters.
-    parser.add_argument('--n-models', type=int, default=1)
-    args = parser.parse_args()
+def run(args):
     args.use_latents = args.property_repr == 'latent'
     args.fit = False
-
+    print(args)
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
     # Build model.
@@ -166,4 +150,28 @@ if __name__ == '__main__':
     logger.save_dataset(dataset=train_dataset, tx=0)
     logger.save_val_dataset(val_dataset=val_dataset, tx=0)
     logger.save_ensemble(ensemble=ensemble, tx=0)
+
+    return logger.exp_path
+
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--exp-name', type=str, default='', help='Where results will be saved. Randon number if not specified.')
+
+    # Dataset parameters. 
+    parser.add_argument('--train-dataset-fname', type=str, required=True)
+    parser.add_argument('--val-dataset-fname', type=str, required=True)
+    parser.add_argument('--n-objects', type=int, required=True)
+    # Model parameters.
+    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--n-hidden', type=int, default=64)
+    parser.add_argument('--n-epochs', type=int, default=50)
+    parser.add_argument('--model', default='pn', choices=['pn', 'pn++'])
+    parser.add_argument('--property-repr', type=str, required=True, choices=['latent', 'explicit', 'removed'])
+    # Ensemble parameters.
+    parser.add_argument('--n-models', type=int, default=1)
+    args = parser.parse_args()
+    
+    run(args)
 

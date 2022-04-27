@@ -8,9 +8,16 @@ from types import SimpleNamespace
 from learning.domains.grasping.generate_grasp_datasets import generate_objects, generate_datasets
 
 
+def get_object_list(fname):
+    print('Opening', fname)
+    with open(fname, 'r') as handle:
+        objects = handle.readlines()
+    return [o.strip() for o in objects if len(o) > 1]
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--train-objects', nargs='+', help='Either "all" or a list of Ycb object names to include')
-parser.add_argument('--test-objects', nargs='+', help='Either "all" or a list of Ycb object names to include')
+parser.add_argument('--train-objects-fname', type=str, required=True)
+parser.add_argument('--test-objects-fname', type=str, required=True)
 parser.add_argument('--data-root-name', type=str, required=True)
 parser.add_argument('--n-property-samples-train', type=int, required=True)
 parser.add_argument('--n-property-samples-test', type=int, required=True)
@@ -18,7 +25,7 @@ parser.add_argument('--n-grasps-per-object', type=int, required=True)
 parser.add_argument('--n-points-per-object', type=int, required=True)
 parser.add_argument('--n-fit-grasps', type=int, required=True)
 args = parser.parse_args()
-
+print(args)
 
 if __name__ == '__main__':
     # Directory setup.
@@ -39,31 +46,34 @@ if __name__ == '__main__':
         os.mkdir(objects_path)
         os.mkdir(grasps_path)
 
+    train_objects = get_object_list(args.train_objects_fname)
+    test_objects = get_object_list(args.test_objects_fname)
+
     # Generate initial object sets.
     print('[Objects] Generating train objects.')
-    train_objects_path = os.path.join(objects_path, 'train_objects.pkl')
+    train_objects_path = os.path.join(objects_path, 'train_geo_train_props.pkl')
     if not os.path.exists(train_objects_path):
         train_objects_args = SimpleNamespace(
             fname=train_objects_path, 
-            ycb_objects=args.train_objects, 
+            ycb_objects=train_objects, 
             n_property_samples=args.n_property_samples_train)
         generate_objects(train_objects_args)
     
     print('[Objects] Generating test objects: novel geometry.')
-    test_objects_path = os.path.join(objects_path, 'test_objects.pkl')
+    test_objects_path = os.path.join(objects_path, 'test_geo_test_props.pkl')
     if not os.path.exists(test_objects_path):
         test_objects_args = SimpleNamespace(
             fname=test_objects_path, 
-            ycb_objects=args.test_objects, 
+            ycb_objects=test_objects, 
             n_property_samples=args.n_property_samples_test)
         generate_objects(test_objects_args)
 
     print('[Objects] Generating test objects: train geometry.')
-    test_objects_samegeo_path = os.path.join(objects_path, 'test_objects_samegeo.pkl')
+    test_objects_samegeo_path = os.path.join(objects_path, 'train_geo_test_props.pkl')
     if not os.path.exists(test_objects_samegeo_path):
         test_objects_samegeo_args = SimpleNamespace(
             fname=test_objects_samegeo_path, 
-            ycb_objects=args.train_objects, 
+            ycb_objects=train_objects, 
             n_property_samples=args.n_property_samples_test)
         generate_objects(test_objects_samegeo_args)
 
@@ -97,9 +107,9 @@ if __name__ == '__main__':
     if not os.path.exists(fitting_phase_path):
         os.mkdir(fitting_phase_path)
     
-    for ox in range(0, len(args.test_objects*args.n_property_samples_test)):
+    for ox in range(0, len(test_objects)*args.n_property_samples_test):
         print('[Grasps] Generating grasps for evaluating fitting phase for object %d.' % ox)
-        fit_grasps_path = os.path.join(fitting_phase_path, 'fit_grasps_object%d.pkl' % ox)
+        fit_grasps_path = os.path.join(fitting_phase_path, 'fit_grasps_test_geo_object%d.pkl' % ox)
         if not os.path.exists(fit_grasps_path):
             fit_grasps_args = SimpleNamespace(
                 fname=fit_grasps_path,
@@ -109,9 +119,9 @@ if __name__ == '__main__':
                 object_ix=ox)
             generate_datasets(fit_grasps_args)
 
-    for ox in range(0, len(args.train_objects*args.n_property_samples_test)):
+    for ox in range(0, len(train_objects)*args.n_property_samples_test):
         print('[Grasps] Generating grasps for evaluating fitting phase for samegeo object %d.' % ox)
-        fit_grasps_samegeo_path = os.path.join(fitting_phase_path, 'fit_grasps_train_object%d.pkl' % ox)
+        fit_grasps_samegeo_path = os.path.join(fitting_phase_path, 'fit_grasps_train_geo_object%d.pkl' % ox)
         if not os.path.exists(fit_grasps_samegeo_path):
             fit_grasps_samegeo_args = SimpleNamespace(
                 fname=fit_grasps_samegeo_path,
