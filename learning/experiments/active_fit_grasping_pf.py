@@ -55,6 +55,10 @@ def particle_filter_loop(pf, object_set, logger, strategy, args):
         logger.save_particles(particles, tx)
 
 def run_particle_filter_fitting(args):
+    print(args)
+    args.use_latents = True
+    args.fit_pf = True
+    
     logger = ActiveExperimentLogger.setup_experiment_directory(args)
 
     # ----- Load the block set -----
@@ -84,7 +88,8 @@ def run_particle_filter_fitting(args):
 
     # ----- Run particle filter loop -----
     particle_filter_loop(pf, object_set, logger, args.strategy, args)
-
+    
+    return logger.exp_path
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -98,9 +103,6 @@ if __name__ == '__main__':
     parser.add_argument('--strategy', type=str, choices=['bald', 'random', 'task'], default='bald')
     parser.add_argument('--n-particles', type=int, default=100)
     args = parser.parse_args()
-
-    print(args)
-    args.use_latents = True
-    args.fit_pf = True
-
+    
     run_particle_filter_fitting(args)
+    
