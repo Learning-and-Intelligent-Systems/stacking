@@ -6,6 +6,7 @@ import sys
 
 from learning.active.utils import ActiveExperimentLogger
 from learning.evaluate.evaluate_grasping import get_pf_validation_accuracy
+from learning.evaluate.plot_compare_grasping_runs import plot_val_loss
 from learning.experiments.train_grasping_single import run as training_phase
 from learning.experiments.active_fit_grasping_pf import run_particle_filter_fitting as fitting_phase
 
@@ -72,7 +73,7 @@ def get_fitting_phase_dataset_args(dataset_fname):
 
     with open(test_geo_fname, 'rb') as handle:
         test_geo_objects = pickle.load(handle)
-    n_test_geo = len(train_geo_objects['object_data']['object_names'])
+    n_test_geo = len(test_geo_objects['object_data']['object_names'])
 
     return train_geo_fname, test_geo_fname, n_train_geo, n_test_geo
 
@@ -114,7 +115,7 @@ def run_fitting_phase(args):
             fitting_args.exp_name = fitting_exp_name
             fitting_args.max_acquisitions = 10
             fitting_args.objects_fname = objects_fname
-            fitting_args.n_samples = 100
+            fitting_args.n_samples = 50
             fitting_args.pretrained_ensemble_exp_path = pretrained_model_path
             fitting_args.ensemble_tx = 0
             fitting_args.eval_object_ix = ox
@@ -179,6 +180,108 @@ def run_training_phase(args):
         json.dump(logs_lookup, handle)
     
 
+def run_testing_phase(args):
+    
+    # Create log_group files.
+    exp_path = os.path.join(EXPERIMENT_ROOT, args.exp_name)
+    if not os.path.exists(exp_path):
+        print(f'[ERROR] Experiment does not exist: {args.exp_name}')
+        sys.exit()
+
+    logs_path = os.path.join(exp_path, 'logs_lookup.json')
+    with open(logs_path, 'r') as handle:
+        logs_lookup = json.load(handle)
+
+    # Get train_geo_test_props.pkl and test_geo_test_props.pkl
+    args_path = os.path.join(exp_path, 'args.pkl')
+    with open(args_path, 'rb') as handle:
+        exp_args = pickle.load(handle)
+
+    # Get object data.
+    train_objects_fname = os.path.join(DATA_ROOT, exp_args.dataset_name, 'objects', 'train_geo_test_props.pkl')
+    with open(train_objects_fname, 'rb') as handle:
+        train_objects = pickle.load(handle)
+    test_objects_fname = os.path.join(DATA_ROOT, exp_args.dataset_name, 'objects', 'test_geo_test_props.pkl')
+    with open(test_objects_fname, 'rb') as handle:
+        test_objects = pickle.load(handle)
+
+    # Nested dictionary: [train_geo/test_geo][random/bald][all/object_name]
+    logs_lookup_by_object = {
+        'train_geo': {
+            'random': {
+                'all': [],
+            },
+            'bald': {
+                'all': [],
+            }
+        },
+        'test_geo': {
+            'random': {
+                'all': [],
+            },
+            'bald': {
+                'all': [],
+            }
+        }
+    }
+    for ox, object_name in enumerate(train_objects['object_data']['object_names']):
+        if object_name not in logs_lookup_by_object['train_geo']['random']:
+            logs_lookup_by_object['train_geo']['random'][object_name] = []
+        if object_name not in logs_lookup_by_object['train_geo']['bald']:
+            logs_lookup_by_object['train_geo']['bald'][object_name] = []
+
+        random_log_key = f'grasp_{exp_args.exp_name}_fit_random_train_geo_object{ox}'
+        if random_log_key in logs_lookup['fitting_phase']['random']:
+            random_log_fname = logs_lookup['fitting_phase']['random'][random_log_key]
+
+            logs_lookup_by_object['train_geo']['random']['all'].append(random_log_fname)
+            logs_lookup_by_object['train_geo']['random'][object_name].append(random_log_fname)
+
+        bald_log_key = f'grasp_{args.exp_name}_fit_bald_train_geo_object{ox}'
+        if bald_log_key in logs_lookup['fitting_phase']['bald']:
+            bald_log_fname = logs_lookup['fitting_phase']['bald'][bald_log_key]
+
+            logs_lookup_by_object['train_geo']['bald']['all'].append(random_log_fname)
+            logs_lookup_by_object['train_geo']['bald'][object_name].append(bald_log_fname)
+    
+    for ox, object_name in enumerate(test_objects['object_data']['object_names']):
+        if object_name not in logs_lookup_by_object['test_geo']['random']:
+            logs_lookup_by_object['test_geo']['random'][object_name] = []
+        if object_name not in logs_lookup_by_object['test_geo']['bald']:
+            logs_lookup_by_object['test_geo']['bald'][object_name] = []
+
+        random_log_key = f'grasp_{exp_args.exp_name}_fit_random_test_geo_object{ox}'
+        if random_log_key in logs_lookup['fitting_phase']['random']:
+            random_log_fname = logs_lookup['fitting_phase']['random'][random_log_key]
+
+            logs_lookup_by_object['test_geo']['random']['all'].append(random_log_fname)
+            logs_lookup_by_object['test_geo']['random'][object_name].append(random_log_fname)
+
+        bald_log_key = f'grasp_{args.exp_name}_fit_bald_test_geo_object{ox}'
+        if bald_log_key in logs_lookup['fitting_phase']['bald']:
+            bald_log_fname = logs_lookup['fitting_phase']['bald'][bald_log_key]
+            
+            logs_lookup_by_object['test_geo']['bald']['all'].append(random_log_fname)
+            logs_lookup_by_object['test_geo']['bald'][object_name].append(bald_log_fname)
+    
+
+    for  obj_name, loggers in logs_lookup_by_object['train_geo']['random'].items():
+        all_train_loggers = {
+            f'{obj_name}_traingeo_random': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in loggers],
+            f'{obj_name}_traingeo_bald': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['train_geo']['bald'][obj_name]]
+        }
+        fig_path = os.path.join(exp_path, 'figures', f'{obj_name}_traingeo.png')
+        plot_val_loss(all_train_loggers, fig_path)
+    
+    for  obj_name, loggers in logs_lookup_by_object['test_geo']['random'].items():
+        all_test_loggers = {
+            f'{obj_name}_testgeo_random': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in loggers],
+            f'{obj_name}_testgeo_bald': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['test_geo']['bald'][obj_name]]
+        }
+        fig_path = os.path.join(exp_path, 'figures', f'{obj_name}_testgeo.png')
+        plot_val_loss(all_test_loggers, fig_path)
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--phase', required=True, choices=['create', 'training', 'fitting', 'testing'])
 parser.add_argument('--dataset-name', type=str, default='')
@@ -196,4 +299,4 @@ if __name__ == '__main__':
     elif args.phase == 'fitting':
         run_fitting_phase(args)
     elif args.phase == 'testing':
-        pass
+        run_testing_phase(args)
