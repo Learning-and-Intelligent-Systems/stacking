@@ -12,22 +12,12 @@ def vector_from_graspablebody(graspable_body):
     vector =  np.array(graspable_body.com + (graspable_body.mass, graspable_body.friction))
     return vector
 
-def graspablebody_from_vector(ycb_name, vector):
-    graspable_body = GraspableBody(ycb_name=ycb_name,
+def graspablebody_from_vector(object_name, vector):
+    graspable_body = GraspableBody(object_name=object_name,
                                    com=tuple(vector[0:3]),
                                    mass=vector[3],
                                    friction=vector[4])
     return graspable_body
-
-def get_ycb_objects(object_list):
-    valid_names = [name for name in os.listdir(ycb_objects.getDataPath()) if 'Ycb' in name] 
-    if len(object_list) == 1 and object_list[0] == 'all':
-        return valid_names
-    else:
-        for name in object_list:
-            if name not in valid_names:
-                raise ValueError('%s not a valid Ycb Object.' % name)
-        return object_list
 
 def sample_grasp_X(graspable_body, property_vector, n_points_per_object):
     # Sample new point cloud for object.
@@ -87,7 +77,7 @@ def generate_datasets(args):
         object_name = object_data['object_names'][px]
         property_vector = object_data['object_properties'][px]
         graspable_body = graspablebody_from_vector(object_name, property_vector)
-
+        print(f'Object name: {object_name}')
         # Sample random grasps with labels. 
         for gx in range(0, args.n_grasps_per_object):
             print('Grasp %d/%d...' % (gx, args.n_grasps_per_object))
@@ -116,16 +106,15 @@ def generate_datasets(args):
 
 
 def generate_objects(args):
-    object_names = get_ycb_objects(args.ycb_objects)
     assert('learning/data/grasping' in args.fname)
     object_instance_names = []
     object_instance_properties = []
-    for ox, name in enumerate(object_names):
-        print('Object %d/%d...' % (ox, len(object_names)))
+    for ox, name in enumerate(args.object_names):
+        print('Object %d/%d...' % (ox, len(args.object_names)))
         for px in range(0, args.n_property_samples):
             print('Property sample %d/%d...' % (px, args.n_property_samples))
             
-            object_id = ox*len(object_names) + px
+            object_id = ox*len(args.object_names) + px
             
             # Sample a new object.
             graspable_body = GraspableBodySampler.sample_random_object_properties(name)
@@ -152,7 +141,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', required=True, choices=['objects', 'grasps'])
     parser.add_argument('--fname', type=str, required=True, help='Base name used for saving all dataset files.')
     # args.mode == 'objects' parameters
-    parser.add_argument('--ycb-objects', default=['none'], nargs='+', help='Either "all" or a list of Ycb object names to include')
+    parser.add_argument('--object-names', default=[], nargs='+', help='List of all SN or YCB objects to include.')
     parser.add_argument('--n-property-samples', type=int, default=-1, help='Number of object instances per each YcbObject geometry type.')
     # args.mode == 'grasps' parameters
     parser.add_argument('--objects-fname', default='', type=str, help='File with data about objects and object properties.')
@@ -163,7 +152,7 @@ if __name__ == '__main__':
     print(args)
     
     if args.mode == 'objects':
-        assert(args.ycb_objects != ['none'])
+        assert(len(args.object_names) > 0)
         assert(args.n_property_samples > 0)
         generate_objects(args)
     elif args.mode == 'grasps':

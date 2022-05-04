@@ -55,7 +55,7 @@ if __name__ == '__main__':
     if not os.path.exists(train_objects_path):
         train_objects_args = SimpleNamespace(
             fname=train_objects_path, 
-            ycb_objects=train_objects, 
+            object_names=train_objects, 
             n_property_samples=args.n_property_samples_train)
         generate_objects(train_objects_args)
     
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     if not os.path.exists(test_objects_path):
         test_objects_args = SimpleNamespace(
             fname=test_objects_path, 
-            ycb_objects=test_objects, 
+            object_names=test_objects, 
             n_property_samples=args.n_property_samples_test)
         generate_objects(test_objects_args)
 
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     if not os.path.exists(test_objects_samegeo_path):
         test_objects_samegeo_args = SimpleNamespace(
             fname=test_objects_samegeo_path, 
-            ycb_objects=train_objects, 
+            object_names=train_objects, 
             n_property_samples=args.n_property_samples_test)
         generate_objects(test_objects_samegeo_args)
 

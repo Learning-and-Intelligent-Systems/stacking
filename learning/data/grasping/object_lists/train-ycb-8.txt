@@ -1,0 +1,8 @@
+YCB::YcbTennisBall
+YCB::YcbStrawberry
+YCB::YcbScissors
+YCB::YcbGelatinBox
+YCB::YcbPottedMeatCan
+YCB::YcbMustardBottle
+YCB::YcbCrackerBox
+YCB::YcbMediumClamp

@@ -1,0 +1,5 @@
+YCB::YcbPowerDrill
+YCB::YcbFoamBrick
+YCB::YcbBanana
+YCB::YcbHammer
+YCB::YcbTomatoSoupCan
