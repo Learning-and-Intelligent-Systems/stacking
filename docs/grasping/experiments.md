@@ -32,7 +32,7 @@ This script will create the following dataset directory format:
 ## Creating an Experiment
 
 An experiment will host references to all artifacts needed during training. Create an experiment by running:
-`python -m learning.experiments.grasping_experiment_scripts.run_grasping_experiments.py --phase create --exp-name <EXP_NAME> --dataset-name <DATASET_NAME>`
+`python -m learning.experiments.grasping_experiment_scripts.run_grasping_experiments --phase create --exp-name <EXP_NAME> --dataset-name <DATASET_NAME>`
 
 This will create a folder the metadata for the specific experiment in the metadata folder.
 ```
@@ -43,12 +43,12 @@ learning/experiments/metadata/<EXP_NAME>
 
 ## Training Phase
 
-`python -m learning.experiments.grasping_experiment_scripts.run_grasping_experiments --phase training`
+`python -m learning.experiments.grasping_experiment_scripts.run_grasping_experiments --phase training --exp-name <EXP_NAME>`
 
 ## Fitting Phase
 
-`python -m learning.experiments.grasping_experiment_scripts.run_grasping_experiments --phase fitting`
+`python -m learning.experiments.grasping_experiment_scripts.run_grasping_experiments --phase fitting --exp-name <EXP_NAME>`
 
 ## Evaluation Phase
 
-`python -m learning.experiments.grasping_experiment_scripts.run_grasping_experiments --phase eval`
+`python -m learning.experiments.grasping_experiment_scripts.run_grasping_experiments --phase eval --exp-name <EXP_NAME>`

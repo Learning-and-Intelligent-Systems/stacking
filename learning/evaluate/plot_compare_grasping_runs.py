@@ -64,6 +64,7 @@ def get_loggers_from_run_groups(run_groups):
     return loggers
 
 def plot_val_loss(loggers, output_path):
+    plt.clf()
     fig, axes = plt.subplots(1, sharex=False, figsize=(20,10))
     val_fname = 'val_accuracies.pkl'
     for name, group_loggers in loggers.items():
@@ -103,8 +104,8 @@ def plot_val_loss(loggers, output_path):
         axes.set_ylabel('Val Accuracy')
         axes.set_xlabel('Number of adaptation towers')
         axes.legend()
-    plt_fname = 'validation_accuracy.png'
-    plt.savefig(os.path.join(output_path, plt_fname))
+    # plt_fname = 'validation_accuracy.png'
+    plt.savefig(output_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
