@@ -82,8 +82,10 @@ if __name__ == '__main__':
     if not os.path.exists(training_phase_path):
         os.mkdir(training_phase_path)
     
-        print('[Grasps] Generating train grasps for training phase.')
-        train_grasps_path = os.path.join(training_phase_path, 'train_grasps.pkl') 
+
+    print('[Grasps] Generating train grasps for training phase.')
+    train_grasps_path = os.path.join(training_phase_path, 'train_grasps.pkl') 
+    if not os.path.exists(train_grasps_path):
         train_grasps_args = SimpleNamespace(
             fname=train_grasps_path,
             objects_fname=train_objects_path,
@@ -92,8 +94,9 @@ if __name__ == '__main__':
             object_ix=-1)
         generate_datasets(train_grasps_args)
 
-        print('[Grasps] Generating validation grasps for training phase.')
-        val_grasps_path = os.path.join(training_phase_path, 'val_grasps.pkl')
+    print('[Grasps] Generating validation grasps for training phase.')
+    val_grasps_path = os.path.join(training_phase_path, 'val_grasps.pkl')
+    if not os.path.exists(val_grasps_path):
         val_grasps_args = SimpleNamespace(
             fname=val_grasps_path,
             objects_fname=train_objects_path,
