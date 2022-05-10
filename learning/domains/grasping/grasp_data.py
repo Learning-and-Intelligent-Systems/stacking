@@ -86,5 +86,33 @@ def visualize_grasp_dataset(dataset, ycb_name, n_objects, n_grasps_per_object, l
             sim_client.tm_show_grasps(grasps, obj_labels, fname=figure_path % ix)
         else:
             sim_client.tm_show_grasps(grasps, obj_labels)
-    
 
+def visualize_acquisition_dataset(logger, figure_path=''):
+
+    grasps, obj_labels = [], []
+    for tx in range(1, 11):
+        dataset, _ = logger.load_acquisition_data(tx)
+        print(type(dataset))
+
+        graspable_body = dataset['grasp_data']['raw_grasps'][0].graspable_body
+        
+        grasp_points = []
+        for kx in range(3):
+            grasp_points.append(dataset['grasp_data']['grasps'][0][kx, 0:3])
+        grasps.append(grasp_points)
+
+        obj_labels.append(dataset['grasp_data']['labels'][0])
+
+    print(obj_labels)
+    sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
+    if len(figure_path) > 0:
+        sim_client.tm_show_grasps(grasps, obj_labels, fname=figure_path % ix)
+    else:
+        sim_client.tm_show_grasps(grasps, obj_labels)
+    sim_client.disconnect()
+
+if __name__ == '__main__':
+    logger_fname = 'learning/experiments/logs/grasp_train-sn-test-ycb-1_fit_bald_train_geo_object11-20220509-233743'
+    from learning.active.utils import ActiveExperimentLogger
+    logger = ActiveExperimentLogger(logger_fname, use_latents=True)
+    visualize_acquisition_dataset(logger)
