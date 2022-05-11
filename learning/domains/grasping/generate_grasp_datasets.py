@@ -19,7 +19,7 @@ def graspablebody_from_vector(object_name, vector):
                                    friction=vector[4])
     return graspable_body
 
-def sample_grasp_X(graspable_body, property_vector, n_points_per_object):
+def sample_grasp_X(graspable_body, property_vector, n_points_per_object, grasp=None):
     # Sample new point cloud for object.
     sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
     mesh_points = np.array(sim_client.mesh.sample(n_points_per_object, return_index=False), dtype='float32')
@@ -28,9 +28,11 @@ def sample_grasp_X(graspable_body, property_vector, n_points_per_object):
     sim_client.disconnect()  
 
     # Sample grasp.
-    grasp_sampler = GraspSampler(graspable_body=graspable_body, antipodal_tolerance=30, show_pybullet=False)
-    grasp = grasp_sampler.sample_grasp(force=20, show_trimesh=False)
-    grasp_sampler.disconnect()
+    if grasp is None:
+        grasp_sampler = GraspSampler(graspable_body=graspable_body, antipodal_tolerance=30, show_pybullet=False)
+        grasp = grasp_sampler.sample_grasp(force=20, show_trimesh=False)
+        grasp_sampler.disconnect()
+        
 
     # Encode grasp as points.
     grasp_points = (grasp.pb_point1, grasp.pb_point2, grasp.ee_relpose[0])
