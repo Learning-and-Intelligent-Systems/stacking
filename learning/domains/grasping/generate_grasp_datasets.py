@@ -87,7 +87,7 @@ def generate_datasets(args):
             grasp, X = sample_grasp_X(graspable_body, property_vector, args.n_points_per_object)
             
             # Get label.
-            labeler = GraspStabilityChecker(stability_direction='all', label_type='relpose')
+            labeler = GraspStabilityChecker(stability_direction='all', label_type='relpose', grasp_noise=args.grasp_noise)
             label = labeler.get_label(grasp, show_pybullet=False)
 
             object_grasp_data.append(X)
@@ -150,6 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-points-per-object', type=int, default=-1, help='Number of points to include in each point cloud.')
     parser.add_argument('--n-grasps-per-object', type=int, default=-1, help='Number of grasps to label per object.')
     parser.add_argument('--object-ix', type=int, default=-1, help='Only use the given object in the dataset.')
+    parser.add_argument('--grasp-noise', type=float, default=0.0)
     args = parser.parse_args()
     print(args)
     

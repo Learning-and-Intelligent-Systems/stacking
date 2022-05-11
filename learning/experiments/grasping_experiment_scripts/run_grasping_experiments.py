@@ -1,5 +1,6 @@
 import argparse
 import json
+import numpy as np
 import os
 import pickle
 import sys
@@ -104,6 +105,9 @@ def run_fitting_phase(args):
     for geo_type, objects_fname, n_objects in zip(['train_geo', 'test_geo'], [train_geo_fname, test_geo_fname], [n_train_geo, n_test_geo]): 
         
         for ox in range(n_objects):
+            if ox > 100:
+                print(ox)
+                break
             fitting_exp_name = f'grasp_{exp_args.exp_name}_fit_{args.strategy}_{geo_type}_object{ox}'
 
             # Check if we have already fit this object.
@@ -120,7 +124,7 @@ def run_fitting_phase(args):
             fitting_args.ensemble_tx = 0
             fitting_args.eval_object_ix = ox
             fitting_args.strategy = args.strategy
-            fitting_args.n_particles = 100
+            fitting_args.n_particles = 200
 
             print(f'Running fitting phase: {fitting_exp_name}')
             fit_log_path = fitting_phase(fitting_args)
@@ -139,6 +143,8 @@ def run_fitting_phase(args):
             val_dataset_path = os.path.join(DATA_ROOT, exp_args.dataset_name, 'grasps', 'fitting_phase', val_dataset_fname)
 
             get_pf_validation_accuracy(fit_logger, val_dataset_path)
+
+            
 
 
 def run_training_phase(args):
@@ -224,7 +230,22 @@ def run_testing_phase(args):
             }
         }
     }
+
+    n_found = 0
+    p_stable_low, p_stable_high = 0.0, 1.0
     for ox, object_name in enumerate(train_objects['object_data']['object_names']):
+        # TO REMOVE. (2 lines)
+        val_dataset_fname = f'fit_grasps_train_geo_object{ox}.pkl'
+        val_dataset_path = os.path.join(DATA_ROOT, exp_args.dataset_name, 'grasps', 'fitting_phase', val_dataset_fname)
+
+        with open(val_dataset_path, 'rb') as handle:
+            data = pickle.load(handle)
+            p_stable = np.mean(data['grasp_data']['labels'])
+            if p_stable < p_stable_low or p_stable > p_stable_high:
+                continue
+            n_found += 1
+        print(f'{object_name} in range ({p_stable_low}, {p_stable_high}) ({p_stable})')
+
         if object_name not in logs_lookup_by_object['train_geo']['random']:
             logs_lookup_by_object['train_geo']['random'][object_name] = []
         if object_name not in logs_lookup_by_object['train_geo']['bald']:
@@ -236,15 +257,39 @@ def run_testing_phase(args):
 
             logs_lookup_by_object['train_geo']['random']['all'].append(random_log_fname)
             logs_lookup_by_object['train_geo']['random'][object_name].append(random_log_fname)
+            
+            # TO REMVOE (2 lines)
+            # fit_logger = ActiveExperimentLogger(random_log_fname, use_latents=True) 
+            # get_pf_validation_accuracy(fit_logger, val_dataset_path)
+
 
         bald_log_key = f'grasp_{args.exp_name}_fit_bald_train_geo_object{ox}'
         if bald_log_key in logs_lookup['fitting_phase']['bald']:
             bald_log_fname = logs_lookup['fitting_phase']['bald'][bald_log_key]
 
-            logs_lookup_by_object['train_geo']['bald']['all'].append(random_log_fname)
+            logs_lookup_by_object['train_geo']['bald']['all'].append(bald_log_fname)
             logs_lookup_by_object['train_geo']['bald'][object_name].append(bald_log_fname)
-    
+
+            # TO REMOVE (2 lines)
+            # fit_logger = ActiveExperimentLogger(bald_log_fname, use_latents=True) 
+            # get_pf_validation_accuracy(fit_logger, val_dataset_path)
+
+        if ox > 100:
+            break
+    print(f'{n_found} train geo objects included.')
+    n_found = 0
     for ox, object_name in enumerate(test_objects['object_data']['object_names']):
+         # TO REMOVE. (2 lines)
+        val_dataset_fname = f'fit_grasps_test_geo_object{ox}.pkl'
+        val_dataset_path = os.path.join(DATA_ROOT, exp_args.dataset_name, 'grasps', 'fitting_phase', val_dataset_fname)
+
+        with open(val_dataset_path, 'rb') as handle:
+            data = pickle.load(handle)
+            p_stable = np.mean(data['grasp_data']['labels'])
+            if p_stable < p_stable_low or p_stable > p_stable_high:
+                continue
+            n_found += 1
+        
         if object_name not in logs_lookup_by_object['test_geo']['random']:
             logs_lookup_by_object['test_geo']['random'][object_name] = []
         if object_name not in logs_lookup_by_object['test_geo']['bald']:
@@ -257,13 +302,22 @@ def run_testing_phase(args):
             logs_lookup_by_object['test_geo']['random']['all'].append(random_log_fname)
             logs_lookup_by_object['test_geo']['random'][object_name].append(random_log_fname)
 
+            # TO REMVOE (2 lines)
+            # fit_logger = ActiveExperimentLogger(random_log_fname, use_latents=True) 
+            # get_pf_validation_accuracy(fit_logger, val_dataset_path)
+
+
         bald_log_key = f'grasp_{args.exp_name}_fit_bald_test_geo_object{ox}'
         if bald_log_key in logs_lookup['fitting_phase']['bald']:
             bald_log_fname = logs_lookup['fitting_phase']['bald'][bald_log_key]
             
-            logs_lookup_by_object['test_geo']['bald']['all'].append(random_log_fname)
+            logs_lookup_by_object['test_geo']['bald']['all'].append(bald_log_fname)
             logs_lookup_by_object['test_geo']['bald'][object_name].append(bald_log_fname)
-    
+
+            # TO REMVOE (2 lines)
+            # fit_logger = ActiveExperimentLogger(bald_log_fname, use_latents=True) 
+            # get_pf_validation_accuracy(fit_logger, val_dataset_path)
+    print(f'{n_found} test geo objects included.')
 
     for  obj_name, loggers in logs_lookup_by_object['train_geo']['random'].items():
         all_train_loggers = {

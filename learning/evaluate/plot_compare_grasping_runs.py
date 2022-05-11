@@ -67,6 +67,8 @@ def plot_val_loss(loggers, output_path):
     plt.clf()
     fig, axes = plt.subplots(1, sharex=False, figsize=(20,10))
     val_fname = 'val_accuracies.pkl'
+    # val_fname = 'val_precisions.pkl'
+    # val_fname = 'val_f1s.pkl'
     for name, group_loggers in loggers.items():
         # First create one large results dictionary with pooled results from each logger.
         all_accs = []
@@ -84,7 +86,8 @@ def plot_val_loss(loggers, output_path):
             else:
                 for tx in range(len(all_accs)):
                     all_accs[tx].append(vals[tx])
-        
+        if len(all_accs) == 0:
+            continue
         # Then plot the regrets and save it in the results folder.
         upper75 = [] 
         median = [] 
@@ -106,6 +109,7 @@ def plot_val_loss(loggers, output_path):
         axes.legend()
     # plt_fname = 'validation_accuracy.png'
     plt.savefig(output_path)
+    plt.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

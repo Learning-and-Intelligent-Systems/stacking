@@ -7,11 +7,14 @@ import pickle
 import torch
 
 from mpl_toolkits.axes_grid1 import ImageGrid
-from sklearn.metrics import recall_score, precision_score, accuracy_score
+from sklearn.metrics import recall_score, precision_score, balanced_accuracy_score, f1_score, confusion_matrix, accuracy_score
 from torch.utils.data import DataLoader
+from learning.domains.grasping.active_utils import get_fit_object, sample_unlabeled_data, get_labels, get_train_and_fit_objects
+from learning.active.acquire import bald
 
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.grasping.grasp_data import GraspDataset, GraspParallelDataLoader, visualize_grasp_dataset
+from particle_belief import GraspingDiscreteLikelihoodParticleBelief
 
 
 def get_labels_predictions(logger, val_dataset_fname):
@@ -145,14 +148,13 @@ def get_predictions_with_particles(particles, grasp_data, ensemble, n_particle_s
 
 
 def get_pf_validation_accuracy(logger, fname):
-    accs = []
+    accs, precisions, recalls, f1s, balanced_accs = [], [], [], [], []
+    confusions = []
     
     with open(fname, 'rb') as handle:
         val_grasp_data = pickle.load(handle)
 
     eval_range = range(0, logger.args.max_acquisitions, 1)
-    output_fname = 'val_accuracies.pkl'
-
     for tx in eval_range:
         print('Eval timestep, ', tx)
         ensemble = logger.get_ensemble(tx)
@@ -164,13 +166,66 @@ def get_pf_validation_accuracy(logger, fname):
         preds = (probs > 0.5).float()
 
         acc = accuracy_score(labels, preds)
-        print('Acc:', acc)
+        prec = precision_score(labels, preds)
+        rec = recall_score(labels, preds)
+        confs = confusion_matrix(labels, preds)
+        f1 = f1_score(labels, preds)
+        b_acc = balanced_accuracy_score(labels, preds)
+
+        print(f'Acc: {acc}\tBalanced Acc: {b_acc}\tPrecision: {prec}\tRecall: {rec}\tF1: {f1}')
         accs.append(acc)
+        precisions.append(prec)
+        recalls.append(rec)
+        confusions.append(confs)
+        f1s.append(f1)
+        balanced_accs.append(b_acc)
     
-    with open(logger.get_figure_path(output_fname), 'wb') as handle:
+    with open(logger.get_figure_path('val_accuracies.pkl'), 'wb') as handle:
         pickle.dump(accs, handle)
+    with open(logger.get_figure_path('val_precisions.pkl'), 'wb') as handle:
+        pickle.dump(precisions, handle)
+    with open(logger.get_figure_path('val_recalls.pkl'), 'wb') as handle:
+        pickle.dump(recalls, handle)
+    with open(logger.get_figure_path('val_confusions.pkl'), 'wb') as handle:
+        pickle.dump(confusions, handle)
+    with open(logger.get_figure_path('val_f1s.pkl'), 'wb') as handle:
+        pickle.dump(f1s, handle)
+    with open(logger.get_figure_path('val_balanced_accs.pkl'), 'wb') as handle:
+        pickle.dump(balanced_accs, handle)
     return accs
-            
+
+def get_acquired_preditctions_pf(logger):
+    pf_args = logger.args
+    latent_ensemble = logger.get_ensemble(0)
+    if torch.cuda.is_available():
+        latent_ensemble.cuda()
+
+    object_set = get_train_and_fit_objects(pretrained_ensemble_path=pf_args.pretrained_ensemble_exp_path,
+                                           use_latents=True,
+                                           fit_objects_fname=pf_args.objects_fname,
+                                           fit_object_ix=pf_args.eval_object_ix)
+    print('Total objects:', len(object_set['object_names']))
+    pf_args.num_eval_objects = 1
+    pf_args.num_train_objects = len(object_set['object_names']) - pf_args.num_eval_objects
+
+    pf = GraspingDiscreteLikelihoodParticleBelief(
+        object_set=object_set,
+        D=latent_ensemble.d_latents,
+        N=pf_args.n_particles,
+        likelihood=latent_ensemble,
+        plot=True)
+
+    for tx in range(1, 11):
+        particles = logger.load_particles(tx)
+        pf.particles = particles
+
+        grasp_data, _ = logger.load_acquisition_data(tx)
+
+        preds = pf.get_particle_likelihoods(pf.particles.particles, grasp_data).reshape((1, pf_args.n_particles))
+        print(preds.shape)
+        score = bald(torch.Tensor(preds))
+        print(score, preds.mean())
+
 
 
 if __name__ == '__main__':
@@ -184,5 +239,5 @@ if __name__ == '__main__':
     #get_validation_metrics(logger, args.val_dataset_fname)
     #visualize_predictions(logger, args.val_dataset_fname)
     #combine_image_grids(logger, ['labels', 'predictions', 'correct'])
-
-    get_pf_validation_accuracy(logger, args.val_dataset_fname)
+    get_acquired_preditctions_pf(logger)
+    #get_pf_validation_accuracy(logger, args.val_dataset_fname)

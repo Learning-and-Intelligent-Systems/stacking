@@ -94,7 +94,7 @@ class ActiveExperimentLogger:
         if len(aq_files) == 0:
             return
         max_aq = np.max([int(s.split('_')[1].split('.')[0]) for s in aq_files if '_' in s]) + 1
-        if max_aq != self.args.max_acquisitions:
+        if max_aq < self.args.max_acquisitions:
             print('[WARNING] Only %d acquisition steps have been executed so far.' % max_aq)
             self.args.max_acquisitions = max_aq
     
@@ -236,12 +236,12 @@ class ActiveExperimentLogger:
             ensemble.load_state_dict(torch.load(path, map_location='cpu'))
             return ensemble
         except:
-            print('ensemble_%d.pkl not found on path' % tx)
+            print('ensemble_%d.pt not found on path' % tx)
             return None
 
 
 
-    def save_ensemble(self, ensemble, tx):
+    def save_ensemble(self, ensemble, tx, symlink_tx0=False):
         """ Save an ensemble within the logging directory. The weights
         will be saved to <exp_name>/models/ensemble_<tx>.pt. Model metadata that
         is needed to initialize the Ensemble class while loading is 
@@ -251,7 +251,7 @@ class ActiveExperimentLogger:
         :tx: The active learning timestep these models represent.
         """
         if self.use_latents:
-            self.save_latent_ensemble(ensemble, tx)
+            self.save_latent_ensemble(ensemble, tx, symlink_tx0)
             return
 
         # Save ensemble metadata.
@@ -266,7 +266,7 @@ class ActiveExperimentLogger:
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
         torch.save(ensemble.state_dict(), os.path.join(path))
 
-    def save_latent_ensemble(self, latent_ensemble, tx):
+    def save_latent_ensemble(self, latent_ensemble, tx, symlink_tx0):
         metadata = {'base_model': latent_ensemble.ensemble.base_model,
                     'base_args': latent_ensemble.ensemble.base_args,
                     'n_models': latent_ensemble.ensemble.n_models,
@@ -278,7 +278,11 @@ class ActiveExperimentLogger:
 
         # Save ensemble weights.
         path = os.path.join(self.exp_path, 'models', 'ensemble_%d.pt' % tx)
-        torch.save(latent_ensemble.state_dict(), os.path.join(path))
+        if tx > 0 and symlink_tx0:
+            src = 'ensemble_0.pt'
+            os.symlink(src, path)
+        else:
+            torch.save(latent_ensemble.state_dict(), os.path.join(path))
 
     def get_towers_data(self, tx):
         # Get all tower files at the current acquisition step, in sorted order
@@ -314,9 +318,9 @@ class ActiveExperimentLogger:
         path = os.path.join(self.exp_path, 'acquisition_data', 'acquired_%d.pkl' % tx)
         with open(path, 'wb') as handle:
             pickle.dump(data, handle)
-        self.acquisition_step = tx+1
-        self.tower_counter = 0
-        self.remove_unlabeled_acquisition_data()
+        # self.acquisition_step = tx+1
+        # self.tower_counter = 0
+        # self.remove_unlabeled_acquisition_data()
         
     def remove_unlabeled_acquisition_data(self):
         os.remove(os.path.join(self.exp_path, 'acquired_processing.pkl'))

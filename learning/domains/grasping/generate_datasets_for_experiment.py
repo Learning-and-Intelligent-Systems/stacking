@@ -24,6 +24,7 @@ parser.add_argument('--n-property-samples-test', type=int, required=True)
 parser.add_argument('--n-grasps-per-object', type=int, required=True)
 parser.add_argument('--n-points-per-object', type=int, required=True)
 parser.add_argument('--n-fit-grasps', type=int, required=True)
+parser.add_argument('--grasp-noise', type=float, required=True)
 args = parser.parse_args()
 print(args)
 
@@ -91,7 +92,8 @@ if __name__ == '__main__':
             objects_fname=train_objects_path,
             n_points_per_object=args.n_points_per_object,
             n_grasps_per_object=args.n_grasps_per_object,
-            object_ix=-1)
+            object_ix=-1,
+            grasp_noise=args.grasp_noise)
         generate_datasets(train_grasps_args)
 
     print('[Grasps] Generating validation grasps for training phase.')
@@ -102,7 +104,8 @@ if __name__ == '__main__':
             objects_fname=train_objects_path,
             n_points_per_object=args.n_points_per_object,
             n_grasps_per_object=args.n_grasps_per_object,
-            object_ix=-1)
+            object_ix=-1,
+            grasp_noise=args.grasp_noise)
         generate_datasets(val_grasps_args)
 
     # Generate fitting object datasets.
@@ -110,7 +113,7 @@ if __name__ == '__main__':
     if not os.path.exists(fitting_phase_path):
         os.mkdir(fitting_phase_path)
     
-    for ox in range(0, len(test_objects)*args.n_property_samples_test):
+    for ox in range(0, min(100, len(test_objects)*args.n_property_samples_test)):
         print('[Grasps] Generating grasps for evaluating fitting phase for object %d.' % ox)
         fit_grasps_path = os.path.join(fitting_phase_path, 'fit_grasps_test_geo_object%d.pkl' % ox)
         if not os.path.exists(fit_grasps_path):
@@ -119,10 +122,11 @@ if __name__ == '__main__':
                 objects_fname=test_objects_path,
                 n_points_per_object=args.n_points_per_object,
                 n_grasps_per_object=args.n_fit_grasps,
-                object_ix=ox)
+                object_ix=ox,
+                grasp_noise=args.grasp_noise)
             generate_datasets(fit_grasps_args)
 
-    for ox in range(0, len(train_objects)*args.n_property_samples_test):
+    for ox in range(0, min(100, len(train_objects)*args.n_property_samples_test)):
         print('[Grasps] Generating grasps for evaluating fitting phase for samegeo object %d.' % ox)
         fit_grasps_samegeo_path = os.path.join(fitting_phase_path, 'fit_grasps_train_geo_object%d.pkl' % ox)
         if not os.path.exists(fit_grasps_samegeo_path):
@@ -131,7 +135,8 @@ if __name__ == '__main__':
                 objects_fname=test_objects_samegeo_path,
                 n_points_per_object=args.n_points_per_object,
                 n_grasps_per_object=args.n_fit_grasps,
-                object_ix=ox)
+                object_ix=ox,
+                grasp_noise=args.grasp_noise)
             generate_datasets(fit_grasps_samegeo_args)
         
 
