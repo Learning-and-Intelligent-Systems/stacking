@@ -418,17 +418,18 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         # cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3) #+ np.eye(D)*0.5
         # resampled_particles = sample_particle_distribution(distribution, num_samples=N)
         # mean = np.mean(resampled_particles, axis=0)
-        # print('Proposal:')
-        # print(mean)
-        # print(np.diag(cov))
+        # # print('Proposal:')
+        # # print(mean)
+        # # print(np.diag(cov))
         # # mean = np.zeros((5,))
         # # cov = np.eye(5)*2
         # proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
 
         # PROPOSAL 2: Resample then wiggle.
         particles = distribution.particles
-        proposed_particles = sample_particle_distribution(distribution, num_samples=N)
-        proposed_particles += np.random.multivariate_normal(mean=np.zeros((D,)), cov=np.eye(D)*0.25, size=N)
+        resampled_particles = sample_particle_distribution(distribution, num_samples=N)     
+        proposed_particles = resampled_particles + np.random.multivariate_normal(mean=np.zeros((D,)), cov=np.eye(D)*0.5, size=N)
+
         # proposed_particles = particles
         # particles = distribution.particles
         # TODO: Update M-H update to be compatible with our model.

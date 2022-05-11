@@ -9,7 +9,7 @@ Before creating a dataset, we first need to create lists specifying the train/te
 `python -m learning.domains.grasping.generate_object_lists --n-train 100 --n-test 10 --train-objects-datasets ShapeNet --test-objects-datasets YCB --train-objects-fname train-sh-100.txt --test-objects-fname test-ycb-10.txt`
 
 After the object splits exist, run the following to create all the relevant datasets for an experiment:
-`python -m learning.domains.grasping.generate_datasets_for_experiment --train-objects-fname <> --test-objects-fname <> --data-root-name <> --n-property-samples-train <> --n-property-samples-test <> --n-grasps-per-object <> --n-fit-grasps <> --n-points-per-object <>`
+`python -m learning.domains.grasping.generate_datasets_for_experiment --train-objects-fname <> --test-objects-fname <> --data-root-name <> --n-property-samples-train <> --n-property-samples-test <> --n-grasps-per-object <> --n-fit-grasps <> --n-points-per-object <> --grasp-noise <>`
 
 This script will create the following dataset directory format:
 ```

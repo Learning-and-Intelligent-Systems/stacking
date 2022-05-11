@@ -26,11 +26,15 @@ def find_informative_tower(pf, object_set, logger, args):
     
     pred_vec = torch.Tensor(np.stack(all_preds))
     scores = bald(pred_vec).cpu().numpy()
+    print('Scores:', scores)
     acquire_ix = np.argsort(scores)[::-1][0]
 
     return all_grasps[acquire_ix]
 
 def particle_filter_loop(pf, object_set, logger, strategy, args):
+    logger.save_ensemble(pf.likelihood, 0, symlink_tx0=True)
+    logger.save_particles(pf.particles, 0)
+
     for tx in range(0, args.max_acquisitions):
         print('[ParticleFilter] Interaction Number', tx)
         
@@ -51,9 +55,10 @@ def particle_filter_loop(pf, object_set, logger, strategy, args):
         particles, means = pf.update(grasp_dataset)
 
         # TODO: Save the model and particle distribution at each step.
-        logger.save_ensemble(pf.likelihood, tx)
-        logger.save_particles(particles, tx)
-
+        logger.save_acquisition_data(grasp_dataset, None, tx+1)
+        logger.save_ensemble(pf.likelihood, tx+1, symlink_tx0=True)
+        logger.save_particles(particles, tx+1)
+# "grasp_train-ycb-test-ycb-1_fit_random_train_geo_object0": "learning/experiments/logs/grasp_train-ycb-test-ycb-1_fit_random_train_geo_object0-20220504-134253"
 def run_particle_filter_fitting(args):
     print(args)
     args.use_latents = True
