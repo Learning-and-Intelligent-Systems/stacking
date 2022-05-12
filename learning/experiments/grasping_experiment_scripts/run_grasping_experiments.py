@@ -1,5 +1,6 @@
 import argparse
 import json
+from selectors import EpollSelector
 import numpy as np
 import os
 import pickle
@@ -10,7 +11,7 @@ from learning.evaluate.evaluate_grasping import get_pf_validation_accuracy
 from learning.evaluate.plot_compare_grasping_runs import plot_val_loss
 from learning.experiments.train_grasping_single import run as training_phase
 from learning.experiments.active_fit_grasping_pf import run_particle_filter_fitting as fitting_phase
-
+from learning.experiments.active_fit_constrained_grasping_pf import run_particle_filter_fitting as constrained_fitting_phase
 
 DATA_ROOT = 'learning/data/grasping'
 EXPERIMENT_ROOT = 'learning/experiments/metadata'
@@ -41,7 +42,7 @@ def create_experiment(args):
     logs_path = os.path.join(exp_dir, 'logs_lookup.json')
     logs = {
         'training_phase': '',
-        'fitting_phase': {'random': {}, 'bald': {}}
+        'fitting_phase': {'random': {}, 'bald': {}, 'constrained_random': {}, 'constrained_bald': {}}
     }
     with open(logs_path, 'w') as handle:
         json.dump(logs, handle)
@@ -108,10 +109,15 @@ def run_fitting_phase(args):
             if ox > 100:
                 print(ox)
                 break
-            fitting_exp_name = f'grasp_{exp_args.exp_name}_fit_{args.strategy}_{geo_type}_object{ox}'
+
+            if args.constrained:
+                mode = f'constrained_{args.strategy}'
+            else:
+                mode = f'{args.strategy}'
+            fitting_exp_name = f'grasp_{exp_args.exp_name}_fit_{mode}_{geo_type}_object{ox}'
 
             # Check if we have already fit this object.
-            if fitting_exp_name in logs_lookup['fitting_phase'][args.strategy]:
+            if fitting_exp_name in logs_lookup['fitting_phase'][mode]:
                 print(f'Skipping {fitting_exp_name}...')
                 continue
 
@@ -127,12 +133,15 @@ def run_fitting_phase(args):
             fitting_args.n_particles = 200
 
             print(f'Running fitting phase: {fitting_exp_name}')
-            fit_log_path = fitting_phase(fitting_args)
+            if args.constrained:
+                fit_log_path = constrained_fitting_phase(fitting_args)
+            else:
+                fit_log_path = fitting_phase(fitting_args)
 
             # Save fitting path in metadata.
             if len(logs_lookup['fitting_phase']) == 0:
-                logs_lookup['fitting_phase'] = {'random': {}, 'bald': {}}
-            logs_lookup['fitting_phase'][args.strategy][fitting_exp_name] = fit_log_path
+                logs_lookup['fitting_phase'] = {'random': {}, 'bald': {}, 'constrained_random': {}, 'constrained_bald': {}}
+            logs_lookup['fitting_phase'][mode][fitting_exp_name] = fit_log_path
             with open(logs_path, 'w') as handle:
                 json.dump(logs_lookup, handle)
 
@@ -341,8 +350,10 @@ parser.add_argument('--phase', required=True, choices=['create', 'training', 'fi
 parser.add_argument('--dataset-name', type=str, default='')
 parser.add_argument('--exp-name', required=True, type=str)
 parser.add_argument('--strategy', type=str, choices=['bald', 'random'], default='random')
+parser.add_argument('--constrained', action='store_true', default=False)
 args = parser.parse_args()
-
+print(args)
+sys.exit()
 
 if __name__ == '__main__':
     
