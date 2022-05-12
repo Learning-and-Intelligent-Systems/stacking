@@ -2,6 +2,7 @@ from mimetypes import init
 import numpy as np
 import os
 import pb_robot
+import pybullet as p
 
 from pb_robot.planners.antipodalGraspPlanner import GraspableBody, GraspSampler
 
@@ -9,7 +10,7 @@ from pb_robot.planners.antipodalGraspPlanner import GraspableBody, GraspSampler
 class GraspingAgent:
 
     def __init__(self, graspable_body, init_pose, use_gui=False):
-        self.shapenet_root = '/home/mnosew/workspace/object_models/shapenet-sem/urdfs'
+        self.shapenet_root = '/home/michael/workspace/object_models/shapenet-sem/urdfs'
 
         self.client_id = pb_robot.utils.connect(use_gui=use_gui)
         pb_robot.utils.set_pbrobot_clientid(self.client_id)
@@ -27,6 +28,9 @@ class GraspingAgent:
         self.pb_body = pb_robot.body.createBody(src_path)
 
         self.set_object_pose(init_pose, find_stable_z=True)
+
+    def disconnect(self):
+        p.disconnect(self.client_id)
 
     def set_object_pose(self, pose, find_stable_z=True):
         pb_robot.utils.set_pbrobot_clientid(self.client_id)
@@ -67,7 +71,7 @@ class GraspingAgent:
         self.robot.arm.SetJointValues(robot_conf)
         self.pb_body.set_base_link_pose(object_pose)
 
-    def _sample_grasp_action(self, max_attempts=100):
+    def _sample_grasp_action(self, max_attempts=1000):
         
         for ax in range(0, max_attempts):
             # Step (1): Sample valid antipodal grasp for object.
@@ -75,8 +79,10 @@ class GraspingAgent:
                 antipodal_tolerance=30,
                 show_pybullet=False,
                 urdf_directory='urdf_models')
+            if ax < 10: print('Connected to:', sampler.sim_client.pb_client_id)
             grasp = sampler.sample_grasp(force=20)
-        
+            sampler.disconnect()
+
             # Step (2): Calculate world transform of gripper.
             pb_robot.utils.set_pbrobot_clientid(self.client_id)
             ee_obj = grasp.ee_relpose
@@ -91,14 +97,15 @@ class GraspingAgent:
             if q_grasp is None:
                 continue
             if not self.robot.arm.IsCollisionFree(q_grasp, obstacles=[self.floor]):
+                
                 continue
             self.robot.arm.SetJointValues(q_grasp)
 
             #sampler.sim_client.tm_show_grasp(grasp)
-            sampler.disconnect()
+            # sampler.disconnect()
             return grasp
 
-    def _sample_place_action(self, grasp, max_attempts=100):
+    def _sample_place_action(self, grasp, max_attempts=1000):
 
         placement_x_range = (0.3, 0.7)
         placement_y_range = (-0.4, 0.4)

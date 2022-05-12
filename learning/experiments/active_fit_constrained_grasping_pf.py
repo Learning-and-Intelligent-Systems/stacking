@@ -99,6 +99,7 @@ def particle_filter_loop(pf, object_set, logger, strategy, args):
         logger.save_acquisition_data(grasp_dataset, None, tx+1)
         logger.save_ensemble(pf.likelihood, tx+1)
         logger.save_particles(particles, tx+1)
+    agent.disconnect()
 
 def run_particle_filter_fitting(args):
     print(args)

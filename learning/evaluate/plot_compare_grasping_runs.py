@@ -85,7 +85,10 @@ def plot_val_loss(loggers, output_path):
                 all_accs = [[acc] for acc in vals]
             else:
                 for tx in range(len(all_accs)):
-                    all_accs[tx].append(vals[tx])
+                    if tx >= len(vals):
+                        all_accs[tx].append(vals[-1])
+                    else:
+                        all_accs[tx].append(vals[tx])
         if len(all_accs) == 0:
             continue
         # Then plot the regrets and save it in the results folder.

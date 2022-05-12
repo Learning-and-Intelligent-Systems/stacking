@@ -110,10 +110,16 @@ def run_fitting_phase(args):
                 print(ox)
                 break
 
+            if ox >= 85 and ox < 90:
+                continue
+
             if args.constrained:
                 mode = f'constrained_{args.strategy}'
             else:
                 mode = f'{args.strategy}'
+
+            if mode not in logs_lookup['fitting_phase']:
+                logs_lookup['fitting_phase'][mode] = {}
             fitting_exp_name = f'grasp_{exp_args.exp_name}_fit_{mode}_{geo_type}_object{ox}'
 
             # Check if we have already fit this object.
@@ -228,6 +234,9 @@ def run_testing_phase(args):
             },
             'bald': {
                 'all': [],
+            },
+            'constrained_random': {
+                'all': []
             }
         },
         'test_geo': {
@@ -236,6 +245,9 @@ def run_testing_phase(args):
             },
             'bald': {
                 'all': [],
+            },
+            'constrained_random': {
+                'all': []
             }
         }
     }
@@ -259,6 +271,8 @@ def run_testing_phase(args):
             logs_lookup_by_object['train_geo']['random'][object_name] = []
         if object_name not in logs_lookup_by_object['train_geo']['bald']:
             logs_lookup_by_object['train_geo']['bald'][object_name] = []
+        if object_name not in logs_lookup_by_object['train_geo']['constrained_random']:
+            logs_lookup_by_object['train_geo']['constrained_random'][object_name] = []
 
         random_log_key = f'grasp_{exp_args.exp_name}_fit_random_train_geo_object{ox}'
         if random_log_key in logs_lookup['fitting_phase']['random']:
@@ -271,6 +285,12 @@ def run_testing_phase(args):
             # fit_logger = ActiveExperimentLogger(random_log_fname, use_latents=True) 
             # get_pf_validation_accuracy(fit_logger, val_dataset_path)
 
+        constrained_random_log_key = f'grasp_{exp_args.exp_name}_fit_constrained_random_train_geo_object{ox}'
+        if constrained_random_log_key in logs_lookup['fitting_phase']['constrained_random']:
+            constrained_random_log_fname = logs_lookup['fitting_phase']['constrained_random'][constrained_random_log_key]
+
+            logs_lookup_by_object['train_geo']['constrained_random']['all'].append(constrained_random_log_fname)
+            logs_lookup_by_object['train_geo']['constrained_random'][object_name].append(constrained_random_log_fname)
 
         bald_log_key = f'grasp_{args.exp_name}_fit_bald_train_geo_object{ox}'
         if bald_log_key in logs_lookup['fitting_phase']['bald']:
@@ -331,7 +351,8 @@ def run_testing_phase(args):
     for  obj_name, loggers in logs_lookup_by_object['train_geo']['random'].items():
         all_train_loggers = {
             f'{obj_name}_traingeo_random': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in loggers],
-            f'{obj_name}_traingeo_bald': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['train_geo']['bald'][obj_name]]
+            f'{obj_name}_traingeo_bald': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['train_geo']['bald'][obj_name]],
+            f'{obj_name}_traingeo_crandom': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['train_geo']['constrained_random'][obj_name]]
         }
         fig_path = os.path.join(exp_path, 'figures', f'{obj_name}_traingeo.png')
         plot_val_loss(all_train_loggers, fig_path)
@@ -352,8 +373,7 @@ parser.add_argument('--exp-name', required=True, type=str)
 parser.add_argument('--strategy', type=str, choices=['bald', 'random'], default='random')
 parser.add_argument('--constrained', action='store_true', default=False)
 args = parser.parse_args()
-print(args)
-sys.exit()
+
 
 if __name__ == '__main__':
     
