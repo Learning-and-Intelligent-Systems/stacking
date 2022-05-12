@@ -4,13 +4,13 @@ import os
 import pb_robot
 import pybullet as p
 
-from pb_robot.planners.antipodalGraspPlanner import GraspableBody, GraspSampler
+from pb_robot.planners.antipodalGraspPlanner import GraspableBody, GraspSampler, GraspSimulationClient
 
 
 class GraspingAgent:
 
     def __init__(self, graspable_body, init_pose, use_gui=False):
-        self.shapenet_root = '/home/michael/workspace/object_models/shapenet-sem/urdfs'
+        self.shapenet_root = '/home/mnosew/workspace/object_models/shapenet-sem/urdfs'
 
         self.client_id = pb_robot.utils.connect(use_gui=use_gui)
         pb_robot.utils.set_pbrobot_clientid(self.client_id)
@@ -121,7 +121,22 @@ class GraspingAgent:
             quat = pb_robot.transformations.random_quaternion()
             
             self.pb_body.set_base_link_pose(((x, y, 1.0), quat))
-            z = pb_robot.placements.stable_z(self.pb_body, self.floor)
+            
+            client = GraspSimulationClient(self.graspable_body, False, 'urdf_models')
+            # pb_aabb = p.getAABB(self.pb_body.id, physicsClientId=self.client_id)
+            # print(pb_aabb)
+            # pb_robot.utils.set_pbrobot_clientid(self.client_id)
+            # pb_robot.viz.draw_aabb(pb_aabb)
+            aabb = client.tm_get_aabb(((x, y, 1.0), quat))
+            floor_aabb = p.getAABB(self.floor.id, physicsClientId=self.client_id)
+            center = pb_robot.aabb.get_aabb_center(aabb)
+            extent = pb_robot.aabb.get_aabb_extent(aabb)
+            client.disconnect()
+            pb_robot.utils.set_pbrobot_clientid(self.client_id)
+
+            z = (floor_aabb[1] + extent/2 + (self.pb_body.get_base_link_point() - center))[2]
+
+            # z = pb_robot.placements.stable_z(self.pb_body, self.floor)
             self.pb_body.set_base_link_pose(((x, y, z), quat))
 
             # Step (3): Compute world frame of gripper with given grasp.
@@ -146,10 +161,10 @@ class GraspingAgent:
 if __name__ == '__main__':
     object_name = 'ShapeNet::Desk_fe2a9f23035580ce239883c5795189ed'
     # object_name = 'ShapeNet::ComputerMouse_379e93edfd0cb9e4cc034c03c3eb69d'
-    object_name = 'ShapeNet::WineGlass_2d89d2b3b6749a9d99fbba385cc0d41d'
+    #object_name = 'ShapeNet::WineGlass_2d89d2b3b6749a9d99fbba385cc0d41d'
     # object_name = 'ShapeNet::WallLamp_8be32f90153eb7281b30b67ce787d4d3'    
-    # object_name = 'ShapeNet::PersonStanding_3dfe62d56a28f464c17f8c1c27c3df1'
-    object_name = 'ShapeNet::DrinkingUtensil_c491d8bc77f4fb1ca4c322790a683350'
+    object_name = 'ShapeNet::PersonStanding_3dfe62d56a28f464c17f8c1c27c3df1'
+    #object_name = 'ShapeNet::DrinkingUtensil_c491d8bc77f4fb1ca4c322790a683350'
     graspable_body = GraspableBody(object_name=object_name, com=(0, 0, 0), mass=0.1, friction=1.0)
 
     agent = GraspingAgent(graspable_body=graspable_body, 
