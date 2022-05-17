@@ -421,14 +421,18 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         # # print('Proposal:')
         # # print(mean)
         # # print(np.diag(cov))
-        # # mean = np.zeros((5,))
-        # # cov = np.eye(5)*2
-        # proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
-
+        
+        
+        #particles = distribution.particles
+        #mean = np.zeros((3,))
+        #cov = np.eye(3)
+        #proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
+        
         # PROPOSAL 2: Resample then wiggle.
         particles = distribution.particles
         resampled_particles = sample_particle_distribution(distribution, num_samples=N)     
         proposed_particles = resampled_particles + np.random.multivariate_normal(mean=np.zeros((D,)), cov=np.eye(D)*0.5, size=N)
+        # ----------
 
         # proposed_particles = particles
         # particles = distribution.particles
@@ -460,11 +464,11 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
             print((n_correct[:, 0]/len(experience)).mean())
 
             # Calculate M-H acceptance prob. Uncomment if using a non-symmetric proposal distribution.
-            # prop_probs = np.zeros((N,2))
-            # for ix in range(N):
-            #     prop_probs[ix,0] = np.log(multivariate_normal.pdf(particles[ix,:], mean=mean, cov=cov)+1e-8)
-            #     prop_probs[ix,1] = np.log(multivariate_normal.pdf(proposed_particles[ix,:], mean=mean, cov=cov)+1e-8)
-            # p_accept = likelihoods[:,1]+prop_probs[:,0] - (likelihoods[:,0]+prop_probs[:,1])
+            #prop_probs = np.zeros((N,2))
+            #for ix in range(N):
+            #    prop_probs[ix,0] = np.log(multivariate_normal.pdf(particles[ix,:], mean=mean, cov=cov)+1e-8)
+            #    prop_probs[ix,1] = np.log(multivariate_normal.pdf(proposed_particles[ix,:], mean=mean, cov=cov)+1e-8)
+            #p_accept = likelihoods[:,1]+prop_probs[:,0] - (likelihoods[:,0]+prop_probs[:,1])
 
             p_accept = likelihoods[:,1] - (likelihoods[:,0])
             accept = np.zeros((N,2))
@@ -488,7 +492,7 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
          
         """
         self.likelihood.eval()
-        dataset = GraspDataset(data=observation)
+        dataset = GraspDataset(data=observation, grasp_encoding='per_point')
         dataloader = GraspParallelDataLoader(dataset=dataset,
                                              batch_size=1,
                                              shuffle=False,
@@ -521,10 +525,7 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         """
         # Resample the distribution
         if len(self.experience) > 0:
-            if len(self.experience) == 5:
-                n = 1
-            else:
-                n = 1
+            n = 1
             for nx in range(n):
                 print(nx, '/', n)
                 self.particles = self.sample_and_wiggle(self.particles, self.experience)

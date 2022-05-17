@@ -21,7 +21,7 @@ def get_labels_predictions(logger, val_dataset_fname):
     # Load dataset
     with open(val_dataset_fname, 'rb') as handle:
         val_data = pickle.load(handle)
-    val_dataset = GraspDataset(val_data)
+    val_dataset = GraspDataset(val_data, grasp_encoding='per_point')
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     model = logger.get_ensemble(0)
@@ -106,7 +106,7 @@ def combine_image_grids(logger, prefixes):
 
 def get_predictions_with_particles(particles, grasp_data, ensemble, n_particle_samples=10):
     preds, labels = [], []
-    dataset = GraspDataset(data=grasp_data)
+    dataset = GraspDataset(data=grasp_data, grasp_encoding='per_point')
     dataloader = GraspParallelDataLoader(dataset=dataset,
                                          batch_size=16,
                                          shuffle=False,
