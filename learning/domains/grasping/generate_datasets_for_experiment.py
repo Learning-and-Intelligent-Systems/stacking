@@ -103,7 +103,7 @@ if __name__ == '__main__':
             fname=val_grasps_path,
             objects_fname=train_objects_path,
             n_points_per_object=args.n_points_per_object,
-            n_grasps_per_object=args.n_grasps_per_object,
+            n_grasps_per_object=10,
             object_ix=-1,
             grasp_noise=args.grasp_noise)
         generate_datasets(val_grasps_args)
@@ -137,6 +137,19 @@ if __name__ == '__main__':
                 n_grasps_per_object=args.n_fit_grasps,
                 object_ix=ox,
                 grasp_noise=args.grasp_noise)
+            generate_datasets(fit_grasps_samegeo_args)
+
+    for ox in range(0, min(100, len(train_objects)*args.n_property_samples_train)):
+        print('[Grasps] Generating grasps for evaluating fitting phase for samegeo sameprop object %d.' % ox)
+        fit_grasps_samegeo_sameprop_path = os.path.join(fitting_phase_path, 'fit_grasps_train_geo_trainprop_object%d.pkl' % ox)
+        if not os.path.exists(fit_grasps_samegeo_sameprop_path):
+            fit_grasps_samegeo_args = SimpleNamespace(
+                fname=fit_grasps_samegeo_sameprop_path,
+                objects_fname=train_objects_path,
+                n_points_per_object=args.n_points_per_object,
+                n_grasps_per_object=args.n_fit_grasps,
+                object_ix=ox,
+                grasp_noise=0.0)
             generate_datasets(fit_grasps_samegeo_args)
         
 

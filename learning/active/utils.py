@@ -236,7 +236,7 @@ class ActiveExperimentLogger:
             ensemble.load_state_dict(torch.load(path, map_location='cpu'))
             return ensemble
         except:
-            print('ensemble_%d.pt not found on path' % tx)
+            print('ensemble_%d.pt not found on path: %s' % (tx, path))
             return None
 
 

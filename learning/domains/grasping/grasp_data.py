@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 
 from torch.utils.data import Dataset, DataLoader, Sampler
 
@@ -90,24 +91,39 @@ class GraspParallelDataLoader:
         return len(self.loaders[0])
 
         
-def visualize_grasp_dataset(dataset, ycb_name, n_objects, n_grasps_per_object, labels=None, figure_path=''):
+def visualize_grasp_dataset(dataset_fname, labels=None, figure_path=''):
+    with open(dataset_fname, 'rb') as handle:
+        val_data = pickle.load(handle)
+    dataset_args = val_data['metadata']
+    object_names = val_data['object_data']['object_names']
+    object_properties = val_data['object_data']['object_properties']
+    n_objects = len(object_names)
+
+    dataset = GraspDataset(val_data, grasp_encoding='per_point')
+    
+    # import IPython
+    # IPython.embed()
+
     if labels is None:
         labels = dataset.grasp_labels
-
+    
     for ix in range(n_objects):
-
-        object_properties = dataset.grasp_vectors[ix*n_grasps_per_object][0, -5:]
-        graspable_body = graspablebody_from_vector(ycb_name, object_properties)
+        if ix*dataset_args.n_grasps_per_object > len(labels):
+            break
+        
+        graspable_body = graspablebody_from_vector(object_names[ix], object_properties[ix])
 
         sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
         grasps = []
-        for gx in range(n_grasps_per_object):
-            grasp_points = []
-            for kx in range(3):
-                grasp_points.append(dataset.grasp_vectors[ix*n_grasps_per_object+gx][kx, 0:3])
+        for gx in range(dataset_args.n_grasps_per_object):
+            grasp_points = [
+                dataset.grasp_vectors[ix*dataset_args.n_grasps_per_object+gx][0, 3:6],
+                dataset.grasp_vectors[ix*dataset_args.n_grasps_per_object+gx][0, 6:9],
+                dataset.grasp_vectors[ix*dataset_args.n_grasps_per_object+gx][0, 9:12]
+            ]
             grasps.append(grasp_points)
 
-        obj_labels = labels[ix*n_grasps_per_object:(ix+1)*n_grasps_per_object]
+        obj_labels = labels[ix*dataset_args.n_grasps_per_object:(ix+1)*dataset_args.n_grasps_per_object]
 
         if len(figure_path) > 0:
             sim_client.tm_show_grasps(grasps, obj_labels, fname=figure_path % ix)
