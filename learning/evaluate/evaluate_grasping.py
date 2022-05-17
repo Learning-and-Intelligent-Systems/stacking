@@ -5,7 +5,9 @@ import numpy as np
 import os
 import pickle
 import torch
+import matplotlib.cm as cm
 
+from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.axes_grid1 import ImageGrid
 from sklearn.metrics import recall_score, precision_score, balanced_accuracy_score, f1_score, confusion_matrix, accuracy_score
 from torch.utils.data import DataLoader
@@ -21,7 +23,7 @@ def get_labels_predictions(logger, val_dataset_fname):
     # Load dataset
     with open(val_dataset_fname, 'rb') as handle:
         val_data = pickle.load(handle)
-    val_dataset = GraspDataset(val_data)
+    val_dataset = GraspDataset(val_data, grasp_encoding='per_point')
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     model = logger.get_ensemble(0)
@@ -41,6 +43,9 @@ def get_labels_predictions(logger, val_dataset_fname):
         
         predictions.append(preds)
         labels.append(y)
+
+    import IPython
+    IPython.embed()
 
     predictions = torch.cat(predictions).numpy()
     labels = torch.cat(labels).numpy()
@@ -226,7 +231,50 @@ def get_acquired_preditctions_pf(logger):
         score = bald(torch.Tensor(preds))
         print(score, preds.mean())
 
+        import IPython
+        IPython.embed()
 
+def viz_latents(locs, scales, lim=4, fname=''):
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    n_plot = 500
+    if lim < 1:
+        ax.plot([-lim, lim], [0, 0], [0, 0], c='r')
+        ax.plot([0, 0], [-lim, lim], [0, 0], c='r')
+        ax.plot([0, 0], [0, 0], [-lim, lim], c='r')
+
+    ax.scatter(locs[:n_plot, 0], 
+               locs[:n_plot, 1],
+               locs[:n_plot, 2], c=np.arange(n_plot), cmap=cm.tab10)
+
+    if lim > 1:
+        u = np.linspace(0, 2 * np.pi, 10)
+        v = np.linspace(0, np.pi, 10)
+        for ix in range(n_plot):
+            x = locs[ix, 0] + scales[ix, 0] * np.outer(np.cos(u), np.sin(v))
+            y = locs[ix, 1] + scales[ix, 1] * np.outer(np.sin(u), np.sin(v))
+            z = locs[ix, 2] + scales[ix, 2] * np.outer(np.ones(np.size(u)), np.cos(v))
+
+            ax.plot_surface(x, y, z, color='b', alpha=0.05)
+
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
+    ax.set_zlim(-lim, lim)
+    if len(fname) > 0:
+        plt.savefig(fname)
+        plt.close()
+    else:
+        plt.show()
+
+def plot_training_latents(logger):
+    latent_ensemble = logger.get_ensemble(0)
+    if torch.cuda.is_available():
+        latent_ensemble.cuda()
+
+    latent_locs = latent_ensemble.latent_locs.detach().numpy()
+    latent_scales = np.exp(latent_ensemble.latent_logscales.detach().numpy())
+
+    viz_latents(latent_locs, latent_scales)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -237,7 +285,10 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
 
     #get_validation_metrics(logger, args.val_dataset_fname)
-    #visualize_predictions(logger, args.val_dataset_fname)
+    visualize_predictions(logger, args.val_dataset_fname)
     #combine_image_grids(logger, ['labels', 'predictions', 'correct'])
-    get_acquired_preditctions_pf(logger)
+    
+    #get_acquired_preditctions_pf(logger)
+    #plot_training_latents(logger)
+
     #get_pf_validation_accuracy(logger, args.val_dataset_fname)
