@@ -21,8 +21,8 @@ def load_datasets(args):
     with open(args.val_dataset_fname, 'rb') as handle:
         val_data = pickle.load(handle)
 
-    train_dataset = GraspDataset(train_data)
-    val_dataset = GraspDataset(val_data)
+    train_dataset = GraspDataset(train_data, grasp_encoding='per_point')
+    val_dataset = GraspDataset(val_data, grasp_encoding='per_point')
 
     if args.use_latents:
         train_dataloader = GraspParallelDataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, n_dataloaders=args.n_models)
@@ -37,7 +37,8 @@ def initialize_model(args):
     
     if args.model == 'pn':
         base_model = PointNetClassifier
-        base_args = {'n_in': 3+3+3+1+1} # xyz, grasp_indicators, com, mass, friction
+        # base_args = {'n_in': 3+3+3+1+1} # xyz, grasp_indicators, com, mass, friction
+        base_args = {'n_in': 3+9+3+1+1-2}
     else:
         raise NotImplementedError()
 
@@ -47,7 +48,7 @@ def initialize_model(args):
     if args.use_latents:
         ensemble = GraspingLatentEnsemble(ensemble=ensemble, 
                                           n_latents=args.n_objects, 
-                                          d_latents=5)
+                                          d_latents=3)
 
     return ensemble
 

@@ -111,7 +111,7 @@ def combine_image_grids(logger, prefixes):
 
 def get_predictions_with_particles(particles, grasp_data, ensemble, n_particle_samples=10):
     preds, labels = [], []
-    dataset = GraspDataset(data=grasp_data)
+    dataset = GraspDataset(data=grasp_data, grasp_encoding='per_point')
     dataloader = GraspParallelDataLoader(dataset=dataset,
                                          batch_size=16,
                                          shuffle=False,

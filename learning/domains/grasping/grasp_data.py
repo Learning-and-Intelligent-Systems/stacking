@@ -7,12 +7,39 @@ from pb_robot.planners.antipodalGraspPlanner import GraspSimulationClient
 
 
 class GraspDataset(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, grasp_encoding='as_points'):
+        """
+        :grasp_encoding: 'as_point' encodes the grasp as the first three points (as is).
+            'per_point' includes the grasp in the feature vector of each point.
+        """
         self.data = data
 
         self.grasp_vectors = np.array(data['grasp_data']['grasps']).astype('float32')
         self.grasp_object_ids = data['grasp_data']['object_ids']
         self.grasp_labels = np.array(data['grasp_data']['labels']).astype('float32')
+
+        if grasp_encoding == 'per_point':
+            self.grasp_vectors = self.get_per_point_repr(self.grasp_vectors)
+
+    def get_per_point_repr(self, grasp_vectors):
+        """ By default grasps_vectors is of shape (N_grasps, (3+N_points), 3+N_feats).
+        """
+        new_repr = []
+        for gx in range(grasp_vectors.shape[0]):
+            grasp_vector = grasp_vectors[gx, :, :]
+            grasp_points = grasp_vector[0:3, 0:3].flatten()
+
+            object_points = grasp_vector[3:, 0:3]
+            object_properties = grasp_vector[3:, 6:]
+            
+            N_points = object_points.shape[0]
+            grasp_points = np.tile(grasp_points[None, :], (N_points, 1))
+        
+            new_grasp_vector = np.concatenate([object_points, grasp_points, object_properties], axis=1)
+            new_repr.append(new_grasp_vector)
+
+        return np.array(new_repr)
+
         
     def __getitem__(self, ix):
         """
