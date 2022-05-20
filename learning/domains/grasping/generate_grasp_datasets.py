@@ -81,30 +81,40 @@ def generate_datasets(args):
         graspable_body = graspablebody_from_vector(object_name, property_vector)
         print(f'Object name: {object_name}')
         # Sample random grasps with labels. 
+
+        labeler = GraspStabilityChecker(graspable_body,
+            stability_direction='all', 
+            label_type='relpose', 
+            grasp_noise=args.grasp_noise)
+        print('PBID:', labeler.sim_client.pb_client_id)
         for gx in range(0, args.n_grasps_per_object):
             print('Grasp %d/%d...' % (gx, args.n_grasps_per_object))
 
             grasp, X = sample_grasp_X(graspable_body, property_vector, args.n_points_per_object)
             
             # Get label.
-            labeler = GraspStabilityChecker(stability_direction='all', label_type='relpose', grasp_noise=args.grasp_noise)
-            label = labeler.get_label(grasp, show_pybullet=False)
+            label = labeler.get_label(grasp)
 
             object_grasp_data.append(X)
             object_grasp_ids.append(object_id)
             object_grasp_labels.append(int(label))
+        
+        labeler.disconnect()
 
-    dataset = {
-        'grasp_data': {
-            'grasps': object_grasp_data,
-            'object_ids': object_grasp_ids,
-            'labels': object_grasp_labels
-        },
-        'object_data': object_data,
-        'metadata': args
-    }
+        dataset = {
+            'grasp_data': {
+                'grasps': object_grasp_data,
+                'object_ids': object_grasp_ids,
+                'labels': object_grasp_labels
+            },
+            'object_data': object_data,
+            'metadata': args
+        }
+        with open('%s.tmp' % args.fname, 'wb') as handle:
+            pickle.dump(dataset, handle)
+    
     with open('%s' % args.fname, 'wb') as handle:
-        pickle.dump(dataset, handle)
+            pickle.dump(dataset, handle)
 
 
 def generate_objects(args):
