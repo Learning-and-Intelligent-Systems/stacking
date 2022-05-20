@@ -60,11 +60,13 @@ def sample_unlabeled_data(n_samples, object_set):
 
 
 def get_labels(grasp_dataset):
-    labeler = GraspStabilityChecker(stability_direction='all', label_type='relpose')
     raw_grasps = grasp_dataset['grasp_data']['raw_grasps']
+    graspable_body = raw_grasps[0].graspable_body
+    labeler = GraspStabilityChecker(graspable_body, stability_direction='all', label_type='relpose')
     for gx in range(0, len(raw_grasps)):
-        label = labeler.get_label(raw_grasps[gx], show_pybullet=False)
+        label = labeler.get_label(raw_grasps[gx])
         print('Label', label)
         grasp_dataset['grasp_data']['labels'][gx] = label
+    labeler.disconnect()
     return grasp_dataset
 
