@@ -12,6 +12,27 @@ from learning.active.acquire import bald
 # from learning.evaluate.planner import EnsemblePlanner
 import sys
 
+def particle_bald(predictions, weights, eps=1e-5):
+    """ Get the BALD score for each example.
+    :param predictions: (N, K) predictions for N datapoints from K models.
+    :return: (N,) The BALD score for each of the datapoints.
+    """
+    predictions = predictions.cpu().numpy()
+    norm = weights.sum()
+
+    mp_c1 = np.sum(weights*predictions, axis=1)/norm
+    mp_c0 = 1 - mp_c1
+
+    m_ent = -(mp_c1 * np.log(mp_c1+eps) + mp_c0 * np.log(mp_c0+eps))
+
+    p_c1 = predictions
+    p_c0 = 1 - predictions
+
+    ent_per_model = p_c1 * np.log(p_c1+eps) + p_c0 * np.log(p_c0+eps)
+    ent = np.sum(ent_per_model*weights, axis=1)/norm
+
+    bald = m_ent + ent
+    return bald
 
 def find_informative_tower(pf, object_set, logger, args):
     data_sampler_fn = lambda n: sample_unlabeled_data(n_samples=n, object_set=object_set)
@@ -25,7 +46,8 @@ def find_informative_tower(pf, object_set, logger, args):
         all_grasps.append(grasp_data)
     
     pred_vec = torch.Tensor(np.stack(all_preds))
-    scores = bald(pred_vec).cpu().numpy()
+    # scores = bald(pred_vec).cpu().numpy()
+    scores = particle_bald(pred_vec, pf.particles.weights)
     print('Scores:', scores)
     acquire_ix = np.argsort(scores)[::-1][0]
 
@@ -58,6 +80,7 @@ def particle_filter_loop(pf, object_set, logger, strategy, args):
         logger.save_acquisition_data(grasp_dataset, None, tx+1)
         logger.save_ensemble(pf.likelihood, tx+1, symlink_tx0=True)
         logger.save_particles(particles, tx+1)
+
 # "grasp_train-ycb-test-ycb-1_fit_random_train_geo_object0": "learning/experiments/logs/grasp_train-ycb-test-ycb-1_fit_random_train_geo_object0-20220504-134253"
 def run_particle_filter_fitting(args):
     print(args)
@@ -89,6 +112,7 @@ def run_particle_filter_fitting(args):
         D=latent_ensemble.d_latents,
         N=args.n_particles,
         likelihood=latent_ensemble,
+        resample=False,
         plot=True)
 
     # ----- Run particle filter loop -----

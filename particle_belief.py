@@ -350,12 +350,12 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
 
     The prior distribution for this belief is N(0, 1). 
     """
-    def __init__(self, object_set, D, N=200, likelihood=None, plot=False):
+    def __init__(self, object_set, D, N, likelihood=None, resample=False, plot=False):
         object_name, object_properties, object_ix = get_fit_object(object_set)
         self.object_name = object_name
         self.object_properties = object_properties
         self.object_ix = object_ix
-
+        self.resample = resample
         self.plot = plot                        # plot the particles
 
         self.N = N        # number of particles
@@ -377,6 +377,9 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
                                                    D=self.D, 
                                                    means=[0.]*self.D,
                                                    stds=[1.]*self.D)
+        if not self.resample:
+            self.particles = ParticleDistribution(self.particles.particles, np.ones(self.N))
+        
         self.experience = []
         self.estimated_coms = []
 
@@ -396,7 +399,7 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
 
     def plot_particles(self, ax, particles, weights, t=None, true_com=None):
         for particle, weight in zip(particles, weights):
-            alpha = 0.25 + 0.75 * weight
+            alpha = 0.25 + 0.75 * weight/np.sum(weights)
             ax.scatter(*particle[:3], s=10, color=(0, 0, 1), alpha=alpha)
         plt.draw()
         plt.pause(0.1)
@@ -524,11 +527,8 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         :param observation: tower_dict format for a single tower.
         """
         # Resample the distribution
-        if len(self.experience) > 0:
-            n = 1
-            for nx in range(n):
-                print(nx, '/', n)
-                self.particles = self.sample_and_wiggle(self.particles, self.experience)
+        if len(self.experience) > 0 and self.resample:
+            self.particles = self.sample_and_wiggle(self.particles, self.experience)
 
         # Append the current observation to the dataset of all observations so far.
         self.experience.append(observation)
@@ -539,10 +539,8 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         label = observation['grasp_data']['labels'][0]
         n_correct = ((bernoulli_probs > 0.5).astype('float32') == label).sum()
         print('Correct for CURRENT sample:', n_correct/len(bernoulli_probs), len(bernoulli_probs))
-        # TODO: Replace below using the likelihood defined by the NN.
-        # update all particle weights
-        new_weights = []
         
+        new_weights = []
         for pi, (bern_prob, old_weight) in enumerate(zip(bernoulli_probs, self.particles.weights)):
             # print(pi, bern_prob, old_weight)
             obs_model = bern_prob*label + (1-bern_prob)*(1-label)
@@ -550,7 +548,11 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
             new_weights.append(new_weight)
 
         # normalize particle weights
-        new_weights = np.array(new_weights)/np.sum(new_weights)
+        new_weights = np.array(new_weights)
+        # If resampling, normalize weights as they will be used as probabilities.
+        if self.resample:
+            new_weights /= np.sum(new_weights)
+
         # and update the particle distribution with the new weights
         self.particles = ParticleDistribution(self.particles.particles, new_weights)
 
