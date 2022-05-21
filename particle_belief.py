@@ -415,9 +415,9 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         
         # PROPOSAL 1: Fit mean and cov to current particles and sample from those.
         # particles = distribution.particles
-        # cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3) #+ np.eye(D)*0.5
-        # resampled_particles = sample_particle_distribution(distribution, num_samples=N)
-        # mean = np.mean(resampled_particles, axis=0)
+        cov = np.cov(distribution.particles, rowvar=False, aweights=distribution.weights+1e-3) + np.eye(D)*0.5
+        particles = sample_particle_distribution(distribution, num_samples=N)
+        mean = np.mean(particles, axis=0)
         # # print('Proposal:')
         # # print(mean)
         # # print(np.diag(cov))
@@ -426,12 +426,12 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         #particles = distribution.particles
         #mean = np.zeros((3,))
         #cov = np.eye(3)
-        #proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
+        proposed_particles = np.random.multivariate_normal(mean=mean, cov=cov, size=N)
         
         # PROPOSAL 2: Resample then wiggle.
-        particles = distribution.particles
-        resampled_particles = sample_particle_distribution(distribution, num_samples=N)     
-        proposed_particles = resampled_particles + np.random.multivariate_normal(mean=np.zeros((D,)), cov=np.eye(D)*0.5, size=N)
+        # particles = distribution.particles
+        # resampled_particles = sample_particle_distribution(distribution, num_samples=N)     
+        # proposed_particles = resampled_particles + np.random.multivariate_normal(mean=np.zeros((D,)), cov=np.eye(D)*0.5, size=N)
         # ----------
 
         # proposed_particles = particles
@@ -464,13 +464,13 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
             print((n_correct[:, 0]/len(experience)).mean())
 
             # Calculate M-H acceptance prob. Uncomment if using a non-symmetric proposal distribution.
-            #prop_probs = np.zeros((N,2))
-            #for ix in range(N):
-            #    prop_probs[ix,0] = np.log(multivariate_normal.pdf(particles[ix,:], mean=mean, cov=cov)+1e-8)
-            #    prop_probs[ix,1] = np.log(multivariate_normal.pdf(proposed_particles[ix,:], mean=mean, cov=cov)+1e-8)
-            #p_accept = likelihoods[:,1]+prop_probs[:,0] - (likelihoods[:,0]+prop_probs[:,1])
+            prop_probs = np.zeros((N,2))
+            for ix in range(N):
+                prop_probs[ix,0] = np.log(multivariate_normal.pdf(particles[ix,:], mean=mean, cov=cov)+1e-8)
+                prop_probs[ix,1] = np.log(multivariate_normal.pdf(proposed_particles[ix,:], mean=mean, cov=cov)+1e-8)
+            p_accept = likelihoods[:,1]+prop_probs[:,0] - (likelihoods[:,0]+prop_probs[:,1])
 
-            p_accept = likelihoods[:,1] - (likelihoods[:,0])
+            # p_accept = likelihoods[:,1] - (likelihoods[:,0])
             accept = np.zeros((N,2))
             accept[:, 0] = p_accept
             #print(np.concatenate([likelihoods, prop_probs, accept, n_correct], axis=1)[:20, :])
