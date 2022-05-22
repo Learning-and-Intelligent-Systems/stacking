@@ -69,12 +69,16 @@ def particle_filter_loop(pf, object_set, logger, strategy, args):
         else:
             raise NotImplementedError()
 
-        print(grasp_dataset['grasp_data']['object_ids'])
         # Get the observation for the chosen tower.
         grasp_dataset = get_labels(grasp_dataset)
-
+        
         # Update the particle belief.
         particles, means = pf.update(grasp_dataset)
+        print('[ParticleFilter] Particle Statistics')
+        print(f'Min Weight: {np.min(pf.particles.weights)}')
+        print(f'Max Weight: {np.max(pf.particles.weights)}')
+        print(f'Sum Weights: {np.sum(pf.particles.weights)}')
+
 
         # TODO: Save the model and particle distribution at each step.
         logger.save_acquisition_data(grasp_dataset, None, tx+1)

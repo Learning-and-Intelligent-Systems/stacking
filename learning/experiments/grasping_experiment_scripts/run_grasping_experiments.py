@@ -104,13 +104,15 @@ def run_fitting_phase(args):
     # Run fitting phase for all objects that have not yet been evaluated (each has a standard name in the experiment logs).
     
     for geo_type, objects_fname, n_objects in zip(['train_geo', 'test_geo'], [train_geo_fname, test_geo_fname], [n_train_geo, n_test_geo]): 
-        
+        if geo_type == 'train_geo': continue 
         for ox in range(n_objects):
-            if ox > 100:
+            if ox > 99:
                 print(ox)
                 break
 
-            if ox >= 85 and ox < 90:
+            if args.constrained and geo_type == 'test_geo' and ox in [15, 16, 17, 18, 19]:
+                continue
+            if args.constrained and geo_type == 'train_geo' and (ox >= 85 and ox < 90):
                 continue
 
             if args.constrained:
@@ -131,12 +133,12 @@ def run_fitting_phase(args):
             fitting_args.exp_name = fitting_exp_name
             fitting_args.max_acquisitions = 10
             fitting_args.objects_fname = objects_fname
-            fitting_args.n_samples = 50
+            fitting_args.n_samples = 100
             fitting_args.pretrained_ensemble_exp_path = pretrained_model_path
             fitting_args.ensemble_tx = 0
             fitting_args.eval_object_ix = ox
             fitting_args.strategy = args.strategy
-            fitting_args.n_particles = 200
+            fitting_args.n_particles = 1000
 
             print(f'Running fitting phase: {fitting_exp_name}')
             if args.constrained:
@@ -145,6 +147,9 @@ def run_fitting_phase(args):
                 fit_log_path = fitting_phase(fitting_args)
 
             # Save fitting path in metadata.
+            with open(logs_path, 'r') as handle:
+                logs_lookup = json.load(handle)
+            
             if len(logs_lookup['fitting_phase']) == 0:
                 logs_lookup['fitting_phase'] = {'random': {}, 'bald': {}, 'constrained_random': {}, 'constrained_bald': {}}
             logs_lookup['fitting_phase'][mode][fitting_exp_name] = fit_log_path
@@ -156,7 +161,7 @@ def run_fitting_phase(args):
             fit_logger = ActiveExperimentLogger(fit_log_path, use_latents=True) 
             val_dataset_fname = f'fit_grasps_{geo_type}_object{ox}.pkl'
             val_dataset_path = os.path.join(DATA_ROOT, exp_args.dataset_name, 'grasps', 'fitting_phase', val_dataset_fname)
-
+            
             get_pf_validation_accuracy(fit_logger, val_dataset_path)
 
             
@@ -189,7 +194,7 @@ def run_training_phase(args):
     training_args.n_epochs = 20
     training_args.model = 'pn'
     training_args.n_hidden = 64
-    training_args.batch_size = 16
+    training_args.batch_size = 32
     training_args.property_repr = 'latent'
     training_args.n_models = 5
 
@@ -253,10 +258,17 @@ def run_testing_phase(args):
     }
 
     n_found = 0
-    p_stable_low, p_stable_high = 0.0, 1.0
+    p_stable_low, p_stable_high = 0., 2.
     for ox, object_name in enumerate(train_objects['object_data']['object_names']):
+        # break
+        if ox > 99:
+            break
         # TO REMOVE. (2 lines)
         val_dataset_fname = f'fit_grasps_train_geo_object{ox}.pkl'
+        #if not os.path.exists(val_dataset_fname): 
+        #    print('Skipping')
+        #    break
+
         val_dataset_path = os.path.join(DATA_ROOT, exp_args.dataset_name, 'grasps', 'fitting_phase', val_dataset_fname)
 
         with open(val_dataset_path, 'rb') as handle:
@@ -303,8 +315,6 @@ def run_testing_phase(args):
             # fit_logger = ActiveExperimentLogger(bald_log_fname, use_latents=True) 
             # get_pf_validation_accuracy(fit_logger, val_dataset_path)
 
-        if ox > 100:
-            break
     print(f'{n_found} train geo objects included.')
     n_found = 0
     for ox, object_name in enumerate(test_objects['object_data']['object_names']):
@@ -323,6 +333,8 @@ def run_testing_phase(args):
             logs_lookup_by_object['test_geo']['random'][object_name] = []
         if object_name not in logs_lookup_by_object['test_geo']['bald']:
             logs_lookup_by_object['test_geo']['bald'][object_name] = []
+        if object_name not in logs_lookup_by_object['test_geo']['constrained_random']:
+            logs_lookup_by_object['test_geo']['constrained_random'][object_name] = []
 
         random_log_key = f'grasp_{exp_args.exp_name}_fit_random_test_geo_object{ox}'
         if random_log_key in logs_lookup['fitting_phase']['random']:
@@ -335,6 +347,12 @@ def run_testing_phase(args):
             # fit_logger = ActiveExperimentLogger(random_log_fname, use_latents=True) 
             # get_pf_validation_accuracy(fit_logger, val_dataset_path)
 
+        constrained_random_log_key = f'grasp_{exp_args.exp_name}_fit_constrained_random_test_geo_object{ox}'
+        if constrained_random_log_key in logs_lookup['fitting_phase']['constrained_random']:
+            constrained_random_log_fname = logs_lookup['fitting_phase']['constrained_random'][constrained_random_log_key]
+
+            logs_lookup_by_object['test_geo']['constrained_random']['all'].append(constrained_random_log_fname)
+            logs_lookup_by_object['test_geo']['constrained_random'][object_name].append(constrained_random_log_fname)
 
         bald_log_key = f'grasp_{args.exp_name}_fit_bald_test_geo_object{ox}'
         if bald_log_key in logs_lookup['fitting_phase']['bald']:
@@ -354,15 +372,16 @@ def run_testing_phase(args):
             f'{obj_name}_traingeo_bald': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['train_geo']['bald'][obj_name]],
             f'{obj_name}_traingeo_crandom': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['train_geo']['constrained_random'][obj_name]]
         }
-        fig_path = os.path.join(exp_path, 'figures', f'{obj_name}_traingeo.png')
+        fig_path = os.path.join(exp_path, 'figures', f'traingeo_{obj_name}.png')
         plot_val_loss(all_train_loggers, fig_path)
     
     for  obj_name, loggers in logs_lookup_by_object['test_geo']['random'].items():
         all_test_loggers = {
             f'{obj_name}_testgeo_random': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in loggers],
-            f'{obj_name}_testgeo_bald': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['test_geo']['bald'][obj_name]]
+            f'{obj_name}_testgeo_bald': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['test_geo']['bald'][obj_name]],
+            f'{obj_name}_testgeo_crandom': [ActiveExperimentLogger(exp_path=name, use_latents=True) for name in logs_lookup_by_object['test_geo']['constrained_random'][obj_name]]
         }
-        fig_path = os.path.join(exp_path, 'figures', f'{obj_name}_testgeo.png')
+        fig_path = os.path.join(exp_path, 'figures', f'testgeo_{obj_name}.png')
         plot_val_loss(all_test_loggers, fig_path)
 
 
