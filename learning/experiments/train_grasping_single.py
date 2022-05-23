@@ -38,7 +38,7 @@ def initialize_model(args):
     if args.model == 'pn':
         base_model = PointNetClassifier
         # base_args = {'n_in': 3+3+3+1+1} # xyz, grasp_indicators, com, mass, friction
-        base_args = {'n_in': 3+9+3+1+1-2}
+        base_args = {'n_in': 3+9+3+1+1-2} # xyz, nxyz, grasp_pts, props
     else:
         raise NotImplementedError()
 

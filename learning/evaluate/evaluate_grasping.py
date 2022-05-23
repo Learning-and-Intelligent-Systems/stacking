@@ -14,6 +14,8 @@ from torch.utils.data import DataLoader
 from learning.domains.grasping.active_utils import get_fit_object, sample_unlabeled_data, get_labels, get_train_and_fit_objects
 from learning.active.acquire import bald
 
+from block_utils import ParticleDistribution
+from filter_utils import sample_particle_distribution
 from learning.active.utils import ActiveExperimentLogger
 from learning.domains.grasping.grasp_data import GraspDataset, GraspParallelDataLoader
 from learning.domains.grasping.explore_dataset import visualize_grasp_dataset
@@ -168,7 +170,10 @@ def get_pf_validation_accuracy(logger, fname):
             ensemble = ensemble.cuda()
 
         particles = logger.load_particles(tx)
-        probs, labels = get_predictions_with_particles(particles.particles, val_grasp_data, ensemble)
+
+        sampling_dist = ParticleDistribution(particles.particles, particles.weights/np.sum(particles.weights))
+        resampled_parts = sample_particle_distribution(sampling_dist, num_samples=50)
+        probs, labels = get_predictions_with_particles(resampled_parts, val_grasp_data, ensemble, n_particle_samples=50)
         preds = (probs > 0.5).float()
 
         acc = accuracy_score(labels, preds)
