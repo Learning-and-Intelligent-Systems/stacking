@@ -3,39 +3,72 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 
 class GNPGraspDataset(Dataset):
-    def __init__(self, data):
-        self.contexts, self.target_xs, self.target_ys = self.process_raw_data(data)
+    def __init__(self, data, context_data=None):
+        """ Given data dictionaries, format them for the GNP model.
 
-    def process_raw_data(self, data):
-        # Group all grasps for each object first.
-        grasp_data, object_data = data['grasp_data'], data['object_data']
+        If just data is given, generate a context for each grasp that includes all 
+        the other contexts for that object.
+
+        If context_data is also given, use all of context_data as the contexts and 
+        only data as the targets. Note that object IDs should correspond in each 
+        dataset for proper functionality.
+        """
         
-        all_grasps = np.array(grasp_data['grasps']).astype('float32')
-        all_object_ixs = np.array(grasp_data['object_ids'])
-        all_labels = np.array(grasp_data['labels']).astype('float32')
+        self.contexts, self.target_xs, self.target_ys = self.process_raw_data(data, context_data)
+
+    def process_raw_data(self, data, context_data=None):        
+        # Targets always come from data.
+        target_xs = self.get_per_point_repr(np.array(data['grasp_data']['grasps']).astype('float32'))
+        target_ys = np.array(data['grasp_data']['labels']).astype('float32')
+
+        object_data = data['object_data']
+        # Choose the contexts from the appropriate dataset.
+        if context_data is None:
+            target_grasp_data = data['grasp_data']
+            context_grasp_data = data['grasp_data']
+        else:
+            target_grasp_data = data['grasp_data']
+            context_grasp_data = context_data['grasp_data']
+
+        all_context_grasps = np.array(context_grasp_data['grasps']).astype('float32')
+        all_context_object_ixs = np.array(context_grasp_data['object_ids'])
+        all_context_labels = np.array(context_grasp_data['labels']).astype('float32')
+
+        all_target_grasps = np.array(target_grasp_data['grasps']).astype('float32')
+        all_target_object_ixs = np.array(target_grasp_data['object_ids'])
 
         contexts = []
-        target_xs = self.get_per_point_repr(all_grasps)
-        target_ys = all_labels
-
         for ox in range(len(object_data['object_names'])):
-            grasp_ixs = (all_object_ixs == ox)
-            
-            X_ox = all_grasps[grasp_ixs, ...]
-            labels_ox = all_grasps[grasp_ixs]
-            
-            meshes_ox = X_ox[:, 3:, :3]
-            grasps_ox = X_ox[:, 0:3, :3]
-            midpoints_ox = (X_ox[:, 0, :] + X_ox[:, 1, :])/2.
+            context_ixs = (all_context_object_ixs == ox)
+            target_ixs = (all_target_object_ixs == ox)
 
-            for gx in range(grasps_ox.shape[0]):
+            target_X_ox = all_target_grasps[target_ixs, ...]
+            context_X_ox = all_context_grasps[context_ixs, ...]
+            context_labels_ox = all_context_labels[context_ixs]
+            
+            # Meshes will come from the target set.
+            meshes_ox = target_X_ox[:, 3:, :3]
+
+            # Get grasps from the context grasp set.
+            grasps_ox = context_X_ox[:, 0:3, :3]
+            midpoints_ox = (grasps_ox[:, 0, :] + grasps_ox[:, 1, :])/2.
+
+            for gx in range(meshes_ox.shape[0]):
                 # TODO: Create context vector leaving out grasp gx.
                 context_meshpoints = meshes_ox[gx, ...]
 
-                context_ixs = (np.arange(len(midpoints_ox)) != gx)
-                context_grasppoints = midpoints_ox[context_ixs, ...]
-                context_labels = labels_ox[context_ixs]
+                if context_data is None:
+                    # Exclude the grasp from contexts if we're using the same data for contexts.
+                    context_ixs = (np.arange(len(midpoints_ox)) != gx)
+                    context_grasppoints = midpoints_ox[context_ixs, ...]
+                    context_labels = context_labels_ox[context_ixs]
+                else:
+                    context_grasppoints = midpoints_ox
+                    context_labels = context_labels_ox
                 
+                # import IPython
+                # IPython.embed()
+                # sys.exit()
                 # Add context indicators so we can differentiate the mesh from grasp points.
                 context_mesh = np.concatenate([
                     context_meshpoints, 
@@ -76,6 +109,9 @@ class GNPGraspDataset(Dataset):
         return np.array(new_repr).astype('float32')
 
     def __getitem__(self, ix):
-        return self.contexts[ix], self.target_xs[ix], self.target_ys[ix]
+        return self.contexts[ix].T, self.target_xs[ix].T, self.target_ys[ix]
+
+    def __len__(self):
+        return len(self.contexts)
 
 
