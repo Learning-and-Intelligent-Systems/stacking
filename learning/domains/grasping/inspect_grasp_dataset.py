@@ -1,6 +1,7 @@
 import os
 import random
 from pybullet_object_models import ycb_objects
+from PIL import Image
 
 from pb_robot.planners.antipodalGraspPlanner import GraspableBodySampler, GraspSampler, GraspSimulationClient, GraspStabilityChecker
 
