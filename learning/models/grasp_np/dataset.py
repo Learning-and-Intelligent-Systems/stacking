@@ -48,8 +48,8 @@ class GNPGraspDataset(Dataset):
                     context_labels[:, None]
                 ], axis=1).astype('float32')
                 context = np.concatenate([
-                    context_mesh,
-                    context_grasps
+                    context_grasps,
+                    context_mesh
                 ], axis=0)
                 contexts.append(context)
 
