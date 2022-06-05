@@ -157,3 +157,23 @@ class PointNetClassifier(nn.Module):
         x = self.fc3(x)
         x = torch.sigmoid(x)
         return x #, trans_feat
+
+class PointNetRegressor(nn.Module):
+    def __init__(self, n_in, n_out):
+        super(PointNetRegressor, self).__init__()
+
+        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, channel=n_in)
+        self.fc1 = nn.Linear(1024, 512)  # 1024, 512
+        self.fc2 = nn.Linear(512, 256)  # 512, 256
+        self.fc3 = nn.Linear(256, n_out)  # 256, 1
+        self.dropout = nn.Dropout(p=0.)  # 0.4
+        self.bn1 = nn.BatchNorm1d(512)  # 512
+        self.bn2 = nn.BatchNorm1d(256)  # 256
+        self.nonlin = nn.ReLU()
+
+    def forward(self, x):
+        x, trans, trans_feat = self.feat(x)
+        x = self.nonlin(self.bn1(self.fc1(x)))
+        x = self.nonlin(self.bn2(self.dropout(self.fc2(x))))
+        x = self.fc3(x)
+        return x
