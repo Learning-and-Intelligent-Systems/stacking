@@ -142,7 +142,7 @@ def get_predictions_with_particles(particles, grasp_data, ensemble, n_particle_s
             pred = ensemble.forward(X=grasps[:, :-5, :],
                                     object_ids=object_ids,
                                     N_samples=n_particle_samples,
-                                    ensemble_idx=ensemble_ix,
+                                    ensemble_idx=-1,#ensemble_ix,
                                     collapse_latents=True, 
                                     collapse_ensemble=True,
                                     pf_latent_ix=100,
@@ -153,6 +153,68 @@ def get_predictions_with_particles(particles, grasp_data, ensemble, n_particle_s
             # if (len(preds)*16) > 200: break
     return torch.cat(preds, dim=0).cpu(), torch.cat(labels, dim=0).cpu()
 
+
+def get_pf_task_performance(logger, fname):
+    with open(fname, 'rb') as handle:
+        val_grasp_data = pickle.load(handle)
+        grasps = val_grasp_data['grasp_data']['grasps']
+    regrets = []
+    eval_range = range(0, logger.args.max_acquisitions, 1)
+    for tx in eval_range:
+        print('Eval timestep, ', tx)
+        ensemble = logger.get_ensemble(tx)
+        if torch.cuda.is_available():
+            ensemble = ensemble.cuda()
+        particles = logger.load_particles(tx)
+
+        sampling_dist = ParticleDistribution(particles.particles, particles.weights/np.sum(particles.weights))
+        resampled_parts = sample_particle_distribution(sampling_dist, num_samples=100)
+        probs, labels = get_predictions_with_particles(resampled_parts, val_grasp_data, ensemble, n_particle_samples=100)
+        probs = probs.cpu().numpy()
+        labels = labels.cpu().numpy()
+        
+        neg_reward = 0.
+
+        all_rewards = []
+        exp_rewards = []
+
+        max_reward = -1
+        max_exp_reward = -1
+        max_achieved_reward = -1
+        #import IPython
+        #IPython.embed()
+        print(f'# Stable: {np.sum(labels)}/{len(labels)}')
+        for grasp, prob, label in zip(grasps, probs, labels):
+            finger1, finger2 = grasp[0][0:3], grasp[1][0:3]
+            midpoint = (finger1+finger2)/2.0
+            
+            if label == 1:
+                reward = np.linalg.norm(midpoint)
+            else:
+                reward = neg_reward
+
+            exp_reward = neg_reward * (1-prob) + prob*reward
+        
+            if (reward > max_reward) and (label == 1):
+                max_reward = reward
+
+            if (exp_reward > max_exp_reward):
+                max_exp_reward = exp_reward
+                max_achieved_reward = reward
+        
+        if max_achieved_reward == neg_reward:
+            regret = 1
+        else:
+            regret = (max_reward - max_achieved_reward)/max_reward
+        regrets.append(regret)
+        print(f'Max Reward: {max_reward}\tReward: {max_achieved_reward}\tRegret: {regret}')
+        
+        with open(logger.get_figure_path('regrets.pkl'), 'wb') as handle:
+            pickle.dump(regrets, handle)
+        # import IPython
+        # IPython.embed()
+
+        
 
 def get_pf_validation_accuracy(logger, fname):
     accs, precisions, recalls, f1s, balanced_accs = [], [], [], [], []
@@ -290,7 +352,8 @@ if __name__ == '__main__':
     logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
 
     #get_validation_metrics(logger, args.val_dataset_fname)
-    visualize_predictions(logger, args.val_dataset_fname)
+    get_pf_task_performance(logger, args.val_dataset_fname)
+    #visualize_predictions(logger, args.val_dataset_fname)
     #combine_image_grids(logger, ['labels', 'predictions', 'correct'])
     
     #get_acquired_preditctions_pf(logger)
