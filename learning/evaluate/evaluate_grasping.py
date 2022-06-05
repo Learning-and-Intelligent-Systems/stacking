@@ -17,7 +17,8 @@ from learning.active.acquire import bald
 from block_utils import ParticleDistribution
 from filter_utils import sample_particle_distribution
 from learning.active.utils import ActiveExperimentLogger
-from learning.domains.grasping.grasp_data import GraspDataset, GraspParallelDataLoader, visualize_grasp_dataset
+from learning.domains.grasping.grasp_data import GraspDataset, GraspParallelDataLoader
+from learning.domains.grasping.explore_dataset import visualize_grasp_dataset
 from particle_belief import GraspingDiscreteLikelihoodParticleBelief
 
 
@@ -29,25 +30,30 @@ def get_labels_predictions(logger, val_dataset_fname):
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     model = logger.get_ensemble(0)
-    if torch.cuda.is_available:
+    if torch.cuda.is_available():
         model = model.cuda()
     model.eval()
 
     # Get predictions
+    n_batches = 0
     predictions, labels = [], []
-    for x, y in val_dataloader:
+    for x, object_ids, y in val_dataloader:
         if torch.cuda.is_available():
             x = x.float().cuda()
         with torch.no_grad():
-            probs = model.forward(x).mean(dim=1).cpu()
+            probs = model.forward(x[:, :-5, :], object_ids).squeeze().cpu()
 
         preds = (probs > 0.5).float()
         
+        wrong = (preds != y)
+        print('Wrong Probabilities:', probs[wrong])
         predictions.append(preds)
         labels.append(y)
 
-    import IPython
-    IPython.embed()
+        n_batches += 1
+        print(n_batches)
+        if n_batches > 50:
+            break
 
     predictions = torch.cat(predictions).numpy()
     labels = torch.cat(labels).numpy()
@@ -74,17 +80,12 @@ def get_validation_metrics(logger, val_dataset_fname):
 
 def visualize_predictions(logger, val_dataset_fname):
     labels, predictions = get_labels_predictions(logger, val_dataset_fname)
-    with open(val_dataset_fname, 'rb') as handle:
-        val_data = pickle.load(handle)
-    val_dataset = GraspDataset(val_data)
 
-
-    figure_path = logger.get_figure_path('correct_%d.png')
-    visualize_grasp_dataset(val_dataset, 'YcbHammer', 5, 25, labels=predictions==labels, figure_path=figure_path)
-    figure_path = logger.get_figure_path('labels_%d.png')
-    visualize_grasp_dataset(val_dataset, 'YcbHammer', 5, 25, labels=labels, figure_path=figure_path)
-    figure_path = logger.get_figure_path('predictions_%d.png')
-    visualize_grasp_dataset(val_dataset, 'YcbHammer', 5, 25, labels=predictions, figure_path=figure_path)
+    figure_path = logger.get_figure_path('')
+    # visualize_grasp_dataset(val_dataset_fname, labels=predictions==labels)
+    visualize_grasp_dataset(val_dataset_fname, labels=predictions==labels, figpath=figure_path, prefix='correct_')
+    visualize_grasp_dataset(val_dataset_fname, labels=labels, figpath=figure_path, prefix='labels_')
+    visualize_grasp_dataset(val_dataset_fname, labels=predictions, figpath=figure_path, prefix='predictions_')
 
 def combine_image_grids(logger, prefixes):
     for ix in range(0, 50):

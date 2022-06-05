@@ -35,7 +35,7 @@ def get_success_per_test_object(dataset_root, n_bins=10):
 
 def inspect_train_dataset(dataset_root):
 
-    train_fname = os.path.join(dataset_root, 'grasps', 'training_phase', 'train_grasps.pkl.tmp')
+    train_fname = os.path.join(dataset_root, 'grasps', 'training_phase', 'train_grasps.pkl')
     with open(train_fname, 'rb') as handle:
         train_data = pickle.load(handle)
 
@@ -47,7 +47,7 @@ def inspect_train_dataset(dataset_root):
     labels = train_data['grasp_data']['labels']
     p_successes = []
     masses, frictions = [], []
-    for ox in range(100):#(len(object_names)):
+    for ox in range(len(object_names)):
         ox_ids = np.array(ids)==ox
         ox_labels = np.array(labels)[ox_ids]
         p_success = np.mean(ox_labels)
@@ -63,12 +63,15 @@ def inspect_train_dataset(dataset_root):
     plt.hist(p_successes, bins=10)
     plt.xlabel('Object-wise Grasp Success')
     plt.ylabel('Object Counts')
-    plt.show()
+    fname = os.path.join(dataset_root, 'figures', 'success_hist.png')
+    plt.savefig(fname)
 
+    plt.clf()
     plt.scatter(masses, frictions, c=p_successes, cmap=plt.get_cmap('viridis'))
     plt.xlabel('mass')
     plt.ylabel('friction')
-    plt.show()
+    fname = os.path.join(dataset_root, 'figures', 'success_scatter.png')
+    plt.savefig(fname)
 
 
 def generate_object_grid(objects, dataset_figpath):
@@ -121,7 +124,7 @@ def generate_object_grid(objects, dataset_figpath):
         print(fname)
         plt.savefig(fname)
     
-def visualize_grasp_dataset(dataset_fname, labels=None, figpath=''):
+def visualize_grasp_dataset(dataset_fname, labels=None, figpath='', prefix=''):
 
     with open(dataset_fname, 'rb') as handle:
         val_data = pickle.load(handle)
@@ -135,7 +138,7 @@ def visualize_grasp_dataset(dataset_fname, labels=None, figpath=''):
         labels = val_data['grasp_data']['labels']
     
     for ix in range(n_objects):
-        if ix*dataset_args.n_grasps_per_object > len(labels):
+        if (ix+1)*dataset_args.n_grasps_per_object > len(labels):
             break
         
         graspable_body = graspablebody_from_vector(object_names[ix], object_properties[ix])
@@ -152,7 +155,7 @@ def visualize_grasp_dataset(dataset_fname, labels=None, figpath=''):
 
         obj_labels = labels[ix*dataset_args.n_grasps_per_object:(ix+1)*dataset_args.n_grasps_per_object]
 
-        fname = os.path.join(figpath, f'object{ix}.png')
+        fname = os.path.join(figpath, f'{prefix}object{ix}.png')
         if len(figpath) > 0:
              sim_client.tm_show_grasps(grasps, obj_labels, fname=fname)
         else:
@@ -192,13 +195,13 @@ if __name__ == '__main__':
         os.mkdir(val_meshes_path)
     # generate_object_grid(val_objects, val_meshes_path)
 
-    inspect_train_dataset(dataset_root)
+    # inspect_train_dataset(dataset_root)
 
-    train_grasps = os.path.join(dataset_root, 'grasps', 'training_phase', 'train_grasps.pkl.tmp')
+    train_grasps = os.path.join(dataset_root, 'grasps', 'training_phase', 'train_grasps.pkl')
     figpath = os.path.join(dataset_figpath, 'train_grasps')
     if not os.path.exists(figpath):
         os.mkdir(figpath)
-    # visualize_grasp_dataset(train_grasps, figpath=figpath)
+    visualize_grasp_dataset(train_grasps, figpath=figpath)
 
     # get_success_per_test_object(dataset_root)
 
