@@ -17,7 +17,7 @@ class GraspNeuralProcess(nn.Module):
         total_context_points = int(contexts[0, 3, :].sum().item())
         assert(n_context <= total_context_points)
         if n_context == -1:
-            n_context = np.random.randint(total_context_points)
+            n_context = 49 #np.random.randint(total_context_points)
         
         # Only keep specified amount of context points.
         keep_ixs = torch.randperm(total_context_points)[:n_context]
@@ -33,9 +33,9 @@ class GraspNeuralProcess(nn.Module):
         z = q_z.rsample()[:, :, None].expand(-1, -1, target_xs.shape[-1])
         
         # Replace True properties with latent samples.
-        target_xs = torch.cat([target_xs[:, :-self.d_latents, :], z], dim=1)
-
-        y_pred = self.decoder(target_xs)
+        target_xs_with_latents = torch.cat([target_xs[:, :-5, :], z], dim=1)
+                
+        y_pred = self.decoder(target_xs_with_latents)
         return y_pred, q_z
         
 class GNPEncoder(nn.Module):
@@ -49,7 +49,8 @@ class GNPEncoder(nn.Module):
         
         x = self.pointnet(contexts)
         mu, log_sigma = x[..., :self.d_latents], x[..., self.d_latents:]
-        sigma = 0.1 + 0.9 + torch.sigmoid(log_sigma)
+        #sigma = 0.01 + 0.99 * torch.sigmoid(log_sigma)
+        sigma = 0.01 + torch.exp(log_sigma)
         return mu, sigma   
         
 class GNPDecoder(nn.Module):
