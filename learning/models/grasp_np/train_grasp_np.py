@@ -5,10 +5,9 @@ import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
-from learning.models.grasp_np.dataset import GNPGraspDataset
-from learning.models.grasp_np.grasp_neural_process import GraspNeuralProcess
+from learning.models.grasp_np.dataset import MultiTargetGNPGraspDataset, collate_fn
+from learning.models.grasp_np.grasp_neural_process import MultiTargetGraspNeuralProcess
 
-# TODO: Get accuracies.
 # TODO: Save best models.
 
 def get_accuracy(y_probs, target_ys):
@@ -48,6 +47,9 @@ def train(train_dataloader, val_dataloader, model, n_epochs=10):
             optimizer.zero_grad()
 
             y_probs, q_z = model.forward(contexts, target_xs)
+            n_predictions = target_ys.shape[1]
+            y_probs = y_probs.squeeze()[:, :n_predictions]
+            
             loss, bce_loss, kld_loss = get_loss(y_probs, target_ys, q_z, alpha=alpha)
             if bx % 200 == 0:
                 print(q_z.loc[0:5,...], q_z.scale[0:5,...])
@@ -57,11 +59,12 @@ def train(train_dataloader, val_dataloader, model, n_epochs=10):
             optimizer.step()
 
             epoch_loss += loss.item()
-            train_probs.append(y_probs.squeeze())
-            train_targets.append(target_ys)
+            train_probs.append(y_probs.flatten())
+            train_targets.append(target_ys.flatten())
+
             
         epoch_loss /= len(train_dataloader.dataset)
-        train_acc = get_accuracy(torch.cat(train_probs), torch.cat(train_targets))
+        train_acc = get_accuracy(torch.cat(train_probs).flatten(), torch.cat(train_targets).flatten())
 
         print(f'Train Loss: {epoch_loss}\tTrain Acc: {train_acc}')
 
@@ -73,11 +76,14 @@ def train(train_dataloader, val_dataloader, model, n_epochs=10):
                     contexts = contexts.cuda()
                     target_xs = target_xs.cuda()
                     target_ys = target_ys.cuda()
-                y_probs, q_z = model.forward(contexts, target_xs, n_context=50)
+                y_probs, q_z = model.forward(contexts, target_xs)
+                n_predictions = target_ys.shape[1]
+                y_probs = y_probs.squeeze()[:, :n_predictions]
+                
                 val_loss += get_loss(y_probs, target_ys, q_z)[0].item()
 
-                val_probs.append(y_probs.squeeze())
-                val_targets.append(target_ys)
+                val_probs.append(y_probs.flatten())
+                val_targets.append(target_ys.flatten())
             
             val_loss /= len(val_dataloader.dataset)
             val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets))
@@ -102,23 +108,24 @@ if __name__ == '__main__':
     with open(val_dataset_fname, 'rb') as handle:
         val_data = pickle.load(handle)
     
-    train_dataset = GNPGraspDataset(data=train_data)
-    val_dataset = GNPGraspDataset(data=val_data, context_data=train_data)
-    print_dataset_stats(train_dataset, 'Train')
-    print_dataset_stats(val_dataset, 'Val')
+    train_dataset = MultiTargetGNPGraspDataset(data=train_data)
+    val_dataset = MultiTargetGNPGraspDataset(data=val_data, context_data=train_data)
+
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
-        batch_size=128,
+        batch_size=16,
+        collate_fn=collate_fn,
         shuffle=True
     )
     val_dataloader = DataLoader(
         dataset=val_dataset,
-        batch_size=64,
+        collate_fn=collate_fn,
+        batch_size=16,
         shuffle=False
     )
 
-    model = GraspNeuralProcess(d_latents=5)
+    model = MultiTargetGraspNeuralProcess(d_latents=5)
 
     train(train_dataloader=train_dataloader,
         val_dataloader=val_dataloader,

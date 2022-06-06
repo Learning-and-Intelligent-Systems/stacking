@@ -2,8 +2,28 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from learning.models.pointnet import PointNetRegressor, PointNetClassifier
+from learning.models.pointnet import PointNetRegressor, PointNetClassifier, PointNetPerPointClassifier
 
+class MultiTargetGraspNeuralProcess(nn.Module):
+
+    def __init__(self, d_latents):
+        super(MultiTargetGraspNeuralProcess, self).__init__()
+        self.encoder = GNPEncoder(d_latents=d_latents)
+        self.decoder = MultiTargetGNPDecoder(n_in=3+1+d_latents)
+        self.d_latents = d_latents
+        
+    def forward(self, contexts, target_xs):
+        mu, sigma = self.encoder(contexts)
+
+        # Sample via reparameterization trick.
+        q_z = torch.distributions.normal.Normal(mu, sigma)
+        z = q_z.rsample()[:, :, None].expand(-1, -1, target_xs.shape[-1])
+        
+        # Replace True properties with latent samples.
+        target_xs_with_latents = torch.cat([target_xs, z], dim=1)
+                
+        y_pred = self.decoder(target_xs_with_latents)
+        return y_pred, q_z
 
 class GraspNeuralProcess(nn.Module):
 
@@ -58,6 +78,15 @@ class GNPDecoder(nn.Module):
     def __init__(self, n_in):
         super(GNPDecoder, self).__init__()
         self.pointnet = PointNetClassifier(n_in=n_in)
+
+    def forward(self, target_xs):
+        return self.pointnet(target_xs)
+
+class MultiTargetGNPDecoder(nn.Module):
+
+    def __init__(self, n_in):
+        super(MultiTargetGNPDecoder, self).__init__()
+        self.pointnet = PointNetPerPointClassifier(n_in=n_in)
 
     def forward(self, target_xs):
         return self.pointnet(target_xs)
