@@ -196,10 +196,10 @@ def collate_fn(items):
         n_target = items[0][2].shape[0]
     else:
         max_context = items[0][1].shape[0] + 1
-        n_context = np.random.randint(max_context)
+        n_context = np.random.randint(low=45, high=max_context)
         max_target = max_context - n_context
         n_target = np.random.randint(max_target)
-    print(f'n_context: {n_context}\tn_target: {n_target}')
+    # print(f'n_context: {n_context}\tn_target: {n_target}')
 
     contexts, target_xs, target_ys = [], [], []
     for meshes, context_pool, heldout_pool in items:
