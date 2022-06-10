@@ -69,8 +69,8 @@ class GNPEncoder(nn.Module):
         
         x = self.pointnet(contexts)
         mu, log_sigma = x[..., :self.d_latents], x[..., self.d_latents:]
-        #sigma = 0.01 + 0.99 * torch.sigmoid(log_sigma)
-        sigma = 0.01 + torch.exp(log_sigma)
+        sigma = 0.01 + 0.99 * torch.sigmoid(log_sigma)
+        #sigma = 0.01 + torch.exp(log_sigma)
         return mu, sigma   
         
 class GNPDecoder(nn.Module):
