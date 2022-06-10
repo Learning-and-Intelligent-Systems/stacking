@@ -48,10 +48,9 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
             optimizer.zero_grad()
 
             y_probs, q_z = model.forward((c_grasp_geoms, c_midpoints, c_labels), (t_grasp_geoms, t_midpoints))
-            n_predictions = target_ys.shape[1]
-            y_probs = y_probs.squeeze()[:, :n_predictions]
+            y_probs = y_probs.squeeze()
             
-            loss, bce_loss, kld_loss = get_loss(y_probs, target_ys, q_z, alpha=alpha)
+            loss, bce_loss, kld_loss = get_loss(y_probs, t_labels, q_z, alpha=alpha)
             #if bx % 200 == 0:
             #    print(q_z.loc[0:5,...], q_z.scale[0:5,...])
             #    print(f'Loss: {loss.item()}\tBCE: {bce_loss}\tKLD: {kld_loss}')
@@ -61,7 +60,7 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
 
             epoch_loss += loss.item()
             train_probs.append(y_probs.flatten())
-            train_targets.append(target_ys.flatten())
+            train_targets.append(t_labels.flatten())
 
             
         epoch_loss /= len(train_dataloader.dataset)
@@ -79,15 +78,14 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
                     c_grasp_geoms, c_midpoints, c_labels = c_grasp_geoms.cuda(), c_midpoints.cuda(), c_labels.cuda()
                     t_grasp_geoms, t_midpoints, t_labels = t_grasp_geoms.cuda(), t_midpoints.cuda(), t_labels.cuda()
                 y_probs, q_z = model.forward((c_grasp_geoms, c_midpoints, c_labels), (t_grasp_geoms, t_midpoints))
-                n_predictions = target_ys.shape[1]
-                y_probs = y_probs.squeeze()[:, :n_predictions]
+                y_probs = y_probs.squeeze()
                 
                 if bx % 200 == 0:
                     print(q_z.loc[0:5,...], q_z.scale[0:5,...])
-                val_loss += get_loss(y_probs, target_ys, q_z)[0].item()
+                val_loss += get_loss(y_probs, t_labels, q_z)[0].item()
 
                 val_probs.append(y_probs.flatten())
-                val_targets.append(target_ys.flatten())
+                val_targets.append(t_labels.flatten())
             
             val_loss /= len(train_dataloader_val.dataset)
             val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets))
@@ -102,13 +100,12 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
                     c_grasp_geoms, c_midpoints, c_labels = c_grasp_geoms.cuda(), c_midpoints.cuda(), c_labels.cuda()
                     t_grasp_geoms, t_midpoints, t_labels = t_grasp_geoms.cuda(), t_midpoints.cuda(), t_labels.cuda()
                 y_probs, q_z = model.forward((c_grasp_geoms, c_midpoints, c_labels), (t_grasp_geoms, t_midpoints))
-                n_predictions = target_ys.shape[1]
-                y_probs = y_probs.squeeze()[:, :n_predictions]
+                y_probs = y_probs.squeeze()
                 
-                val_loss += get_loss(y_probs, target_ys, q_z)[0].item()
+                val_loss += get_loss(y_probs, t_labels, q_z)[0].item()
 
                 val_probs.append(y_probs.flatten())
-                val_targets.append(target_ys.flatten())
+                val_targets.append(t_labels.flatten())
             
             val_loss /= len(val_dataloader_val.dataset)
             val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets))
