@@ -276,7 +276,15 @@ class CustomGNPGraspDataset(Dataset):
         if data is None:
             return None, None, None
         else:            
-            grasp_geometries = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['grasp_geometries'].items()}
+            grasp_geometries = {}
+            for k, v in data['grasp_data']['grasp_geometries'].items():
+                meshes = [arr[:256, :] for arr in v]
+                for mx in range(len(meshes)):
+                    while meshes[mx].shape[0] != 256: 
+                        n_dup = 256 - meshes[mx].shape[0]
+                        meshes[mx] = np.concatenate([meshes[mx], meshes[mx][:n_dup, :]], axis=0)
+                        
+                grasp_geometries[k] = np.array(meshes).astype('float32')
             grasp_midpoints = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['grasp_midpoints'].items()}
             grasp_labels = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['labels'].items()}
             return grasp_geometries, grasp_midpoints, grasp_labels
@@ -307,75 +315,54 @@ def custom_collate_fn(items):
     """
     if items[0][0] is not None:
         n_context = items[0][0]['grasp_geometries'].shape[0]
-        n_target = items[0][1]['grasp_geometris'].shape[0]
+        n_target = items[0][1]['grasp_geometries'].shape[0]
     else:
         max_context = items[0][1]['grasp_geometries'].shape[0] + 1
-        n_context = np.random.randint(max_context)
+        n_context = np.random.randint(low=40, high=max_context)
         max_target = max_context - n_context
         n_target = np.random.randint(max_target)
     print(f'n_context: {n_context}\tn_target: {n_target}')
 
-    contexts, target_xs, target_ys = [], [], []
-    for meshes, context_pool, heldout_pool in items:
-        if heldout_pool is None:
+    context_geoms, context_midpoints, context_labels = [], [], []
+    target_geoms, target_midpoints, target_labels = [], [], []
+
+    for context_data, heldout_data in items:
+        if context_data is None:
+            all_context_geoms = heldout_data['grasp_geometries']
+            all_context_midpoints = heldout_data['grasp_midpoints']
+            all_context_labels = heldout_data['grasp_labels']
+
             # We are training and will reuse context pool.
-            random_ixs = np.random.permutation(context_pool.shape[0]) 
+            random_ixs = np.random.permutation(all_context_geoms.shape[0]) 
             context_ixs = random_ixs[:n_context]
-            target_ixs = random_ixs[n_context:(n_context+n_target)]
+            target_ixs = random_ixs[:(n_context+n_target)]
 
-            mesh_ix = np.random.randint(0, meshes.shape[0])
-            mesh = meshes[mesh_ix, ...]
+            context_geoms.append(all_context_geoms[context_ixs, ...].swapaxes(1, 2))
+            context_midpoints.append(all_context_midpoints[context_ixs,...])
+            context_labels.append(all_context_labels[context_ixs])
 
-            context = np.concatenate([
-                context_pool[context_ixs],
-                mesh
-            ], axis=0).astype('float32')
-            contexts.append(context.T)
-
-            # Create target_xs: remove labels from all grasps.
-            target_x = np.concatenate([
-                context_pool[target_ixs],
-                context_pool[context_ixs],
-                mesh
-            ], axis=0).astype('float32')[:, :-1]
-            target_xs.append(target_x.T)
-
-            target_y = np.concatenate([
-                context_pool[target_ixs, 4],
-                context_pool[context_ixs, 4],
-            ], axis=0).astype('float32')
-            target_ys.append(target_y)
-        
+            target_geoms.append(all_context_geoms[target_ixs, ...].swapaxes(1, 2))
+            target_midpoints.append(all_context_midpoints[target_ixs,...])
+            target_labels.append(all_context_labels[target_ixs])
         else:
             # We are testing and will keep context and targets separate.
-            mesh_ix = np.random.randint(0, meshes.shape[0])
-            mesh = meshes[mesh_ix, ...]
+            context_geoms.append(context_data['grasp_geometries'].swapaxes(1, 2))
+            context_midpoints.append(context_data['grasp_midpoints'])
+            context_labels.append(context_data['grasp_labels'])
 
-            context = np.concatenate([
-                context_pool,
-                mesh
-            ], axis=0).astype('float32')
-            contexts.append(context.T)
+            target_geoms.append(heldout_data['grasp_geometries'].swapaxes(1, 2))
+            target_midpoints.append(heldout_data['grasp_midpoints'])
+            target_labels.append(heldout_data['grasp_labels'])
 
-            # Create target_xs: remove labels from all grasps.
-            target_x = np.concatenate([
-                heldout_pool,
-                mesh
-            ], axis=0).astype('float32')[:, :-1]
-            target_xs.append(target_x.T)
-
-            target_y = heldout_pool[:, 4]
-            target_ys.append(target_y)
-
-    return torch.Tensor(contexts), torch.Tensor(target_xs), torch.Tensor(target_ys)
+    return (torch.Tensor(context_geoms), torch.Tensor(context_midpoints), torch.Tensor(context_labels)),  (torch.Tensor(target_geoms), torch.Tensor(target_midpoints), torch.Tensor(target_labels))
 
 
 if __name__ == '__main__':
     import pickle
     from torch.utils.data import DataLoader
 
-    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust/grasps/training_phase/train_grasps.pkl'
-    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust/grasps/training_phase/val_grasps.pkl'
+    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-gnp/grasps/training_phase/train_grasps.pkl'
+    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-gnp/grasps/training_phase/val_grasps.pkl'
     print('Loading train dataset...')
     with open(train_dataset_fname, 'rb') as handle:
         train_data = pickle.load(handle)
@@ -383,28 +370,32 @@ if __name__ == '__main__':
     with open(val_dataset_fname, 'rb') as handle:
         val_data = pickle.load(handle)
     
-    train_dataset = MultiTargetGNPGraspDataset(data=train_data)
-    val_dataset = MultiTargetGNPGraspDataset(data=val_data, context_data=train_data)
+    print('Loading Train Dataset')
+    train_dataset = CustomGNPGraspDataset(data=train_data)
+    print('Loading Val Dataset')
+    val_dataset = CustomGNPGraspDataset(data=val_data, context_data=train_data)
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=128,
-        collate_fn=collate_fn,
+        collate_fn=custom_collate_fn,
         shuffle=True
     )
     val_dataloader = DataLoader(
         dataset=val_dataset,
-        collate_fn=collate_fn,
+        collate_fn=custom_collate_fn,
         batch_size=64,
         shuffle=False
     )
 
     for batch in train_dataloader:
-        print(len(batch))
-        for elem in batch:
-            print(elem.shape)
+        print(f'---- {len(batch)} ----')
+        for elem1 in batch:
+            for elem in elem1:
+                print(elem.shape)
 
     for batch in val_dataloader:
-        print(len(batch))
-        for elem in batch:
-            print(elem.shape)
+        print(f'---- {len(batch)} ----')
+        for elem1 in batch:
+            for elem in elem1:
+                print(elem.shape)

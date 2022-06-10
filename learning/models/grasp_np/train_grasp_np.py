@@ -5,8 +5,8 @@ import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
-from learning.models.grasp_np.dataset import MultiTargetGNPGraspDataset, collate_fn
-from learning.models.grasp_np.grasp_neural_process import MultiTargetGraspNeuralProcess
+from learning.models.grasp_np.dataset import CustomGNPGraspDataset, custom_collate_fn
+from learning.models.grasp_np.grasp_neural_process import CustomGraspNeuralProcess
 
 # TODO: Save best models.
 
@@ -38,15 +38,16 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
         alpha *= 0.75
         epoch_loss, train_probs, train_targets  = 0, [], []
         model.train()
-        for bx, (contexts, target_xs, target_ys) in enumerate(train_dataloader):
+        for bx, (context_data, target_data) in enumerate(train_dataloader):
+            c_grasp_geoms, c_midpoints, c_labels = context_data
+            t_grasp_geoms, t_midpoints, t_labels = target_data
             if torch.cuda.is_available():
-                contexts = contexts.cuda()
-                target_xs = target_xs.cuda()
-                target_ys = target_ys.cuda()
+                c_grasp_geoms, c_midpoints, c_labels = c_grasp_geoms.cuda(), c_midpoints.cuda(), c_labels.cuda()
+                t_grasp_geoms, t_midpoints, t_labels = t_grasp_geoms.cuda(), t_midpoints.cuda(), t_labels.cuda()
 
             optimizer.zero_grad()
 
-            y_probs, q_z = model.forward(contexts, target_xs)
+            y_probs, q_z = model.forward((c_grasp_geoms, c_midpoints, c_labels), (t_grasp_geoms, t_midpoints))
             n_predictions = target_ys.shape[1]
             y_probs = y_probs.squeeze()[:, :n_predictions]
             
@@ -71,12 +72,13 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
         model.eval()
         val_loss, val_probs, val_targets = 0, [], []
         with torch.no_grad():
-            for bx, (contexts, target_xs, target_ys) in enumerate(train_dataloader_val):
+            for bx, (context_data, target_data) in enumerate(train_dataloader_val):
+                c_grasp_geoms, c_midpoints, c_labels = context_data
+                t_grasp_geoms, t_midpoints, t_labels = target_data
                 if torch.cuda.is_available():
-                    contexts = contexts.cuda()
-                    target_xs = target_xs.cuda()
-                    target_ys = target_ys.cuda()
-                y_probs, q_z = model.forward(contexts, target_xs)
+                    c_grasp_geoms, c_midpoints, c_labels = c_grasp_geoms.cuda(), c_midpoints.cuda(), c_labels.cuda()
+                    t_grasp_geoms, t_midpoints, t_labels = t_grasp_geoms.cuda(), t_midpoints.cuda(), t_labels.cuda()
+                y_probs, q_z = model.forward((c_grasp_geoms, c_midpoints, c_labels), (t_grasp_geoms, t_midpoints))
                 n_predictions = target_ys.shape[1]
                 y_probs = y_probs.squeeze()[:, :n_predictions]
                 
@@ -94,11 +96,12 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
         val_loss, val_probs, val_targets = 0, [], []
         with torch.no_grad():
             for bx, (contexts, target_xs, target_ys) in enumerate(val_dataloader_val):
+                c_grasp_geoms, c_midpoints, c_labels = context_data
+                t_grasp_geoms, t_midpoints, t_labels = target_data
                 if torch.cuda.is_available():
-                    contexts = contexts.cuda()
-                    target_xs = target_xs.cuda()
-                    target_ys = target_ys.cuda()
-                y_probs, q_z = model.forward(contexts, target_xs)
+                    c_grasp_geoms, c_midpoints, c_labels = c_grasp_geoms.cuda(), c_midpoints.cuda(), c_labels.cuda()
+                    t_grasp_geoms, t_midpoints, t_labels = t_grasp_geoms.cuda(), t_midpoints.cuda(), t_labels.cuda()
+                y_probs, q_z = model.forward((c_grasp_geoms, c_midpoints, c_labels), (t_grasp_geoms, t_midpoints))
                 n_predictions = target_ys.shape[1]
                 y_probs = y_probs.squeeze()[:, :n_predictions]
                 
@@ -120,8 +123,8 @@ def print_dataset_stats(dataset, name):
 
 if __name__ == '__main__':
 
-    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large/grasps/training_phase/train_grasps.pkl'
-    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large/grasps/training_phase/val_grasps.pkl'
+    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/train_grasps.pkl'
+    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/val_grasps.pkl'
     print('Loading train dataset...')
     with open(train_dataset_fname, 'rb') as handle:
         train_data_large = pickle.load(handle)
@@ -129,8 +132,8 @@ if __name__ == '__main__':
     with open(val_dataset_fname, 'rb') as handle:
         val_data_large = pickle.load(handle)
     
-    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust/grasps/training_phase/train_grasps.pkl'
-    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust/grasps/training_phase/val_grasps.pkl'
+    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-gnp/grasps/training_phase/train_grasps.pkl'
+    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-gnp/grasps/training_phase/val_grasps.pkl'
     print('Loading train dataset...')
     with open(train_dataset_fname, 'rb') as handle:
         train_data_small = pickle.load(handle)
@@ -138,31 +141,31 @@ if __name__ == '__main__':
     with open(val_dataset_fname, 'rb') as handle:
         val_data_small = pickle.load(handle)
 
-    train_dataset = MultiTargetGNPGraspDataset(data=train_data_large)
-    train_dataset_val = MultiTargetGNPGraspDataset(data=val_data_large, context_data=train_data_large)
-    val_dataset_val = MultiTargetGNPGraspDataset(data=val_data_small, context_data=train_data_small)
+    train_dataset = CustomGNPGraspDataset(data=train_data_large)
+    train_dataset_val = CustomGNPGraspDataset(data=val_data_large, context_data=train_data_large)
+    val_dataset_val = CustomGNPGraspDataset(data=val_data_small, context_data=train_data_small)
 
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=16,
-        collate_fn=collate_fn,
+        collate_fn=custom_collate_fn,
         shuffle=True
     )
     train_dataloader_val = DataLoader(
         dataset=train_dataset_val,
         batch_size=16,
-        collate_fn=collate_fn,
+        collate_fn=custom_collate_fn,
         shuffle=False
     )
     val_dataloader_val = DataLoader(
         dataset=val_dataset_val,
-        collate_fn=collate_fn,
+        collate_fn=custom_collate_fn,
         batch_size=16,
         shuffle=False
     )
 
-    model = MultiTargetGraspNeuralProcess(d_latents=5)
+    model = CustomGraspNeuralProcess(d_latents=5)
 
     train(train_dataloader=train_dataloader,
         train_dataloader_val=train_dataloader_val,
