@@ -189,13 +189,127 @@ class MultiTargetGNPGraspDataset(Dataset):
 
 def collate_fn(items):
     """
-    Decide how any context and target points to add.
+    Decide how many context and target points to add.
     """
     if items[0][2] is not None:
         n_context = items[0][1].shape[0]
         n_target = items[0][2].shape[0]
     else:
         max_context = items[0][1].shape[0] + 1
+        n_context = np.random.randint(max_context)
+        max_target = max_context - n_context
+        n_target = np.random.randint(max_target)
+    print(f'n_context: {n_context}\tn_target: {n_target}')
+
+    contexts, target_xs, target_ys = [], [], []
+    for meshes, context_pool, heldout_pool in items:
+        if heldout_pool is None:
+            # We are training and will reuse context pool.
+            random_ixs = np.random.permutation(context_pool.shape[0]) 
+            context_ixs = random_ixs[:n_context]
+            target_ixs = random_ixs[n_context:(n_context+n_target)]
+
+            mesh_ix = np.random.randint(0, meshes.shape[0])
+            mesh = meshes[mesh_ix, ...]
+
+            context = np.concatenate([
+                context_pool[context_ixs],
+                mesh
+            ], axis=0).astype('float32')
+            contexts.append(context.T)
+
+            # Create target_xs: remove labels from all grasps.
+            target_x = np.concatenate([
+                context_pool[target_ixs],
+                context_pool[context_ixs],
+                mesh
+            ], axis=0).astype('float32')[:, :-1]
+            target_xs.append(target_x.T)
+
+            target_y = np.concatenate([
+                context_pool[target_ixs, 4],
+                context_pool[context_ixs, 4],
+            ], axis=0).astype('float32')
+            target_ys.append(target_y)
+        
+        else:
+            # We are testing and will keep context and targets separate.
+            mesh_ix = np.random.randint(0, meshes.shape[0])
+            mesh = meshes[mesh_ix, ...]
+
+            context = np.concatenate([
+                context_pool,
+                mesh
+            ], axis=0).astype('float32')
+            contexts.append(context.T)
+
+            # Create target_xs: remove labels from all grasps.
+            target_x = np.concatenate([
+                heldout_pool,
+                mesh
+            ], axis=0).astype('float32')[:, :-1]
+            target_xs.append(target_x.T)
+
+            target_y = heldout_pool[:, 4]
+            target_ys.append(target_y)
+
+    return torch.Tensor(contexts), torch.Tensor(target_xs), torch.Tensor(target_ys)
+
+
+class CustomGNPGraspDataset(Dataset):
+    def __init__(self, data, context_data=None):
+        """ Given data dictionaries, format them for the GNP model.
+
+        If just data is given, generate a context for each grasp that includes all 
+        the other contexts for that object.
+
+        If context_data is also given, use all of context_data as the contexts and 
+        only data as the targets. Note that object IDs should correspond in each 
+        dataset for proper functionality.
+        """
+        
+        # Each of these is a list of length #objects.
+        self.cp_grasp_geometries, self.cp_grasp_midpoints, self.cp_grasp_labels = self.process_raw_data(context_data)
+        self.hp_grasp_geometries, self.hp_grasp_midpoints, self.hp_grasp_labels = self.process_raw_data(data)
+
+    def process_raw_data(self, data):
+        if data is None:
+            return None, None, None
+        else:            
+            grasp_geometries = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['grasp_geometries'].items()}
+            grasp_midpoints = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['grasp_midpoints'].items()}
+            grasp_labels = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['labels'].items()}
+            return grasp_geometries, grasp_midpoints, grasp_labels
+
+    def __getitem__(self, ox):
+        if self.cp_grasp_geometries is None:
+            cp_data = None
+        else:
+            cp_data = {
+                'grasp_geometries': self.cp_grasp_geometries[ox],
+                'grasp_midpoints': self.cp_grasp_midpoints[ox],
+                'grasp_labels': self.cp_grasp_labels[ox]
+            }
+        hp_data = {
+            'grasp_geometries': self.hp_grasp_geometries[ox],
+            'grasp_midpoints': self.hp_grasp_midpoints[ox],
+            'grasp_labels': self.hp_grasp_labels[ox]
+        }
+        return cp_data, hp_data
+
+    def __len__(self):
+        return len(self.hp_grasp_geometries)
+
+
+def custom_collate_fn(items):
+    """
+    Decide how many context and target points to add.
+    """
+    if items[0][0] is not None:
+        n_context = items[0][0]['grasp_geometries'].shape[0]
+        n_target = items[0][1]['grasp_geometris'].shape[0]
+    else:
+        max_context = items[0][1]['grasp_geometries'].shape[0] + 1
         n_context = np.random.randint(max_context)
         max_target = max_context - n_context
         n_target = np.random.randint(max_target)
