@@ -77,6 +77,7 @@ def process_geometry(train_dataset, radius=0.02, skip=1):
     new_geometries_dict = defaultdict(list) # obj_id -> [grasp__points]
     new_midpoints_dict = defaultdict(list) # obj_id -> [grasp_midpoint]
     new_labels_dict = defaultdict(list) # obj_id -> [grasp_label]
+    new_meshes_dict = defaultdict(list)
 
     for grasp_vector, object_id, label in zip(all_grasps, all_ids, all_labels):
         print(f'Coverting grasp {gx}/{len(all_ids)}...')
@@ -111,10 +112,12 @@ def process_geometry(train_dataset, radius=0.02, skip=1):
         # Assemble dataset.
         new_geometries_dict[object_id].append(points)
         new_midpoints_dict[object_id].append(midpoint)
-        new_labels_dict[object_id].append(label)        
+        new_labels_dict[object_id].append(label)  
+        new_meshes_dict[object_id].append(all_points_per_objects[object_id][:512,:])      
 
     dataset = {
         'grasp_data': {
+            'object_meshes': new_meshes_dict,
             'grasp_geometries': new_geometries_dict,
             'grasp_midpoints': new_midpoints_dict,
             'labels': new_labels_dict

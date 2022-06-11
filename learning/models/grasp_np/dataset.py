@@ -295,15 +295,15 @@ class CustomGNPGraspDataset(Dataset):
             cp_data = None
         else:
             cp_data = {
-                'object_mesh': self.cp_full_meshes[ox],
-                'grasp_geometries': self.cp_grasp_geometries[ox],
-                'grasp_midpoints': self.cp_grasp_midpoints[ox],
+                'object_mesh': self.cp_full_meshes[ox]/0.02,
+                'grasp_geometries': self.cp_grasp_geometries[ox]/0.02,
+                'grasp_midpoints': self.cp_grasp_midpoints[ox]/0.02,
                 'grasp_labels': self.cp_grasp_labels[ox]
             }
         hp_data = {
-            'object_mesh': self.hp_full_meshes[ox],
-            'grasp_geometries': self.hp_grasp_geometries[ox],
-            'grasp_midpoints': self.hp_grasp_midpoints[ox],
+            'object_mesh': self.hp_full_meshes[ox]/0.02,
+            'grasp_geometries': self.hp_grasp_geometries[ox]/0.02,
+            'grasp_midpoints': self.hp_grasp_midpoints[ox]/0.02,
             'grasp_labels': self.hp_grasp_labels[ox]
         }
         return cp_data, hp_data
@@ -324,7 +324,7 @@ def custom_collate_fn(items):
         n_context = np.random.randint(low=40, high=max_context)
         max_target = max_context - n_context
         n_target = np.random.randint(max_target)
-    print(f'n_context: {n_context}\tn_target: {n_target}')
+    # print(f'n_context: {n_context}\tn_target: {n_target}')
 
     context_geoms, context_midpoints, context_labels = [], [], []
     target_geoms, target_midpoints, target_labels = [], [], []
@@ -332,7 +332,7 @@ def custom_collate_fn(items):
 
 
     for context_data, heldout_data in items:
-        full_meshes.append(heldout_data['object_mesh'])
+        full_meshes.append(heldout_data['object_mesh'].swapaxes(0, 1))
         if context_data is None:
             all_context_geoms = heldout_data['grasp_geometries']
             all_context_midpoints = heldout_data['grasp_midpoints']
@@ -359,8 +359,18 @@ def custom_collate_fn(items):
             target_geoms.append(heldout_data['grasp_geometries'].swapaxes(1, 2))
             target_midpoints.append(heldout_data['grasp_midpoints'])
             target_labels.append(heldout_data['grasp_labels'])
+    
+    context_geoms = np.array(context_geoms).astype('float32')
+    context_midpoints = np.array(context_midpoints).astype('float32')
+    context_labels = np.array(context_labels).astype('float32')
 
-    return (torch.Tensor(context_geoms), torch.Tensor(context_midpoints), torch.Tensor(context_labels)),  (torch.Tensor(target_geoms), torch.Tensor(target_midpoints), torch.Tensor(target_labels))
+    target_geoms = np.array(target_geoms).astype('float32')
+    target_midpoints = np.array(target_midpoints).astype('float32')
+    target_labels = np.array(target_labels).astype('float32')
+
+    full_meshes = np.array(full_meshes).astype('float32')
+
+    return (torch.Tensor(context_geoms), torch.Tensor(context_midpoints), torch.Tensor(context_labels)),  (torch.Tensor(target_geoms), torch.Tensor(target_midpoints), torch.Tensor(target_labels)), torch.Tensor(full_meshes)
 
 
 if __name__ == '__main__':

@@ -128,7 +128,7 @@ class PointNetEncoder(nn.Module):
         pointfeat = x
         x = self.nonlin(self.bn2(self.conv2(x)))
         x = self.bn3(self.conv3(x))
-        x = torch.max(x, 2, keepdim=True)[0]
+        x = torch.mean(x, 2, keepdim=True)#[0]
         x = x.view(-1, 1024)
         if self.global_feat:
             return x, trans, trans_feat
@@ -150,10 +150,13 @@ class PointNetClassifier(nn.Module):
         self.bn2 = nn.BatchNorm1d(256)  # 256
         self.nonlin = nn.ReLU()
 
-    def forward(self, x):
+    def forward(self, x, zs):
         x, trans, trans_feat = self.feat(x)
+        #x = torch.cat([x, zs], dim=1)
         x = self.nonlin(self.bn1(self.fc1(x)))
+        #x = torch.cat([x, zs], dim=1)
         x = self.nonlin(self.bn2(self.dropout(self.fc2(x))))
+        #x = torch.cat([x, zs], dim=1)
         x = self.fc3(x)
         x = torch.sigmoid(x)
         return x #, trans_feat
