@@ -269,12 +269,12 @@ class CustomGNPGraspDataset(Dataset):
         """
         
         # Each of these is a list of length #objects.
-        self.cp_grasp_geometries, self.cp_grasp_midpoints, self.cp_grasp_labels = self.process_raw_data(context_data)
-        self.hp_grasp_geometries, self.hp_grasp_midpoints, self.hp_grasp_labels = self.process_raw_data(data)
+        self.cp_grasp_geometries, self.cp_grasp_midpoints, self.cp_grasp_labels, self.cp_full_meshes = self.process_raw_data(context_data)
+        self.hp_grasp_geometries, self.hp_grasp_midpoints, self.hp_grasp_labels, self.hp_full_meshes = self.process_raw_data(data)
 
     def process_raw_data(self, data):
         if data is None:
-            return None, None, None
+            return None, None, None, None
         else:            
             grasp_geometries = {}
             for k, v in data['grasp_data']['grasp_geometries'].items():
@@ -287,18 +287,21 @@ class CustomGNPGraspDataset(Dataset):
                 grasp_geometries[k] = np.array(meshes).astype('float32')
             grasp_midpoints = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['grasp_midpoints'].items()}
             grasp_labels = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['labels'].items()}
-            return grasp_geometries, grasp_midpoints, grasp_labels
+            full_meshes = {k: np.array(v).astype('float32') for k, v in data['grasp_data']['object_meshes'].items() }
+            return grasp_geometries, grasp_midpoints, grasp_labels, full_meshes
 
     def __getitem__(self, ox):
         if self.cp_grasp_geometries is None:
             cp_data = None
         else:
             cp_data = {
+                'object_mesh': self.cp_full_meshes[ox],
                 'grasp_geometries': self.cp_grasp_geometries[ox],
                 'grasp_midpoints': self.cp_grasp_midpoints[ox],
                 'grasp_labels': self.cp_grasp_labels[ox]
             }
         hp_data = {
+            'object_mesh': self.hp_full_meshes[ox],
             'grasp_geometries': self.hp_grasp_geometries[ox],
             'grasp_midpoints': self.hp_grasp_midpoints[ox],
             'grasp_labels': self.hp_grasp_labels[ox]
@@ -325,8 +328,11 @@ def custom_collate_fn(items):
 
     context_geoms, context_midpoints, context_labels = [], [], []
     target_geoms, target_midpoints, target_labels = [], [], []
+    full_meshes = []
+
 
     for context_data, heldout_data in items:
+        full_meshes.append(heldout_data['object_mesh'])
         if context_data is None:
             all_context_geoms = heldout_data['grasp_geometries']
             all_context_midpoints = heldout_data['grasp_midpoints']
