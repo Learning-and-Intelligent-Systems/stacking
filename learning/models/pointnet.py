@@ -88,19 +88,23 @@ class STNkd(nn.Module):
 
 
 class PointNetEncoder(nn.Module):
-    def __init__(self, global_feat=True, feature_transform=True, channel=3):
+    def __init__(self, global_feat=True, feature_transform=True, channel=3, n_out=1024):
         super(PointNetEncoder, self).__init__()
         self.stn = STN3d(channel)
-        self.conv1 = torch.nn.Conv1d(channel, 64, 1)  # 64
-        self.conv2 = torch.nn.Conv1d(64, 128, 1)   # 64, 128
-        self.conv3 = torch.nn.Conv1d(128, 1024, 1)  # 128, 1024
-        self.bn1 = nn.BatchNorm1d(64)  # 64
-        self.bn2 = nn.BatchNorm1d(128)  # 128
-        self.bn3 = nn.BatchNorm1d(1024)  # 1024
+
+        self.n_out = n_out
+        n_hidden1, n_hidden2 = n_out//16, n_out//8
+
+        self.conv1 = torch.nn.Conv1d(channel, n_hidden1, 1)  # 64
+        self.conv2 = torch.nn.Conv1d(n_hidden1, n_hidden2, 1)   # 64, 128
+        self.conv3 = torch.nn.Conv1d(n_hidden2, n_out, 1)  # 128, 1024
+        self.bn1 = nn.BatchNorm1d(n_hidden1)  # 64
+        self.bn2 = nn.BatchNorm1d(n_hidden2)  # 128
+        self.bn3 = nn.BatchNorm1d(n_out)  # 1024
         self.global_feat = global_feat
         self.feature_transform = feature_transform
         if self.feature_transform:
-            self.fstn = STNkd(k=64)
+            self.fstn = STNkd(k=n_hidden1)
         
         self.nonlin = nn.ReLU()
 
@@ -129,11 +133,11 @@ class PointNetEncoder(nn.Module):
         x = self.nonlin(self.bn2(self.conv2(x)))
         x = self.bn3(self.conv3(x))
         x = torch.mean(x, 2, keepdim=True)#[0]
-        x = x.view(-1, 1024)
+        x = x.view(-1, self.n_out)
         if self.global_feat:
             return x, trans, trans_feat
         else:
-            x = x.view(-1, 1024, 1).repeat(1, 1, N)
+            x = x.view(-1, self.n_out, 1).repeat(1, 1, N)
             return torch.cat([x, pointfeat], 1), trans, trans_feat
 
 
@@ -141,13 +145,15 @@ class PointNetClassifier(nn.Module):
     def __init__(self, n_in):
         super(PointNetClassifier, self).__init__()
 
-        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, channel=n_in)
-        self.fc1 = nn.Linear(1024, 512)  # 1024, 512
-        self.fc2 = nn.Linear(512, 256)  # 512, 256
-        self.fc3 = nn.Linear(256, 1)  # 256, 1
-        self.dropout = nn.Dropout(p=0.)  # 0.4
-        self.bn1 = nn.BatchNorm1d(512)  # 512
-        self.bn2 = nn.BatchNorm1d(256)  # 256
+        n_enc = 256
+        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, channel=n_in, n_out=n_enc)
+
+        self.fc1 = nn.Linear(n_enc, n_enc//2)  # 1024, 512
+        self.fc2 = nn.Linear(n_enc//2, n_enc//4)  # 512, 256
+        self.fc3 = nn.Linear(n_enc//4, 1)  # 256, 1
+        self.dropout = nn.Dropout(p=0.4)  # 0.4
+        self.bn1 = nn.BatchNorm1d(n_enc//2)  # 512
+        self.bn2 = nn.BatchNorm1d(n_enc//4)  # 256
         self.nonlin = nn.ReLU()
 
     def forward(self, x, zs):
@@ -165,13 +171,15 @@ class PointNetRegressor(nn.Module):
     def __init__(self, n_in, n_out):
         super(PointNetRegressor, self).__init__()
 
-        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, channel=n_in)
-        self.fc1 = nn.Linear(1024, 512)  # 1024, 512
-        self.fc2 = nn.Linear(512, 256)  # 512, 256
-        self.fc3 = nn.Linear(256, n_out)  # 256, 1
-        self.dropout = nn.Dropout(p=0.)  # 0.4
-        self.bn1 = nn.BatchNorm1d(512)  # 512
-        self.bn2 = nn.BatchNorm1d(256)  # 256
+        n_enc = 256
+        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, channel=n_in, n_out=n_enc)
+
+        self.fc1 = nn.Linear(n_enc, n_enc//2)  # 1024, 512
+        self.fc2 = nn.Linear(n_enc//2, n_enc//4)  # 512, 256
+        self.fc3 = nn.Linear(n_enc//4, n_out)  # 256, 1
+        self.dropout = nn.Dropout(p=0.4)  # 0.4
+        self.bn1 = nn.BatchNorm1d(n_enc//2)  # 512
+        self.bn2 = nn.BatchNorm1d(n_enc//4)  # 256
         self.nonlin = nn.ReLU()
 
     def forward(self, x):

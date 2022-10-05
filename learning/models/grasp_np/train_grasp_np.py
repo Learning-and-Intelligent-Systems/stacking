@@ -51,7 +51,7 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
         alpha *= 0.75
         epoch_loss, train_probs, train_targets  = 0, [], []
         model.train()
-        for bx, (context_data, target_dat, meshes) in enumerate(train_dataloader):
+        for bx, (context_data, target_data, meshes) in enumerate(train_dataloader):
             c_grasp_geoms, c_midpoints, c_labels = context_data
             t_grasp_geoms, t_midpoints, t_labels = target_data
             if torch.cuda.is_available():
@@ -153,9 +153,9 @@ if __name__ == '__main__':
     with open(val_dataset_fname, 'rb') as handle:
         val_data_small = pickle.load(handle)
 
-    train_dataset = CustomGNPGraspDataset(data=train_data_large)
-    train_dataset_val = CustomGNPGraspDataset(data=val_data_small, context_data=train_data_small)
-    val_dataset_val = CustomGNPGraspDataset(data=val_data_large, context_data=train_data_large)
+    train_dataset = CustomGNPGraspDataset(data=train_data_small)
+    train_dataset_val = CustomGNPGraspDataset(data=train_data_small, context_data=train_data_small)
+    val_dataset_val = CustomGNPGraspDataset(data=val_data_small, context_data=train_data_small)
     print(len(train_dataset), len(train_dataset_val), len(val_dataset_val))
 
     train_dataloader = DataLoader(
