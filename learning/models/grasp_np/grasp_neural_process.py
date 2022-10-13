@@ -105,6 +105,7 @@ class CustomGraspNeuralProcess(nn.Module):
         
     def forward(self, contexts, target_xs, meshes):
         mesh_enc = self.mesh_encoder(meshes)
+        mesh_enc = torch.zeros_like(mesh_enc)
         mu, sigma = self.encoder(*contexts, mesh_enc)
 
         # Sample via reparameterization trick.
