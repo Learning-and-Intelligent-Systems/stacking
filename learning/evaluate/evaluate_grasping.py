@@ -344,19 +344,41 @@ def plot_training_latents(logger):
 
     viz_latents(latent_locs, latent_scales)
 
+def visualize_gnp_predictions():
+    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust/grasps/training_phase/val_grasps.pkl'
+    with open('learning/experiments/metadata/grasp_np/results.pkl', 'rb') as handle:
+        probs, targets = pickle.load(handle)
+    
+    predictions = (probs.flatten()) > 0.5
+    labels = targets.flatten()
+
+    figure_path = 'learning/experiments/metadata/grasp_np/figures'
+    # visualize_grasp_dataset(val_dataset_fname, labels=predictions==labels)
+    #visualize_grasp_dataset(val_dataset_fname, labels=predictions==labels, figpath=figure_path, prefix='correct_')
+    #visualize_grasp_dataset(val_dataset_fname, labels=labels, figpath=figure_path, prefix='vhacd_labels_')
+    # visualize_grasp_dataset(val_dataset_fname, labels=predictions, figpath=figure_path, prefix='predictions_')
+    probs = probs.reshape(-1, 10)
+    targets = targets.reshape(-1, 10)
+    for ox in range(probs.shape[0]):
+        acc = ((probs[ox] > 0.5) == targets[ox]).mean()
+        if acc < 0.7:
+            print(f'Object {ox}: {acc} True {targets[ox].mean()}')
+        else:
+            print(f'----- Object {ox}: {acc} True {targets[ox].mean()}')
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp-path', type=str, required=True)
     parser.add_argument('--val-dataset-fname', type=str, required=True)
     args = parser.parse_args()
 
-    logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
+    #logger = ActiveExperimentLogger(args.exp_path, use_latents=True)
 
     #get_validation_metrics(logger, args.val_dataset_fname)
-    get_pf_task_performance(logger, args.val_dataset_fname)
+    #get_pf_task_performance(logger, args.val_dataset_fname)
     #visualize_predictions(logger, args.val_dataset_fname)
     #combine_image_grids(logger, ['labels', 'predictions', 'correct'])
-    
+    visualize_gnp_predictions()
     #get_acquired_preditctions_pf(logger)
     #plot_training_latents(logger)
 

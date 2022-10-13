@@ -12,6 +12,7 @@ import os
 import random
 import shutil
 import torch
+import torch.nn as nn
 
 from copy import deepcopy
 from mpl_toolkits.mplot3d import Axes3D
@@ -534,8 +535,10 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         self.experience.append(observation)
 
         # Forward simulation using the LatentEnsemble likelihood.
-        bernoulli_probs = self.get_particle_likelihoods(self.particles.particles, observation)
-
+        if isinstance(self.likelihood, nn.Module):
+            bernoulli_probs = self.get_particle_likelihoods(self.particles.particles, observation)
+        else:
+            bernoulli_probs = self.likelihood.get_particle_likelihoods(self.particles.particles, observation)
         label = observation['grasp_data']['labels'][0]
         n_correct = ((bernoulli_probs > 0.5).astype('float32') == label).sum()
         print('Correct for CURRENT sample:', n_correct/len(bernoulli_probs), len(bernoulli_probs))
@@ -544,7 +547,7 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
         for pi, (bern_prob, old_weight) in enumerate(zip(bernoulli_probs, self.particles.weights)):
             # print(pi, bern_prob, old_weight)
             obs_model = bern_prob*label + (1-bern_prob)*(1-label)
-            new_weight = old_weight * obs_model
+            new_weight = old_weight*obs_model
             new_weights.append(new_weight)
 
         # normalize particle weights
@@ -561,8 +564,11 @@ class GraspingDiscreteLikelihoodParticleBelief(BeliefBase):
             self.setup_ax(self.ax)
             self.plot_particles(self.ax, self.particles.particles, new_weights)
 
-        mean = np.array(self.particles.particles).T@np.array(self.particles.weights)
+        part_probs = np.array(self.particles.weights)
+        part_probs /= part_probs.sum()
+        mean = np.array(self.particles.particles).T@part_probs
         print('Particle Mean:', mean)
+        print('True:', self.object_properties)
         self.estimated_coms.append(mean)
 
         return self.particles, self.estimated_coms

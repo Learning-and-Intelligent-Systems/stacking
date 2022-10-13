@@ -8,11 +8,12 @@ import trimesh
 import time
 import io
 from matplotlib import cm
+import pybullet as p
 from PIL import Image
 from mpl_toolkits.axes_grid1 import ImageGrid
 
 from learning.domains.grasping.generate_grasp_datasets import graspablebody_from_vector
-from pb_robot.planners.antipodalGraspPlanner import GraspSimulationClient
+from pb_robot.planners.antipodalGraspPlanner import Grasp, GraspSimulationClient
 
 def get_success_per_test_object(dataset_root, n_bins=10):
     p_stables = []
@@ -138,6 +139,8 @@ def visualize_grasp_dataset(dataset_fname, labels=None, figpath='', prefix=''):
         labels = val_data['grasp_data']['labels']
     
     for ix in range(n_objects):
+        if ix not in [2, 3, 46, 49, 51, 54, 65, 68, 83, 170, 213, 249, 256, 258, 267, 286, 287, 292, 337, 338, 351, 396, 400, 401, 415, 435, 446, 457, 496]:
+            continue
         if (ix+1)*dataset_args.n_grasps_per_object > len(labels):
             break
         
@@ -162,6 +165,42 @@ def visualize_grasp_dataset(dataset_fname, labels=None, figpath='', prefix=''):
             sim_client.tm_show_grasps(grasps, obj_labels)
         sim_client.disconnect()
         
+def analyze_objects(objects_all):
+    objects = objects_all['object_data']
+    grasps = objects_all['grasp_data']['labels']
+    inertias = []
+    volumes = []
+    BAD = [2, 3, 46, 49, 51, 54, 65, 68, 83, 170, 213, 249, 256, 258, 267, 286, 287, 292, 337, 338, 351, 396, 400, 401, 415, 435, 446, 457, 496]
+    bad_count = 0
+    for ox, (name, props) in enumerate(zip(objects['object_names'], objects['object_properties'])):
+        print(ox)
+        #if ox > 50: break
+        graspable_body = graspablebody_from_vector(name, props)
+        sim_client = GraspSimulationClient(graspable_body=graspable_body,
+            show_pybullet=False,
+            urdf_directory='object_models',
+            recompute_inertia=True)
+        inertia = p.getDynamicsInfo(sim_client.body_id, -1, sim_client.pb_client_id)[2]
+        inertias.append(inertia)
+        # if np.any(np.array(inertia) < 1e-4) or np.any(np.array(inertia) > 1e-2):
+        #     print('SMALL OR LARGE INERTIA', ox, name, props, inertia)
+        avg_correct = np.mean(grasps[ox*50:(ox+1)*50])
+        bounding_box = sim_client.mesh.bounding_box
+        # if sim_client.mesh.volume > 0.00025 and avg_correct > 0.05 and avg_correct < 0.95:
+        #     print(ox, sim_client.mesh.volume, avg_correct)
+        if sim_client.mesh.volume > 0.00025 and ox in BAD:
+            bad_count += 1
+            print('BAD:', bad_count, len(BAD))
+        volumes.append(sim_client.mesh.volume)
+        #import IPython; IPython.embed(); sys.exit();
+        sim_client.disconnect()
+    inertia = np.array(inertias)
+    #plt.hist(inertia.flatten(), bins=100)
+    plt.hist(volumes, bins=100)
+    #plt.xscale('log')
+    plt.show()
+    print(np.min(inertia), np.max(inertia))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -186,6 +225,7 @@ if __name__ == '__main__':
     if not os.path.exists(train_meshes_path):
         os.mkdir(train_meshes_path)
     # generate_object_grid(train_objects, train_meshes_path)
+    
 
     val_objects_path = os.path.join(dataset_root, 'objects', 'test_geo_test_props.pkl')
     with open(val_objects_path, 'rb') as handle:
@@ -201,7 +241,11 @@ if __name__ == '__main__':
     figpath = os.path.join(dataset_figpath, 'train_grasps')
     if not os.path.exists(figpath):
         os.mkdir(figpath)
-    visualize_grasp_dataset(train_grasps, figpath=figpath)
+    with open(train_grasps, 'rb') as handle:
+        train_grasps = pickle.load(handle)
+    analyze_objects(train_grasps)
+    sys.exit()
+    # visualize_grasp_dataset(train_grasps, figpath=figpath)
 
     # get_success_per_test_object(dataset_root)
 

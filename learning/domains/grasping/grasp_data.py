@@ -6,6 +6,8 @@ from torch.utils.data import Dataset, DataLoader, Sampler
 from learning.domains.grasping.generate_grasp_datasets import graspablebody_from_vector
 from pb_robot.planners.antipodalGraspPlanner import GraspSimulationClient
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 class GraspDataset(Dataset):
     def __init__(self, data, grasp_encoding='as_points'):
@@ -18,9 +20,43 @@ class GraspDataset(Dataset):
         self.grasp_vectors = np.array(data['grasp_data']['grasps']).astype('float32')
         self.grasp_object_ids = data['grasp_data']['object_ids']
         self.grasp_labels = np.array(data['grasp_data']['labels']).astype('float32')
-
+        print(self.grasp_vectors.shape)
         if grasp_encoding == 'per_point':
             self.grasp_vectors = self.get_per_point_repr(self.grasp_vectors)
+            #self.grasp_vectors = self.remove_far_points(self.grasp_vectors, 0.02)
+        
+    def remove_far_points(self, grasp_vectors, threshold):
+        new_grasp_vectors = []
+
+        for gx in range(grasp_vectors.shape[0]):    
+            new_grasp = []
+            grasp = grasp_vectors[gx]
+            # finger1 = grasp[0, 6:9]
+            # finger2 = grasp[0, 9:12]
+            finger1 = grasp[0, 0:3]
+            finger2 = grasp[1, 0:3]
+            for px in range(3, grasp.shape[0]):
+                xyz = grasp[px][0:3]
+                d1 = np.linalg.norm(finger1-xyz)
+                d2 = np.linalg.norm(finger2-xyz)
+                if d1 < threshold or d2 < threshold:
+                    new_grasp.append(grasp[px])
+            new_grasp_vectors.append(new_grasp)
+            if gx % 50 == 0:
+                fig = plt.figure()
+                ax = plt.axes(projection='3d')
+                lim = 0.2
+                ax.set_xlim(-lim, lim)
+                ax.set_ylim(-lim, lim)
+                ax.set_zlim(-lim, lim)
+                points = np.array(new_grasp)
+                ax.scatter(grasp[3:, 0], grasp[3:, 1], grasp[3:, 2], color='b', alpha=0.2)
+                ax.scatter(points[:, 0], points[:, 1], points[:, 2], color='r', alpha=1.0)
+                plt.show()
+            print(f'Reduced grasps from {512} to {len(new_grasp)}')
+        new_grasps_vectors = np.array(new_grasp_vectors, dtype='float32')
+        
+        return new_grasps_vectors
 
     def get_per_point_repr(self, grasp_vectors):
         """ By default grasps_vectors is of shape (N_grasps, (3+N_points), 3+N_feats).
@@ -90,45 +126,6 @@ class GraspParallelDataLoader:
     def __len__(self):
         return len(self.loaders[0])
 
-        
-def visualize_grasp_dataset(dataset_fname, labels=None, figure_path=''):
-    with open(dataset_fname, 'rb') as handle:
-        val_data = pickle.load(handle)
-    dataset_args = val_data['metadata']
-    object_names = val_data['object_data']['object_names']
-    object_properties = val_data['object_data']['object_properties']
-    n_objects = len(object_names)
-
-    dataset = GraspDataset(val_data, grasp_encoding='per_point')
-    
-    # import IPython
-    # IPython.embed()
-
-    if labels is None:
-        labels = dataset.grasp_labels
-    
-    for ix in range(n_objects):
-        if ix*dataset_args.n_grasps_per_object > len(labels):
-            break
-        
-        graspable_body = graspablebody_from_vector(object_names[ix], object_properties[ix])
-
-        sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
-        grasps = []
-        for gx in range(dataset_args.n_grasps_per_object):
-            grasp_points = [
-                dataset.grasp_vectors[ix*dataset_args.n_grasps_per_object+gx][0, 3:6],
-                dataset.grasp_vectors[ix*dataset_args.n_grasps_per_object+gx][0, 6:9],
-                dataset.grasp_vectors[ix*dataset_args.n_grasps_per_object+gx][0, 9:12]
-            ]
-            grasps.append(grasp_points)
-
-        obj_labels = labels[ix*dataset_args.n_grasps_per_object:(ix+1)*dataset_args.n_grasps_per_object]
-
-        if len(figure_path) > 0:
-            sim_client.tm_show_grasps(grasps, obj_labels, fname=figure_path % ix)
-        else:
-            sim_client.tm_show_grasps(grasps, obj_labels)
 
 def visualize_acquisition_dataset(logger, figure_path=''):
 

@@ -1,10 +1,11 @@
 import argparse
 import copy
-import numpy as np
 import os
-from xml.etree.ElementInclude import include
+
+import numpy as np
 
 from pybullet_object_models import ycb_objects
+from xml.etree.ElementInclude import include
 
 
 IGNORE_MODELS = [
@@ -17,17 +18,18 @@ with open('learning/data/grasping/object_lists/non-watertight.txt', 'r') as hand
     IGNORE_MODELS += handle.read().split('\n')
 with open('learning/data/grasping/object_lists/no-valid-grasps.txt', 'r') as handle:
     IGNORE_MODELS += handle.read().split('\n')
-print(len(IGNORE_MODELS))
 SHAPENET_IGNORE_CATEGORIES = [
     'Paper',
     'Room'
 ]
 
+
 def get_shapenet_models(shapenet_urdf_root=''):
+    """ Get a list of all ShapeNet model names as a string. """
     objects_names = [os.path.splitext(name)[0] for name in os.listdir(shapenet_urdf_root)]
     include_objects = []
     for obj_name in objects_names:
-        category, sn_id = obj_name.split('_')
+        category, _ = obj_name.split('_')
         if category in SHAPENET_IGNORE_CATEGORIES:
             continue
         full_name = f'ShapeNet::{obj_name}'
@@ -37,7 +39,8 @@ def get_shapenet_models(shapenet_urdf_root=''):
 
 
 def get_ycb_models():
-    objects_names = [name for name in os.listdir(ycb_objects.getDataPath()) if 'Ycb' in name] 
+    """ Get a list of all YCB model names as a string. """
+    objects_names = [name for name in os.listdir(ycb_objects.getDataPath()) if 'Ycb' in name]
     include_objects = []
     for obj_name in objects_names:
         full_name = f'YCB::{obj_name}'
@@ -45,20 +48,22 @@ def get_ycb_models():
             include_objects.append(full_name)
     return include_objects
 
-def select_objects(ycb_objects, sn_objects, datasets, n):
+
+def select_objects(ycb_object_names, sn_object_names, datasets, n_objects):
+    """ Select a subset of objects. Remove from source list to avoid reuse. """
     all_objects = []
     if 'YCB' in datasets:
-        all_objects += copy.deepcopy(ycb_objects)
+        all_objects += copy.deepcopy(ycb_object_names)
     if 'ShapeNet' in datasets:
-        all_objects += copy.deepcopy(sn_objects)
-    
-    chosen_objects = np.random.choice(all_objects, n, replace=False)
+        all_objects += copy.deepcopy(sn_object_names)
+
+    chosen_objects = np.random.choice(all_objects, n_objects, replace=False)
 
     for obj in chosen_objects:
         if obj.split('::')[0] == 'YCB':
-            ycb_objects.remove(obj)
+            ycb_object_names.remove(obj)
         else:
-            sn_objects.remove(obj)
+            sn_object_names.remove(obj)
 
     return chosen_objects
 
@@ -75,8 +80,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    assert(len(args.train_objects_datasets) > 0)
-    assert(len(args.test_objects_datasets) > 0)
+    assert len(args.train_objects_datasets) > 0
+    assert len(args.test_objects_datasets) > 0
     for dataset in args.train_objects_datasets + args.test_objects_datasets:
         print(dataset)
         assert(dataset in ['ShapeNet', 'YCB'])
@@ -85,15 +90,16 @@ if __name__ == '__main__':
     all_shapenet_objects = get_shapenet_models('/home/mnosew/workspace/object_models/shapenet-sem/urdfs')
 
     # Remove objects from lists as you go.
-    train_objects = select_objects(all_ycb_objects, all_shapenet_objects, args.train_objects_datasets, args.n_train)
-    test_objects = select_objects(all_ycb_objects, all_shapenet_objects, args.test_objects_datasets, args.n_test)
-    
+    train_objects = select_objects(ycb_object_names=all_ycb_objects,
+                                   sn_object_names=all_shapenet_objects,
+                                   datasets=args.train_objects_datasets,
+                                   n_objects=args.n_train)
+    test_objects = select_objects(ycb_object_names=all_ycb_objects,
+                                  sn_object_names=all_shapenet_objects,
+                                  datasets=args.test_objects_datasets,
+                                  n_objects=args.n_test)
+
     with open(os.path.join(OBJECTS_LIST_DIR, args.train_objects_fname), 'w') as handle:
         handle.write('\n'.join(train_objects))
     with open(os.path.join(OBJECTS_LIST_DIR, args.test_objects_fname), 'w') as handle:
         handle.write('\n'.join(test_objects))
-
-
-
-
-

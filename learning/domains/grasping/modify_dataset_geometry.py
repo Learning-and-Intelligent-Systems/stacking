@@ -175,9 +175,9 @@ if __name__ == '__main__':
 
     new_train_dataset = process_geometry(
         train_dataset,
-        n_points=512,
+        n_points=1024,
         add_normals=False,
-        local_geo_only=True,
+        local_geo_only=False,
         skip=1
     )
 
@@ -187,10 +187,10 @@ if __name__ == '__main__':
 
     new_val_dataset = process_geometry(
         val_dataset,
-        n_points=512,
+        n_points=1024,
         add_normals=False,
-        local_geo_only=True,
-        skip=5
+        local_geo_only=False,
+        skip=1
     )
 
     in_data_root_path = os.path.join(DATA_ROOT, args.in_dataset_fname)

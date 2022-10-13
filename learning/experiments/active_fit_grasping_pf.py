@@ -8,6 +8,7 @@ from learning.models import latent_ensemble
 from learning.active.utils import ActiveExperimentLogger
 from particle_belief import GraspingDiscreteLikelihoodParticleBelief
 from learning.domains.grasping.active_utils import get_fit_object, sample_unlabeled_data, get_labels, get_train_and_fit_objects
+from learning.domains.grasping.pybullet_likelihood import PBLikelihood
 from learning.active.acquire import bald
 # from learning.evaluate.planner import EnsemblePlanner
 import sys
@@ -54,7 +55,8 @@ def find_informative_tower(pf, object_set, logger, args):
     return all_grasps[acquire_ix]
 
 def particle_filter_loop(pf, object_set, logger, strategy, args):
-    logger.save_ensemble(pf.likelihood, 0, symlink_tx0=True)
+    if args.likelihood == 'nn':
+        logger.save_ensemble(pf.likelihood, 0, symlink_tx0=True)
     logger.save_particles(pf.particles, 0)
 
     for tx in range(0, args.max_acquisitions):
@@ -81,8 +83,9 @@ def particle_filter_loop(pf, object_set, logger, strategy, args):
 
 
         # TODO: Save the model and particle distribution at each step.
+        if args.likelihood == 'nn':
+            logger.save_ensemble(pf.likelihood, tx+1, symlink_tx0=True)
         logger.save_acquisition_data(grasp_dataset, None, tx+1)
-        logger.save_ensemble(pf.likelihood, tx+1, symlink_tx0=True)
         logger.save_particles(particles, tx+1)
 
 # "grasp_train-ycb-test-ycb-1_fit_random_train_geo_object0": "learning/experiments/logs/grasp_train-ycb-test-ycb-1_fit_random_train_geo_object0-20220504-134253"
@@ -104,20 +107,28 @@ def run_particle_filter_fitting(args):
     args.num_train_objects = len(object_set['object_names']) - args.num_eval_objects
 
     # ----- Likelihood Model -----
-    train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path, use_latents=True)
-    latent_ensemble = train_logger.get_ensemble(args.ensemble_tx)
-    if torch.cuda.is_available():
-        latent_ensemble.cuda()
-    latent_ensemble.add_latents(1)
+    if args.likelihood == 'nn':
+        train_logger = ActiveExperimentLogger(exp_path=args.pretrained_ensemble_exp_path, use_latents=True)
+        latent_ensemble = train_logger.get_ensemble(args.ensemble_tx)
+        if torch.cuda.is_available():
+            latent_ensemble.cuda()
+        latent_ensemble.add_latents(1)
+        likelihood_model = latent_ensemble
+        d_latents = latent_ensemble.d_latents
+    elif args.likelihood == 'pb':
+        likelihood_model = PBLikelihood(object_name=object_set['object_names'][-1], n_samples=5, batch_size=50)   
+        d_latents = 5
 
     # ----- Initialize particle filter from prior -----
     pf = GraspingDiscreteLikelihoodParticleBelief(
         object_set=object_set,
-        D=latent_ensemble.d_latents,
+        D=d_latents,
         N=args.n_particles,
-        likelihood=latent_ensemble,
+        likelihood=likelihood_model,
         resample=False,
         plot=True)
+    if args.likelihood == 'pb':
+        pf.particles = likelihood_model.init_particles(args.n_particles)
 
     # ----- Run particle filter loop -----
     particle_filter_loop(pf, object_set, logger, args.strategy, args)
@@ -135,6 +146,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval-object-ix', type=int, default=0, help='Index of which eval object to use.')
     parser.add_argument('--strategy', type=str, choices=['bald', 'random', 'task'], default='bald')
     parser.add_argument('--n-particles', type=int, default=100)
+    parser.add_argument('--likelihood', choices=['nn', 'pb'], default='nn')
     args = parser.parse_args()
     
     run_particle_filter_fitting(args)
