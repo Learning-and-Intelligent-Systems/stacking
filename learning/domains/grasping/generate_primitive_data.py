@@ -64,7 +64,7 @@ def main(args):
                                          2 * i + 1,
                                          'cylinder length=%f radius=%f' % (side_len, side_len / 2),
                                          'cylinder length=%f radius=%f' % (side_len, side_len / 2))
-            f = open(data_dir + 'Cylinder_%i.urdf' % i, 'w')
+            f = open(data_dir + 'Cylinder_%i.urdf' % hash(random.uniform(0, 1)), 'w')
             f.write(urdf_text)
             f.close()
 
@@ -75,7 +75,7 @@ def main(args):
                                          2 * i + 1,
                                          'box size=\"%f %f %f\"' % (side_len, side_len, side_len),
                                          'box size=\"%f %f %f\"' % (side_len, side_len, side_len))
-            f = open(data_dir + 'Box_%i.urdf' % i, 'w')
+            f = open(data_dir + 'Box_%i.urdf' % hash(random.uniform(0, 1)), 'w')
             f.write(urdf_text)
             f.close()
 
@@ -86,7 +86,7 @@ def main(args):
                                          2 * i + 1,
                                          'sphere radius=%f' % (side_len / 2),
                                          'sphere radius=%f' % (side_len / 2))
-            f = open(data_dir + 'Sphere_%i.urdf' % i, 'w')
+            f = open(data_dir + 'Sphere_%i.urdf' % hash(random.uniform(0, 1)), 'w')
             f.write(urdf_text)
             f.close()
 
