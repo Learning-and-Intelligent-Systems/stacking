@@ -75,10 +75,9 @@ class GraspingAgent:
         
         for ax in range(0, max_attempts):
             # Step (1): Sample valid antipodal grasp for object.
-            sampler = GraspSampler(graspable_body=self.graspable_body, 
+            sampler = GraspSampler(graspable_body=self.graspable_body,
                 antipodal_tolerance=30,
-                show_pybullet=False,
-                urdf_directory='urdf_models')
+                show_pybullet=False)
             if ax < 10: print('Connected to:', sampler.sim_client.pb_client_id)
             grasp = sampler.sample_grasp(force=20)
             sampler.disconnect()
@@ -122,7 +121,7 @@ class GraspingAgent:
             
             self.pb_body.set_base_link_pose(((x, y, 1.0), quat))
             
-            client = GraspSimulationClient(self.graspable_body, False, 'urdf_models')
+            client = GraspSimulationClient(self.graspable_body, False)
             # pb_aabb = p.getAABB(self.pb_body.id, physicsClientId=self.client_id)
             # print(pb_aabb)
             # pb_robot.utils.set_pbrobot_clientid(self.client_id)

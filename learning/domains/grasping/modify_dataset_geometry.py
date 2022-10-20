@@ -77,7 +77,7 @@ def process_geometry(train_dataset, n_points, add_normals, local_geo_only, skip=
         
         # Only load mesh once the object changes for speed.
         if old_object_id != object_id:
-            sim_client = GraspSimulationClient(graspable_body=graspable_body, show_pybullet=False, urdf_directory='object_models')
+            sim_client = GraspSimulationClient(graspable_body=graspable_body, show_pybullet=False)
             print(sim_client.pb_client_id)
             mesh = sim_client.mesh
             sim_client.disconnect()
