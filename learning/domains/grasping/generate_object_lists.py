@@ -7,7 +7,6 @@ import numpy as np
 from pybullet_object_models import ycb_objects
 from xml.etree.ElementInclude import include
 
-
 IGNORE_MODELS = [
     'YCB::YcbMasterChefCan',
     'YCB::YcbChipsCan',
@@ -22,6 +21,17 @@ SHAPENET_IGNORE_CATEGORIES = [
     'Paper',
     'Room'
 ]
+
+
+def get_primitive_models(primitive_urdf_root=''):
+    """ get a list of all primitive models as a string """
+    objects_names = [os.path.splitext(name)[0] for name in os.listdir(primitive_urdf_root)]
+    include_objects = []
+    for obj_name in objects_names:
+        category, _ = obj_name.split('_')
+        full_name = f'Primitive::{obj_name}'
+        include_objects.append(full_name)
+    return include_objects
 
 
 def get_shapenet_models(shapenet_urdf_root=''):
@@ -49,21 +59,25 @@ def get_ycb_models():
     return include_objects
 
 
-def select_objects(ycb_object_names, sn_object_names, datasets, n_objects):
+def select_objects(ycb_object_names, sn_object_names, pm_object_names, datasets, n_objects):
     """ Select a subset of objects. Remove from source list to avoid reuse. """
     all_objects = []
     if 'YCB' in datasets:
         all_objects += copy.deepcopy(ycb_object_names)
     if 'ShapeNet' in datasets:
         all_objects += copy.deepcopy(sn_object_names)
+    if len([zet for zet in datasets if zet not in ['Shapenet', 'YCB']]) > 0: # if there are any primitives
+        all_objects += copy.deepcopy(pm_object_names)
 
     chosen_objects = np.random.choice(all_objects, n_objects, replace=False)
 
     for obj in chosen_objects:
         if obj.split('::')[0] == 'YCB':
             ycb_object_names.remove(obj)
-        else:
+        elif obj.split('::')[0] == 'ShapeNet':
             sn_object_names.remove(obj)
+        else:
+            pm_object_names.remove(obj)
 
     return chosen_objects
 
@@ -71,6 +85,7 @@ def select_objects(ycb_object_names, sn_object_names, datasets, n_objects):
 OBJECTS_LIST_DIR = 'learning/data/grasping/object_lists'
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset-lookup-dir', type=str, default='/home/seiji/Research/object_models/')
     parser.add_argument('--train-objects-fname', type=str, required=True)
     parser.add_argument('--test-objects-fname', type=str, required=True)
     parser.add_argument('--train-objects-datasets', nargs='+', required=True)
@@ -82,20 +97,37 @@ if __name__ == '__main__':
 
     assert len(args.train_objects_datasets) > 0
     assert len(args.test_objects_datasets) > 0
-    for dataset in args.train_objects_datasets + args.test_objects_datasets:
-        print(dataset)
-        assert(dataset in ['ShapeNet', 'YCB'])
 
     all_ycb_objects = get_ycb_models()
-    all_shapenet_objects = get_shapenet_models('/home/mnosew/workspace/object_models/shapenet-sem/urdfs')
+
+    lookup_dir = args.dataset_lookup_dir if args.dataset_lookup_dir[-1] == '/' else args.dataset_lookup_dir + '/'
+    all_shapenet_objects = get_shapenet_models(lookup_dir + 'shapenet-sem/urdfs')
+
+    # then use train_object_datasets and then lookup with try except and then just inform
+    # user if the set name passed as an argument does not exist
+
+    # removing special cases from the sets defined
+    non_ycb_shapenet_items = [s for s in (args.train_objects_datasets + args.test_objects_datasets) \
+                              if s not in ['ShapeNet', 'YCB', 'shapenet-sem']]
+    non_ycb_shapenet_items = list(set(non_ycb_shapenet_items))
+
+    all_primitive_objects = []
+    for primitive_models in non_ycb_shapenet_items:
+        full_primitive_dir = lookup_dir + primitive_models + '/urdfs'
+        try:
+            all_primitive_objects += get_primitive_models(full_primitive_dir)
+        except FileExistsError as e:
+            print('Could not find dataset ' + full_primitive_dir + '... skipping...')
 
     # Remove objects from lists as you go.
     train_objects = select_objects(ycb_object_names=all_ycb_objects,
                                    sn_object_names=all_shapenet_objects,
+                                   pm_object_names=all_primitive_objects,
                                    datasets=args.train_objects_datasets,
                                    n_objects=args.n_train)
     test_objects = select_objects(ycb_object_names=all_ycb_objects,
                                   sn_object_names=all_shapenet_objects,
+                                  pm_object_names=all_primitive_objects,
                                   datasets=args.test_objects_datasets,
                                   n_objects=args.n_test)
 
