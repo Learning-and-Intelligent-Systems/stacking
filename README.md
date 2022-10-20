@@ -1,52 +1,45 @@
-# stacking
+# Learning Feasibility
 
-This repo has code for using a simulation-based particle filter to estimate the center of mass of blocks, then 
-solving for the tallest stable tower (in expectation). Finally, the tower is constructed using a panda robot in simulation.
-The robot functionality comes from [rachelholladay/pb_robot](https://github.com/rachelholladay/pb_robot) repository.
+This repo has code for discovering object-level latent spaces based on interactions with that object. This
+is an extension of the [stacking](https://github.com/Learning-and-Intelligent-Systems/stacking) repository and
+Tmuch of the robot functionality comes from the [rachelholladay/pb_robot](https://github.com/rachelholladay/pb_robot) repository.
 
 ## Installation
 
 Dependencies: python3, git
 
-1. Install [pb_robot](https://github.com/mike-n-7/pb_robot) using the instructions below, not the ones in the repo's README
-    1. Install pb_robot dependencies
-        1. ```pip3 install numpy pybullet recordclass catkin_pkg IPython networkx scipy numpy-quaternion```
-        2. ```pip3 install git+https://github.com/mike-n-7/tsr.git```
-    2. Clone pb_robot
-    3. Compile the IKFast library for the panda
+1. Install  `latent_feasibility` 
+    1. Clone this repository.
+    2. Create a virual environment for this project.
+        1. ```cd latent_feasibility```
+        2. ```virtualenv .venv --python=/usr/bin/python3```
+        3. ```source .venv/bin/activate```
+    2. Install dependencies.
+        1. ```xargs -n1 pip3 install < requirements.txt```
+        2. We are currently using PyTorch `1.9.1`: ```pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html```
+2. Install [pb_robot](https://github.com/mike-n-7/pb_robot) using the instructions below, not the ones in the repo's README
+    1. Clone `pb_robot` outside of `latent_feasibility`.
+    2. Compile the IKFast library for the panda
         1. ```cd pb_robot/src/pb_robot/ikfast/franka_panda```
-        2. ```python3 setup.py build``` (for errors, see **troubleshooting** below)
-2. Install stacking
-    1. Clone this repo
-    1. Install dependencies
-        1. ```cd stacking```
-        2. ```xargs -n1 pip3 install < requirements.txt```
-        3. NOTE: I got the following errors for the following lines in requirements.txt (although everything afterwards still worked...)
-            1. ```-e git://github.com/hauptmech/odio_urdf.git@1f9ecb4e7833957c11cc707fa4c1b781ceb70ae8#egg=odio_urdf```-->```-e option requires 1 argument```
-            2. ```tsr @ git+https://github.com/mike-n-7/tsr.git@aa92079b215fddf58075b71fc07a0ddb17e309af```-->```ERROR: Invalid requirement: '@'```
-            
+        2. ```python3 setup.py build``` (for errors, see **troubleshooting** below)           
 3. Install [pddlstream](https://github.com/caelan/pddlstream) 
-    1. follow installation instructions there
-4. Create a symlink to required repos (this assumes you cloned pb_robot and pddl_stream to your home directory). Run these commands from the top directory of this repo.
-    1. ```ln -s ~/pb_robot/src/pb_robot .```
-    2. ```ln -s ~/pddlstream/pddlstream .```
-  
+    1. Clone `pddlstream` outside of `latent_feasibility`.
+    2. Follow installation instructions there.
+4. Create a symlink to required repos (this assumes you cloned `pb_robot` and `pddl_stream` to your home directory). Run these commands from the top directory `latent_feasibility`.
+    1. ```ln -s <path-to-pb_robot>/pb_robot/src/pb_robot .```
+    2. ```ln -s <path-to-pddstream>/pddlstream/pddlstream .```
+
+## Grasping Dataset
+
+To use the grasping modules (specifically from `pb_robot/planners/antipodalGraspPlanner.py`), you will need to download a dataset
+containing URDFs:
+1. Download URDFs and object meshes from [here](https://drive.google.com/file/d/1ooOmft1K2lemZXJL62In8sgNzvuzxRWE/view?usp=sharing).
+2. Unzip the archive: `unzip shapenet-sim.zip`
+3. Set the `SHAPENET_ROOT` environment variable to the location of the dataset: `export SHAPENET_ROOT=<path-to-dataset>/shapenet-sem`
+
+
 ## Run
 
-### Find COM, solve for stable tower, find and execute plan to build tower
-The following command will find the COM of the given blocks, find the tallest stable tower, and plan and execute the construction of that tower.
-```
-cd stacking
-python3 -m run
-```
-Arguments:
-  - ```--num-blocks (int)```: Number of blocks to use
-  - ```--agent ([teleport or panda])```: ```panda``` to have the robot plan and execute actions, ```teleport``` for no agent
-
-The tamp folder has the two key pddl files. `domain_stacking.pddl` defines the predicates and the actions. `stream_stacking.pddl` defines the streams, which generate values to satify the actions. The various streams are implemented in `tamp/primitives.py`. Within these streams, for this pick and place example, we opt to define grasp sets via TSRs and execute path planning with a bi-directional RRT. These are not significant (truly, they were made out of convenience) and thus could be swapped with any grasp set definition and path planner.  
-
-### Train a network to predict tower stability
-TODO
 
 ## Troubleshooting
 
