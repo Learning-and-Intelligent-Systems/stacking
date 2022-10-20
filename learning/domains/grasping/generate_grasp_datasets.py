@@ -82,10 +82,9 @@ def generate_datasets(dataset_args):
     object_grasp_data, object_grasp_ids, object_grasp_labels = [], [], []
 
     for prop_ix in range(len(object_data['object_names'])):
-        print('Property sample %d/%d...' % (prop_ix, len(object_data['object_names'])))
-
         if dataset_args.object_ix > -1 and dataset_args.object_ix != prop_ix:
             continue
+        print('Property sample %d/%d...' % (prop_ix, len(object_data['object_names'])))
 
         object_id = prop_ix
         object_name = object_data['object_names'][prop_ix]
@@ -126,8 +125,6 @@ def generate_datasets(dataset_args):
             'object_data': object_data,
             'metadata': dataset_args
         }
-        with open('%s.tmp' % dataset_args.fname, 'wb') as handle:
-            pickle.dump(dataset, handle)
 
     with open('%s' % dataset_args.fname, 'wb') as handle:
         pickle.dump(dataset, handle)
