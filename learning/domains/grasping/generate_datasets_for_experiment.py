@@ -15,6 +15,7 @@ Fitting phase datasets are created for each of these to cover a range of difficu
 """
 
 import argparse
+import multiprocessing
 import pickle
 import os
 
@@ -41,22 +42,28 @@ parser.add_argument('--n-grasps-per-object', type=int, required=True)
 parser.add_argument('--n-points-per-object', type=int, required=True)
 parser.add_argument('--n-fit-grasps', type=int, required=True)
 parser.add_argument('--grasp-noise', type=float, required=True)
-args = parser.parse_args()
-print(args)
+parser.add_argument('--n-processes', type=int, default=1)
+new_args = parser.parse_args()
+print(new_args)
 
 
 if __name__ == '__main__':
+
     # Directory setup.
-    data_root_path = os.path.join('learning', 'data', 'grasping', args.data_root_name)
+    data_root_path = os.path.join('learning', 'data', 'grasping', new_args.data_root_name)
     args_path = os.path.join(data_root_path, 'args.pkl')
     if os.path.exists(data_root_path):
         input('[Warning] Data root directory already exists. Continue using initial args?')
         with open(args_path, 'rb') as handle:
             args = pickle.load(handle)
+            args.n_processes = new_args.n_processes
     else:
         os.mkdir(data_root_path)
         with open(args_path, 'wb') as handle:
-            pickle.dump(args, handle)
+            pickle.dump(new_args, handle)
+        args = new_args
+
+    worker_pool = multiprocessing.Pool(processes=args.n_processes)
 
     objects_path = os.path.join(data_root_path, 'objects')
     grasps_path = os.path.join(data_root_path, 'grasps')
@@ -68,6 +75,8 @@ if __name__ == '__main__':
     test_objects = get_object_list(args.test_objects_fname)
 
     # Generate initial object sets.
+    object_tasks = []
+
     print('[Objects] Generating train objects.')
     train_objects_path = os.path.join(objects_path, 'train_geo_train_props.pkl')
     if not os.path.exists(train_objects_path):
@@ -75,7 +84,7 @@ if __name__ == '__main__':
             fname=train_objects_path,
             object_names=train_objects,
             n_property_samples=args.n_property_samples_train)
-        generate_objects(train_objects_args)
+        object_tasks.append(train_objects_args)
 
     print('[Objects] Generating test objects: novel geometry.')
     test_objects_path = os.path.join(objects_path, 'test_geo_test_props.pkl')
@@ -84,7 +93,7 @@ if __name__ == '__main__':
             fname=test_objects_path,
             object_names=test_objects,
             n_property_samples=args.n_property_samples_test)
-        generate_objects(test_objects_args)
+        object_tasks.append(test_objects_args)
 
     print('[Objects] Generating test objects: train geometry.')
     test_objects_samegeo_path = os.path.join(objects_path, 'train_geo_test_props.pkl')
@@ -93,17 +102,22 @@ if __name__ == '__main__':
             fname=test_objects_samegeo_path,
             object_names=train_objects,
             n_property_samples=args.n_property_samples_test)
-        generate_objects(test_objects_samegeo_args)
+        object_tasks.append(test_objects_samegeo_args)
+
+    worker_pool.map(generate_objects, object_tasks)
 
     # Generate training and validation sets used for the training phase.
     training_phase_path = os.path.join(grasps_path, 'training_phase')
     if not os.path.exists(training_phase_path):
         os.mkdir(training_phase_path)
 
+    SKIP_TRAIN_OBJECTS = [1665, 1666, 1667, 1668, 1669]
+    train_dataset_tasks = []
+
     print('[Grasps] Generating train grasps for training phase.')
     # train_grasps_path = os.path.join(training_phase_path, 'train_grasps.pkl')
     for ox in range(0, len(train_objects)*args.n_property_samples_train):
-        if ox in [1665, 1666, 1667, 1668, 1669]:
+        if ox in SKIP_TRAIN_OBJECTS:
             continue
         train_grasps_path = os.path.join(training_phase_path, f'train_grasps_object{ox}.pkl')
         if not os.path.exists(train_grasps_path):
@@ -114,10 +128,12 @@ if __name__ == '__main__':
                 n_grasps_per_object=args.n_grasps_per_object,
                 object_ix=ox,
                 grasp_noise=args.grasp_noise)
-            generate_datasets(train_grasps_args)
+            train_dataset_tasks.append(train_grasps_args)
+
+    worker_pool.map(generate_datasets, train_dataset_tasks)
 
     print('[Grasps] Generating validation grasps for training phase.')
-    # val_grasps_path = os.path.join(training_phase_path, 'val_grasps.pkl')
+    val_dataset_tasks = []
     for ox in range(0, len(train_objects)*args.n_property_samples_train):
         val_grasps_path = os.path.join(training_phase_path, f'val_grasps_object{ox}.pkl')
         if not os.path.exists(val_grasps_path):
@@ -128,16 +144,19 @@ if __name__ == '__main__':
                 n_grasps_per_object=10,
                 object_ix=ox,
                 grasp_noise=args.grasp_noise)
-            generate_datasets(val_grasps_args)
+            val_dataset_tasks.append(val_grasps_args)
+
+    worker_pool.map(generate_datasets, val_dataset_tasks)
 
     # Generate fitting object datasets.
     fitting_phase_path = os.path.join(grasps_path, 'fitting_phase')
     if not os.path.exists(fitting_phase_path):
         os.mkdir(fitting_phase_path)
 
+    fit_dataset_tasks = []
     for ox in range(0, min(100, len(test_objects)*args.n_property_samples_test)):
-        print('[Grasps] Generating grasps for evaluating fitting phase for object %d.' % ox)
-        fit_grasps_path = os.path.join(fitting_phase_path, 'fit_grasps_test_geo_object%d.pkl' % ox)
+        print(f'[Grasps] Generating grasps for fitting phase eval for obj {ox}.')
+        fit_grasps_path = os.path.join(fitting_phase_path, f'fit_grasps_test_geo_object{ox}.pkl')
         if not os.path.exists(fit_grasps_path):
             fit_grasps_args = SimpleNamespace(
                 fname=fit_grasps_path,
@@ -146,10 +165,13 @@ if __name__ == '__main__':
                 n_grasps_per_object=args.n_fit_grasps,
                 object_ix=ox,
                 grasp_noise=args.grasp_noise)
-            generate_datasets(fit_grasps_args)
+            fit_dataset_tasks.append(fit_grasps_args)
 
+    worker_pool.map(generate_datasets, fit_dataset_tasks)
+
+    fit_dataset_samegeo_tasks = []
     for ox in range(0, min(100, len(train_objects)*args.n_property_samples_test)):
-        print(f'[Grasps] Generating grasps for evaluating fitting phase for samegeo object {ox}.')
+        print(f'[Grasps] Generating grasps for fitting phase eval for samegeo obj {ox}.')
         fit_grasps_samegeo_path = os.path.join(fitting_phase_path,
                                                f'fit_grasps_train_geo_object{ox}.pkl')
         if not os.path.exists(fit_grasps_samegeo_path):
@@ -160,11 +182,17 @@ if __name__ == '__main__':
                 n_grasps_per_object=args.n_fit_grasps,
                 object_ix=ox,
                 grasp_noise=args.grasp_noise)
-            generate_datasets(fit_grasps_samegeo_args)
+            fit_dataset_samegeo_tasks.append(fit_grasps_samegeo_args)
 
+    worker_pool.map(generate_datasets, fit_dataset_samegeo_tasks)
+
+    fit_dataset_samegeo_tasks = []
     for ox in range(0, min(100, len(train_objects)*args.n_property_samples_train)):
-        print(f'[Grasps] Generating grasps for evaluating fitting phase for samegeo sameprop object {ox}.')
-        fit_grasps_samegeo_sameprop_path = os.path.join(fitting_phase_path, 'fit_grasps_train_geo_trainprop_object%d.pkl' % ox)
+        print(f'[Grasps] Generating grasps for fitting phase eval for samegeo sameprop obj {ox}.')
+        fit_grasps_samegeo_sameprop_path = os.path.join(
+            fitting_phase_path,
+            f'fit_grasps_train_geo_trainprop_object{ox}.pkl'
+        )
         if not os.path.exists(fit_grasps_samegeo_sameprop_path):
             fit_grasps_samegeo_args = SimpleNamespace(
                 fname=fit_grasps_samegeo_sameprop_path,
@@ -173,4 +201,6 @@ if __name__ == '__main__':
                 n_grasps_per_object=args.n_fit_grasps,
                 object_ix=ox,
                 grasp_noise=0.0)
-            generate_datasets(fit_grasps_samegeo_args)
+            fit_dataset_samegeo_tasks.append(fit_grasps_samegeo_args)
+
+    worker_pool.map(generate_datasets, fit_dataset_samegeo_tasks)
