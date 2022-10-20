@@ -1,10 +1,10 @@
+YCB::YcbTomatoSoupCan
 YCB::YcbTennisBall
+YCB::YcbCrackerBox
 YCB::YcbBanana
-YCB::YcbMediumClamp
-YCB::YcbMustardBottle
+YCB::YcbFoamBrick
 YCB::YcbGelatinBox
 YCB::YcbScissors
 YCB::YcbHammer
-YCB::YcbStrawberry
-YCB::YcbCrackerBox
 YCB::YcbPottedMeatCan
+YCB::YcbMustardBottle
