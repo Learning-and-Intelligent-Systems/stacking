@@ -14,7 +14,7 @@ kiwisolver==1.1.0
 matplotlib==3.2.0
 more-itertools==8.2.0
 networkx==2.4
-numpy==1.18.1
+numpy==1.22.0
 git+https://github.com/hauptmech/odio_urdf.git
 packaging==20.3
 parso==0.7.0
