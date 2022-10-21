@@ -86,7 +86,7 @@ def generate_object_grid(objects, dataset_figpath):
     images = []
     for ox, (name, prop) in enumerate(zip(names, properties)):    
         graspable_body = graspablebody_from_vector(name, prop)
-        sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
+        sim_client = GraspSimulationClient(graspable_body, False)
 
         axis = sim_client._get_tm_com_axis()
         scene = trimesh.scene.Scene([sim_client.mesh, axis])
@@ -146,7 +146,7 @@ def visualize_grasp_dataset(dataset_fname, labels=None, figpath='', prefix=''):
         
         graspable_body = graspablebody_from_vector(object_names[ix], object_properties[ix])
 
-        sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
+        sim_client = GraspSimulationClient(graspable_body, False)
         grasps = []
         for gx in range(dataset_args.n_grasps_per_object):
             grasp_points = [
@@ -178,7 +178,6 @@ def analyze_objects(objects_all):
         graspable_body = graspablebody_from_vector(name, props)
         sim_client = GraspSimulationClient(graspable_body=graspable_body,
             show_pybullet=False,
-            urdf_directory='object_models',
             recompute_inertia=True)
         inertia = p.getDynamicsInfo(sim_client.body_id, -1, sim_client.pb_client_id)[2]
         inertias.append(inertia)

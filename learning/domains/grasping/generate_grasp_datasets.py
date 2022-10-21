@@ -28,7 +28,7 @@ def graspablebody_from_vector(object_name, vector):
 
 def sample_grasp_X(graspable_body, property_vector, n_points_per_object, grasp=None):
     # Sample new point cloud for object.
-    sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
+    sim_client = GraspSimulationClient(graspable_body, False)
     mesh_points = np.array(sim_client.mesh.sample(n_points_per_object, return_index=False),
                            dtype='float32')
     mesh_points = np.hstack([mesh_points,
