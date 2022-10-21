@@ -62,8 +62,8 @@ def main(args):
             side_len = random.uniform(args.min_len, args.max_len)
             urdf_text = URDF_TEMPLATE % (2 * i,
                                          2 * i + 1,
-                                         'cylinder length=%f radius=%f' % (side_len, side_len / 2),
-                                         'cylinder length=%f radius=%f' % (side_len, side_len / 2))
+                                         'cylinder length=\"%f\" radius=\"%f\"' % (side_len, side_len / 2),
+                                         'cylinder length=\"%f\" radius=\"%f\"' % (side_len, side_len / 2))
             f = open(data_dir + 'Cylinder_%i.urdf' % hash(random.uniform(0, 1)), 'w')
             f.write(urdf_text)
             f.close()
@@ -84,8 +84,8 @@ def main(args):
             side_len = random.uniform(args.min_len, args.max_len)
             urdf_text = URDF_TEMPLATE % (2 * i,
                                          2 * i + 1,
-                                         'sphere radius=%f' % (side_len / 2),
-                                         'sphere radius=%f' % (side_len / 2))
+                                         'sphere radius=\"%f\"' % (side_len / 2),
+                                         'sphere radius=\"%f\"' % (side_len / 2))
             f = open(data_dir + 'Sphere_%i.urdf' % hash(random.uniform(0, 1)), 'w')
             f.write(urdf_text)
             f.close()
@@ -101,7 +101,7 @@ if __name__ == '__main__':
                         help='number of objects to generate (this is done per primitive)')
     parser.add_argument('--min_len', '-mil', type=float, default=0.01,
                         help='minimum side length of bounding volume on object')
-    parser.add_argument('--max_len', '-mal', type=float, default=0.05,
+    parser.add_argument('--max_len', '-mal', type=float, default=0.03,
                         help='maximum side length of bounding volume on object')
 
     args = parser.parse_args()
