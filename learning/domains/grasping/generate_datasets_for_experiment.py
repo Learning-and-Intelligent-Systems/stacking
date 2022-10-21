@@ -31,6 +31,38 @@ def get_object_list(fname):
         objects = handle.readlines()
     return [o.strip() for o in objects if len(o) > 1]
 
+def merge_datasets(dataset_paths, merged_fname):
+    """ Create one large dataset file form individual object files."""
+    all_grasps, all_object_ids, all_labels = [], [], []
+    for dataset_path in dataset_paths:
+        print('Loading:', dataset_path)
+        if not os.path.exists(dataset_path):
+            continue
+
+        with open(dataset_path, 'rb') as handle:
+            single_dataset = pickle.load(handle)
+
+        all_grasps += [g.astype('float32') for g in single_dataset['grasp_data']['grasps']]
+        all_object_ids += single_dataset['grasp_data']['object_ids']
+        all_labels += single_dataset['grasp_data']['labels']
+
+    updated_metadata = single_dataset['metadata']
+    updated_metadata.fname = merged_fname
+    updated_metadata.object_ix = -1
+
+    merged_dataset = {
+        'grasp_data': {
+            'grasps': all_grasps,
+            'object_ids': all_object_ids,
+            'labels': all_labels
+        },
+        'object_data': single_dataset['object_data'],
+        'metadata': updated_metadata
+    }
+
+    with open(merged_fname, 'wb') as handle:
+        pickle.dump(merged_dataset, handle)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--train-objects-fname', type=str, required=True)
@@ -112,14 +144,14 @@ if __name__ == '__main__':
         os.mkdir(training_phase_path)
 
     SKIP_TRAIN_OBJECTS = [1665, 1666, 1667, 1668, 1669]
-    train_dataset_tasks = []
+    train_dataset_tasks, train_dataset_paths = [], []
 
     print('[Grasps] Generating train grasps for training phase.')
-    # train_grasps_path = os.path.join(training_phase_path, 'train_grasps.pkl')
     for ox in range(0, len(train_objects)*args.n_property_samples_train):
         if ox in SKIP_TRAIN_OBJECTS:
             continue
         train_grasps_path = os.path.join(training_phase_path, f'train_grasps_object{ox}.pkl')
+        train_dataset_paths.append(train_grasps_path)
         if not os.path.exists(train_grasps_path):
             train_grasps_args = SimpleNamespace(
                 fname=train_grasps_path,
@@ -132,8 +164,12 @@ if __name__ == '__main__':
 
     worker_pool.map(generate_datasets, train_dataset_tasks)
 
+    print('[Grasps] Merging all train grasps for training phase.')
+    train_grasps_path = os.path.join(training_phase_path, 'train_grasps.pkl')
+    merge_datasets(train_dataset_paths, train_grasps_path)
+
     print('[Grasps] Generating validation grasps for training phase.')
-    val_dataset_tasks = []
+    val_dataset_tasks, val_dataset_paths = [], []
     for ox in range(0, len(train_objects)*args.n_property_samples_train):
         val_grasps_path = os.path.join(training_phase_path, f'val_grasps_object{ox}.pkl')
         if not os.path.exists(val_grasps_path):
@@ -147,6 +183,10 @@ if __name__ == '__main__':
             val_dataset_tasks.append(val_grasps_args)
 
     worker_pool.map(generate_datasets, val_dataset_tasks)
+
+    print('[Grasps] Merging all validation grasps for training phase.')
+    val_grasps_path = os.path.join(training_phase_path, 'val_grasps.pkl')
+    merge_datasets(val_dataset_paths, val_grasps_path)
 
     # Generate fitting object datasets.
     fitting_phase_path = os.path.join(grasps_path, 'fitting_phase')
