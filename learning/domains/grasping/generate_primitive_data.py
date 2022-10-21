@@ -27,12 +27,12 @@ URDF_TEMPLATE = '''<?xml version="1.0"?>
   </inertial>
   <visual >
    <geometry >
-     <%s>
+     <%s />
    </geometry>
   </visual>
   <collision >
    <geometry >
-     <%s>
+     <%s />
    </geometry>
   </collision>
  </link>
