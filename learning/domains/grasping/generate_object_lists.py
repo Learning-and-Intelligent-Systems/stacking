@@ -23,6 +23,7 @@ SHAPENET_IGNORE_CATEGORIES = [
 ]
 
 
+
 def get_primitive_models(primitive_urdf_root=''):
     """ get a list of all primitive models as a string """
     objects_names = [os.path.splitext(name)[0] for name in os.listdir(primitive_urdf_root)]
@@ -84,8 +85,10 @@ def select_objects(ycb_object_names, sn_object_names, pm_object_names, datasets,
 
 OBJECTS_LIST_DIR = 'learning/data/grasping/object_lists'
 if __name__ == '__main__':
+    shapenet_root = os.environ['SHAPENET_ROOT']
+    primitive_parent_root = os.environ['PRIMITIVE_PARENT_ROOT']
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset-lookup-dir', type=str, default='/home/seiji/Research/object_models/')
     parser.add_argument('--train-objects-fname', type=str, required=True)
     parser.add_argument('--test-objects-fname', type=str, required=True)
     parser.add_argument('--train-objects-datasets', nargs='+', required=True)
@@ -100,8 +103,7 @@ if __name__ == '__main__':
 
     all_ycb_objects = get_ycb_models()
 
-    lookup_dir = args.dataset_lookup_dir if args.dataset_lookup_dir[-1] == '/' else args.dataset_lookup_dir + '/'
-    all_shapenet_objects = get_shapenet_models(lookup_dir + 'shapenet-sem/urdfs')
+    all_shapenet_objects = get_shapenet_models(os.path.join(shapenet_root, 'urdfs'))
 
     # then use train_object_datasets and then lookup with try except and then just inform
     # user if the set name passed as an argument does not exist
@@ -113,7 +115,7 @@ if __name__ == '__main__':
 
     all_primitive_objects = []
     for primitive_models in non_ycb_shapenet_items:
-        full_primitive_dir = lookup_dir + primitive_models + '/urdfs'
+        full_primitive_dir = os.path.join(primitive_parent_root, primitive_models, 'urdfs')
         try:
             all_primitive_objects += get_primitive_models(full_primitive_dir)
         except FileExistsError as e:
