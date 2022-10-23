@@ -3,6 +3,16 @@
 A experiment groups together multiple artifacts (datasets, models, figures) and simplfies inputs to lower-level scripts by making sure parameters stay consistant across different phases. For standard experiments, please use the following high-level scripts (each discussed in detail below).
 
 ## Dataset Creation
+
+### Generating Primitive Dataset (optional, you should be able to use YCB and ShapeNet by default!)
+
+We can generate a primitive a batch of primitive (cubes, cylinders, and spheres) data using
+[generate_primitive_data.py](../../learning/domains/grasping/generate_primitive_data.py).
+
+Example: `python -m learning.domains.grasping.generate_primitive_data --directory <NEW DIRECTORY TO STORE DATA> --primitives cube sphere cylinder --n_prim 10`
+
+### Partitioning into Training and Testing Datasets
+
 The only input to an experiment is a dataset which needs to be created first. A dataset will contain train objects, test objects, and all their associated datasets under one directory. 
 
 Before creating a dataset, we first need to create lists specifying the train/test objects. You can do this manually by creating files in the `learning/data/grasping/object_lists` folder or running the following script:
