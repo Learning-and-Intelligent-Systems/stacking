@@ -23,7 +23,7 @@ def generate_images_for_object(ycb_name, path, mass=None, friction=None, com=Non
         print('Labeling %d/%d...' % (lx, n_samples))
         labels.append(labeler.get_label(grasp, show_pybullet=False))
 
-    sim_client = GraspSimulationClient(graspable_body, show_pybullet=False, urdf_directory='object_models')
+    sim_client = GraspSimulationClient(graspable_body, show_pybullet=False)
     sim_client.tm_show_grasps(grasps, labels, fname=path)
     sim_client.disconnect()
 

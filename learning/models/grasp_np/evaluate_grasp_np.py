@@ -39,7 +39,6 @@ def get_object_metadata(dataset_name):
             client = GraspSimulationClient(
                 graspable_body=graspable_body,
                 show_pybullet=False,
-                urdf_directory='object_models'
             )
 
             geom_props = {

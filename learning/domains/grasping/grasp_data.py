@@ -144,7 +144,7 @@ def visualize_acquisition_dataset(logger, figure_path=''):
         obj_labels.append(dataset['grasp_data']['labels'][0])
 
     print(obj_labels)
-    sim_client = GraspSimulationClient(graspable_body, False, 'object_models')
+    sim_client = GraspSimulationClient(graspable_body, False)
     if len(figure_path) > 0:
         sim_client.tm_show_grasps(grasps, obj_labels, fname=figure_path % ix)
     else:
