@@ -4,6 +4,12 @@ In this work, we develop a grasp feasibility model that applies to objects with 
 
 ## Objects
 
+### Primitive Objects
+We can generate datasets with URDF primitives using [generate_primitive_data.py](../../learning/domains/grasping/generate_primitive_data.py)
+as a way to debug or sanity check our results. Since these objects are URDF primitives
+(spheres, cylinders, and cubes), we rely on Pybullet and Trimesh's internal primitives and do not
+include any mesh representation.
+
 ### YCB Objects
 
 ### ShapeNet-Sem Objects
