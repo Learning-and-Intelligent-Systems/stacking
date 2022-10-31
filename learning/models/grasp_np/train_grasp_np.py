@@ -135,17 +135,17 @@ def print_dataset_stats(dataset, name):
 
 if __name__ == '__main__':
 
-    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/train_grasps.pkl'
-    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/val_grasps.pkl'
-    print('Loading train dataset...')
-    with open(train_dataset_fname, 'rb') as handle:
-        train_data_large = pickle.load(handle)
-    print('Loading val dataset...')
-    with open(val_dataset_fname, 'rb') as handle:
-        val_data_large = pickle.load(handle)
+    # train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/train_grasps.pkl'
+    # val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/val_grasps.pkl'
+    # print('Loading train dataset...')
+    # with open(train_dataset_fname, 'rb') as handle:
+    #     train_data_large = pickle.load(handle)
+    # print('Loading val dataset...')
+    # with open(val_dataset_fname, 'rb') as handle:
+    #     val_data_large = pickle.load(handle)
     
-    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-gnp/grasps/training_phase/train_grasps.pkl'
-    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-gnp/grasps/training_phase/val_grasps.pkl'
+    train_dataset_fname = 'learning/data/grasping/cube_dataset_train100_test10_gnp/grasps/training_phase/train_grasps.pkl'
+    val_dataset_fname = 'learning/data/grasping/cube_dataset_train100_test10_gnp/grasps/training_phase/val_grasps.pkl'
     print('Loading train dataset...')
     with open(train_dataset_fname, 'rb') as handle:
         train_data_small = pickle.load(handle)
