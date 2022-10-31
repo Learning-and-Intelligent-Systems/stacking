@@ -33,6 +33,9 @@ def get_object_list(fname):
 
 def parse_ignore_file(fname):
     """ Sometimes we can't grasp objects due to geometry. Specify object to skip in an ignore.txt file. """
+    if not os.path.exists(fname):
+        return [], []
+
     with open(fname, 'r') as handle:
         lines = [l.strip().split(',') for l in handle.readlines()]
 
@@ -160,7 +163,7 @@ if __name__ == '__main__':
     training_phase_path = os.path.join(grasps_path, 'training_phase')
     if not os.path.exists(training_phase_path):
         os.mkdir(training_phase_path)
-
+    
     TRAIN_IGNORE, TEST_IGNORE = parse_ignore_file(os.path.join(data_root_path, 'ignore.txt'))
     train_dataset_tasks, train_dataset_paths = [], []
 
