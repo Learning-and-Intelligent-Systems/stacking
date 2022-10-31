@@ -2,6 +2,8 @@ import argparse
 import numpy as np
 import os
 import pickle
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 from pb_robot.planners.antipodalGraspPlanner import (
@@ -21,13 +23,22 @@ def get_object_metadata(dataset_name):
     with open(objects_fname, 'rb') as handle:
         objects = pickle.load(handle)
 
+    ignore_path = os.path.join(dataset_path, 'ignore.txt')
+    ignore_objects = []
+    with open(ignore_path, 'r') as handle:
+        for l in handle.readlines():
+            if 'train' in l:
+                ignore_objects.append(int(l.strip().split(',')[1]))
+
     object_names = objects['object_data']['object_names']
     object_properties = objects['object_data']['object_properties']
     object_metadata = []
 
     geom_props_cache = {}
     count = 0
-    for name, props in zip(object_names, object_properties):
+    for ox, (name, props) in enumerate(zip(object_names, object_properties)):
+        if ox in ignore_objects:
+            continue
         print(name, props)
         graspable_body = graspablebody_from_vector(
             object_name=name,
@@ -55,8 +66,8 @@ def get_object_metadata(dataset_name):
                 'geometric': geom_props,
                 'dynamic': {
                     'com': props[0:3],
-                    'friction': props[3],
-                    'mass': props[4]
+                    'friction': props[4],
+                    'mass': props[3]
                 }
             }
         )
@@ -69,7 +80,7 @@ def get_object_metadata(dataset_name):
 
 
 def compare_volume(metadata):
-    with open('learning/experiments/metadata/grasp_np/results_large.pkl', 'rb') as handle:
+    with open('learning/experiments/metadata/grasp_np/results_val.pkl', 'rb') as handle:
         y_probs, target_ys = pickle.load(handle)
     per_obj_probs = y_probs.reshape(-1, 10)
     per_obj_target = target_ys.reshape(-1, 10)
@@ -79,13 +90,13 @@ def compare_volume(metadata):
     import IPython; IPython.embed()
     print(per_obj_acc.mean())
     for ox in range(len(metadata)):
-        if target_rate[ox] > 0.1 and target_rate[ox] < 0.9:
-            # plt.scatter(metadata[ox]['geometric']['volume'], per_obj_acc[ox], c='b', alpha=0.05)
-            plt.scatter(
-                metadata[ox]['dynamic']['com'][0],
-                per_obj_acc[ox],
-                c='b', alpha=0.05
-            )
+        # if target_rate[ox] > 0.1 and target_rate[ox] < 0.9:
+        # plt.scatter(metadata[ox]['geometric']['volume'], per_obj_acc[ox], c='b', alpha=0.05)
+        plt.scatter(
+            metadata[ox]['dynamic']['friction'],
+            per_obj_acc[ox],
+            c='b', alpha=0.05
+        )
 
     plt.show()
     # for ox in range(len(metadata)):
