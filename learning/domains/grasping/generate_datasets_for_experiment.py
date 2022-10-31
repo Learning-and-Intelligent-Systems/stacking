@@ -31,6 +31,54 @@ def get_object_list(fname):
         objects = handle.readlines()
     return [o.strip() for o in objects if len(o) > 1]
 
+def parse_ignore_file(fname):
+    """ Sometimes we can't grasp objects due to geometry. Specify object to skip in an ignore.txt file. """
+    if not os.path.exists(fname):
+        return [], []
+
+    with open(fname, 'r') as handle:
+        lines = [l.strip().split(',') for l in handle.readlines()]
+
+    train_skip, test_skip = [], []
+    for split, ox in lines:
+        if split == 'train':
+            train_skip.append(int(ox))
+        else:
+            test_skip.append(int(ox))
+
+    return train_skip, test_skip
+
+def merge_datasets(dataset_paths, merged_fname):
+    """ Create one large dataset file form individual object files."""
+    all_grasps, all_object_ids, all_labels = [], [], []
+    for dataset_path in dataset_paths:
+        if not os.path.exists(dataset_path):
+            continue
+
+        with open(dataset_path, 'rb') as handle:
+            single_dataset = pickle.load(handle)
+
+        all_grasps += [g.astype('float32') for g in single_dataset['grasp_data']['grasps']]
+        all_object_ids += single_dataset['grasp_data']['object_ids']
+        all_labels += single_dataset['grasp_data']['labels']
+
+    updated_metadata = single_dataset['metadata']
+    updated_metadata.fname = merged_fname
+    updated_metadata.object_ix = -1
+
+    merged_dataset = {
+        'grasp_data': {
+            'grasps': all_grasps,
+            'object_ids': all_object_ids,
+            'labels': all_labels
+        },
+        'object_data': single_dataset['object_data'],
+        'metadata': updated_metadata
+    }
+
+    with open(merged_fname, 'wb') as handle:
+        pickle.dump(merged_dataset, handle)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--train-objects-fname', type=str, required=True)
@@ -43,6 +91,7 @@ parser.add_argument('--n-points-per-object', type=int, required=True)
 parser.add_argument('--n-fit-grasps', type=int, required=True)
 parser.add_argument('--grasp-noise', type=float, required=True)
 parser.add_argument('--n-processes', type=int, default=1)
+parser.add_argument('--merge', action='store_true', default=False)
 new_args = parser.parse_args()
 print(new_args)
 
@@ -57,13 +106,17 @@ if __name__ == '__main__':
         with open(args_path, 'rb') as handle:
             args = pickle.load(handle)
             args.n_processes = new_args.n_processes
+            args.merge = new_args.merge
     else:
         os.mkdir(data_root_path)
         with open(args_path, 'wb') as handle:
             pickle.dump(new_args, handle)
         args = new_args
 
-    worker_pool = multiprocessing.Pool(processes=args.n_processes)
+    worker_pool = multiprocessing.Pool(
+        processes=args.n_processes,
+        maxtasksperchild=1
+    )
 
     objects_path = os.path.join(data_root_path, 'objects')
     grasps_path = os.path.join(data_root_path, 'grasps')
@@ -110,16 +163,16 @@ if __name__ == '__main__':
     training_phase_path = os.path.join(grasps_path, 'training_phase')
     if not os.path.exists(training_phase_path):
         os.mkdir(training_phase_path)
-
-    SKIP_TRAIN_OBJECTS = [1665, 1666, 1667, 1668, 1669]
-    train_dataset_tasks = []
+    
+    TRAIN_IGNORE, TEST_IGNORE = parse_ignore_file(os.path.join(data_root_path, 'ignore.txt'))
+    train_dataset_tasks, train_dataset_paths = [], []
 
     print('[Grasps] Generating train grasps for training phase.')
-    # train_grasps_path = os.path.join(training_phase_path, 'train_grasps.pkl')
     for ox in range(0, len(train_objects)*args.n_property_samples_train):
-        if ox in SKIP_TRAIN_OBJECTS:
+        if ox in TRAIN_IGNORE:
             continue
         train_grasps_path = os.path.join(training_phase_path, f'train_grasps_object{ox}.pkl')
+        train_dataset_paths.append(train_grasps_path)
         if not os.path.exists(train_grasps_path):
             train_grasps_args = SimpleNamespace(
                 fname=train_grasps_path,
@@ -132,10 +185,18 @@ if __name__ == '__main__':
 
     worker_pool.map(generate_datasets, train_dataset_tasks)
 
+    if args.merge:
+        print('[Grasps] Merging all train grasps for training phase.')
+        train_grasps_path = os.path.join(training_phase_path, 'train_grasps.pkl')
+        merge_datasets(train_dataset_paths, train_grasps_path)
+
     print('[Grasps] Generating validation grasps for training phase.')
-    val_dataset_tasks = []
+    val_dataset_tasks, val_dataset_paths = [], []
     for ox in range(0, len(train_objects)*args.n_property_samples_train):
+        if ox in TRAIN_IGNORE:
+            continue
         val_grasps_path = os.path.join(training_phase_path, f'val_grasps_object{ox}.pkl')
+        val_dataset_paths.append(val_grasps_path)
         if not os.path.exists(val_grasps_path):
             val_grasps_args = SimpleNamespace(
                 fname=val_grasps_path,
@@ -147,6 +208,11 @@ if __name__ == '__main__':
             val_dataset_tasks.append(val_grasps_args)
 
     worker_pool.map(generate_datasets, val_dataset_tasks)
+    
+    if args.merge:
+        print('[Grasps] Merging all validation grasps for training phase.')
+        val_grasps_path = os.path.join(training_phase_path, 'val_grasps.pkl')
+        merge_datasets(val_dataset_paths, val_grasps_path)
 
     # Generate fitting object datasets.
     fitting_phase_path = os.path.join(grasps_path, 'fitting_phase')
@@ -155,6 +221,8 @@ if __name__ == '__main__':
 
     fit_dataset_tasks = []
     for ox in range(0, min(100, len(test_objects)*args.n_property_samples_test)):
+        if ox in TEST_IGNORE:
+            continue
         print(f'[Grasps] Generating grasps for fitting phase eval for obj {ox}.')
         fit_grasps_path = os.path.join(fitting_phase_path, f'fit_grasps_test_geo_object{ox}.pkl')
         if not os.path.exists(fit_grasps_path):
@@ -171,6 +239,8 @@ if __name__ == '__main__':
 
     fit_dataset_samegeo_tasks = []
     for ox in range(0, min(100, len(train_objects)*args.n_property_samples_test)):
+        if ox in TRAIN_IGNORE:
+            continue
         print(f'[Grasps] Generating grasps for fitting phase eval for samegeo obj {ox}.')
         fit_grasps_samegeo_path = os.path.join(fitting_phase_path,
                                                f'fit_grasps_train_geo_object{ox}.pkl')
@@ -188,6 +258,8 @@ if __name__ == '__main__':
 
     fit_dataset_samegeo_tasks = []
     for ox in range(0, min(100, len(train_objects)*args.n_property_samples_train)):
+        if ox in TRAIN_IGNORE:
+            continue
         print(f'[Grasps] Generating grasps for fitting phase eval for samegeo sameprop obj {ox}.')
         fit_grasps_samegeo_sameprop_path = os.path.join(
             fitting_phase_path,
