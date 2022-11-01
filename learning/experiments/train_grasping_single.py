@@ -79,7 +79,6 @@ def evaluate(loader, model, val_metric='acc'):
     elif val_metric == 'acc':
         score = -np.mean(acc)
     else:
-        # TODO: fix import
         score = -f1_score(labels, preds)
 
     return score
