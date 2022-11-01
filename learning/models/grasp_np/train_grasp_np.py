@@ -11,16 +11,24 @@ from learning.models.grasp_np.grasp_neural_process import CustomGraspNeuralProce
 
 # TODO: Save best models.
 
-def get_accuracy(y_probs, target_ys, test=False):
+def get_accuracy(y_probs, target_ys, test=False, save=False):
     assert(y_probs.shape == target_ys.shape)
     if test==True:
-        per_obj_probs = y_probs.view(-1, 10)
-        per_obj_target = target_ys.view(-1, 10)
+        if y_probs.shape[0] > 100000: 
+            n_grasps = 50
+        else:
+            n_grasps = 10
+        per_obj_probs = y_probs.view(-1, n_grasps)
+        per_obj_target = target_ys.view(-1, n_grasps)
         per_obj_acc = ((per_obj_probs > 0.5) == per_obj_target).float().mean(dim=1)
         print(per_obj_probs.shape, per_obj_acc.shape)
+        if save:
+            with open('learning/experiments/metadata/grasp_np/accs.pkl', 'wb') as handle:
+                pickle.dump((per_obj_acc, per_obj_target), handle)
+                print(per_obj_probs.shape)
         print('HIST:', np.histogram(per_obj_acc.cpu(), bins=10))
-        if per_obj_probs.shape[0] == 500:
-            with open('learning/experiments/metadata/grasp_np/results.pkl', 'wb') as handle:
+        if save:
+            with open('learning/experiments/metadata/grasp_np/results_val.pkl', 'wb') as handle:
                 pickle.dump((y_probs.cpu().numpy(), target_ys.cpu().numpy()), handle)
 
     acc =  ((y_probs > 0.5) == target_ys).float().mean()
@@ -94,15 +102,15 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
                 y_probs, q_z = model.forward((c_grasp_geoms, c_midpoints, c_labels), (t_grasp_geoms, t_midpoints), meshes)
                 y_probs = y_probs.squeeze()
                 
-                if bx % 200 == 0:
-                    print(q_z.loc[0:5,...], q_z.scale[0:5,...])
+                # if bx % 200 == 0:
+                #    print(q_z.loc[0:5,...], q_z.scale[0:5,...])
                 val_loss += get_loss(y_probs, t_labels, q_z)[0].item()
 
                 val_probs.append(y_probs.flatten())
                 val_targets.append(t_labels.flatten())
             
             val_loss /= len(train_dataloader_val.dataset)
-            val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets), test=True)
+            val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets), test=True, save=False)
             print(f'Train Loss: {val_loss}\tTrain Acc: {val_acc}')
 
         val_loss, val_probs, val_targets = 0, [], []
@@ -123,7 +131,7 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
                 val_targets.append(t_labels.flatten())
             
             val_loss /= len(val_dataloader_val.dataset)
-            val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets), test=True)
+            val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets), test=True, save=True)
             print(f'Val Loss: {val_loss}\tVal Acc: {val_acc}')
 
 def print_dataset_stats(dataset, name):
@@ -135,17 +143,19 @@ def print_dataset_stats(dataset, name):
 
 if __name__ == '__main__':
 
+    train_dataset_fname = 'learning/data/grasping/train-sn1000-test-sn100-gnp/grasps/training_phase/train_grasps.pkl'
+    val_dataset_fname = 'learning/data/grasping/train-sn1000-test-sn100-gnp/grasps/training_phase/val_grasps.pkl'
     # train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/train_grasps.pkl'
     # val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/val_grasps.pkl'
-    # print('Loading train dataset...')
-    # with open(train_dataset_fname, 'rb') as handle:
-    #     train_data_large = pickle.load(handle)
-    # print('Loading val dataset...')
-    # with open(val_dataset_fname, 'rb') as handle:
-    #     val_data_large = pickle.load(handle)
+    print('Loading train dataset...')
+    with open(train_dataset_fname, 'rb') as handle:
+        train_data_large = pickle.load(handle)
+    print('Loading val dataset...')
+    with open(val_dataset_fname, 'rb') as handle:
+        val_data_large = pickle.load(handle)
     
-    train_dataset_fname = 'learning/data/grasping/cube_dataset_train100_test10_gnp/grasps/training_phase/train_grasps.pkl'
-    val_dataset_fname = 'learning/data/grasping/cube_dataset_train100_test10_gnp/grasps/training_phase/val_grasps.pkl'
+    train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-gnp/grasps/training_phase/train_grasps.pkl'
+    val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-gnp/grasps/training_phase/val_grasps.pkl'
     print('Loading train dataset...')
     with open(train_dataset_fname, 'rb') as handle:
         train_data_small = pickle.load(handle)
@@ -153,11 +163,11 @@ if __name__ == '__main__':
     with open(val_dataset_fname, 'rb') as handle:
         val_data_small = pickle.load(handle)
 
-    train_dataset = CustomGNPGraspDataset(data=train_data_small)
-    train_dataset_val = CustomGNPGraspDataset(data=train_data_small, context_data=train_data_small)
-    val_dataset_val = CustomGNPGraspDataset(data=val_data_small, context_data=train_data_small)
+    train_dataset = CustomGNPGraspDataset(data=train_data_large)
+    train_dataset_val = CustomGNPGraspDataset(data=train_data_large, context_data=train_data_large)
+    val_dataset_val = CustomGNPGraspDataset(data=val_data_large, context_data=train_data_large)
     print(len(train_dataset), len(train_dataset_val), len(val_dataset_val))
-
+    # import IPython; IPython.embed(); import sys; sys.exit()
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=32,
@@ -177,7 +187,7 @@ if __name__ == '__main__':
         shuffle=False
     )
 
-    model = CustomGraspNeuralProcess(d_latents=5)
+    model = CustomGraspNeuralProcess(d_latents=10)
 
     train(train_dataloader=train_dataloader,
         train_dataloader_val=train_dataloader_val,
