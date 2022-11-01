@@ -53,6 +53,8 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     best_loss = 10000
+    best_weights = None
+
     alpha = 0.
     for ep in range(n_epochs):
         print(f'----- Epoch {ep} -----')
@@ -90,7 +92,7 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
         # print(f'Train Loss: {epoch_loss}\tTrain Acc: {train_acc}')
 
         model.eval()
-        val_loss, val_probs, val_targets = 0, [], []
+        train_loss, train_probs, train_targets = 0, [], []
         with torch.no_grad():
             for bx, (context_data, target_data, meshes) in enumerate(train_dataloader_val):
                 c_grasp_geoms, c_midpoints, c_labels = context_data
@@ -104,14 +106,14 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
                 
                 # if bx % 200 == 0:
                 #    print(q_z.loc[0:5,...], q_z.scale[0:5,...])
-                val_loss += get_loss(y_probs, t_labels, q_z)[0].item()
+                train_loss += get_loss(y_probs, t_labels, q_z)[0].item()
 
-                val_probs.append(y_probs.flatten())
-                val_targets.append(t_labels.flatten())
+                train_probs.append(y_probs.flatten())
+                train_targets.append(t_labels.flatten())
             
-            val_loss /= len(train_dataloader_val.dataset)
-            val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets), test=True, save=False)
-            print(f'Train Loss: {val_loss}\tTrain Acc: {val_acc}')
+            train_loss /= len(train_dataloader_val.dataset)
+            train_acc = get_accuracy(torch.cat(train_probs), torch.cat(train_targets), test=True, save=False)
+            print(f'Train Loss: {train_loss}\tTrain Acc: {train_acc}')
 
         val_loss, val_probs, val_targets = 0, [], []
         with torch.no_grad():
