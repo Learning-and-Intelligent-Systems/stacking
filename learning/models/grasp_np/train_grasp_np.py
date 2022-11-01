@@ -1,4 +1,6 @@
 import argparse
+import copy
+
 import numpy as np
 import pickle
 import torch
@@ -136,6 +138,15 @@ def train(train_dataloader, train_dataloader_val, val_dataloader_val, model, n_e
             val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets), test=True, save=True)
             print(f'Val Loss: {val_loss}\tVal Acc: {val_acc}')
 
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_weights = copy.deepcopy(model.state_dict())
+                print('New best loss: ', val_loss)
+
+    model.load_state_dict(best_weights)
+    return model
+
+
 def print_dataset_stats(dataset, name):
     print(f'----- {name} Dataset Statistics -----')
     print(f'N: {len(dataset)}')
@@ -145,10 +156,12 @@ def print_dataset_stats(dataset, name):
 
 if __name__ == '__main__':
 
-    train_dataset_fname = 'learning/data/grasping/train-sn1000-test-sn100-gnp/grasps/training_phase/train_grasps.pkl'
-    val_dataset_fname = 'learning/data/grasping/train-sn1000-test-sn100-gnp/grasps/training_phase/val_grasps.pkl'
-    # train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/train_grasps.pkl'
-    # val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/val_grasps.pkl'
+    # train_dataset_fname = 'learning/data/grasping/train-sn1000-test-sn100-gnp/grasps/training_phase/train_grasps.pkl'
+    # val_dataset_fname = 'learning/data/grasping/train-sn1000-test-sn100-gnp/grasps/training_phase/val_grasps.pkl'
+    # # train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/train_grasps.pkl'
+    # # val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-robust-large-gnp/grasps/training_phase/val_grasps.pkl'
+    train_dataset_fname = 'learning/data/grasping/cube_dataset_train100_test10_gnp/grasps/training_phase/train_grasps.pkl'
+    val_dataset_fname = 'learning/data/grasping/cube_dataset_train100_test10_gnp/grasps/training_phase/val_grasps.pkl'
     print('Loading train dataset...')
     with open(train_dataset_fname, 'rb') as handle:
         train_data_large = pickle.load(handle)
@@ -158,12 +171,14 @@ if __name__ == '__main__':
     
     train_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-gnp/grasps/training_phase/train_grasps.pkl'
     val_dataset_fname = 'learning/data/grasping/train-sn100-test-sn10-gnp/grasps/training_phase/val_grasps.pkl'
-    print('Loading train dataset...')
-    with open(train_dataset_fname, 'rb') as handle:
-        train_data_small = pickle.load(handle)
-    print('Loading val dataset...')
-    with open(val_dataset_fname, 'rb') as handle:
-        val_data_small = pickle.load(handle)
+
+
+    # print('Loading train dataset...')
+    # with open(train_dataset_fname, 'rb') as handle:
+    #     train_data_small = pickle.load(handle)
+    # print('Loading val dataset...')
+    # with open(val_dataset_fname, 'rb') as handle:
+    #     val_data_small = pickle.load(handle)
 
     train_dataset = CustomGNPGraspDataset(data=train_data_large)
     train_dataset_val = CustomGNPGraspDataset(data=train_data_large, context_data=train_data_large)
@@ -191,11 +206,13 @@ if __name__ == '__main__':
 
     model = CustomGraspNeuralProcess(d_latents=10)
 
-    train(train_dataloader=train_dataloader,
+    model = train(train_dataloader=train_dataloader,
         train_dataloader_val=train_dataloader_val,
         val_dataloader_val=val_dataloader_val,
         model=model,
-        n_epochs=1000
+        n_epochs=10
     )
+
+    print(model)
 
 
