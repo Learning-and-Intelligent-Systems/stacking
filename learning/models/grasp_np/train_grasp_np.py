@@ -176,27 +176,27 @@ def run(args):
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
-        batch_size=32,
+        batch_size=args.batch_size,
         collate_fn=custom_collate_fn,
         shuffle=True
     )
-    train_dataloader_val = DataLoader(
+    train_dataloader_eval = DataLoader(
         dataset=train_dataset_eval,
-        batch_size=16,
+        batch_size=args.batch_size,
         collate_fn=custom_collate_fn,
         shuffle=False
     )
-    val_dataloader_val = DataLoader(
+    val_dataloader_eval = DataLoader(
         dataset=val_dataset_eval,
         collate_fn=custom_collate_fn,
-        batch_size=16,
+        batch_size=args.batch_size,
         shuffle=False
     )
 
     # train model
     model = train(train_dataloader=train_dataloader,
-                  train_dataloader_eval=train_dataloader_val,
-                  val_dataloader_eval=val_dataloader_val,
+                  train_dataloader_eval=train_dataloader_eval,
+                  val_dataloader_eval=val_dataloader_eval,
                   model=model,
                   n_epochs=args.n_epochs
     )
@@ -211,7 +211,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_dataset_fname', type=str, required=True)
     parser.add_argument('--val_dataset_fname', type=str, required=True)
-    parser.add_argument('--exp-path', type=str, required=True)
+    parser.add_argument('--exp-name', type=str, required=True)
     parser.add_argument('--d-latents', type=int, required=True)
     parser.add_argument('--n-epochs', type=int, required=True)
     args = parser.parse_args()
