@@ -9,7 +9,8 @@ import sys
 from learning.active.utils import ActiveExperimentLogger
 from learning.evaluate.evaluate_grasping import get_pf_validation_accuracy
 from learning.evaluate.plot_compare_grasping_runs import plot_val_loss
-from learning.experiments.train_grasping_single import run as training_phase
+from learning.experiments.train_grasping_single import run as training_phase_variational
+from learning.models.grasp_np.train_grasp_np import run as training_phase_amortized
 from learning.experiments.active_fit_grasping_pf import run_particle_filter_fitting as fitting_phase
 from learning.experiments.active_fit_constrained_grasping_pf import run_particle_filter_fitting as constrained_fitting_phase
 
@@ -79,6 +80,7 @@ def get_fitting_phase_dataset_args(dataset_fname):
 
     return train_geo_fname, test_geo_fname, n_train_geo, n_test_geo
 
+# TODO: implement amortized flag here
 def run_fitting_phase(args):
     exp_path = os.path.join(EXPERIMENT_ROOT, args.exp_name)
     if not os.path.exists(exp_path):
@@ -186,26 +188,39 @@ def run_training_phase(args):
 
     train_data_fname, val_data_fname, n_objs = get_training_phase_dataset_args(exp_args.dataset_name)
 
-    training_args = argparse.Namespace()
-    training_args.exp_name = f'grasp_{exp_args.exp_name}_train'
-    training_args.train_dataset_fname = train_data_fname
-    training_args.val_dataset_fname = val_data_fname
-    training_args.n_objects = n_objs
-    training_args.n_epochs = 20
-    training_args.model = 'pn'
-    training_args.n_hidden = 64
-    training_args.batch_size = 32
-    training_args.property_repr = 'latent'
-    training_args.n_models = 5
+    if args.amortize:
+        training_args = argparse.Namespace()
+        training_args.exp_name = f'grasp_{exp_args.exp_name}_train'
+        training_args.train_dataset_fname = train_data_fname
+        training_args.val_dataset_fname = val_data_fname
+        training_args.n_epochs = 20
+        training_args.d_latents = 5 # TODO: fix latent dimension magic number elsewhere?
+        training_args.batch_size = 32
 
-    train_log_path = training_phase(training_args)
+        train_log_path = training_phase_amortized(training_args)
+
+    else:
+        training_args = argparse.Namespace()
+        training_args.exp_name = f'grasp_{exp_args.exp_name}_train'
+        training_args.train_dataset_fname = train_data_fname
+        training_args.val_dataset_fname = val_data_fname
+        training_args.n_objects = n_objs
+        training_args.n_epochs = 20
+        training_args.model = 'pn'
+        training_args.n_hidden = 64
+        training_args.batch_size = 32
+        training_args.property_repr = 'latent'
+        training_args.n_models = 5
+
+        train_log_path = training_phase_variational(training_args)
+
     
     # Save training path in metadata.
     logs_lookup['training_phase'] = train_log_path
     with open(logs_path, 'w') as handle:
         json.dump(logs_lookup, handle)
     
-
+# TODO: implement amortized flag here
 def run_testing_phase(args):
     
     # Create log_group files.
@@ -391,6 +406,7 @@ parser.add_argument('--dataset-name', type=str, default='')
 parser.add_argument('--exp-name', required=True, type=str)
 parser.add_argument('--strategy', type=str, choices=['bald', 'random'], default='random')
 parser.add_argument('--constrained', action='store_true', default=False)
+parser.add_argument('--amortize', action='store_true', default=False)
 args = parser.parse_args()
 
 
