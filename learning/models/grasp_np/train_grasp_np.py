@@ -214,5 +214,6 @@ if __name__ == '__main__':
     parser.add_argument('--exp-name', type=str, required=True)
     parser.add_argument('--d-latents', type=int, required=True)
     parser.add_argument('--n-epochs', type=int, required=True)
+    parser.add_argument('--batch-size', type=int, required=True)
     args = parser.parse_args()
     run(args)
