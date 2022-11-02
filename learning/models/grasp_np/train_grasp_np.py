@@ -49,7 +49,7 @@ def get_loss(y_probs, target_ys, q_z, alpha=1):
     return bce_loss + kld_loss, bce_loss, kld_loss
 
 
-def train(train_dataloader, train_dataloader_eval, val_dataloader_eval, model, n_epochs=10):
+def train(train_dataloader, val_dataloader, model, n_epochs=10):
     if torch.cuda.is_available():
         model = model.cuda()
 
@@ -90,37 +90,12 @@ def train(train_dataloader, train_dataloader_eval, val_dataloader_eval, model, n
 
         epoch_loss /= len(train_dataloader.dataset)
         train_acc = get_accuracy(torch.cat(train_probs).flatten(), torch.cat(train_targets).flatten())
-
-        # print(f'Train Loss: {epoch_loss}\tTrain Acc: {train_acc}')
+        print(f'Train Loss: {epoch_loss}\tTrain Acc: {train_acc}')
 
         model.eval()
-        train_loss, train_probs, train_targets = 0, [], []
-        with torch.no_grad():
-            for bx, (context_data, target_data, meshes) in enumerate(train_dataloader_eval):
-                c_grasp_geoms, c_midpoints, c_labels = context_data
-                t_grasp_geoms, t_midpoints, t_labels = target_data
-                if torch.cuda.is_available():
-                    c_grasp_geoms, c_midpoints, c_labels = c_grasp_geoms.cuda(), c_midpoints.cuda(), c_labels.cuda()
-                    t_grasp_geoms, t_midpoints, t_labels = t_grasp_geoms.cuda(), t_midpoints.cuda(), t_labels.cuda()
-                    meshes = meshes.cuda()
-                y_probs, q_z = model.forward((c_grasp_geoms, c_midpoints, c_labels), (t_grasp_geoms, t_midpoints),
-                                             meshes)
-                y_probs = y_probs.squeeze()
-
-                # if bx % 200 == 0:
-                #    print(q_z.loc[0:5,...], q_z.scale[0:5,...])
-                train_loss += get_loss(y_probs, t_labels, q_z)[0].item()
-
-                train_probs.append(y_probs.flatten())
-                train_targets.append(t_labels.flatten())
-
-            train_loss /= len(train_dataloader_eval.dataset)
-            train_acc = get_accuracy(torch.cat(train_probs), torch.cat(train_targets), test=True, save=False)
-            print(f'Train Loss: {train_loss}\tTrain Acc: {train_acc}')
-
         val_loss, val_probs, val_targets = 0, [], []
         with torch.no_grad():
-            for bx, (context_data, target_data, meshes) in enumerate(val_dataloader_eval):
+            for bx, (context_data, target_data, meshes) in enumerate(val_dataloader):
                 c_grasp_geoms, c_midpoints, c_labels = context_data
                 t_grasp_geoms, t_midpoints, t_labels = target_data
                 if torch.cuda.is_available():
@@ -136,7 +111,7 @@ def train(train_dataloader, train_dataloader_eval, val_dataloader_eval, model, n
                 val_probs.append(y_probs.flatten())
                 val_targets.append(t_labels.flatten())
 
-            val_loss /= len(val_dataloader_eval.dataset)
+            val_loss /= len(val_dataloader.dataset)
             val_acc = get_accuracy(torch.cat(val_probs), torch.cat(val_targets), test=True, save=True)
             print(f'Val Loss: {val_loss}\tVal Acc: {val_acc}')
 
@@ -171,7 +146,6 @@ def run(args):
         val_data = pickle.load(handle)
 
     train_dataset = CustomGNPGraspDataset(data=train_data)
-    train_dataset_eval = CustomGNPGraspDataset(data=train_data, context_data=train_data)
     val_dataset_eval = CustomGNPGraspDataset(data=val_data, context_data=train_data)
 
     train_dataloader = DataLoader(
@@ -180,13 +154,8 @@ def run(args):
         collate_fn=custom_collate_fn,
         shuffle=True
     )
-    train_dataloader_eval = DataLoader(
-        dataset=train_dataset_eval,
-        batch_size=args.batch_size,
-        collate_fn=custom_collate_fn,
-        shuffle=False
-    )
-    val_dataloader_eval = DataLoader(
+
+    val_dataloader = DataLoader(
         dataset=val_dataset_eval,
         collate_fn=custom_collate_fn,
         batch_size=args.batch_size,
@@ -195,11 +164,10 @@ def run(args):
 
     # train model
     model = train(train_dataloader=train_dataloader,
-                  train_dataloader_eval=train_dataloader_eval,
-                  val_dataloader_eval=val_dataloader_eval,
+                  val_dataloader=val_dataloader,
                   model=model,
                   n_epochs=args.n_epochs
-    )
+                  )
 
     # save model
     logger.save_dataset(dataset=train_dataset, tx=0)
@@ -209,11 +177,13 @@ def run(args):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_dataset_fname', type=str, required=True)
-    parser.add_argument('--val_dataset_fname', type=str, required=True)
+    parser.add_argument('--train-dataset-fname', type=str, required=True)
+    parser.add_argument('--val-dataset-fname', type=str, required=True)
     parser.add_argument('--exp-name', type=str, required=True)
     parser.add_argument('--d-latents', type=int, required=True)
     parser.add_argument('--n-epochs', type=int, required=True)
     parser.add_argument('--batch-size', type=int, required=True)
     args = parser.parse_args()
+    args.use_latents = False # NOTE: this is for the specific workaround for block stacking that assumes
+                             # a different NN architecture
     run(args)
